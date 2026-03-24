@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>U-Konek+ — Medical Personnel System</title>
+    <link rel="stylesheet" href="../css/style.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+</head>
+
+<body class="auth-page">
+    <div class="wrap">
+        <div class="side" role="side">
+            <img src="#" alt="">
+            <div class="SiteName">
+                <h1>U-Konek</h1>
+                <h2>+</h2>
+            </div>
+            <h5>A comprehensive healthcare management system designed for modern medical facilities. Streamline
+                operations, manage citizens, and enhance care.</h5>
+            <img src="#" alt="">
+            <h5>Trusted by 500+ professionals</h5>
+        </div>
+        <div class="card" role="main">
+            <div class="brand">
+                <h1 id="panel-title">Welcome Back</h1>
+                <h4 id="panel-desc">Enter your credentials to access the portal</h4>
+            </div>
+
+            <div class="tabs" role="tablist" aria-label="Authentication tabs">
+                <button id="tab-login" class="tab active" role="tab" aria-selected="true">Login</button>
+                <button id="tab-register" class="tab" role="tab" aria-selected="false">Register</button>
+            </div>
+
+            <!-- Login Panel -->
+            <div id="login-panel">
+                <form id="login-form" novalidate autocomplete="off">
+                    <div class="field">
+                        <label class="inputLabel" for="role">Role</label>
+                        <select id="role" required>
+                            <option value="">Select role (required)</option>
+                            <option value="admin">Admin</option>
+                            <option value="staff">Staff</option>
+                            <option value="doctor">Doctor</option>
+                            <option value="nurse">Nurse</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label class="inputLabel" for="username">Email</label>
+                        <input id="username" type="email" placeholder="e.g., yourname@hospital.com" required autocomplete="username" />
+                    </div>
+
+                    <div class="field">
+                        <label class="inputLabel" for="password">Password</label>
+                        <input id="password" type="password" placeholder="Enter your account password" required autocomplete="current-password" />
+                    </div>
+
+                    <div class="actions">
+                        <button type="submit" class="btn" id="login-submit-btn">
+                            <span class="btn-spinner" aria-hidden="true"></span>
+                            <span class="btn-label">SIGN IN</span>
+                        </button>
+                    </div>
+                    <div class="actions" style="margin-top: 8px; justify-content: flex-end;">
+                        <button id="forgot-password-toggle" type="button" class="link">Forgot password?</button>
+                    </div>
+                    <div id="login-error" class="note" aria-live="polite" style="display:none"></div>
+                </form>
+
+                <form id="reset-form" novalidate autocomplete="off" style="display:none; margin-top: 12px;">
+                    <h1 class="reminders" style="margin: 0 0 10px; font-size: 14px;">Enter your email and we'll send a password reset link.</h1>
+                    <div class="field">
+                        <label class="inputLabel" for="reset-email">Email</label>
+                        <input id="reset-email" type="email" placeholder="e.g., yourname@hospital.com" required />
+                    </div>
+                    <div class="actions">
+                        <button class="btn" type="submit" id="reset-submit-btn">
+                            <span class="btn-spinner" aria-hidden="true"></span>
+                            <span class="btn-label">Send reset link</span>
+                        </button>
+                    </div>
+                    <div id="reset-msg" class="small" aria-live="polite" style="display:none"></div>
+                </form>
+            </div>
+
+            <!-- Register Panel -->
+            <div id="register-panel" style="display:none">
+                <form id="register-form" novalidate autocomplete="off">
+                    <div class="field">
+                        <label class="inputLabel" for="reg-first-name">First Name</label>
+                        <input id="reg-first-name" type="text" placeholder="e.g., Maria" required pattern="[A-Za-z][A-Za-z '-]*" title="Name must contain letters only" />
+                    </div>
+
+                    <div class="field">
+                        <label class="inputLabel" for="reg-middle-name">Middle Name (Optional)</label>
+                        <input id="reg-middle-name" type="text" placeholder="e.g., Santos" pattern="[A-Za-z][A-Za-z '-]*" title="Name must contain letters only" />
+                    </div>
+
+                    <div class="field">
+                        <label class="inputLabel" for="reg-last-name">Last Name</label>
+                        <input id="reg-last-name" type="text" placeholder="e.g., Dela Cruz" required pattern="[A-Za-z][A-Za-z '-]*" title="Name must contain letters only" />
+                    </div>
+
+                    <div class="field">
+                        <label class="inputLabel" for="reg-birthday">Birthday</label>
+                        <input id="reg-birthday" type="date" aria-describedby="reg-birthday-help" required />
+                        <div id="reg-birthday-help" class="small">Select your birth date from the calendar picker.</div>
+                    </div>
+
+                    <div class="field">
+                        <label class="inputLabel" for="reg-gender">Gender</label>
+                        <select id="reg-gender" required>
+                            <option value="">Select gender (required)</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label class="inputLabel" for="reg-employee-id">Employee ID</label>
+                        <input id="reg-employee-id" type="text" placeholder="e.g., 12345" required inputmode="numeric" pattern="\d+" title="Employee ID must contain numbers only" />
+                    </div>
+
+                    <div class="field">
+                        <label class="inputLabel" for="reg-email">Email</label>
+                        <input id="reg-email" type="email" placeholder="e.g., yourname@hospital.com" required />
+                        <div id="err-reg-email" class="field-error note hidden"></div>
+                    </div>
+
+                    <div class="field">
+                        <label class="inputLabel" for="reg-role">Role</label>
+                        <select id="reg-role" required>
+                            <option value="">Select role (required)</option>
+                            <option value="doctor">Doctor</option>
+                            <option value="nurse">Nurse</option>
+                            <option value="staff">Staff</option>
+                        </select>
+                    </div>
+
+                    <div class="actions">
+                        <button type="submit" class="btn" id="register-submit-btn">
+                            <span class="btn-spinner" aria-hidden="true"></span>
+                            <span class="btn-label">REGISTER</span>
+                        </button>
+                    </div>
+                    <div id="register-error" class="note" aria-live="polite" style="display:none"></div>
+                    <div id="register-success" class="note" style="display:none; color: green;"></div>
+                </form>
+            </div>
+
+        </div>
+    </div>
+
+
+
+    <!-- Registration Success Modal -->
+    <div id="registration-success-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-icon">✓</div>
+            <h2 class="modal-heading">Registration Complete</h2>
+            <p class="modal-message">Your account request was submitted successfully and is now pending admin approval.</p>
+            <button id="modal-login-btn" class="btn modal-btn">Go to Login</button>
+        </div>
+    </div>
+
+    <!-- Registration OTP Modal -->
+    <div id="registration-otp-modal" class="modal-overlay hidden" aria-hidden="true">
+        <div class="modal-box otp-modal-box" role="dialog" aria-modal="true" aria-labelledby="otp-modal-title">
+            <h2 id="otp-modal-title" class="modal-heading">Verify Your Email</h2>
+            <p class="modal-message">Enter the 8-digit OTP sent to <span id="otp-email-target"></span>.</p>
+
+            <div class="field otp-field-wrap">
+                <label class="inputLabel" for="otp-code-input">Verification Code</label>
+                <input id="otp-code-input" type="text" inputmode="numeric" maxlength="8" placeholder="Enter 8-digit OTP" autocomplete="one-time-code" />
+            </div>
+
+            <div id="otp-modal-msg" class="note otp-note" aria-live="polite" style="display:none"></div>
+
+            <div class="otp-actions-row">
+                <button id="otp-resend-btn" class="link" type="button">Resend OTP</button>
+            </div>
+
+            <div class="actions otp-actions">
+                <button id="otp-cancel-btn" class="btn otp-btn-secondary" type="button">Cancel</button>
+                <button id="otp-verify-btn" class="btn" type="button">
+                    <span class="btn-spinner" aria-hidden="true"></span>
+                    <span class="btn-label">Verify OTP</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/runtime-config.js"></script>
+    <script type="module" src="../js/script.js"></script>
+</body>
+
+</html>
