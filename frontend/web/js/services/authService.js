@@ -81,25 +81,6 @@ export async function requestRegistrationEmailOtp(email) {
   }
 }
 
-export async function sendStaffApprovalEmail(email) {
-  const normalizedEmail = String(email || '').trim().toLowerCase();
-
-  if (!normalizedEmail) {
-    throw new Error('Staff email is required to send approval notification.');
-  }
-
-  const { error } = await supabase.auth.signInWithOtp({
-    email: normalizedEmail,
-    options: {
-      shouldCreateUser: false
-    }
-  });
-
-  if (error) {
-    throw new Error(error.message || 'Failed to send approval email.');
-  }
-}
-
 export async function verifyRegistrationEmailOtp(email, otp) {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   const normalizedOtp = String(otp || '').trim();

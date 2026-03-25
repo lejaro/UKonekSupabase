@@ -1,8 +1,7 @@
 import {
     signInStaff,
     requestPasswordReset,
-    requestRegistrationEmailOtp,
-    verifyRegistrationEmailOtp
+    requestRegistrationEmailOtp
 } from './services/authService.js';
 import { createPendingStaff } from './services/staffService.js';
 
@@ -380,7 +379,6 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
 
     try {
         await requestRegistrationEmailOtp(email.toLowerCase());
-        const authUserId = await openOtpModal(email.toLowerCase());
 
         await createPendingStaff({
             first_name,
@@ -394,7 +392,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
             role,
             consent_given: true,
             status: 'Pending',
-            auth_user_id: authUserId
+            auth_user_id: null
         });
 
         document.getElementById('register-form').reset();

@@ -1,4 +1,4 @@
-import { getAuthenticatedStaffProfile, signOutStaff, sendStaffApprovalEmail } from './services/authService.js';
+import { getAuthenticatedStaffProfile, signOutStaff } from './services/authService.js';
 import {
   listStaff,
   listPendingStaff,
@@ -602,17 +602,7 @@ function attachPendingRowListener(row) {
       showConfirm('Accept this registration and activate the account?', async () => {
         try {
           await approvePendingStaff(stored.id);
-          if (stored.email) {
-            try {
-              await sendStaffApprovalEmail(stored.email);
-              showToast('Account approved. Approval email sent.', 'success');
-            } catch (mailError) {
-              console.error('Approval email error:', mailError);
-              showToast('Account approved, but failed to send email notification.', 'info');
-            }
-          } else {
-            showToast('Account approved successfully.', 'success');
-          }
+          showToast('Account approved. Inform the user to wait for admin approval and try logging in after 1-2 hours.', 'success');
           loadStaffData();
           loadPendingStaffData();
         } catch (err) {

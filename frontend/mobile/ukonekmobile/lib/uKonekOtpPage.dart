@@ -1,6 +1,4 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'services/api_service.dart';
 import 'uKonekLoginPage.dart';
 
@@ -45,61 +43,23 @@ class uKonekOtpPage extends StatefulWidget {
 }
 
 class _uKonekOtpPageState extends State<uKonekOtpPage> {
-  final List<TextEditingController> _controllers =
-  List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes =
-  List.generate(6, (_) => FocusNode());
-
-  bool _isRequestingOtp = false;
   bool _isVerifying = false;
   bool _isSubmitting = false;
-
-  int _secondsLeft = 60;
-  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _requestOtp(initialRequest: true);
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
-    }
     super.dispose();
   }
 
-  void _startCountdown() {
-    _timer?.cancel();
-    setState(() => _secondsLeft = 60);
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (_secondsLeft == 0) {
-        t.cancel();
-      } else {
-        setState(() => _secondsLeft--);
-      }
-    });
-  }
-
-  String get _enteredOtp =>
-      _controllers.map((c) => c.text).join();
-
   Future<void> _verifyOtp() async {
-    final entered = _enteredOtp;
-    if (entered.length < 6) {
-      _showSnack("⚠️ Please enter all 6 digits.", isError: true);
-      return;
-    }
-
     setState(() => _isVerifying = true);
     try {
-      await _submitRegistration(entered);
+      await _submitRegistration('magic_link');
     } finally {
       if (mounted) {
         setState(() => _isVerifying = false);
@@ -161,47 +121,11 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
       if (!mounted) return;
       final message = error.toString().replaceFirst('Exception: ', '');
       _showSnack(message, isError: true);
-      for (final c in _controllers) {
-        c.clear();
-      }
-      _focusNodes[0].requestFocus();
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
       }
     }
-  }
-
-  Future<void> _requestOtp({bool initialRequest = false}) async {
-    if (_isRequestingOtp) return;
-    setState(() => _isRequestingOtp = true);
-
-    try {
-      await ApiService.requestCitizenOtp(
-        email: widget.email,
-        purpose: 'registration',
-      );
-      if (!mounted) return;
-      for (final c in _controllers) {
-        c.clear();
-      }
-      _focusNodes[0].requestFocus();
-      _startCountdown();
-      if (!initialRequest) {
-        _showSnack('🔁 A new OTP has been sent to your email.');
-      }
-    } catch (error) {
-      if (!mounted) return;
-      _showSnack(error.toString().replaceFirst('Exception: ', ''), isError: true);
-    } finally {
-      if (mounted) {
-        setState(() => _isRequestingOtp = false);
-      }
-    }
-  }
-
-  void _resendOtp() {
-    _requestOtp();
   }
 
   void _showSnack(String msg, {bool isError = false}) {
@@ -278,7 +202,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
                               color: Color(0xFF1976D2), size: 32),
                           const SizedBox(height: 10),
                           const Text(
-                            "An OTP verification code was sent to",
+                            "Your verification magic link will be sent to",
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontSize: 14, color: Colors.black54),
@@ -295,7 +219,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
                           ),
                           const SizedBox(height: 6),
                           const Text(
-                            "Please check your inbox (and spam folder).",
+                            "Create your account below, then open the link from your inbox (or spam folder).",
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontSize: 12, color: Colors.black45),
@@ -308,65 +232,19 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
 
                     const SizedBox(height: 28),
 
-                    // ── OTP Input label ──────────────────────
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Enter 6-digit OTP",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        border: Border.all(color: Colors.amber.shade200),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // ── 6 digit boxes ─────────────────────────
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(6, (i) {
-                        return SizedBox(
-                          width: 46,
-                          height: 56,
-                          child: TextField(
-                            controller: _controllers[i],
-                            focusNode: _focusNodes[i],
-                            textAlign: TextAlign.center,
-                            keyboardType: TextInputType.number,
-                            maxLength: 1,
-                            style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly
-                            ],
-                            decoration: InputDecoration(
-                              counterText: "",
-                              contentPadding: EdgeInsets.zero,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide:
-                                const BorderSide(color: Colors.grey),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(
-                                    color: Color(0xFF1976D2), width: 2),
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey.shade100,
-                            ),
-                            onChanged: (value) {
-                              if (value.isNotEmpty && i < 5) {
-                                _focusNodes[i + 1].requestFocus();
-                              } else if (value.isEmpty && i > 0) {
-                                _focusNodes[i - 1].requestFocus();
-                              }
-                              if (_enteredOtp.length == 6) {
-                                _verifyOtp();
-                              }
-                            },
-                          ),
-                        );
-                      }),
+                      child: const Text(
+                        "This screen now uses email magic link verification. No numeric OTP code is required.",
+                        style: TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
 
                     const SizedBox(height: 28),
@@ -380,8 +258,8 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
                           padding:
                           const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        onPressed: (_isRequestingOtp || _isVerifying || _isSubmitting) ? null : _verifyOtp,
-                        child: (_isRequestingOtp || _isVerifying || _isSubmitting)
+                        onPressed: (_isVerifying || _isSubmitting) ? null : _verifyOtp,
+                        child: (_isVerifying || _isSubmitting)
                             ? const SizedBox(
                           height: 20,
                           width: 20,
@@ -389,7 +267,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
                               color: Colors.white, strokeWidth: 2),
                         )
                             : const Text(
-                          "VERIFY OTP",
+                              "CREATE ACCOUNT & SEND MAGIC LINK",
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -400,26 +278,11 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
 
                     const SizedBox(height: 20),
 
-                    // ── Resend countdown ──────────────────────
-                    if (_secondsLeft > 0)
-                      Text(
-                        "Resend OTP in $_secondsLeft seconds",
-                        style: const TextStyle(
-                            color: Colors.black45, fontSize: 13),
-                      )
-                    else
-                      GestureDetector(
-                        onTap: _isRequestingOtp ? null : _resendOtp,
-                        child: const Text(
-                          "Didn't receive the code? Resend OTP",
-                          style: TextStyle(
-                            color: Color(0xFF1976D2),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
+                    const Text(
+                      "After creation, wait for admin approval and try to log in after an hour or two.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.black45, fontSize: 13),
+                    ),
 
                     const SizedBox(height: 16),
 

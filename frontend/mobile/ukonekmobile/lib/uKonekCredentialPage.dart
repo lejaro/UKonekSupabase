@@ -102,7 +102,7 @@ class _uKonekCredentialsPageState extends State<uKonekCredentialsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✅ Account created. Check your email to verify your account before signing in.'),
+          content: Text('✅ Account created. Check your email for the magic link to verify your account before signing in.'),
           backgroundColor: Colors.green,
         ),
       );
