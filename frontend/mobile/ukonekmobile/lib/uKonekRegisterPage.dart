@@ -221,6 +221,16 @@ class _uKonekRegisterPageState extends State<uKonekRegisterPage> {
                     ),
                     const SizedBox(height: 16),
                     _sectionCard(
+                      icon: Icons.contact_emergency_outlined,
+                      title: "Emergency Contact",
+                      children: [
+                        _styledField("Emergency Contact Name", emergencyNameController, Icons.person_2_outlined, nameOnly: true),
+                        _phoneField("Emergency Contact Number", emergencyContactController, Icons.phone_in_talk_outlined),
+                        _styledField("Relationship", relationController, Icons.people_outline_rounded, nameOnly: true),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _sectionCard(
                       icon: Icons.credit_card_outlined,
                       title: "National ID Verification",
                       children: [
