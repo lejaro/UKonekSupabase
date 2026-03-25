@@ -47,8 +47,6 @@ function clearAuthSensitiveInputs() {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
-    const roleField = document.getElementById('role');
-    if (roleField) roleField.value = '';
     const loginError = document.getElementById('login-error');
     if (loginError) loginError.style.display = 'none';
     const registerError = document.getElementById('register-error');
@@ -411,18 +409,17 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
 });
 
 // =======================================================================
-// Login Form — uses Supabase auth, then verifies staff role
+// Login Form — uses Supabase auth and resolves role automatically on backend
 // =======================================================================
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const selectedRole = document.getElementById('role').value;
     const identifier = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
     const err = document.getElementById('login-error');
     err.style.display = 'none';
 
-    if (!selectedRole || !identifier || !password) {
-        err.textContent = 'Please select a role and enter email and password.';
+    if (!identifier || !password) {
+        err.textContent = 'Please enter email and password.';
         err.style.display = 'block';
         return;
     }
@@ -436,7 +433,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     setLoginLoading(true);
 
     try {
-        await signInStaff({ identifier, password, selectedRole });
+        await signInStaff({ identifier, password });
 
         resetInvalidLoginAttempts();
         clearAuthSensitiveInputs();

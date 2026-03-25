@@ -119,15 +119,52 @@ create policy citizens_select_admin
 
 create or replace function public.get_staff_role()
 returns text
-language sql
+language plpgsql
 stable
 security definer
 as $$
-  select role
+declare
+  v_user_email text;
+  v_role text;
+begin
+  -- Get the current auth user's email
+  v_user_email := auth.jwt()->>'email';
+
+  if v_user_email is null then
+    return null;
+  end if;
+
+  -- Try to find staff role - first check by auth_user_id (most efficient)
+  select role into v_role
   from public.staff
   where auth_user_id = auth.uid()
     and lower(status) = 'active'
   limit 1;
+
+  if v_role is not null then
+    return v_role;
+  end if;
+
+  -- If not found by auth_user_id, try to find by email and auto-link
+  -- This handles cases where account was created but not linked
+  select role into v_role
+  from public.staff
+  where lower(email) = lower(v_user_email)
+    and lower(status) = 'active'
+  limit 1;
+
+  if v_role is not null then
+    -- Auto-link the account for future logins (more efficient)
+    update public.staff
+    set auth_user_id = auth.uid()
+    where lower(email) = lower(v_user_email)
+      and auth_user_id is null;
+    
+    return v_role;
+  end if;
+
+  return null;
+end;
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -136,18 +173,58 @@ $$;
 
 create or replace function public.get_staff_profile()
 returns json
-language sql
+language plpgsql
 stable
 security definer
 as $$
-  select row_to_json(t)
+declare
+  v_user_email text;
+  v_profile json;
+begin
+  -- Get the current auth user's email
+  v_user_email := auth.jwt()->>'email';
+
+  if v_user_email is null then
+    return null;
+  end if;
+
+  -- Try to find profile by auth_user_id first (most efficient)
+  select row_to_json(t) into v_profile
   from (
-    select id, first_name, middle_name, last_name, username, role, email
+    select id, first_name, middle_name, last_name, username, role, email, status
     from public.staff
     where auth_user_id = auth.uid()
       and lower(status) = 'active'
     limit 1
   ) t;
+
+  if v_profile is not null then
+    return v_profile;
+  end if;
+
+  -- If not found by auth_user_id, try to find by email and auto-link
+  -- This handles cases where account was created but not linked
+  select row_to_json(t) into v_profile
+  from (
+    select id, first_name, middle_name, last_name, username, role, email, status
+    from public.staff
+    where lower(email) = lower(v_user_email)
+      and lower(status) = 'active'
+    limit 1
+  ) t;
+
+  if v_profile is not null then
+    -- Auto-link the account for future logins (more efficient)
+    update public.staff
+    set auth_user_id = auth.uid()
+    where lower(email) = lower(v_user_email)
+      and auth_user_id is null;
+    
+    return v_profile;
+  end if;
+
+  return null;
+end;
 $$;
 
 -- ---------------------------------------------------------------------------
