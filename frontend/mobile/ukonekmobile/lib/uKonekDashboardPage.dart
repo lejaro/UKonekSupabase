@@ -2,6 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'uKonekLoginPage.dart';
 
+// ── Design tokens ──────────────────────────────────────────────────────────
+class _C {
+  static const primary = Color(0xFF0A2E6E);
+  static const primaryMid = Color(0xFF1565C0);
+  static const primaryLight = Color(0xFF1976D2);
+  static const bg = Color(0xFFF0F4FA);
+  static const surface = Colors.white;
+  static const textDark = Color(0xFF1A2740);
+  static const textMuted = Color(0xFF8A93A0);
+  static const divider = Color(0xFFEEF1F6);
+  static const heartRed = Color(0xFFE53935);
+  static const sleepPurple = Color(0xFF7B1FA2);
+  static const stepsBlue = Color(0xFF1976D2);
+  static const bmiGreen = Color(0xFF2E7D32);
+}
+
 class uKonekDashboardPage extends StatefulWidget {
   final String username;
 
@@ -22,13 +38,11 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
   int _selectedTab = 0;
 
-  // Dummy health stats
   final int _heartRate = 72;
-  final int _steps = 6_840;
+  final int _steps = 6840;
   final int _sleep = 7;
   final double _bmi = 22.4;
 
-  // Dummy upcoming appointments
   final List<Map<String, String>> _appointments = [
     {
       'doctor': 'Dr. Maria Santos',
@@ -53,47 +67,36 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     },
   ];
 
-  // Dummy medications
   final List<Map<String, String>> _medications = [
-    {
-      'name': 'Metformin 500mg',
-      'time': '8:00 AM',
-      'status': 'taken',
-      'icon': '💊',
-    },
-    {
-      'name': 'Amlodipine 5mg',
-      'time': '12:00 PM',
-      'status': 'pending',
-      'icon': '💊',
-    },
-    {
-      'name': 'Vitamin D3',
-      'time': '6:00 PM',
-      'status': 'pending',
-      'icon': '🟡',
-    },
+    {'name': 'Metformin 500mg', 'time': '8:00 AM', 'status': 'taken', 'icon': '💊'},
+    {'name': 'Amlodipine 5mg', 'time': '12:00 PM', 'status': 'pending', 'icon': '💊'},
+    {'name': 'Vitamin D3', 'time': '6:00 PM', 'status': 'pending', 'icon': '🟡'},
   ];
 
-  // Dummy health tips
-  final List<Map<String, String>> _healthTips = [
+  final List<Map<String, dynamic>> _healthTips = [
     {
       'title': 'Stay Hydrated',
       'desc': 'Drink at least 8 glasses of water daily.',
       'icon': '💧',
-      'color': '0xFF0288D1',
+      'color': const Color(0xFF1D4ED8),
+      'bg': const Color(0xFFEFF6FF),
+      'border': const Color(0xFFBFDBFE),
     },
     {
       'title': 'Walk More',
       'desc': 'Aim for 10,000 steps a day for heart health.',
       'icon': '🚶',
-      'color': '0xFF2E7D32',
+      'color': const Color(0xFF15803D),
+      'bg': const Color(0xFFF0FDF4),
+      'border': const Color(0xFFBBF7D0),
     },
     {
       'title': 'Sleep Well',
       'desc': '7–9 hours of sleep boosts immunity.',
       'icon': '🌙',
-      'color': '0xFF6A1B9A',
+      'color': const Color(0xFF6D28D9),
+      'bg': const Color(0xFFF5F3FF),
+      'border': const Color(0xFFDDD6FE),
     },
   ];
 
@@ -102,21 +105,18 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     super.initState();
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
+      statusBarIconBrightness: Brightness.light,
     ));
 
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 700),
     );
     _fadeIn = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _slideUp = Tween<Offset>(
-      begin: const Offset(0, 0.12),
+      begin: const Offset(0, 0.08),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeOutCubic,
-    ));
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic));
 
     _animController.forward();
   }
@@ -130,56 +130,40 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FB),
+      backgroundColor: _C.bg,
+      extendBodyBehindAppBar: true,
       body: FadeTransition(
         opacity: _fadeIn,
         child: SlideTransition(
           position: _slideUp,
           child: Column(
             children: [
-              // ── Top Header ─────────────────────────────────────────────
               _buildHeader(),
-
-              // ── Body ───────────────────────────────────────────────────
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 110),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 20),
-
-                      // Health Stats
-                      _sectionTitle("Today's Health Summary"),
+                      const SizedBox(height: 22),
+                      _sectionHeader("Today's Health Summary"),
                       const SizedBox(height: 12),
                       _buildHealthStats(),
-
-                      const SizedBox(height: 28),
-
-                      // Quick Actions
-                      _sectionTitle("Quick Actions"),
+                      const SizedBox(height: 26),
+                      _sectionHeader("Quick Actions", showSeeAll: false),
                       const SizedBox(height: 12),
                       _buildQuickActions(),
-
-                      const SizedBox(height: 28),
-
-                      // Upcoming Appointments
-                      _sectionTitle("Upcoming Appointments"),
+                      const SizedBox(height: 26),
+                      _sectionHeader("Upcoming Appointments"),
                       const SizedBox(height: 12),
                       _buildAppointments(),
-
-                      const SizedBox(height: 28),
-
-                      // Medications
-                      _sectionTitle("Today's Medications"),
+                      const SizedBox(height: 26),
+                      _sectionHeader("Today's Medications"),
                       const SizedBox(height: 12),
                       _buildMedications(),
-
-                      const SizedBox(height: 28),
-
-                      // Health Tips
-                      _sectionTitle("Health Tips"),
+                      const SizedBox(height: 26),
+                      _sectionHeader("Health Tips", showSeeAll: false),
                       const SizedBox(height: 12),
                       _buildHealthTips(),
                     ],
@@ -190,33 +174,31 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
           ),
         ),
       ),
-
-      // ── Bottom Nav ────────────────────────────────────────────────────
       bottomNavigationBar: _buildBottomNav(),
     );
   }
 
-  // ── HEADER ──────────────────────────────────────────────────────────────
+  // ── HEADER ─────────────────────────────────────────────────────────────
   Widget _buildHeader() {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF0D47A1), Color(0xFF1E88E5)],
+          colors: [Color(0xFF0A2E6E), Color(0xFF1565C0), Color(0xFF1976D2)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
         ),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
           child: Column(
             children: [
-              // Top row: greeting + notification + avatar
+              // Top row
               Row(
                 children: [
                   Expanded(
@@ -227,7 +209,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                           _greeting(),
                           style: const TextStyle(
                             color: Colors.white60,
-                            fontSize: 13,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -235,86 +218,63 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                           widget.username,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.3,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.2,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  // Notification bell
+                  // Notification
                   Stack(
                     children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                      _headerBtn(
                         child: const Icon(Icons.notifications_outlined,
-                            color: Colors.white, size: 22),
+                            color: Colors.white, size: 20),
                       ),
                       Positioned(
-                        top: 8,
-                        right: 8,
+                        top: 9,
+                        right: 9,
                         child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFF5252),
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF5252),
                             shape: BoxShape.circle,
+                            border: Border.all(
+                                color: _C.primaryLight, width: 1.5),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(width: 10),
-                  // Avatar
-                  GestureDetector(
-                    onTap: _showLogoutDialog,
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 8,
-                          )
-                        ],
-                      ),
-                      child: const Center(
-                        child: Text("👤", style: TextStyle(fontSize: 20)),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(width: 8),
                 ],
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               // Search bar
               Container(
-                height: 44,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                  color: Colors.white.withOpacity(0.13),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: Colors.white.withOpacity(0.18), width: 1),
                 ),
                 child: Row(
                   children: [
                     const SizedBox(width: 14),
-                    const Icon(Icons.search, color: Colors.white60, size: 20),
+                    const Icon(Icons.search_rounded,
+                        color: Colors.white60, size: 18),
                     const SizedBox(width: 8),
                     Text(
                       "Search doctors, services...",
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.55),
-                        fontSize: 13,
+                        fontSize: 12.5,
                       ),
                     ),
                   ],
@@ -327,47 +287,59 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
-  // ── HEALTH STATS GRID ────────────────────────────────────────────────────
+  Widget _headerBtn({required Widget child}) {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: child,
+    );
+  }
+
+  // ── HEALTH STATS GRID ──────────────────────────────────────────────────
   Widget _buildHealthStats() {
     return GridView.count(
       crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       childAspectRatio: 1.55,
       children: [
         _statCard(
           icon: Icons.favorite_rounded,
-          iconColor: const Color(0xFFE53935),
+          iconColor: _C.heartRed,
+          bgColor: const Color(0xFFFFEBEE),
           label: "Heart Rate",
           value: "$_heartRate",
           unit: "bpm",
-          bgColor: const Color(0xFFFFEBEE),
         ),
         _statCard(
           icon: Icons.directions_walk_rounded,
-          iconColor: const Color(0xFF1976D2),
+          iconColor: _C.stepsBlue,
+          bgColor: const Color(0xFFE3F2FD),
           label: "Steps",
           value: "${(_steps / 1000).toStringAsFixed(1)}k",
           unit: "/ 10k goal",
-          bgColor: const Color(0xFFE3F2FD),
         ),
         _statCard(
           icon: Icons.nightlight_round,
-          iconColor: const Color(0xFF7B1FA2),
+          iconColor: _C.sleepPurple,
+          bgColor: const Color(0xFFF3E5F5),
           label: "Sleep",
           value: "$_sleep",
           unit: "hrs last night",
-          bgColor: const Color(0xFFF3E5F5),
         ),
         _statCard(
           icon: Icons.monitor_weight_outlined,
-          iconColor: const Color(0xFF2E7D32),
+          iconColor: _C.bmiGreen,
+          bgColor: const Color(0xFFE8F5E9),
           label: "BMI",
           value: "$_bmi",
           unit: "Normal",
-          bgColor: const Color(0xFFE8F5E9),
         ),
       ],
     );
@@ -376,22 +348,23 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   Widget _statCard({
     required IconData icon,
     required Color iconColor,
+    required Color bgColor,
     required String label,
     required String value,
     required String unit,
-    required Color bgColor,
   }) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _C.surface,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black.withOpacity(0.05), width: 0.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Column(
@@ -399,13 +372,13 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
-            width: 34,
-            height: 34,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: bgColor,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: iconColor, size: 18),
+            child: Icon(icon, color: iconColor, size: 16),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -413,22 +386,21 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w600,
                   color: iconColor,
+                  height: 1,
                 ),
               ),
-              Text(
-                unit,
-                style: const TextStyle(fontSize: 10, color: Colors.black38),
-              ),
-              Text(
-                label,
-                style: const TextStyle(
-                    fontSize: 11,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w500),
-              ),
+              const SizedBox(height: 1),
+              Text(unit,
+                  style: const TextStyle(fontSize: 9.5, color: Colors.black38)),
+              const SizedBox(height: 1),
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 10.5,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w500)),
             ],
           ),
         ],
@@ -436,49 +408,64 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
-  // ── QUICK ACTIONS ────────────────────────────────────────────────────────
+  // ── QUICK ACTIONS ──────────────────────────────────────────────────────
   Widget _buildQuickActions() {
     final actions = [
-      {'icon': Icons.calendar_month_rounded, 'label': 'Book\nAppointment', 'color': 0xFF1565C0},
-      {'icon': Icons.medical_services_outlined, 'label': 'Find\nDoctor', 'color': 0xFF00838F},
-      {'icon': Icons.medication_rounded, 'label': 'My\nMeds', 'color': 0xFF6A1B9A},
-      {'icon': Icons.receipt_long_outlined, 'label': 'Medical\nRecords', 'color': 0xFFBF360C},
+      {
+        'icon': Icons.calendar_month_rounded,
+        'label': 'Book\nAppt',
+        'gradient': [const Color(0xFF0D47A1), const Color(0xFF1E88E5)],
+      },
+      {
+        'icon': Icons.medical_services_outlined,
+        'label': 'Find\nDoctor',
+        'gradient': [const Color(0xFF00838F), const Color(0xFF00ACC1)],
+      },
+      {
+        'icon': Icons.medication_rounded,
+        'label': 'My\nMeds',
+        'gradient': [const Color(0xFF6A1B9A), const Color(0xFF9C27B0)],
+      },
+      {
+        'icon': Icons.receipt_long_outlined,
+        'label': 'Records',
+        'gradient': [const Color(0xFFBF360C), const Color(0xFFE64A19)],
+      },
     ];
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: actions.map((a) {
+        final gradients = a['gradient'] as List<Color>;
         return GestureDetector(
-          onTap: () => _showComingSoon(a['label'].toString().replaceAll('\n', ' ')),
+          onTap: () => _showComingSoon(
+              (a['label'] as String).replaceAll('\n', ' ')),
           child: Column(
             children: [
               Container(
-                width: 58,
-                height: 58,
+                width: 54,
+                height: 54,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      Color(a['color'] as int),
-                      Color(a['color'] as int).withOpacity(0.7),
-                    ],
+                    colors: gradients,
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Color(a['color'] as int).withOpacity(0.35),
-                      blurRadius: 10,
+                      color: gradients.first.withOpacity(0.3),
+                      blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Icon(a['icon'] as IconData,
-                    color: Colors.white, size: 26),
+                    color: Colors.white, size: 22),
               ),
               const SizedBox(height: 6),
               Text(
-                a['label'].toString(),
+                a['label'] as String,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 10.5,
@@ -494,40 +481,52 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
-  // ── APPOINTMENTS ─────────────────────────────────────────────────────────
+  // ── APPOINTMENTS ───────────────────────────────────────────────────────
   Widget _buildAppointments() {
     return SizedBox(
-      height: 148,
+      height: 142,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         itemCount: _appointments.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        separatorBuilder: (_, __) => const SizedBox(width: 11),
         itemBuilder: (context, i) {
           final apt = _appointments[i];
           return Container(
-            width: 200,
+            width: 188,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _C.surface,
               borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: Colors.black.withOpacity(0.05), width: 0.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withOpacity(0.04),
                   blurRadius: 10,
-                  offset: const Offset(0, 4),
-                )
+                  offset: const Offset(0, 3),
+                ),
               ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                // Doctor row
                 Row(
                   children: [
-                    Text(apt['avatar']!,
-                        style: const TextStyle(fontSize: 28)),
-                    const SizedBox(width: 8),
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE3F0FF),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(apt['avatar']!,
+                            style: const TextStyle(fontSize: 18)),
+                      ),
+                    ),
+                    const SizedBox(width: 9),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -535,8 +534,9 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                           Text(
                             apt['doctor']!,
                             style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: _C.textDark,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -544,37 +544,38 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                           Text(
                             apt['specialty']!,
                             style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.black45,
-                            ),
+                                fontSize: 10, color: Colors.black38),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                const Divider(height: 1),
+                const SizedBox(height: 10),
+                const Divider(height: 1, color: _C.divider),
+                const SizedBox(height: 9),
                 Row(
                   children: [
                     const Icon(Icons.calendar_today_outlined,
-                        size: 12, color: Color(0xFF1976D2)),
-                    const SizedBox(width: 4),
+                        size: 12, color: _C.primaryMid),
+                    const SizedBox(width: 5),
                     Text(
                       apt['date']!,
                       style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF1976D2)),
+                          fontSize: 10.5, color: _C.primaryMid),
                     ),
                   ],
                 ),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     const Icon(Icons.access_time_rounded,
                         size: 12, color: Colors.black38),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 5),
                     Text(
                       apt['time']!,
                       style: const TextStyle(
-                          fontSize: 11, color: Colors.black45),
+                          fontSize: 10.5, color: Colors.black45),
                     ),
                   ],
                 ),
@@ -586,28 +587,30 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
-  // ── MEDICATIONS ───────────────────────────────────────────────────────────
+  // ── MEDICATIONS ────────────────────────────────────────────────────────
   Widget _buildMedications() {
     return Column(
       children: _medications.map((med) {
         final isTaken = med['status'] == 'taken';
         return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          margin: const EdgeInsets.only(bottom: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: _C.surface,
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: Colors.black.withOpacity(0.05), width: 0.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withOpacity(0.03),
                 blurRadius: 8,
-                offset: const Offset(0, 3),
-              )
+                offset: const Offset(0, 2),
+              ),
             ],
           ),
           child: Row(
             children: [
-              Text(med['icon']!, style: const TextStyle(fontSize: 24)),
+              Text(med['icon']!, style: const TextStyle(fontSize: 22)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -616,37 +619,40 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     Text(
                       med['name']!,
                       style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 13),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: _C.textDark),
                     ),
                     Text(
                       med['time']!,
                       style: const TextStyle(
-                          fontSize: 11, color: Colors.black38),
+                          fontSize: 10.5, color: Colors.black38),
                     ),
                   ],
                 ),
               ),
               Container(
                 padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: isTaken
-                      ? Colors.green.shade50
-                      : const Color(0xFFE3F2FD),
+                      ? const Color(0xFFE8F5E9)
+                      : const Color(0xFFE3F0FF),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: isTaken
-                        ? Colors.green.shade300
-                        : const Color(0xFF1976D2).withOpacity(0.4),
+                        ? const Color(0xFFA5D6A7)
+                        : const Color(0xFF90CAF9),
+                    width: 0.7,
                   ),
                 ),
                 child: Text(
-                  isTaken ? "✓ Taken" : "Pending",
+                  isTaken ? "✓  Taken" : "Pending",
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
                     color: isTaken
-                        ? Colors.green.shade700
+                        ? const Color(0xFF2E7D32)
                         : const Color(0xFF1565C0),
                   ),
                 ),
@@ -658,22 +664,23 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
-  // ── HEALTH TIPS ───────────────────────────────────────────────────────────
+  // ── HEALTH TIPS ────────────────────────────────────────────────────────
   Widget _buildHealthTips() {
     return Column(
       children: _healthTips.map((tip) {
-        final color = Color(int.parse(tip['color']!));
         return Container(
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: const EdgeInsets.only(bottom: 9),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.07),
+            color: tip['bg'] as Color,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withOpacity(0.2)),
+            border: Border.all(
+                color: (tip['border'] as Color), width: 0.5),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(tip['icon']!, style: const TextStyle(fontSize: 28)),
+              Text(tip['icon']!, style: const TextStyle(fontSize: 22)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -682,15 +689,16 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     Text(
                       tip['title']!,
                       style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: color),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: tip['color'] as Color,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       tip['desc']!,
                       style: const TextStyle(
-                          fontSize: 12, color: Colors.black54),
+                          fontSize: 11.5, color: Colors.black54),
                     ),
                   ],
                 ),
@@ -702,7 +710,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
-  // ── BOTTOM NAV ────────────────────────────────────────────────────────────
+  // ── BOTTOM NAV ─────────────────────────────────────────────────────────
   Widget _buildBottomNav() {
     final tabs = [
       {'icon': Icons.home_rounded, 'label': 'Home'},
@@ -713,23 +721,26 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _C.surface,
+        border: const Border(
+          top: BorderSide(color: Color(0x14000000), width: 0.5),
+        ),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(22),
+          topRight: Radius.circular(22),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withOpacity(0.07),
             blurRadius: 20,
             offset: const Offset(0, -4),
-          )
+          ),
         ],
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
       ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(tabs.length, (i) {
@@ -737,36 +748,35 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               return GestureDetector(
                 onTap: () => setState(() => _selectedTab = i),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
+                  duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOut,
                   padding: EdgeInsets.symmetric(
-                      horizontal: isSelected ? 18 : 12, vertical: 8),
+                      horizontal: isSelected ? 16 : 10, vertical: 7),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? const Color(0xFF0D47A1).withOpacity(0.1)
+                        ? _C.primaryMid.withOpacity(0.1)
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         tabs[i]['icon'] as IconData,
-                        color: isSelected
-                            ? const Color(0xFF0D47A1)
-                            : Colors.black38,
-                        size: 22,
+                        color: isSelected ? _C.primaryMid : Colors.black26,
+                        size: 21,
                       ),
                       if (isSelected) ...[
                         const SizedBox(width: 6),
                         Text(
                           tabs[i]['label'] as String,
                           style: const TextStyle(
-                            color: Color(0xFF0D47A1),
+                            color: _C.primaryMid,
                             fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ]
+                      ],
                     ],
                   ),
                 ),
@@ -778,46 +788,51 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
-  // ── HELPERS ───────────────────────────────────────────────────────────────
-  Widget _sectionTitle(String title) {
+  // ── HELPERS ────────────────────────────────────────────────────────────
+  Widget _sectionHeader(String title, {bool showSeeAll = true}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           title,
           style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-            letterSpacing: 0.2,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: _C.textDark,
+            letterSpacing: 0.1,
           ),
         ),
-        Text(
-          "See all",
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.blue.shade700,
-            fontWeight: FontWeight.w500,
+        if (showSeeAll)
+          Text(
+            "See all",
+            style: TextStyle(
+              fontSize: 11.5,
+              color: Colors.blue.shade700,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
       ],
     );
   }
 
   String _greeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return "🌤 Good Morning,";
-    if (hour < 17) return "☀️ Good Afternoon,";
-    return "🌙 Good Evening,";
+    if (hour < 12) return "☀️  Good Morning,";
+    if (hour < 17) return "🌤  Good Afternoon,";
+    return "🌙  Good Evening,";
   }
 
   void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text("$feature — coming soon!"),
-      backgroundColor: const Color(0xFF0D47A1),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("$feature — coming soon!"),
+        backgroundColor: _C.primaryMid,
+        behavior: SnackBarBehavior.floating,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      ),
+    );
   }
 
   void _showLogoutDialog() {
@@ -825,32 +840,34 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
       context: context,
       builder: (ctx) => AlertDialog(
         shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text("Log Out",
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text("Are you sure you want to log out?"),
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 17)),
+        content: const Text("Are you sure you want to log out?",
+            style: TextStyle(fontSize: 14, color: Colors.black54)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel"),
+            child: Text("Cancel",
+                style: TextStyle(color: Colors.grey.shade600)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D47A1),
+              backgroundColor: _C.primaryMid,
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
             ),
             onPressed: () {
               Navigator.pop(ctx);
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(
-                    builder: (_) => const uKonekLoginPage()),
-                    (route) => false,
+                MaterialPageRoute(builder: (_) => const uKonekLoginPage()),
+                (route) => false,
               );
             },
-            child: const Text("Log Out",
-                style: TextStyle(color: Colors.white)),
+            child: const Text("Log Out"),
           ),
         ],
       ),

@@ -1,0 +1,28 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ukonekmobile",
+            "cwd": "frontend/mobile/ukonekmobile",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "ukonekmobile (profile mode)",
+            "cwd": "frontend/mobile/ukonekmobile",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "ukonekmobile (release mode)",
+            "cwd": "frontend/mobile/ukonekmobile",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        }
+    ]
+}
