@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'services/api_service.dart';
 import 'uKonekDashboardPage.dart';
-import 'uKonekRegisterPage.dart';
+import 'package:ukonekmobile/uKonekRegistration/uKonekRegisterWrapper.dart';
 import 'uKonekMenuPage.dart';
 import 'uKonekForgotPasswordPage.dart';
 
@@ -415,7 +415,7 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                                             context,
                                             MaterialPageRoute(
                                                 builder: (_) =>
-                                                const uKonekRegisterPage()),
+                                                const uKonekRegisterWrapper()),
                                           ),
                                       ),
                                     ],

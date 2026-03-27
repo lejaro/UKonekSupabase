@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'uKonekCredentialPage.dart';
+import 'uKonekCredentialsPage.dart';
 
 class uKonekPreviewPage extends StatelessWidget {
-  final String firstName, middleName, surname, dob, age, contact, sex, email, address;
+  final String firstName, middleName, surname, nameExtension, dob, age, contact, sex, email, address;
   final String emergencyName, emergencyContact, relation;
   final File? idImage;
   final bool idVerified;
@@ -12,7 +12,7 @@ class uKonekPreviewPage extends StatelessWidget {
 
   const uKonekPreviewPage({
     super.key,
-    required this.firstName, required this.middleName, required this.surname,
+    required this.firstName, required this.middleName, required this.surname, required this.nameExtension,
     required this.dob, required this.age, required this.contact, required this.sex,
     required this.email, required this.address, required this.emergencyName,
     required this.emergencyContact, required this.relation,
@@ -117,6 +117,7 @@ class uKonekPreviewPage extends StatelessWidget {
                     rows: [
                       _InfoRow("First Name", firstName),
                       _InfoRow("Middle Name", middleName),
+                      _InfoRow("Name Extension", nameExtension),
                       _InfoRow("Surname", surname),
                       _InfoRow("Date of Birth", dob),
                       _InfoRow("Age", age),
@@ -205,7 +206,7 @@ class uKonekPreviewPage extends StatelessWidget {
                         shadowColor: _primary.withOpacity(0.4),
                       ),
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => uKonekCredentialsPage(
-                        firstName: firstName, middleName: middleName, surname: surname, dob: dob, age: age,
+                        firstName: firstName, middleName: middleName, surname: surname, nameExtension: nameExtension, dob: dob, age: age,
                         contact: contact, sex: sex, email: email, address: address,
                         emergencyName: emergencyName, emergencyContact: emergencyContact, relation: relation,
                         idImage: idImage, idVerified: idVerified, extractedOcrText: extractedOcrText,

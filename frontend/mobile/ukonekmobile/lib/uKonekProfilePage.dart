@@ -19,114 +19,129 @@ class uKonekProfilePage extends StatelessWidget {
   static const _primary = Color(0xFF0D47A1);
   static const _accent = Color(0xFF1976D2);
   static const _bg = Color(0xFFF4F7FE);
+  static const _textDark = Color(0xFF1A1A2E);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
-      appBar: AppBar(
-        title: const Text("Citizen Profile",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 0.5)),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: _primary,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_note_rounded),
-            onPressed: () {}, // Future: Edit Profile Logic
+      body: Column(
+        children: [
+          // ── 1. FIXED HEADER ──
+          _buildStaticHeader(context),
+
+          // ── 2. SCROLLABLE BODY ──
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 24),
+                  _buildIdentityCard(), // Digital ID Section
+                  const SizedBox(height: 32),
+
+                  _sectionLabel("PERSONAL INFORMATION"),
+                  const SizedBox(height: 12),
+                  _buildPersonalDetailsCard(),
+
+                  const SizedBox(height: 32),
+
+                  _sectionLabel("EMERGENCY CONTACT"),
+                  const SizedBox(height: 12),
+                  _buildEmergencyContactCard(),
+
+                  const SizedBox(height: 32),
+
+                  _sectionLabel("ACCOUNT SETTINGS"),
+                  const SizedBox(height: 12),
+                  _buildSettingsList(),
+
+                  const SizedBox(height: 40),
+                  _buildLogoutButton(context),
+                  const SizedBox(height: 100),
+                ],
+              ),
+            ),
           ),
         ],
-      ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          children: [
-            _buildIdentityCard(),
-            const SizedBox(height: 24),
-            _buildDetailSection(),
-            const SizedBox(height: 12),
-            _buildSettingsSection(context),
-            const SizedBox(height: 40),
-          ],
-        ),
       ),
     );
   }
 
-  // 1. DIGITAL ID CARD HEADER
+  // ── STATIC HEADER ──────────────────────────────────────────────────
+  Widget _buildStaticHeader(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 60, 20, 25),
+      decoration: const BoxDecoration(
+        color: _primary,
+        borderRadius: BorderRadius.only(bottomRight: Radius.circular(40)),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+            onPressed: () => Navigator.pop(context),
+          ),
+          const SizedBox(width: 8),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Citizen Profile",
+                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+              Text("Manage your account & identity",
+                  style: TextStyle(color: Colors.white70, fontSize: 13)),
+            ],
+          ),
+          const Spacer(),
+          const Icon(Icons.settings_outlined, color: Colors.white, size: 24),
+        ],
+      ),
+    );
+  }
+
+  // ── 1. DIGITAL IDENTITY CARD ───────────────────────────────────────
   Widget _buildIdentityCard() {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [_primary, _accent],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: const LinearGradient(colors: [_primary, _accent], begin: Alignment.topLeft, end: Alignment.bottomRight),
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: _primary.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          )
-        ],
+        boxShadow: [BoxShadow(color: _primary.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))],
       ),
       child: Column(
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile Picture with Verified Ring
-              Stack(
+              const Stack(
                 alignment: Alignment.bottomRight,
                 children: [
-                  const CircleAvatar(
-                    radius: 40,
-                    backgroundColor: Colors.white24,
-                    child: CircleAvatar(
-                      radius: 36,
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.person_rounded, size: 45, color: _primary),
-                    ),
-                  ),
-                  Container(
-                    decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                    padding: const EdgeInsets.all(4),
-                    child: const Icon(Icons.check, size: 12, color: Colors.white),
-                  ),
+                  CircleAvatar(radius: 36, backgroundColor: Colors.white24,
+                      child: CircleAvatar(radius: 32, backgroundColor: Colors.white,
+                          child: Icon(Icons.person_rounded, size: 40, color: _primary))),
+                  CircleAvatar(radius: 10, backgroundColor: Colors.green,
+                      child: Icon(Icons.check, size: 12, color: Colors.white)),
                 ],
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      fullName.toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text("Resident ID: BRGY-UG-2026-88",
-                        style: TextStyle(color: Colors.white70, fontSize: 12)),
-                    const SizedBox(height: 12),
+                    Text(fullName, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    const Text("Barangay Ugong Resident", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text("VERIFIED CITIZEN",
-                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8)),
+                      child: const Text("ID: BRGY-UG-2026-88", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
               ),
-              // Mini QR Code Placeholder
-              const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 40),
+              const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 48),
             ],
           ),
         ],
@@ -134,102 +149,87 @@ class uKonekProfilePage extends StatelessWidget {
     );
   }
 
-  // 2. PERSONAL INFORMATION SECTION
-  Widget _buildDetailSection() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("ACCOUNT INFORMATION",
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1)),
-          const SizedBox(height: 12),
-          _infoCard("Email Address", email, Icons.email_outlined),
-          _infoCard("Mobile Number", phone, Icons.phone_android_rounded),
-          _infoCard("Residential Address", address, Icons.map_outlined),
-        ],
-      ),
-    );
+  // ── 2. PERSONAL DETAILS CARD ───────────────────────────────────────
+  Widget _buildPersonalDetailsCard() {
+    return _sectionCard([
+      _infoTile("Full Name", fullName, Icons.person_outline),
+      _infoTile("Birthday", "January 01, 1995", Icons.cake_outlined),
+      _infoTile("Mobile Number", phone, Icons.phone_android_rounded),
+      _infoTile("Residential Address", address, Icons.map_outlined),
+    ], hasEdit: true);
   }
 
-  // 3. SETTINGS & LOGOUT
-  Widget _buildSettingsSection(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("SECURITY & SETTINGS",
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1)),
-          const SizedBox(height: 12),
-          _settingsTile("Health Record Privacy", Icons.lock_person_outlined, Colors.blue),
-          _settingsTile("Notification Preferences", Icons.notifications_active_outlined, Colors.orange),
-          const SizedBox(height: 20),
-
-          // Sign Out Button
-          // Inside _buildSettingsSection
-          SizedBox(
-            width: double.infinity,
-            child: TextButton(
-              // CHANGE THIS LINE:
-              onPressed: () => _showLogoutModal(context),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: Colors.redAccent, width: 1),
-                ),
-              ),
-              child: const Text("Log Out Account",
-                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
-      ),
-    );
+  // ── 3. EMERGENCY CONTACT CARD ──────────────────────────────────────
+  Widget _buildEmergencyContactCard() {
+    return _sectionCard([
+      _infoTile("Contact Name", "Maria Clara", Icons.contact_emergency_outlined),
+      _infoTile("Relationship", "Mother", Icons.people_outline),
+      _infoTile("Contact Number", "0912-345-6789", Icons.phone_callback_rounded),
+    ], hasEdit: true);
   }
 
-  // Helper: Information Card
-  Widget _infoCard(String label, String value, IconData icon) {
+  // ── 4. SETTINGS LIST ───────────────────────────────────────────────
+  Widget _buildSettingsList() {
+    return _sectionCard([
+      _settingsItem("Change Password", Icons.lock_outline),
+      _settingsItem("Notification Settings", Icons.notifications_none),
+      _settingsItem("Privacy & Security", Icons.security_outlined),
+      _settingsItem("About uKonek App", Icons.info_outline),
+    ]);
+  }
+
+  // ── UI HELPERS ─────────────────────────────────────────────────────
+  Widget _sectionLabel(String text) => Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1));
+
+  Widget _sectionCard(List<Widget> children, {bool hasEdit = false}) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+      width: double.infinity,
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 8))]),
+      child: Column(
+        children: [
+          if (hasEdit)
+            Align(alignment: Alignment.topRight, child: TextButton(onPressed: () {}, child: const Text("Edit", style: TextStyle(fontSize: 12)))),
+          ...children,
+        ],
       ),
+    );
+  }
+
+  Widget _infoTile(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       child: Row(
         children: [
-          Icon(icon, color: _primary, size: 22),
+          Icon(icon, color: _primary, size: 20),
           const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1A1A2E))),
-              ],
-            ),
-          ),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: _textDark, fontSize: 14)),
+          ]),
         ],
       ),
     );
   }
 
-  // Helper: Settings Tile
-  Widget _settingsTile(String title, IconData icon, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: color),
-        title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-        trailing: const Icon(Icons.chevron_right, size: 20),
-        onTap: () {},
+  Widget _settingsItem(String title, IconData icon) {
+    return ListTile(
+      leading: Icon(icon, color: _primary, size: 22),
+      title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _textDark)),
+      trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+      onTap: () {},
+    );
+  }
+
+  Widget _buildLogoutButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: TextButton(
+        onPressed: () => _showLogoutModal(context),
+        style: TextButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Colors.redAccent, width: 1)),
+        ),
+        child: const Text("LOG OUT ACCOUNT", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w900, letterSpacing: 1)),
       ),
     );
   }
@@ -237,71 +237,33 @@ class uKonekProfilePage extends StatelessWidget {
   void _showLogoutModal(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 32),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  "Sign Out?",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E)),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  "Are you sure you want to sign out? You will be returned to the main menu.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.5),
-                ),
-                const SizedBox(height: 28),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // ── REDIRECT TO MENU PAGE ──
-                          // This removes all previous screens from the stack
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(builder: (context) => const uKonekMenuPage()),
-                                (route) => false, // This ensures they can't click 'back' to the profile
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.redAccent,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        child: const Text("Sign Out", style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircleAvatar(radius: 30, backgroundColor: Color(0xFFFFF1F0), child: Icon(Icons.logout_rounded, color: Colors.redAccent, size: 30)),
+              const SizedBox(height: 20),
+              const Text("Log Out Account?", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark)),
+              const SizedBox(height: 8),
+              const Text("Are you sure you want to log out? You will need to login again to access your records.", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 13, height: 1.5)),
+              const SizedBox(height: 32),
+              Row(
+                children: [
+                  Expanded(child: TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)))),
+                  const SizedBox(width: 12),
+                  Expanded(child: ElevatedButton(
+                      onPressed: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const uKonekMenuPage()), (route) => false),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                      child: const Text("Log Out", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))),
+                ],
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

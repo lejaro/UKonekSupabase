@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'uKonekRegisterPage.dart';
+import 'uKonekRegistration/uKonekRegisterWrapper.dart';
 import 'uKonekLoginPage.dart';
 
 class uKonekMenuPage extends StatefulWidget {
@@ -153,7 +153,7 @@ class _uKonekMenuPageState extends State<uKonekMenuPage>
                         icon: Icons.person_add_outlined,
                         onTap: () => Navigator.push(
                           context,
-                          _fadeRoute(const uKonekRegisterPage()),
+                          _fadeRoute(const uKonekRegisterWrapper()),
                         ),
                       ),
 
