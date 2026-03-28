@@ -1,7 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'uKonekJoinQueuePage.dart';
 import 'uKonekHealthRecordsPage.dart';
 import 'uKonekProfilePage.dart';
+
+// ── Design tokens ──────────────────────────────────────────────
+class _C {
+  static const primary    = Color(0xFF0A2E6E);
+  static const primaryMid = Color(0xFF1565C0);
+  static const accent     = Color(0xFF1976D2);
+  static const bg         = Color(0xFFF0F4FA);
+  static const surface    = Colors.white;
+  static const textDark   = Color(0xFF1A2740);
+  static const textMuted  = Color(0xFF8A93A0);
+  static const divider    = Color(0xFFEEF1F6);
+  static const success    = Color(0xFF10B981);
+  static const warning    = Color(0xFFF59E0B);
+  static const shadow     = Color(0x0A000000);
+}
 
 class uKonekDashboardPage extends StatefulWidget {
   final String username;
@@ -12,140 +28,210 @@ class uKonekDashboardPage extends StatefulWidget {
   const uKonekDashboardPage({
     super.key,
     required this.username,
-    this.email = "juan.delacruz@email.com",
-    this.phone = "0912 345 6789",
-    this.address = "Brgy. Ugong, Valenzuela City",
+    this.email   = 'juan.delacruz@email.com',
+    this.phone   = '0912 345 6789',
+    this.address = 'Brgy. Ugong, Valenzuela City',
   });
 
   @override
-  State<uKonekDashboardPage> createState() => _uKonekDashboardPageState();
+  State<uKonekDashboardPage> createState() =>
+      _uKonekDashboardPageState();
 }
 
 class _uKonekDashboardPageState extends State<uKonekDashboardPage> {
-  // --- DESIGN TOKENS ---
-  static const Color _primary = Color(0xFF0D47A1);
-  static const Color _bg = Color(0xFFF4F7FE);
-  static const Color _textDark = Color(0xFF1A1A2E);
-  static const Color _accent = Color(0xFF1976D2);
-
   int _selectedTab = 0;
 
-  // ── NAVIGATION HELPER ──
   void _navigateToProfile() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => uKonekProfilePage(
+        builder: (_) => uKonekProfilePage(
           fullName: widget.username,
-          email: widget.email,
-          phone: widget.phone,
-          address: widget.address,
+          email:    widget.email,
+          phone:    widget.phone,
+          address:  widget.address,
         ),
       ),
     );
   }
 
   @override
+  void initState() {
+    super.initState();
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor:           Colors.transparent,
+      statusBarIconBrightness:  Brightness.light,
+    ));
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bg,
-      body: Column(
-        children: [
-          // 1. FIXED STATIC HEADER
-          _buildStaticHeader(),
-
-          // 2. SCROLLABLE CONTENT
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 24),
-
-                  // Section: On Duty Today
-                  _buildOnDutySection(),
-
-                  const SizedBox(height: 32),
-
-                  // Section: Queue Card
-                  _buildQueueCard(),
-
-                  const SizedBox(height: 32),
-
-                  _sectionHeader("Health Care Services"),
-                  const SizedBox(height: 16),
-                  _buildServiceIcons(),
-
-                  const SizedBox(height: 32),
-
-                  _sectionHeader("Quick Actions"),
-                  const SizedBox(height: 16),
-                  _buildQuickActionGrid(),
-
-                  const SizedBox(height: 32),
-
-                  _sectionHeader("Medicine Schedule"),
-                  const SizedBox(height: 16),
-                  _buildMedicineCard(),
-
-                  const SizedBox(height: 100), // Padding for Bottom Nav
-                ],
-              ),
+      backgroundColor: _C.bg,
+      body: Column(children: [
+        _buildHeader(),
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildOnDutySection(),
+                const SizedBox(height: 24),
+                _buildQueueCard(),
+                const SizedBox(height: 28),
+                _sectionHeader('Health Care Services'),
+                const SizedBox(height: 14),
+                _buildServiceIcons(),
+                const SizedBox(height: 28),
+                _sectionHeader('Quick Actions'),
+                const SizedBox(height: 14),
+                _buildQuickActionGrid(),
+                const SizedBox(height: 28),
+                _sectionHeader('Medicine Schedule'),
+                const SizedBox(height: 14),
+                _buildMedicineCard(),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ]),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
 
-  // ── COMPONENTS ─────────────────────────────────────────────────────
-
-  Widget _buildStaticHeader() {
+  // ── Header ──────────────────────────────────────────────────
+  Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 60, 24, 25),
-      decoration: BoxDecoration(
-        color: _primary,
-        borderRadius: const BorderRadius.only(bottomRight: Radius.circular(40)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 12, offset: const Offset(0, 4)),
-        ],
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_C.primary, _C.primaryMid],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft:  Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
       ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              GestureDetector(
-                onTap: _navigateToProfile,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_getGreeting(), style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                    Row(
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+          child: Column(children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                GestureDetector(
+                  onTap: _navigateToProfile,
+                  child: Row(children: [
+                    // Avatar
+                    Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.4)),
+                      ),
+                      child: Center(
+                        child: Text(
+                          widget.username.isNotEmpty
+                              ? widget.username[0].toUpperCase()
+                              : 'U',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(widget.username,
-                            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 12),
+                        Text(_getGreeting(),
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 12)),
+                        Row(children: [
+                          Text(widget.username,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.3,
+                              )),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.arrow_forward_ios_rounded,
+                              color: Colors.white54, size: 11),
+                        ]),
                       ],
                     ),
-                  ],
+                  ]),
                 ),
-              ),
-              _buildNotificationBell(),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _buildPillSearchBar(),
-        ],
+                _buildNotificationBell(),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _buildSearchBar(),
+          ]),
+        ),
       ),
     );
   }
 
+  Widget _buildNotificationBell() {
+    return Stack(children: [
+      Container(
+        width: 44, height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.18),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withOpacity(0.25)),
+        ),
+        child: const Icon(Icons.notifications_outlined,
+            color: Colors.white, size: 22),
+      ),
+      Positioned(
+        top: 9, right: 9,
+        child: Container(
+          width: 8, height: 8,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF5252),
+            shape: BoxShape.circle,
+            border: Border.all(color: _C.primaryMid, width: 1.5),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.25)),
+      ),
+      child: Row(children: [
+        const SizedBox(width: 16),
+        Icon(Icons.search_rounded,
+            color: Colors.white.withOpacity(0.6), size: 20),
+        const SizedBox(width: 10),
+        Text('Search health records...',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 14,
+            )),
+      ]),
+    );
+  }
+
+  // ── On Duty Section ──────────────────────────────────────────
   Widget _buildOnDutySection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,269 +239,474 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text("On Duty Today",
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: _textDark)),
-            Text("Updated real-time",
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade400, fontWeight: FontWeight.w600)),
+            _sectionHeader('On Duty Today'),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _C.success.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(children: [
+                Container(
+                  width: 6, height: 6,
+                  decoration: const BoxDecoration(
+                      color: _C.success, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 5),
+                const Text('Live',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _C.success,
+                      fontWeight: FontWeight.w700,
+                    )),
+              ]),
+            ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 10))],
+            color: _C.surface,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [BoxShadow(
+              color: _C.shadow,
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            )],
           ),
-          child: Column(
-            children: [
-              _staffTile("Dr. Maria Santos", "Doctor", "8:00 AM – 5:00 PM", Colors.green, "Available", Icons.medical_services_rounded),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Divider(height: 1, thickness: 1, color: Colors.grey.withOpacity(0.05)),
-              ),
-              _staffTile("Nurse Juan Dela Cruz", "Nurse", "8:00 AM – 5:00 PM", Colors.orange, "Busy", Icons.person_pin_rounded),
-            ],
-          ),
+          child: Column(children: [
+            _staffTile(
+                'Dr. Maria Santos', 'Doctor',
+                '8:00 AM – 5:00 PM', _C.success, 'Available',
+                Icons.medical_services_rounded),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Divider(height: 1, color: _C.divider),
+            ),
+            _staffTile(
+                'Nurse Juan Dela Cruz', 'Nurse',
+                '8:00 AM – 5:00 PM', _C.warning, 'Busy',
+                Icons.person_pin_rounded),
+          ]),
         ),
       ],
     );
   }
 
-  Widget _staffTile(String name, String role, String time, Color statusColor, String statusLabel, IconData icon) {
+  Widget _staffTile(String name, String role, String time,
+      Color statusColor, String statusLabel, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Container(
-            height: 48, width: 48,
-            decoration: BoxDecoration(color: _primary.withOpacity(0.05), shape: BoxShape.circle),
-            child: Icon(icon, color: _primary, size: 22),
+      padding: const EdgeInsets.symmetric(
+          horizontal: 20, vertical: 16),
+      child: Row(children: [
+        Container(
+          width: 46, height: 46,
+          decoration: BoxDecoration(
+            color: _C.primaryMid.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(13),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _textDark)),
-                Text("$role • $time", style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
-              ],
-            ),
+          child: Icon(icon, color: _C.primaryMid, size: 22),
+        ),
+        const SizedBox(width: 14),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: _C.textDark,
+                )),
+            const SizedBox(height: 2),
+            Text('$role • $time',
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 11,
+                )),
+          ],
+        )),
+        Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: statusColor.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(10),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-            child: Text(statusLabel.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.w900)),
-          ),
-        ],
-      ),
+          child: Text(statusLabel.toUpperCase(),
+              style: TextStyle(
+                color: statusColor,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+              )),
+        ),
+      ]),
     );
   }
 
+  // ── Queue Card ───────────────────────────────────────────────
   Widget _buildQueueCard() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 10))],
+        color: _C.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(
+          color: _C.shadow,
+          blurRadius: 16,
+          offset: const Offset(0, 6),
+        )],
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.fiber_manual_record, color: Colors.green, size: 10),
-              const SizedBox(width: 8),
-              const Text("LIVE QUEUE", style: TextStyle(color: Colors.green, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.1)),
-              const Spacer(),
-              Text("Mar 28, 2026", style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _queueInfo("CURRENTLY SERVING", "A-123", _primary),
-              Container(width: 1, height: 40, color: Colors.grey.withOpacity(0.1)),
-              _queueInfo("YOUR NUMBER", "A-124", _accent),
-            ],
-          ),
-          const SizedBox(height: 20),
+      child: Column(children: [
+        // Live badge row
+        Row(children: [
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(color: _primary.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.timer_outlined, size: 16, color: _primary),
-                SizedBox(width: 8),
-                Text("You're next • Est. Wait: 5 mins", style: TextStyle(color: _primary, fontWeight: FontWeight.bold, fontSize: 12)),
-              ],
+            padding: const EdgeInsets.symmetric(
+                horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: _C.success.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(8),
             ),
+            child: Row(children: [
+              Container(
+                width: 6, height: 6,
+                decoration: const BoxDecoration(
+                    color: _C.success, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 5),
+              const Text('LIVE QUEUE',
+                  style: TextStyle(
+                    color: _C.success,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 10,
+                    letterSpacing: 0.8,
+                  )),
+            ]),
           ),
-        ],
-      ),
+          const Spacer(),
+          Text('Mar 28, 2026',
+              style: TextStyle(
+                  color: Colors.grey.shade400, fontSize: 11)),
+        ]),
+        const SizedBox(height: 20),
+
+        // Queue numbers
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _queueInfo('CURRENTLY SERVING', 'A-123', _C.textMuted),
+            Container(width: 1, height: 44, color: _C.divider),
+            _queueInfo('YOUR NUMBER', 'A-124', _C.primary),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // Status strip
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: _C.primaryMid.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.timer_outlined,
+                  size: 16, color: _C.primaryMid),
+              const SizedBox(width: 8),
+              const Text("You're next • Est. Wait: 5 mins",
+                  style: TextStyle(
+                    color: _C.primaryMid,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  )),
+            ],
+          ),
+        ),
+      ]),
     );
   }
 
+  Widget _queueInfo(String label, String value, Color color) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          style: TextStyle(
+            color: Colors.grey.shade400,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          )),
+      const SizedBox(height: 4),
+      Text(value,
+          style: TextStyle(
+            color: color,
+            fontSize: 30,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -1,
+          )),
+    ]);
+  }
+
+  // ── Services ─────────────────────────────────────────────────
+  Widget _buildServiceIcons() {
+    final services = [
+      {'icon': Icons.medical_services_outlined, 'label': 'Consult',  'color': const Color(0xFF1565C0)},
+      {'icon': Icons.vaccines_outlined,          'label': 'Vaccine',  'color': const Color(0xFF10B981)},
+      {'icon': Icons.monitor_heart_outlined,     'label': 'Check-up', 'color': const Color(0xFFE53935)},
+      {'icon': Icons.child_care_outlined,        'label': 'Maternal', 'color': const Color(0xFF7B1FA2)},
+    ];
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: services.map((s) {
+        final color = s['color'] as Color;
+        return Column(children: [
+          Container(
+            width: 62, height: 62,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                  color: color.withOpacity(0.15)),
+            ),
+            child: Icon(s['icon'] as IconData,
+                color: color, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(s['label'] as String,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: _C.textDark,
+              )),
+        ]);
+      }).toList(),
+    );
+  }
+
+  // ── Quick Actions ────────────────────────────────────────────
   Widget _buildQuickActionGrid() {
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 15,
-      mainAxisSpacing: 15,
+      crossAxisCount:   2,
+      crossAxisSpacing: 14,
+      mainAxisSpacing:  14,
       childAspectRatio: 2.3,
       children: [
-        _actionBtn("Join Queue", Icons.add_circle_outline_rounded, () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const uKonekJoinQueuePage()));
-        }),
-        _actionBtn("Records", Icons.assignment_outlined, () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const uKonekHealthRecordsPage()));
-        }),
-        _actionBtn("Scheduler", Icons.alarm_on_outlined, () {}),
-        _actionBtn("Updates", Icons.campaign_outlined, () {}),
+        _actionBtn('Join Queue', Icons.add_circle_outline_rounded,
+            const Color(0xFF1565C0), () => Navigator.push(context,
+                MaterialPageRoute(
+                    builder: (_) => const uKonekJoinQueuePage()))),
+        _actionBtn('Records', Icons.assignment_outlined,
+            const Color(0xFF10B981), () => Navigator.push(context,
+                MaterialPageRoute(
+                    builder: (_) => const uKonekHealthRecordsPage()))),
+        _actionBtn('Scheduler', Icons.alarm_on_outlined,
+            const Color(0xFF7B1FA2), () {}),
+        _actionBtn('Updates', Icons.campaign_outlined,
+            const Color(0xFFF59E0B), () {}),
       ],
     );
   }
 
-  Widget _buildMedicineCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
-      child: Column(
-        children: [
-          _medRow("Amoxicillin", "08:00 AM", "UPCOMING", Colors.orange),
-          const Divider(height: 32),
-          _medRow("Vitamin C", "12:30 PM", "MISSED", Colors.red),
-        ],
-      ),
-    );
-  }
-
-  // ── HELPERS ────────────────────────────────────────────────────────
-
-  Widget _queueInfo(String label, String value, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(color: Colors.grey.shade400, fontSize: 10, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(value, style: TextStyle(color: color, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -1)),
-      ],
-    );
-  }
-
-  Widget _medRow(String name, String time, String status, Color color) {
-    return Row(
-      children: [
-        Container(
-          height: 48, width: 48,
-          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(14)),
-          child: Icon(Icons.medication_outlined, color: color, size: 24),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _textDark)),
-            Text(time, style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-          ]),
-        ),
-        Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 10)),
-      ],
-    );
-  }
-
-  Widget _actionBtn(String label, IconData icon, VoidCallback onTap) {
+  Widget _actionBtn(String label, IconData icon,
+      Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+        decoration: BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [BoxShadow(
+            color: _C.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )],
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: _primary, size: 22),
+            Container(
+              width: 34, height: 34,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 18),
+            ),
             const SizedBox(width: 10),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _textDark)),
+            Text(label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: _C.textDark,
+                )),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildServiceIcons() {
-    final services = [
-      {'icon': Icons.medical_services_outlined, 'label': 'Consult'},
-      {'icon': Icons.vaccines_outlined, 'label': 'Vax'},
-      {'icon': Icons.monitor_heart_outlined, 'label': 'Checkup'},
-      {'icon': Icons.child_care_outlined, 'label': 'Maternal'},
-    ];
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: services.map((s) => Column(
-        children: [
-          Container(
-            height: 64, width: 64,
-            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-            child: Icon(s['icon'] as IconData, color: _primary, size: 28),
-          ),
-          const SizedBox(height: 10),
-          Text(s['label'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
-        ],
-      )).toList(),
+  // ── Medicine Card ────────────────────────────────────────────
+  Widget _buildMedicineCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _C.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(
+          color: _C.shadow,
+          blurRadius: 14,
+          offset: const Offset(0, 5),
+        )],
+      ),
+      child: Column(children: [
+        _medRow('Amoxicillin', '08:00 AM', 'UPCOMING', _C.warning),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Divider(height: 1, color: _C.divider),
+        ),
+        _medRow('Vitamin C', '12:30 PM', 'MISSED', const Color(0xFFE53935)),
+      ]),
     );
   }
 
-  Widget _buildPillSearchBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      height: 48,
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(30)),
-      child: const Row(
+  Widget _medRow(String name, String time,
+      String status, Color color) {
+    return Row(children: [
+      Container(
+        height: 46, width: 46,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(13),
+        ),
+        child: Icon(Icons.medication_outlined,
+            color: color, size: 22),
+      ),
+      const SizedBox(width: 14),
+      Expanded(child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.search_rounded, color: Colors.white60, size: 22),
-          SizedBox(width: 12),
-          Text("Search health records...", style: TextStyle(color: Colors.white60, fontSize: 14)),
+          Text(name,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: _C.textDark,
+              )),
+          const SizedBox(height: 2),
+          Text(time,
+              style: TextStyle(
+                  color: Colors.grey.shade400, fontSize: 12)),
         ],
+      )),
+      Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(status,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 10,
+              letterSpacing: 0.5,
+            )),
+      ),
+    ]);
+  }
+
+  // ── Bottom Nav ───────────────────────────────────────────────
+  Widget _buildBottomNav() {
+    final tabs = [
+      {'icon': Icons.dashboard_rounded,         'label': 'Home'},
+      {'icon': Icons.event_note_rounded,         'label': 'Medicine'},
+      {'icon': Icons.confirmation_number_rounded,'label': 'Queue'},
+      {'icon': Icons.person_outline_rounded,     'label': 'Profile'},
+    ];
+    return Container(
+      decoration: BoxDecoration(
+        color: _C.surface,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+        boxShadow: [BoxShadow(
+          color: _C.shadow,
+          blurRadius: 20,
+          offset: const Offset(0, -4),
+        )],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 8, vertical: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(tabs.length, (i) {
+              final isSelected = _selectedTab == i;
+              return GestureDetector(
+                onTap: () {
+                  if (i == 3) { _navigateToProfile(); return; }
+                  setState(() => _selectedTab = i);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSelected ? 16 : 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? _C.primaryMid.withOpacity(0.10)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(tabs[i]['icon'] as IconData,
+                          color: isSelected
+                              ? _C.primaryMid
+                              : Colors.grey.shade400,
+                          size: 22),
+                      if (isSelected) ...[
+                        const SizedBox(width: 6),
+                        Text(tabs[i]['label'] as String,
+                            style: const TextStyle(
+                              color: _C.primaryMid,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            )),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildNotificationBell() {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
-      child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
-    );
-  }
+  // ── Helpers ──────────────────────────────────────────────────
+  Widget _sectionHeader(String title) => Text(title,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
+        color: _C.textDark,
+        letterSpacing: -0.3,
+      ));
 
   String _getGreeting() {
-    int hour = DateTime.now().hour;
-    if (hour < 12) return "☀️ Good Morning,";
-    if (hour < 17) return "🌤 Good Afternoon,";
-    return "🌙 Good Evening,";
-  }
-
-  Widget _sectionHeader(String title) {
-    return Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: _textDark, letterSpacing: -0.5));
-  }
-
-  Widget _buildBottomNav() {
-    return BottomNavigationBar(
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: _primary,
-      unselectedItemColor: Colors.grey.shade400,
-      currentIndex: _selectedTab,
-      onTap: (i) {
-        if (i == 3) _navigateToProfile();
-        else setState(() => _selectedTab = i);
-      },
-      backgroundColor: Colors.white,
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: "Home"),
-        BottomNavigationBarItem(icon: Icon(Icons.event_note_rounded), label: "Medicine"),
-        BottomNavigationBarItem(icon: Icon(Icons.confirmation_number_rounded), label: "Queue"),
-        BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: "Profile"),
-      ],
-    );
+    final h = DateTime.now().hour;
+    if (h < 12) return '☀️ Good Morning,';
+    if (h < 17) return '🌤 Good Afternoon,';
+    return '🌙 Good Evening,';
   }
 }
