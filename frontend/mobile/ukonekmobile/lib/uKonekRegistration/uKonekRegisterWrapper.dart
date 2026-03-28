@@ -1,4 +1,4 @@
-import 'dart:io'; // <-- REQUIRED for File type
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:ukonekmobile/uKonekPreviewPage.dart';
 import 'steps/personal_info_step.dart';
@@ -9,58 +9,74 @@ class uKonekRegisterWrapper extends StatefulWidget {
   const uKonekRegisterWrapper({super.key});
 
   @override
-  State<uKonekRegisterWrapper> createState() => _uKonekRegisterWrapperState();
+  State<uKonekRegisterWrapper> createState() =>
+      _uKonekRegisterWrapperState();
 }
 
-class _uKonekRegisterWrapperState extends State<uKonekRegisterWrapper> {
+class _uKonekRegisterWrapperState
+    extends State<uKonekRegisterWrapper> {
   final PageController _pageController = PageController();
   int _currentStep = 0;
 
   final _step1Key = GlobalKey<FormState>();
   final _step2Key = GlobalKey<FormState>();
 
-  // --- CONTROLLERS ---
-  final firstNameController = TextEditingController();
-  final middleNameController = TextEditingController();
-  final lastNameController = TextEditingController();
-  final nameExtensionController = TextEditingController();
-  final ageController = TextEditingController();
-
-  final contactController = TextEditingController();
-  final emailController = TextEditingController();
-  final houseNumberController = TextEditingController();
-  final streetNameController = TextEditingController();
-  final barangayController = TextEditingController(text: "Ugong");
-
-  final emergencyNameController = TextEditingController();
+  // Controllers
+  final firstNameController      = TextEditingController();
+  final middleNameController     = TextEditingController();
+  final lastNameController       = TextEditingController();
+  final nameExtensionController  = TextEditingController();
+  final ageController            = TextEditingController();
+  final contactController        = TextEditingController();
+  final emailController          = TextEditingController();
+  final houseNumberController    = TextEditingController();
+  final streetNameController     = TextEditingController();
+  final barangayController       =
+  TextEditingController(text: 'Ugong');
+  final emergencyNameController    = TextEditingController();
   final emergencyContactController = TextEditingController();
-  final relationController = TextEditingController();
+  final relationController         = TextEditingController();
 
   DateTime? selectedDate;
-  String selectedSex = "Male";
-  bool idVerified = false;
-  File? idImage; // Handled by dart:io import
+  String    selectedSex  = 'Male';
+  bool      idVerified   = false;
+  File?     idImage;
+
+  static const _primary   = Color(0xFF0A2E6E);
+  static const _primary2  = Color(0xFF1565C0);
+  static const _bg        = Color(0xFFF0F4FA);
+  static const _surface   = Colors.white;
+  static const _textDark  = Color(0xFF1A2740);
+  static const _textMuted = Color(0xFF8A93A0);
+  static const _divider   = Color(0xFFEEF1F6);
+
+  // Step labels & icons
+  static const _steps = [
+    {'label': 'Personal',  'icon': Icons.person_outline_rounded},
+    {'label': 'Contact',   'icon': Icons.contact_mail_outlined},
+    {'label': 'Verify ID', 'icon': Icons.shield_outlined},
+  ];
 
   Future<void> pickDate() async {
-    DateTime? picked = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
       initialDate: DateTime(2000),
-      firstDate: DateTime(1950),
-      lastDate: DateTime.now(),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(primary: Color(0xFF0A2E6E)),
-        ),
+      firstDate:   DateTime(1950),
+      lastDate:    DateTime.now(),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+            colorScheme: const ColorScheme.light(
+                primary: _primary)),
         child: child!,
       ),
     );
-
     if (picked != null) {
       setState(() {
         selectedDate = picked;
         int age = DateTime.now().year - picked.year;
         if (DateTime.now().month < picked.month ||
-            (DateTime.now().month == picked.month && DateTime.now().day < picked.day)) {
+            (DateTime.now().month == picked.month &&
+                DateTime.now().day < picked.day)) {
           age--;
         }
         ageController.text = age.toString();
@@ -70,71 +86,73 @@ class _uKonekRegisterWrapperState extends State<uKonekRegisterWrapper> {
 
   void _handleNext() {
     bool canProceed = false;
-
     if (_currentStep == 0) {
       if (_step1Key.currentState!.validate()) {
         if (selectedDate == null) {
-          _showErrorSnackBar("Please select your date of birth");
+          _snackBar('Please select your date of birth');
         } else {
           canProceed = true;
         }
       } else {
-        _showErrorSnackBar("Please complete all required fields");
+        _snackBar('Please complete all required fields');
       }
-    }
-    else if (_currentStep == 1) {
+    } else if (_currentStep == 1) {
       if (_step2Key.currentState!.validate()) {
         canProceed = true;
       } else {
-        _showErrorSnackBar("Please complete all required fields");
+        _snackBar('Please complete all required fields');
       }
-    }
-    else if (_currentStep == 2) {
+    } else if (_currentStep == 2) {
       if (idVerified) {
         _navigateToPreview();
       } else {
-        _showErrorSnackBar("Please verify your ID first.");
+        _snackBar('Please verify your ID first.');
       }
     }
-
     if (canProceed && _currentStep < 2) {
       _pageController.nextPage(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
       );
     }
   }
 
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  void _snackBar(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: Colors.redAccent,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    ));
   }
 
   void _navigateToPreview() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => uKonekPreviewPage(
-          firstName: firstNameController.text,
-          middleName: middleNameController.text,
-          surname: lastNameController.text,
-          nameExtension: nameExtensionController.text, // Passed correctly now
-          dob: selectedDate != null ? "${selectedDate!.month}/${selectedDate!.day}/${selectedDate!.year}" : "",
-          age: ageController.text,
-          contact: "+63${contactController.text}",
-          sex: selectedSex,
-          email: emailController.text,
-          address: "${houseNumberController.text} ${streetNameController.text}, Brgy. ${barangayController.text}",
-          emergencyName: emergencyNameController.text,
-          emergencyContact: emergencyContactController.text.isEmpty ? "" : "+63${emergencyContactController.text}",
-          relation: relationController.text,
-          idImage: idImage,
-          idVerified: idVerified,
+        builder: (_) => uKonekPreviewPage(
+          firstName:        firstNameController.text,
+          middleName:       middleNameController.text,
+          surname:          lastNameController.text,
+          nameExtension:    nameExtensionController.text,
+          dob:              selectedDate != null
+              ? '${selectedDate!.month}/${selectedDate!.day}/${selectedDate!.year}'
+              : '',
+          age:              ageController.text,
+          contact:          '+63${contactController.text}',
+          sex:              selectedSex,
+          email:            emailController.text,
+          address:
+          '${houseNumberController.text} ${streetNameController.text}, Brgy. ${barangayController.text}',
+          emergencyName:    emergencyNameController.text,
+          emergencyContact: emergencyContactController.text.isEmpty
+              ? ''
+              : '+63${emergencyContactController.text}',
+          relation:         relationController.text,
+          idImage:          idImage,
+          idVerified:       idVerified,
         ),
       ),
     );
@@ -143,202 +161,252 @@ class _uKonekRegisterWrapperState extends State<uKonekRegisterWrapper> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFF),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0A2E6E),
-        elevation: 0,
-        centerTitle: true,
-        title: const Text("Create Account",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-          onPressed: () {
-            if (_currentStep > 0) {
-              _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-            } else {
-              Navigator.pop(context);
-            }
-          },
-        ),
-      ),
-      body: Column(
-        children: [
-          _buildProgressBar(),
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              onPageChanged: (int page) => setState(() => _currentStep = page),
-              children: [
-                PersonalInfoStep(
-                  formKey: _step1Key,
-                  firstName: firstNameController,
-                  middleName: middleNameController,
-                  lastName: lastNameController,
-                  nameExtension: nameExtensionController,
-                  age: ageController,
-                  onPickDate: pickDate,
-                  selectedDate: selectedDate,
-                  selectedSex: selectedSex,
-                  onSexChanged: (val) => setState(() => selectedSex = val),
-                ),
-                ContactAddressStep(
-                  formKey: _step2Key,
-                  contact: contactController,
-                  email: emailController,
-                  houseNo: houseNumberController,
-                  street: streetNameController,
-                  brgy: barangayController,
-                  eName: emergencyNameController,
-                  eContact: emergencyContactController,
-                  relation: relationController,
-                ),
-                IdVerificationStep(
-                  firstName: firstNameController.text,
-                  surname: lastNameController.text,
-                  middleName: middleNameController.text,
-                  dob: selectedDate,
-                  onVerified: (verified, pickedFile) { // These names must match the child's call
-                    setState(() {
-                      idVerified = verified;
-                      idImage = pickedFile;
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: _buildBottomNav(),
-    );
-  }
-
-  Widget _buildProgressBar() {
-    const Color formBg = Color(0xFFF8FAFF);
-    const Color activeBlue = Color(0xFF0D47A1);
-    const Color fieldBorder = Color(0xFFDDE3F0);
-    const Color textGrey = Color(0xFF8A93A0);
-
-    return Container(
-      width: double.infinity,
-      color: formBg,
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-      child: Stack(
-        alignment: Alignment.topCenter, // Align stack to top to manage text below
-        children: [
-          // ── 1. THE TRACK LINE (Moves down slightly to center with circles) ──
-          Positioned(
-            top: 17, // Half of circle height (34/2)
-            left: 40,
-            right: 40,
-            child: Stack(
-              children: [
-                Container(height: 2, color: fieldBorder),
-                LayoutBuilder(
-                  builder: (context, constraints) => AnimatedContainer(
-                    duration: const Duration(milliseconds: 500),
-                    width: constraints.maxWidth * (_currentStep / 2),
-                    height: 2,
-                    color: activeBlue,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── 2. THE NODES AND LABELS ──
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: _bg,
+      body: Column(children: [
+        _buildHeader(),
+        _buildStepper(),
+        Expanded(
+          child: PageView(
+            controller: _pageController,
+            physics: const NeverScrollableScrollPhysics(),
+            onPageChanged: (p) =>
+                setState(() => _currentStep = p),
             children: [
-              _buildStepWithLabel(0, "Personal", activeBlue, textGrey, fieldBorder),
-              _buildStepWithLabel(1, "Contact", activeBlue, textGrey, fieldBorder),
-              _buildStepWithLabel(2, "Verify", activeBlue, textGrey, fieldBorder),
+              PersonalInfoStep(
+                formKey:      _step1Key,
+                firstName:    firstNameController,
+                middleName:   middleNameController,
+                lastName:     lastNameController,
+                nameExtension:nameExtensionController,
+                age:          ageController,
+                onPickDate:   pickDate,
+                selectedDate: selectedDate,
+                selectedSex:  selectedSex,
+                onSexChanged: (v) =>
+                    setState(() => selectedSex = v),
+              ),
+              ContactAddressStep(
+                formKey:  _step2Key,
+                contact:  contactController,
+                email:    emailController,
+                houseNo:  houseNumberController,
+                street:   streetNameController,
+                brgy:     barangayController,
+                eName:    emergencyNameController,
+                eContact: emergencyContactController,
+                relation: relationController,
+              ),
+              IdVerificationStep(
+                firstName: firstNameController.text,
+                surname:   lastNameController.text,
+                middleName:middleNameController.text,
+                dob:       selectedDate,
+                onVerified:(verified, file) {
+                  setState(() {
+                    idVerified = verified;
+                    idImage    = file;
+                  });
+                },
+              ),
             ],
           ),
-        ],
+        ),
+        _buildBottomNav(),
+      ]),
+    );
+  }
+
+  // ── Header ───────────────────────────────────────────────────
+  Widget _buildHeader() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_primary, _primary2],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft:  Radius.circular(0),
+          bottomRight: Radius.circular(0),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+          child: Row(children: [
+            GestureDetector(
+              onTap: () {
+                if (_currentStep > 0) {
+                  _pageController.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                } else {
+                  Navigator.pop(context);
+                }
+              },
+              child: Container(
+                width: 38, height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white, size: 18),
+              ),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Create Account',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      letterSpacing: -0.3,
+                    )),
+                SizedBox(height: 2),
+                Text('Fill in your information below',
+                    style: TextStyle(
+                        color: Colors.white70, fontSize: 12)),
+              ],
+            )),
+          ]),
+        ),
       ),
     );
   }
 
-  Widget _buildStepWithLabel(int index, String label, Color active, Color inactive, Color stroke) {
-    bool isCompleted = index < _currentStep;
-    bool isCurrent = index == _currentStep;
-    bool isActive = isCompleted || isCurrent;
-
-    return SizedBox(
-      width: 70, // Fixed width to prevent labels from shifting nodes
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // The Circle
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 400),
-            width: 34,
-            height: 34,
+  // ── Stepper ──────────────────────────────────────────────────
+  Widget _buildStepper() {
+    return Container(
+      color: _surface,
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+      child: Column(children: [
+        // Step nodes + connector
+        Row(children: List.generate(_steps.length * 2 - 1, (i) {
+          if (i.isOdd) {
+            // Connector line
+            final stepIdx = i ~/ 2;
+            final filled  = stepIdx < _currentStep;
+            return Expanded(child: Container(
+              height: 2,
+              color: filled ? _primary : const Color(0xFFE0E7FF),
+            ));
+          }
+          final idx       = i ~/ 2;
+          final completed = idx < _currentStep;
+          final current   = idx == _currentStep;
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 350),
+            width: 40, height: 40,
             decoration: BoxDecoration(
-              color: isActive ? active : Colors.white,
+              color: (completed || current)
+                  ? _primary
+                  : _surface,
               shape: BoxShape.circle,
               border: Border.all(
-                color: isActive ? active : stroke,
-                width: 1.5,
+                color: (completed || current)
+                    ? _primary
+                    : const Color(0xFFDDE3F0),
+                width: 2,
               ),
-              boxShadow: isCurrent ? [
-                BoxShadow(color: active.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4))
-              ] : null,
+              boxShadow: current
+                  ? [BoxShadow(
+                color: _primary.withOpacity(0.25),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              )]
+                  : [],
             ),
             child: Center(
-              child: isCompleted
-                  ? const Icon(Icons.check, color: Colors.white, size: 16)
-                  : Text(
-                "${index + 1}",
-                style: TextStyle(
-                  color: isActive ? Colors.white : inactive,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: completed
+                  ? const Icon(Icons.check_rounded,
+                  color: Colors.white, size: 18)
+                  : Icon(
+                _steps[idx]['icon'] as IconData,
+                color: current
+                    ? Colors.white
+                    : _textMuted,
+                size: 18,
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          // The Label
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 10,
-              letterSpacing: 0.5,
-              fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-              color: isCurrent ? active : inactive,
-            ),
-          ),
-        ],
-      ),
+          );
+        })),
+        const SizedBox(height: 10),
+        // Labels
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(_steps.length, (i) {
+            final isActive = i <= _currentStep;
+            return SizedBox(
+              width: 80,
+              child: Text(
+                _steps[i]['label'] as String,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: i == _currentStep
+                      ? FontWeight.bold
+                      : FontWeight.normal,
+                  color: isActive ? _primary : _textMuted,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            );
+          }),
+        ),
+      ]),
     );
   }
 
+  // ── Bottom Nav ───────────────────────────────────────────────
   Widget _buildBottomNav() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
       decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4))]
+        color: _surface,
+        boxShadow: [BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 16,
+          offset: const Offset(0, -4),
+        )],
       ),
       child: SizedBox(
         width: double.infinity,
+        height: 54,
         child: ElevatedButton(
           onPressed: _handleNext,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF0A2E6E),
+            backgroundColor: _primary,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            elevation: 0,
+            elevation:  4,
+            shadowColor: _primary.withOpacity(0.3),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
           ),
-          child: Text(
-            _currentStep == 2 ? "FINISH" : "NEXT",
-            style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _currentStep == 2 ? 'FINISH' : 'NEXT',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                _currentStep == 2
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.arrow_forward_rounded,
+                size: 18,
+              ),
+            ],
           ),
         ),
       ),
