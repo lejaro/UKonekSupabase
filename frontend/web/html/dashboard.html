@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>U-Konek+ — Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-inner">
+        <div class="brand-row">
+          <div class="logo"></div>
+          <div class="brand-stack">
+            <h3 class="brand-text">U-Konek+</h3>
+            <p class="brand-subtext">Admin Workspace</p>
+          </div>
+          <div class="control-btns">
+            <button id="burger" class="icon-btn" aria-label="Toggle sidebar">☰</button>
+          </div>
+        </div>
+        <p class="sidebar-section-label">Main</p>
+
+        <nav class="nav" aria-label="Main navigation">
+          <a href="#" class="nav-item admin-only" data-section="dashboard" title="Dashboard">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11.5L12 4l9 7.5"/><path d="M5 10.5V20h14v-9.5"/></svg>
+            </span>
+            <span class="label">Dashboard</span>
+          </a>
+          <a href="#" class="nav-item" data-section="schedule" title="Schedule">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            </span>
+            <span class="label">Schedule</span>
+          </a>
+          <div class="nav-item dropdown admin-only">
+            <button class="nav-btn" aria-label="Users menu" title="Users">
+              <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="3"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a3 3 0 0 1 0 5.75"/></svg>
+              </span>
+              <span class="label">Users</span>
+              <span class="arrow">▾</span>
+            </button>
+            <div class="dropdown-menu hidden">
+              <a href="#" class="dropdown-item" data-section="account-management">Account Management</a>
+            </div>
+          </div>
+          <a href="#" class="nav-item" data-section="reports" title="Reports">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-3 4 3 4-3 4 3V8z"/><path d="M14 2v6h6"/></svg>
+            </span>
+            <span class="label">Reports</span>
+          </a>
+          <a href="#" class="nav-item" data-section="settings" title="Settings">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-.33-1 1.65 1.65 0 0 0-1-.6 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1-.33H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1-.33 1.65 1.65 0 0 0 .6-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .33-1V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 .33 1 1.65 1.65 0 0 0 1 .6 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.13.32.2.66.2 1s-.07.68-.2 1z"/></svg>
+            </span>
+            <span class="label">Settings</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="sidebar-footer-dot"></div>
+          <div class="sidebar-footer-copy">
+            <p class="sidebar-footer-title">System Status</p>
+            <p class="sidebar-footer-sub">All services online</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="mainview">
+      <div class="topbar">
+        <div class="topbar-left">
+          <div class="left-controls">
+            <div class="search-wrap">
+              <input id="search-input" class="search-input" type="search" placeholder="Search..." aria-label="Search" />
+            </div>
+          </div>
+          <div class="right-controls">
+            <button id="notif-btn" class="icon-btn topbar-icon-btn" aria-label="Notifications">
+              <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <div class="user-info">
+            <div class="user-name">User</div>
+            <div class="user-pos">Administrator</div>
+          </div>
+          <div class="profile-img" title="Profile"></div>
+          <button id="logout-btn" class="icon-btn logout-btn" title="Logout">Logout</button>
+        </div>
+      </div>
+
+      <section class="section-top admin-only" id="dashboard-section">
+        <div class="dashboard-hero fade-in-up">
+          <div>
+            <p class="section-kicker">Operations Overview</p>
+            <h2 class="section-title">Admin Command Center</h2>
+            <p class="section-subtitle">Monitor registrations, review pending approvals, and keep staff onboarding flowing smoothly.</p>
+          </div>
+          <div class="hero-actions">
+            <button id="dash-refresh-btn" class="chip-btn">Refresh Data</button>
+            <button id="dash-open-pending-btn" class="chip-btn chip-btn-outline">Review Pending</button>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <article class="stat-card fade-in-up" style="animation-delay: 0.03s;">
+            <p class="stat-label">Total Staff</p>
+            <p id="stat-total-staff" class="stat-value">0</p>
+            <p class="stat-foot">All active records</p>
+          </article>
+          <article class="stat-card fade-in-up" style="animation-delay: 0.06s;">
+            <p class="stat-label">Pending Approvals</p>
+            <p id="stat-pending-staff" class="stat-value stat-warning">0</p>
+            <p class="stat-foot">Needs review</p>
+          </article>
+          <article class="stat-card fade-in-up" style="animation-delay: 0.09s;">
+            <p class="stat-label">Doctors</p>
+            <p id="stat-doctors" class="stat-value">0</p>
+            <p class="stat-foot">Clinical personnel</p>
+          </article>
+          <article class="stat-card fade-in-up" style="animation-delay: 0.12s;">
+            <p class="stat-label">Active Accounts</p>
+            <p id="stat-active-staff" class="stat-value stat-success">0</p>
+            <p class="stat-foot">Ready to sign in</p>
+          </article>
+        </div>
+
+        <div class="panel-grid">
+          <section class="panel fade-in-up" style="animation-delay: 0.15s;">
+            <div class="panel-head">
+              <h3>Pending Registration Queue</h3>
+              <span class="panel-hint">Click users in Account Management to approve/reject.</span>
+            </div>
+            <div class="table-wrap">
+              <table class="accounts-table compact-table">
+                <thead>
+                  <tr class="table-header-row">
+                    <th class="table-header-cell">Username</th>
+                    <th class="table-header-cell">Employee ID</th>
+                    <th class="table-header-cell">Role</th>
+                    <th class="table-header-cell">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboard-pending-preview"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel fade-in-up" style="animation-delay: 0.18s;">
+            <div class="panel-head">
+              <h3>Latest Active Accounts</h3>
+              <span class="panel-hint" id="dashboard-last-sync">Last synced: --</span>
+            </div>
+            <div class="table-wrap">
+              <table class="accounts-table compact-table">
+                <thead>
+                  <tr class="table-header-row">
+                    <th class="table-header-cell">Username</th>
+                    <th class="table-header-cell">Role</th>
+                    <th class="table-header-cell">Status</th>
+                    <th class="table-header-cell">Created</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboard-active-preview"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="users-section" class="section-top hidden admin-only">
+        <div id="account-management" class="hidden">
+          <div class="management-shell">
+            <div class="management-head">
+              <div>
+                <h2 class="section-title">Account Management</h2>
+                <p class="section-subtitle">Review all active accounts and process pending registrations.</p>
+              </div>
+              <div class="management-actions">
+                <button id="refresh-accounts-btn" class="chip-btn">Refresh Tables</button>
+              </div>
+            </div>
+
+            <div class="management-toolbar">
+              <div class="tabs">
+                <button id="tab-registered" class="tab active">Registered Accounts</button>
+                <button id="tab-pending" class="tab">Pending Registrations</button>
+              </div>
+              <div class="toolbar-right">
+                <label class="filter-label">Filter by Role:</label>
+                <select id="role-filter" class="filter-select">
+                  <option value="">All Roles</option>
+                  <option value="admin">Admin</option>
+                  <option value="staff">Staff</option>
+                  <option value="doctor">Doctor</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="registered-pane">
+              <table id="accounts-table" class="accounts-table">
+                <thead>
+                  <tr class="table-header-row">
+                    <th class="table-header-cell">Username</th>
+                    <th class="table-header-cell">Employee ID</th>
+                    <th class="table-header-cell">Role</th>
+                    <th class="table-header-cell">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="accounts-tbody">
+                  <tr class="account-row" data-role="admin">
+                    <td class="table-cell">John Doe</td>
+                    <td class="table-cell">john@example.com</td>
+                    <td class="table-cell">Admin</td>
+                    <td class="table-cell"><span class="badge-active">Active</span></td>
+                  </tr>
+                  <tr class="account-row" data-role="doctor">
+                    <td class="table-cell">Jane Smith</td>
+                    <td class="table-cell">jane@example.com</td>
+                    <td class="table-cell">Doctor</td>
+                    <td class="table-cell"><span class="badge-active">Active</span></td>
+                  </tr>
+                  <tr class="account-row" data-role="staff">
+                    <td class="table-cell">Michael Johnson</td>
+                    <td class="table-cell">michael@example.com</td>
+                    <td class="table-cell">Staff</td>
+                    <td class="table-cell"><span class="badge-active">Active</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div id="pending-pane" class="hidden">
+              <h3 class="mb-12">Pending Registrations</h3>
+              <table id="pending-table" class="accounts-table">
+                <thead>
+                  <tr class="table-header-row">
+                    <th class="table-header-cell">Username</th>
+                    <th class="table-header-cell">Employee ID</th>
+                    <th class="table-header-cell">Role</th>
+                    <th class="table-header-cell">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody id="pending-tbody">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="non-admin-section" class="section-top hidden">
+        <div class="dashboard-hero fade-in-up">
+          <div>
+            <p class="section-kicker">Workspace Overview</p>
+            <h2 class="section-title" id="non-admin-title">Role Workspace</h2>
+            <p class="section-subtitle" id="non-admin-subtitle">You are signed in with a non-admin role.</p>
+          </div>
+        </div>
+
+        <div class="panel-grid">
+          <section class="panel fade-in-up" style="animation-delay: 0.05s;">
+            <div class="panel-head">
+              <h3>Your Access</h3>
+              <span class="panel-hint">Role-based permissions are active.</span>
+            </div>
+            <p class="section-subtitle" id="non-admin-permissions">Admin Command Center modules are restricted to admin accounts.</p>
+          </section>
+
+          <section class="panel fade-in-up" style="animation-delay: 0.08s;">
+            <div class="panel-head">
+              <h3>Account Details</h3>
+              <span class="panel-hint">Current signed-in profile</span>
+            </div>
+            <div class="table-wrap">
+              <table class="accounts-table compact-table">
+                <tbody>
+                  <tr>
+                    <th class="table-header-cell">Username</th>
+                    <td class="table-cell" id="non-admin-username">—</td>
+                  </tr>
+                  <tr>
+                    <th class="table-header-cell">Role</th>
+                    <td class="table-cell" id="non-admin-role">—</td>
+                  </tr>
+                  <tr>
+                    <th class="table-header-cell">Email</th>
+                    <td class="table-cell" id="non-admin-email">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <div class="panel fade-in-up" style="animation-delay: 0.12s;">
+          <div class="panel-head">
+            <h3>Admin Command Center</h3>
+            <span class="panel-hint">Restricted module</span>
+          </div>
+          <p class="section-subtitle">Only users with the Admin role can view and use admin account management and approval commands.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Registration Confirmation Modal -->
+  <div id="registration-confirm-modal" class="modal-overlay" style="display:none">
+    <div class="modal-content">
+      <h2 class="modal-title">Confirm Registration</h2>
+      <div class="modal-group"><label class="modal-label">Name</label>
+        <p id="confirm-name" class="modal-text"></p>
+      </div>
+      <div class="modal-group"><label class="modal-label">M.I.</label>
+        <p id="confirm-mi" class="modal-text"></p>
+      </div>
+      <div class="modal-group"><label class="modal-label">Email</label>
+        <p id="confirm-email" class="modal-text"></p>
+      </div>
+      <div class="modal-group"><label class="modal-label">Role</label>
+        <p id="confirm-role" class="modal-text"></p>
+      </div>
+      <div class="modal-group"><label class="modal-label">Contact</label>
+        <p id="confirm-contact" class="modal-text"></p>
+      </div>
+      <div class="modal-group"><label class="modal-label">Address</label>
+        <p id="confirm-address" class="modal-text"></p>
+      </div>
+      <div class="modal-group"><label class="modal-label">Birthday</label>
+        <p id="confirm-bday" class="modal-text"></p>
+      </div>
+      <div class="modal-actions">
+        <button id="confirm-register-btn" class="btn btn-confirm">Register</button>
+        <button id="confirm-cancel-btn" class="btn-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Registration Success Modal -->
+  <div id="registration-success-modal" class="modal-overlay" style="display:none">
+    <div class="modal-content">
+      <h2 class="modal-title">Registration Submitted</h2>
+      <p id="success-text" class="note">Your registration has been submitted. Please wait for admin approval and try to log in after an hour or two.</p>
+      <div class="modal-actions">
+        <button id="success-close-btn" class="btn btn-confirm">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pending Action Confirmation Modal (global) -->
+  <div id="pending-action-confirm-modal" class="modal-overlay" style="display:none">
+    <div class="modal-content">
+      <h2 class="modal-title">Confirm Action</h2>
+      <p id="pending-action-text" class="modal-confirm-text"></p>
+      <div class="modal-actions">
+        <button id="pending-action-yes" class="btn btn-confirm">Confirm</button>
+        <button id="pending-action-no" class="btn-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logout Confirmation Modal -->
+  <div id="logout-confirm-modal" class="modal-overlay" style="display:none">
+    <div class="modal-content">
+      <h2 class="modal-title">Confirm Logout</h2>
+      <p class="modal-confirm-text">Are you sure you want to log out?</p>
+      <div class="modal-actions">
+        <button id="logout-confirm-yes" class="btn btn-confirm">Log Out</button>
+        <button id="logout-confirm-no" class="btn-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account Details Modal -->
+  <div id="account-modal" class="modal-overlay" style="display:none">
+    <div class="modal-content">
+      <h2 id="modal-title" class="modal-title">Registered Account Details</h2>
+      <div class="modal-grid">
+        <div class="modal-group">
+          <label class="modal-label">Full Name</label>
+          <p id="modal-name" class="modal-text"></p>
+        </div>
+
+        <div class="modal-group">
+          <label class="modal-label">Email</label>
+          <p id="modal-email" class="modal-text"></p>
+        </div>
+
+        <div class="modal-group">
+          <label class="modal-label">Role</label>
+          <p id="modal-role" class="modal-text"></p>
+        </div>
+
+        <div class="modal-group">
+          <label class="modal-label">Employee ID</label>
+          <p id="modal-contact" class="modal-text"></p>
+        </div>
+
+        <div class="modal-group">
+          <label class="modal-label">Address</label>
+          <p id="modal-address" class="modal-text"></p>
+        </div>
+
+        <div class="modal-group">
+          <label class="modal-label">Birthday</label>
+          <p id="modal-bday" class="modal-text"></p>
+        </div>
+
+        <div class="modal-group">
+          <label class="modal-label">Status</label>
+          <p id="modal-status" class="modal-text"></p>
+        </div>
+      </div>
+
+      <div id="modal-actions" class="modal-actions">
+        <button id="modal-edit-btn" class="btn btn-confirm flex-1">Edit</button>
+        <button id="modal-delete-btn" class="btn-delete">Delete</button>
+        <button id="modal-close-btn" class="btn-close">Close</button>
+      </div>
+
+      <div id="modal-confirm-section" class="modal-confirm-section">
+        <p id="modal-confirm-text" class="modal-confirm-text"></p>
+        <div class="flex gap-12">
+          <button id="modal-confirm-btn" class="btn btn-confirm">Confirm</button>
+          <button id="modal-cancel-btn" class="btn-cancel">Cancel</button>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/runtime-config.js"></script>
+  <script type="module" src="../js/dashboard.js"></script>
+</body>
+
+</html>
