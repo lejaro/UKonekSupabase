@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>U-Konek+ — Admin Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .stats-chart-panel {
+      margin-top: 18px;
+    }
+
+    .stats-chart-content {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: stretch;
+      gap: 24px;
+      padding: 12px 0 16px;
+    }
+
+    .stats-chart-visual {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 18px;
+      border-radius: 22px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
+      box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+    }
+
+    .stats-chart-meta {
+      flex: 1 1 260px;
+      min-width: 220px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 14px;
+      padding: 12px 6px;
+    }
+
+    .stats-chart-canvas {
+      width: 320px;
+      height: 320px;
+      max-width: 100%;
+      filter: drop-shadow(0 10px 25px rgba(15, 23, 42, 0.12));
+    }
+
+    .stats-chart-panel .note {
+      margin: 0;
+      font-size: 13px;
+      color: #475569;
+      text-align: center;
+    }
+
+    .stats-chart-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .stats-chart-legend li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #0f172a;
+      padding: 10px 12px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 12px;
+      background: #f8fafc;
+      justify-content: space-between;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+
+    .stats-chart-label {
+      flex: 1;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .stats-chart-value {
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .stats-chart-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      display: inline-flex;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 720px) {
+      .stats-chart-content {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .stats-chart-meta {
+        width: 100%;
+      }
+
+      .stats-chart-legend li {
+        width: 100%;
+      }
+    }
+
+    .topbar-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #475569;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .notif-panel {
+      position: fixed;
+      top: 84px;
+      right: 32px;
+      width: 320px;
+      max-height: 420px;
+      padding: 16px;
+      border-radius: 14px;
+      box-shadow: 0 18px 35px rgba(15, 23, 42, 0.18);
+      background: #fff;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      z-index: 1200;
+    }
+
+    .notif-panel.hidden {
+      display: none;
+    }
+
+    .notif-panel h4 {
+      margin: 0 0 8px 0;
+      font-size: 15px;
+    }
+
+    .notif-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .notif-list li {
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+      font-size: 13px;
+    }
+
+    .notif-list li:last-child {
+      border-bottom: none;
+    }
+
+    .notif-type {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #3b82f6;
+      display: inline-block;
+      margin-bottom: 2px;
+    }
+
+    .notif-meta {
+      display: block;
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    #notif-close-btn {
+      margin-top: 12px;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-inner">
+        <div class="brand-row">
+          <div class="logo"><img class="logo" src="../U-KonekLogo-transparent.png" alt="" /></div>
+          <div class="brand-stack">
+            <h3 class="brand-text">U-Konek+</h3>
+            <p class="brand-subtext">Admin Workspace</p>
+          </div>
+          <div class="control-btns">
+            <button id="burger" class="icon-btn burger-toggle" aria-label="Toggle sidebar" aria-expanded="true">
+              <span class="burger-menu" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+              </span>
+              <span class="burger-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M15 5l-7 7 7 7" />
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <p class="sidebar-section-label">Main</p>
+
+        <nav class="nav main-nav" aria-label="Main navigation">
+          <a href="#" class="nav-item admin-only" data-section="dashboard-section" title="Dashboard">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 11.5L12 4l9 7.5" />
+                <path d="M5 10.5V20h14v-9.5" />
+              </svg>
+            </span>
+            <span class="label">Dashboard</span>
+          </a>
+          <a href="#" class="nav-item" data-section="schedule-section" title="Schedule">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <path d="M16 2v4M8 2v4M3 10h18" />
+              </svg>
+            </span>
+            <span class="label">Schedule</span>
+          </a>
+
+          <div class="nav-item dropdown admin-only">
+            <button class="nav-btn" aria-label="Users menu" title="Users" data-section="users-section"
+              data-tab="tab-registered" data-pane="accounts-pane">
+              <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="8.5" cy="7" r="3" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a3 3 0 0 1 0 5.75" />
+                </svg>
+              </span>
+              <span class="label">Users</span>
+              <span class="arrow">▾</span>
+            </button>
+            <div class="dropdown-menu hidden">
+              <a href="#" class="dropdown-item admin-only" data-section="users-section" data-tab="tab-registered" data-pane="accounts-pane">Account Management</a>
+              <a href="#" class="dropdown-item admin-only" data-section="users-section" data-pane="registration-pane">User Registration</a>
+            </div>
+          </div>
+
+          <div class="nav-item dropdown">
+            <button class="nav-btn" aria-label="Reports menu" title="Reports" data-section="reports-section"
+              data-tab="tab-announcements">
+              <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16l4-3 4 3 4-3 4 3V8z" />
+                  <path d="M14 2v6h6" />
+                </svg>
+              </span>
+              <span class="label">Reports</span>
+              <span class="arrow">▾</span>
+            </button>
+            <div class="dropdown-menu hidden">
+              <a href="#" class="dropdown-item admin-only" data-section="reports-section" data-tab="tab-announcements">Announcements</a>
+              <a href="#" class="dropdown-item admin-only" data-section="reports-section" data-tab="tab-feedback">Feedback</a>
+            </div>
+          </div>
+
+          <a href="#" class="nav-item" data-section="profile-section" title="Profile">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3" />
+                <path
+                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-.33-1 1.65 1.65 0 0 0-1-.6 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1-.33H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1-.33 1.65 1.65 0 0 0 .6-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .33-1V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 .33 1 1.65 1.65 0 0 0 1 .6 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.13.32.2.66.2 1s-.07.68-.2 1z" />
+              </svg>
+            </span>
+            <span class="label">Profile</span>
+          </a>
+          <a href="#" class="nav-item" data-section="medicine-section" title="Medicine Inventory">
+            <span class="nav-icon" aria-hidden="true">💊</span>
+            <span class="label">Medicine Inventory</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="sidebar-footer-dot"></div>
+          <div class="sidebar-footer-copy">
+            <p class="sidebar-footer-title">System Status</p>
+            <p class="sidebar-footer-sub">All services online</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="mainview">
+      <div class="topbar">
+        <div class="topbar-left">
+          <div class="left-controls">
+            <p class="topbar-title">Systems Overview</p>
+          </div>
+          <div class="right-controls">
+            <button id="notif-btn" class="icon-btn topbar-icon-btn" aria-label="Notifications">
+              <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <div class="user-info">
+            <div class="user-name">User</div>
+            <div class="user-pos">Administrator</div>
+          </div>
+          <div class="profile-img" title="Profile"></div>
+          <button id="logout-btn" class="icon-btn logout-btn" title="Logout">Logout</button>
+        </div>
+      </div>
+
+      <div id="notification-panel" class="notif-panel hidden" role="dialog" aria-label="Today's notifications">
+        <h4>Today's Notifications</h4>
+        <ul id="notification-list" class="notif-list"></ul>
+        <p id="notification-empty" class="note hidden" style="margin-top:8px;">No notifications for today.</p>
+        <button id="notif-close-btn" class="btn btn-close" type="button">Close</button>
+      </div>
+
+      <section class="section-top admin-only" id="dashboard-section">
+        <div class="dashboard-hero fade-in-up">
+          <div>
+            <p class="section-kicker">Operations Overview</p>
+            <h2 class="section-title">Admin Command Center</h2>
+            <p class="section-subtitle">Monitor registrations, review pending approvals, and keep staff onboarding flowing smoothly.</p>
+          </div>
+          <div class="hero-actions">
+            <button id="dash-refresh-btn" class="chip-btn">Refresh Data</button>
+            <button id="dash-open-pending-btn" class="chip-btn chip-btn-outline">Review Pending</button>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <article class="stat-card fade-in-up" style="animation-delay: 0.02s;">
+            <div class="stat-card-metric">
+              <span class="stat-card-icon stat-icon-indigo" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="8.5" cy="7" r="3" />
+                  <path d="M20 8a3 3 0 1 1-6 0" />
+                  <path d="M20 21v-2a4 4 0 0 0-3-3.87" />
+                </svg>
+              </span>
+              <div>
+                <p class="stat-label">Total Staff</p>
+                <p id="stat-total-staff" class="stat-value">0</p>
+              </div>
+            </div>
+            <p class="stat-foot">All onboarded personnel</p>
+          </article>
+
+          <article class="stat-card fade-in-up" style="animation-delay: 0.04s;">
+            <div class="stat-card-metric">
+              <span class="stat-card-icon stat-icon-emerald" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" />
+                  <path d="m9 12 2 2 4-4" />
+                </svg>
+              </span>
+              <div>
+                <p class="stat-label">Active Staff</p>
+                <p id="stat-active-staff" class="stat-value">0</p>
+              </div>
+            </div>
+            <p class="stat-foot stat-success">Currently online</p>
+          </article>
+
+          <article class="stat-card fade-in-up" style="animation-delay: 0.06s;">
+            <div class="stat-card-metric">
+              <span class="stat-card-icon stat-icon-amber" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="9" />
+                  <polyline points="12 7 12 12 15 15" />
+                </svg>
+              </span>
+              <div>
+                <p class="stat-label">Pending Approvals</p>
+                <p id="stat-pending-staff" class="stat-value">0</p>
+              </div>
+            </div>
+            <p class="stat-foot stat-warning">Awaiting review</p>
+          </article>
+
+          <article class="stat-card fade-in-up" style="animation-delay: 0.08s;">
+            <div class="stat-card-metric">
+              <span class="stat-card-icon stat-icon-cyan" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                  <circle cx="12" cy="12" r="9" />
+                </svg>
+              </span>
+              <div>
+                <p class="stat-label">Doctors Onboarded</p>
+                <p id="stat-doctors" class="stat-value">0</p>
+              </div>
+            </div>
+            <p class="stat-foot">Licensed specialists</p>
+          </article>
+
+          <article class="stat-card fade-in-up" style="animation-delay: 0.1s;">
+            <div class="stat-card-metric">
+              <span class="stat-card-icon stat-icon-violet" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M3 11v8a2 2 0 0 0 2 2h2" />
+                  <path d="M7 19V5a2 2 0 0 1 2-2h6l5 5v11a2 2 0 0 1-2 2H7" />
+                  <path d="M13 3v4a1 1 0 0 0 1 1h4" />
+                </svg>
+              </span>
+              <div>
+                <p class="stat-label">Announcements Sent</p>
+                <p id="stat-announcements" class="stat-value">0</p>
+              </div>
+            </div>
+            <p class="stat-foot">City-wide updates</p>
+          </article>
+
+          <article class="stat-card fade-in-up" style="animation-delay: 0.12s;">
+            <div class="stat-card-metric">
+              <span class="stat-card-icon stat-icon-rose" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+              </span>
+              <div>
+                <p class="stat-label">Feedback Reports</p>
+                <p id="stat-reports" class="stat-value">0</p>
+              </div>
+            </div>
+            <p class="stat-foot">Citizen responses</p>
+          </article>
+
+          <article class="stat-card fade-in-up" style="animation-delay: 0.14s;">
+            <div class="stat-card-metric">
+              <span class="stat-card-icon stat-icon-slate" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M3 11l9-8 9 8" />
+                  <path d="M5 10v10h14V10" />
+                  <path d="M9 21v-6h6v6" />
+                </svg>
+              </span>
+              <div>
+                <p class="stat-label">Registered Citizens</p>
+                <p id="stat-citizens" class="stat-value">0</p>
+              </div>
+            </div>
+            <p class="stat-foot">Resident accounts</p>
+          </article>
+        </div>
+
+        <div class="panel stats-chart-panel fade-in-up" style="animation-delay: 0.06s;">
+          <div class="panel-head">
+            <h3>Operations Breakdown</h3>
+            <span class="panel-hint">Live snapshot of staff, pending approvals, and communication volume.</span>
+          </div>
+          <div class="stats-chart-content">
+            <div class="stats-chart-visual">
+              <canvas id="dashboard-chart" class="stats-chart-canvas" width="320" height="320" role="img"
+                aria-label="Dashboard statistics chart"></canvas>
+              <p id="dashboard-chart-empty" class="note hidden">No dashboard data available yet.</p>
+            </div>
+            <div class="stats-chart-meta">
+              <ul id="dashboard-chart-legend" class="stats-chart-legend hidden"></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="profile-section" class="section-top hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>My Profile</h3>
+            <span class="panel-hint">Edit your profile and upload a profile picture.</span>
+          </div>
+          <div class="table-wrap">
+            <form id="profile-form" class="p-20" novalidate autocomplete="off">
+              <div class="field">
+                <label class="inputLabel" for="profile-name">Display Name</label>
+                <input id="profile-name" type="text" />
+              </div>
+              <div class="field">
+                <label class="inputLabel" for="profile-email">Email</label>
+                <input id="profile-email" type="email" readonly />
+              </div>
+              <div class="field">
+                <label class="inputLabel" for="profile-role">Role</label>
+                <input id="profile-role" type="text" readonly />
+              </div>
+              <div class="field">
+                <label class="inputLabel" for="profile-pic">Profile Picture</label>
+                <input id="profile-pic" type="file" accept="image/*" />
+                <div id="profile-pic-preview" style="margin-top:8px;"></div>
+              </div>
+              <div class="actions">
+                <button type="button" id="profile-save-btn" class="btn">Save Profile</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section id="schedule-section" class="section-top hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Schedule</h3>
+            <span class="panel-hint">View and manage doctor schedules (admin only can modify).</span>
+            <div class="management-actions">
+              <button id="create-schedule-btn" class="chip-btn admin-only">Create Schedule</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <div id="calendar-container" style="margin-bottom:14px;"></div>
+            <table class="accounts-table compact-table">
+              <thead>
+                <tr class="table-header-row">
+                  <th class="table-header-cell">Doctor</th>
+                  <th class="table-header-cell">Date</th>
+                  <th class="table-header-cell">Time</th>
+                  <th class="table-header-cell">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="schedule-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="users-section" class="section-top hidden">
+        <div class="panel" id="accounts-pane">
+          <div class="panel-head">
+            <h3>User Management</h3>
+            <span class="panel-hint">Manage staff accounts, pending registrations, and citizen profiles.</span>
+            <div class="management-actions">
+              <button id="refresh-accounts-btn" class="chip-btn">Refresh</button>
+            </div>
+          </div>
+          <div class="tabs">
+            <button id="tab-registered" class="tab active">Registered</button>
+            <button id="tab-pending" class="tab">Pending</button>
+            <button id="tab-citizens" class="tab">Citizens</button>
+          </div>
+          <div id="registered-pane">
+            <div class="table-wrap">
+              <table class="accounts-table">
+                <thead>
+                  <tr class="table-header-row">
+                    <th class="table-header-cell">Username</th>
+                    <th class="table-header-cell">Employee ID</th>
+                    <th class="table-header-cell">Role</th>
+                    <th class="table-header-cell">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="accounts-tbody">
+                  <tr><td colspan="4" class="table-cell">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div id="pending-pane" class="hidden">
+            <div class="table-wrap">
+              <table class="accounts-table">
+                <thead>
+                  <tr class="table-header-row">
+                    <th class="table-header-cell">Username</th>
+                    <th class="table-header-cell">Employee ID</th>
+                    <th class="table-header-cell">Role</th>
+                    <th class="table-header-cell">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody id="pending-tbody">
+                  <tr><td colspan="4" class="table-cell">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div id="citizens-pane" class="hidden">
+            <div class="table-wrap">
+              <table class="accounts-table">
+                <thead>
+                  <tr class="table-header-row">
+                    <th class="table-header-cell">Username</th>
+                    <th class="table-header-cell">Email</th>
+                    <th class="table-header-cell">Registered</th>
+                    <th class="table-header-cell">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="citizens-tbody">
+                  <tr><td colspan="4" class="table-cell">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="panel hidden admin-only" id="registration-pane">
+          <div class="panel-head">
+            <h3>Register New Staff</h3>
+            <span class="panel-hint">Send a demo OTP flow to onboard administrators, doctors, and nurses.</span>
+            <div class="management-actions">
+              <button type="button" id="registration-back-btn" class="chip-btn">View Account Tables</button>
+              <button type="button" id="back-to-dashboard-btn" class="chip-btn chip-btn-outline">Back to Dashboard</button>
+            </div>
+          </div>
+          <form id="register-form" class="p-20" novalidate autocomplete="off">
+            <div class="field">
+              <label class="inputLabel" for="reg-first-name">First Name</label>
+              <input id="reg-first-name" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="reg-middle-name">Middle Name</label>
+              <input id="reg-middle-name" />
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="reg-last-name">Last Name</label>
+              <input id="reg-last-name" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="reg-birthday">Birthday</label>
+              <input id="reg-birthday" type="date" />
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="reg-gender">Gender</label>
+              <select id="reg-gender">
+                <option value="">Select gender</option>
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+                <option value="Prefer not to say">Prefer not to say</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="reg-employee-id">Employee ID</label>
+              <input id="reg-employee-id" inputmode="numeric" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="reg-email">Work Email</label>
+              <input id="reg-email" type="email" required />
+              <span id="err-reg-email" class="note hidden" style="color:#b91c1c;">Please enter a valid email address.</span>
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="reg-role">Role</label>
+              <select id="reg-role" required>
+                <option value="">Select role</option>
+                <option value="admin">Administrator</option>
+                <option value="doctor">Doctor</option>
+                <option value="nurse">Nurse</option>
+                <option value="staff">Support Staff</option>
+              </select>
+            </div>
+            <div id="register-error" class="note" style="display:none;color:#b91c1c;"></div>
+            <div id="register-success" class="note" style="display:none;color:#15803d;"></div>
+            <div class="actions">
+              <button type="submit" id="register-submit-btn" class="btn">
+                <span class="btn-spinner" aria-hidden="true"></span>
+                <span class="btn-label">SEND OTP</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="reports-section" class="section-top hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Reports</h3>
+            <span class="panel-hint">Announcements and feedback management.</span>
+            <div class="management-actions">
+              <button id="reports-refresh-btn" class="chip-btn">Refresh</button>
+              <button id="create-announcement-topright" class="chip-btn">New Announcement</button>
+            </div>
+          </div>
+          <div class="tabs">
+            <button id="tab-announcements" class="tab active">Announcements</button>
+            <button id="tab-feedback" class="tab">Feedback</button>
+          </div>
+          <div id="announcements-pane">
+            <div class="table-wrap">
+              <table class="accounts-table">
+                <thead>
+                  <tr class="table-header-row">
+                    <th>Title</th>
+                    <th>Preview</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody id="announcements-tbody" class="announcement-rows">
+                  <tr class="announcement-row"><td colspan="3" class="table-cell">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="ann-pagination">
+              <div class="pagination-controls">
+                <span class="pagination-info">1-5 of 12</span>
+              </div>
+            </div>
+          </div>
+          <div id="feedback-pane" class="hidden">
+            <div class="table-wrap">
+              <table class="accounts-table">
+                <thead>
+                  <tr class="table-header-row">
+                    <th>From</th>
+                    <th>Subject</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody id="feedback-tbody">
+                  <tr><td colspan="3" class="table-cell">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="medicine-section" class="section-top hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Medicine Inventory</h3>
+            <span class="panel-hint">Track stock levels and generate reports (view-only access).</span>
+            <div class="management-actions">
+              <button id="medicine-report-btn" class="chip-btn">Generate Report</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="accounts-table">
+              <thead>
+                <tr class="table-header-row">
+                  <th>Name</th>
+                  <th>Quantity</th>
+                  <th>Unit</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="medicine-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <div id="schedule-editor-modal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width:520px; text-align:left;">
+          <h3 class="modal-heading">Schedule Editor</h3>
+          <form id="schedule-form" novalidate>
+            <input id="sched-id" type="hidden" />
+            <div class="field">
+              <label class="inputLabel" for="sched-doctor">Doctor</label>
+              <input id="sched-doctor" type="text" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="sched-date">Date</label>
+              <input id="sched-date" type="date" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="sched-time">Time</label>
+              <input id="sched-time" type="text" placeholder="e.g., 09:00 - 12:00" required />
+            </div>
+            <div id="sched-form-error" class="note" style="display:block;color:#b91c1c;margin-bottom:8px;"></div>
+            <div class="actions" style="gap:8px;">
+              <button type="submit" class="btn">Save</button>
+              <button type="button" id="sched-delete-btn" class="btn btn-delete admin-only">Delete</button>
+              <button type="button" id="sched-cancel-btn" class="btn" style="background:#64748b;">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="consultation-modal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width:520px; text-align:left;">
+          <h3 class="modal-heading">New Consultation</h3>
+          <form id="consultation-form" class="modal-form" novalidate>
+            <div class="field">
+              <label class="inputLabel">Patient ID</label>
+              <input id="consult-patient-id" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel">Symptoms</label>
+              <textarea id="consult-symptoms" rows="2"></textarea>
+            </div>
+            <div class="field">
+              <label class="inputLabel">Diagnosis</label>
+              <input id="consult-diagnosis" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel">Notes</label>
+              <textarea id="consult-notes" rows="3"></textarea>
+            </div>
+            <div class="actions" style="gap:8px;">
+              <button type="submit" class="btn">Save Consultation</button>
+              <button type="button" id="consultation-cancel-btn" class="btn btn-close">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="account-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+          <h3 class="modal-title" id="modal-name"></h3>
+          <div class="modal-group">
+            <label class="modal-label">Email</label>
+            <p class="modal-text" id="modal-email"></p>
+          </div>
+          <div class="modal-group">
+            <label class="modal-label">Role</label>
+            <p class="modal-text" id="modal-role"></p>
+          </div>
+          <div class="modal-group">
+            <label class="modal-label">Status</label>
+            <p class="modal-text" id="modal-status"></p>
+          </div>
+          <div class="modal-group">
+            <label class="modal-label">Employee ID</label>
+            <p class="modal-text" id="modal-contact"></p>
+          </div>
+          <div class="modal-group">
+            <label class="modal-label">Birthday</label>
+            <p class="modal-text" id="modal-bday"></p>
+          </div>
+          <div class="actions" id="modal-actions">
+            <button id="modal-edit-btn" class="btn">Edit</button>
+            <button id="modal-delete-btn" class="btn btn-delete">Delete</button>
+            <button id="modal-close-btn" class="btn btn-close">Close</button>
+          </div>
+          <div id="modal-confirm-section" class="modal-confirm-section">
+            <p class="modal-confirm-text" id="modal-confirm-text"></p>
+            <div class="actions">
+              <button id="modal-confirm-btn" class="btn btn-confirm">Confirm</button>
+              <button id="modal-cancel-btn" class="btn btn-cancel">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="pending-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+          <h3 class="modal-title">Pending Registration</h3>
+          <div class="modal-group">
+            <label class="modal-label">Username</label>
+            <p class="modal-text" id="pending-username"></p>
+          </div>
+          <div class="modal-group">
+            <label class="modal-label">Employee ID</label>
+            <p class="modal-text" id="pending-employee-id"></p>
+          </div>
+          <div class="modal-group">
+            <label class="modal-label">Email</label>
+            <p class="modal-text" id="pending-email"></p>
+          </div>
+          <div class="modal-group">
+            <label class="modal-label">Role</label>
+            <p class="modal-text" id="pending-role"></p>
+          </div>
+          <div class="modal-group">
+            <label class="modal-label">Specialization</label>
+            <p class="modal-text" id="pending-specialization"></p>
+          </div>
+          <div class="modal-group">
+            <label class="modal-label">Schedule</label>
+            <p class="modal-text" id="pending-schedule"></p>
+          </div>
+          <div class="modal-group">
+            <label class="modal-label">Submitted</label>
+            <p class="modal-text" id="pending-submitted"></p>
+          </div>
+          <div class="actions">
+            <button id="pending-accept" class="btn">Accept</button>
+            <button id="pending-reject" class="btn btn-delete">Reject</button>
+            <button class="btn btn-close">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="pending-action-confirm-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+          <p id="pending-action-text"></p>
+          <div class="actions">
+            <button id="pending-action-yes" class="btn btn-delete">Yes</button>
+            <button id="pending-action-no" class="btn btn-close">No</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="data-detail-modal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width:540px;text-align:left;position:relative;">
+          <button id="data-detail-close" class="modal-close" aria-label="Close details">&times;</button>
+          <p id="data-detail-tag" style="display:none;font-size:12px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#475569;margin-bottom:4px;"></p>
+          <h3 class="modal-heading" id="data-detail-title" style="margin-bottom:4px;">Record Detail</h3>
+          <p id="data-detail-subtitle" style="margin-bottom:16px;color:#475569;"></p>
+          <dl id="data-detail-list" style="display:grid;grid-template-columns: minmax(120px, 150px) 1fr;gap:10px 16px;margin:0 0 16px 0;"></dl>
+          <div class="actions" id="data-detail-actions" style="justify-content:flex-end;gap:8px;">
+            <button id="data-detail-dismiss" class="btn btn-close">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="create-announcement-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+          <h3 class="modal-heading">New Announcement</h3>
+          <form id="create-announcement-form">
+            <div class="field">
+              <label class="inputLabel">Title</label>
+              <input id="ann-title" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel">Content</label>
+              <textarea id="ann-content" rows="4" required></textarea>
+            </div>
+            <div id="ann-form-error" class="note"></div>
+            <div class="actions">
+              <button id="ann-submit-btn" type="submit" class="btn">
+                <span class="btn-spinner"></span>
+                <span class="btn-label">PUBLISH ANNOUNCEMENT</span>
+              </button>
+              <button id="ann-cancel-btn" type="button" class="btn btn-close">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="announcement-detail-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+          <button id="announcement-detail-close" class="modal-close">&times;</button>
+          <h3 id="announcement-detail-title"></h3>
+          <p id="announcement-detail-date"></p>
+          <div id="announcement-detail-body"></div>
+        </div>
+      </div>
+
+      <div id="prescription-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+          <h3>New Prescription</h3>
+          <form id="prescription-form">
+            <div class="field">
+              <label class="inputLabel">Patient ID</label>
+              <input id="prescription-patient" required />
+            </div>
+            <div id="prescription-lines"></div>
+            <div class="field">
+              <button type="button" id="add-prescription-line" class="chip-btn">Add Medicine</button>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn">Create Prescription</button>
+              <button type="button" id="cancel-prescription" class="btn btn-close">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="register-otp-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+          <h3>Complete Registration</h3>
+          <form id="register-otp-form">
+            <div class="field">
+              <label class="inputLabel">OTP (sent to email)</label>
+              <input id="reg-otp" type="text" maxlength="6" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel">Username</label>
+              <input id="reg-username" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel">Password</label>
+              <input id="reg-password" type="password" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel">Confirm Password</label>
+              <input id="reg-confirm-password" type="password" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel">
+                <input id="reg-consent" type="checkbox" required /> I agree to terms
+              </label>
+            </div>
+            <div id="otp-modal-error" class="note"></div>
+            <div id="otp-modal-success" class="note" style="color:#15803d;"></div>
+            <div class="actions">
+              <button id="otp-complete-btn" type="submit" class="btn">Complete Registration</button>
+              <button id="otp-modal-close-btn" type="button" class="btn btn-close">Cancel</button>
+              <button id="register-resend-otp-btn" type="button" class="chip-btn">Resend OTP</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="registration-success-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+          <h3>Registration Complete!</h3>
+          <div class="actions">
+            <button id="reg-success-dashboard-btn" class="btn">Go to Dashboard</button>
+            <button id="reg-success-users-btn" class="btn">Manage Users</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="../js/dashboard.js"></script>
+</body>
+
+</html>
