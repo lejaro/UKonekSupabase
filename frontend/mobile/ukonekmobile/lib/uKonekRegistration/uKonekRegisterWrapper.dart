@@ -26,6 +26,7 @@ class _uKonekRegisterWrapperState
   final middleNameController     = TextEditingController();
   final lastNameController       = TextEditingController();
   final nameExtensionController  = TextEditingController();
+  final familyNumberExtensionController = TextEditingController();
   final ageController            = TextEditingController();
   final contactController        = TextEditingController();
   final emailController          = TextEditingController();
@@ -137,6 +138,7 @@ class _uKonekRegisterWrapperState
           middleName:       middleNameController.text,
           surname:          lastNameController.text,
           nameExtension:    nameExtensionController.text,
+          familyNumber: familyNumberExtensionController.text,
           dob:              selectedDate != null
               ? '${selectedDate!.month}/${selectedDate!.day}/${selectedDate!.year}'
               : '',
@@ -178,6 +180,7 @@ class _uKonekRegisterWrapperState
                 middleName:   middleNameController,
                 lastName:     lastNameController,
                 nameExtension:nameExtensionController,
+                familyNumber: familyNumberExtensionController,
                 age:          ageController,
                 onPickDate:   pickDate,
                 selectedDate: selectedDate,

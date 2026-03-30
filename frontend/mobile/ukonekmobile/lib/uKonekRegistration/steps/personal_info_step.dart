@@ -6,6 +6,7 @@ class PersonalInfoStep extends StatelessWidget {
   final TextEditingController middleName;
   final TextEditingController lastName;
   final TextEditingController nameExtension;
+  final TextEditingController familyNumber;
   final TextEditingController age;
   final DateTime? selectedDate;
   final VoidCallback onPickDate;
@@ -19,6 +20,7 @@ class PersonalInfoStep extends StatelessWidget {
     required this.middleName,
     required this.lastName,
     required this.nameExtension,
+    required this.familyNumber,
     required this.age,
     required this.onPickDate,
     this.selectedDate,
@@ -78,6 +80,9 @@ class PersonalInfoStep extends StatelessWidget {
                       required: false, hint: 'Jr/III')),
                 ],
               ),
+              _field('Family Number', familyNumber,
+                  Icons.badge_outlined,
+                  required: false, hint: 'Optional'),
             ]),
             const SizedBox(height: 16),
 

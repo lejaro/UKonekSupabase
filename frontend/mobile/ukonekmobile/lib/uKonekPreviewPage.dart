@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'uKonekCredentialsPage.dart';
 
 class uKonekPreviewPage extends StatelessWidget {
-  final String firstName, middleName, surname, nameExtension;
+  final String firstName, middleName, surname, nameExtension, familyNumber;
   final String dob, age, contact, sex, email, address;
   final String emergencyName, emergencyContact, relation;
   final File?  idImage;
@@ -17,6 +17,7 @@ class uKonekPreviewPage extends StatelessWidget {
     required this.middleName,
     required this.surname,
     required this.nameExtension,
+    required this.familyNumber,
     required this.dob,
     required this.age,
     required this.contact,
@@ -59,6 +60,7 @@ class uKonekPreviewPage extends StatelessWidget {
                   _Row('First Name',       firstName),
                   _Row('Middle Name',      middleName),
                   _Row('Name Extension',   nameExtension),
+                  _Row('Family Number',   familyNumber),
                   _Row('Surname',          surname),
                   _Row('Date of Birth',    dob),
                   _Row('Age',              age),
