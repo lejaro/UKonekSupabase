@@ -13,31 +13,6 @@ export async function listStaff() {
   return data || [];
 }
 
-export async function listPendingStaff() {
-  const { data, error } = await supabase
-    .from('pending_staff')
-    .select('*')
-    .order('id', { ascending: false });
-
-  if (error) {
-    throw new Error(error.message || 'Unable to load pending registrations.');
-  }
-
-  return data || [];
-}
-
-export async function createPendingStaff(payload) {
-  const { error } = await supabase
-    .from('pending_staff')
-    .insert(payload);
-
-  if (error) {
-    throw new Error(error.message || 'Unable to submit registration.');
-  }
-
-  return true;
-}
-
 export async function updateStaffById(id, payload) {
   const { data, error } = await supabase
     .from('staff')
@@ -64,23 +39,26 @@ export async function deleteStaffById(id) {
   }
 }
 
-export async function approvePendingStaff(pendingId) {
-  const { error } = await supabase.rpc('approve_pending_staff', { pending_id: pendingId });
-  if (error) {
-    throw new Error(error.message || 'Approval failed.');
-  }
-}
-
-export async function rejectPendingStaff(pendingId) {
-  const { error } = await supabase.rpc('reject_pending_staff', { pending_id: pendingId });
-  if (error) {
-    throw new Error(error.message || 'Rejection failed.');
-  }
-}
-
 export async function deleteStaffAccount(staffId) {
   const { error } = await supabase.rpc('delete_staff_member', { target_staff_id: staffId });
   if (error) {
     throw new Error(error.message || 'Failed to delete account.');
   }
+}
+
+export async function resetStaffPassword(staffId, newPassword) {
+  const { data, error } = await supabase.rpc('reset_staff_password_admin', {
+    target_staff_id: staffId,
+    p_new_password: newPassword
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to reset password.');
+  }
+
+  if (data && data.error) {
+    throw new Error(data.error);
+  }
+
+  return data;
 }

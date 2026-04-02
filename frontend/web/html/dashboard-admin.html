@@ -185,7 +185,12 @@
   </style>
 </head>
 
-<body>
+<body class="dashboard-loading">
+  <div id="page-preloader" class="preloader" aria-live="polite" aria-label="Loading dashboard">
+    <div class="preloader-logo animated" aria-hidden="true">
+      <img src="../U-KonekLogo-transparent.png" alt="" />
+    </div>
+  </div>
   <div class="app">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-inner">
@@ -234,9 +239,9 @@
             <span class="label">Schedule</span>
           </a>
 
-          <div class="nav-item dropdown admin-only">
+          <div class="nav-item dropdown">
             <button class="nav-btn" aria-label="Users menu" title="Users" data-section="users-section"
-              data-tab="tab-registered" data-pane="accounts-pane">
+              data-pane="registered-pane">
               <span class="nav-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -249,8 +254,9 @@
               <span class="arrow">▾</span>
             </button>
             <div class="dropdown-menu hidden">
-              <a href="#" class="dropdown-item admin-only" data-section="users-section" data-tab="tab-registered" data-pane="accounts-pane">Account Management</a>
-              <a href="#" class="dropdown-item admin-only" data-section="users-section" data-pane="registration-pane">User Registration</a>
+              <a href="#" class="dropdown-item admin-only" data-section="users-section" data-pane="registered-pane">Staffs</a>
+              <a href="#" class="dropdown-item" data-section="users-section" data-pane="citizens-pane">Citizens</a>
+              <a href="#" class="dropdown-item admin-only" data-section="users-section" data-pane="registration-pane">Staff Registration</a>
             </div>
           </div>
 
@@ -338,11 +344,10 @@
           <div>
             <p class="section-kicker">Operations Overview</p>
             <h2 class="section-title">Admin Command Center</h2>
-            <p class="section-subtitle">Monitor registrations, review pending approvals, and keep staff onboarding flowing smoothly.</p>
+            <p class="section-subtitle">Monitor registrations, manage staff access, and keep onboarding flowing smoothly.</p>
           </div>
           <div class="hero-actions">
             <button id="dash-refresh-btn" class="chip-btn">Refresh Data</button>
-            <button id="dash-open-pending-btn" class="chip-btn chip-btn-outline">Review Pending</button>
           </div>
         </div>
         <div class="stats-grid">
@@ -379,24 +384,7 @@
                 <p id="stat-active-staff" class="stat-value">0</p>
               </div>
             </div>
-            <p class="stat-foot stat-success">Currently online</p>
-          </article>
-
-          <article class="stat-card fade-in-up" style="animation-delay: 0.06s;">
-            <div class="stat-card-metric">
-              <span class="stat-card-icon stat-icon-amber" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                  stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="9" />
-                  <polyline points="12 7 12 12 15 15" />
-                </svg>
-              </span>
-              <div>
-                <p class="stat-label">Pending Approvals</p>
-                <p id="stat-pending-staff" class="stat-value">0</p>
-              </div>
-            </div>
-            <p class="stat-foot stat-warning">Awaiting review</p>
+            <p class="stat-foot stat-success">Currently logged in</p>
           </article>
 
           <article class="stat-card fade-in-up" style="animation-delay: 0.08s;">
@@ -473,7 +461,7 @@
         <div class="panel stats-chart-panel fade-in-up" style="animation-delay: 0.06s;">
           <div class="panel-head">
             <h3>Operations Breakdown</h3>
-            <span class="panel-hint">Live snapshot of staff, pending approvals, and communication volume.</span>
+            <span class="panel-hint">Live snapshot of staff and communication volume.</span>
           </div>
           <div class="stats-chart-content">
             <div class="stats-chart-visual">
@@ -508,6 +496,10 @@
                 <label class="inputLabel" for="profile-role">Role</label>
                 <input id="profile-role" type="text" readonly />
               </div>
+              <div class="field hidden" id="profile-specialization-field">
+                <label class="inputLabel" for="profile-specialization">Doctor Specialization</label>
+                <input id="profile-specialization" type="text" placeholder="e.g., Cardiology" />
+              </div>
               <div class="field">
                 <label class="inputLabel" for="profile-pic">Profile Picture</label>
                 <input id="profile-pic" type="file" accept="image/*" />
@@ -524,11 +516,25 @@
       <section id="schedule-section" class="section-top hidden">
         <div class="panel">
           <div class="panel-head">
-            <h3>Schedule</h3>
-            <span class="panel-hint">View and manage doctor schedules (admin only can modify).</span>
+            <h3>Working Schedule</h3>
+            <span class="panel-hint">See doctors and assign schedules by date/time.</span>
             <div class="management-actions">
               <button id="create-schedule-btn" class="chip-btn admin-only">Create Schedule</button>
             </div>
+          </div>
+          <div class="table-wrap" style="margin-bottom:14px;">
+            <table class="accounts-table compact-table">
+              <thead>
+                <tr class="table-header-row">
+                  <th class="table-header-cell">Doctor</th>
+                  <th class="table-header-cell">Specialization</th>
+                  <th class="table-header-cell">Email</th>
+                  <th class="table-header-cell">Status</th>
+                  <th class="table-header-cell">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="schedule-doctors-tbody"></tbody>
+            </table>
           </div>
           <div class="table-wrap">
             <div id="calendar-container" style="margin-bottom:14px;"></div>
@@ -536,8 +542,10 @@
               <thead>
                 <tr class="table-header-row">
                   <th class="table-header-cell">Doctor</th>
+                  <th class="table-header-cell">Specialization</th>
                   <th class="table-header-cell">Date</th>
-                  <th class="table-header-cell">Time</th>
+                  <th class="table-header-cell">Start</th>
+                  <th class="table-header-cell">End</th>
                   <th class="table-header-cell">Actions</th>
                 </tr>
               </thead>
@@ -551,17 +559,22 @@
         <div class="panel" id="accounts-pane">
           <div class="panel-head">
             <h3>User Management</h3>
-            <span class="panel-hint">Manage staff accounts, pending registrations, and citizen profiles.</span>
+            <span class="panel-hint">Manage staff accounts and citizen profiles.</span>
             <div class="management-actions">
               <button id="refresh-accounts-btn" class="chip-btn">Refresh</button>
             </div>
           </div>
-          <div class="tabs">
-            <button id="tab-registered" class="tab active">Registered</button>
-            <button id="tab-pending" class="tab">Pending</button>
-            <button id="tab-citizens" class="tab">Citizens</button>
-          </div>
           <div id="registered-pane">
+            <div class="management-actions" style="margin-bottom:10px;">
+              <input id="staff-finder-input" class="search-input" type="search" placeholder="Find staff by name, role, specialization, or employee ID" aria-label="Find staff" />
+              <select id="role-filter" class="search-input" aria-label="Filter staff by role">
+                <option value="">All roles</option>
+                <option value="admin">Admin</option>
+                <option value="doctor">Doctor</option>
+                <option value="nurse">Nurse</option>
+                <option value="staff">Staff</option>
+              </select>
+            </div>
             <div class="table-wrap">
               <table class="accounts-table">
                 <thead>
@@ -569,33 +582,18 @@
                     <th class="table-header-cell">Username</th>
                     <th class="table-header-cell">Employee ID</th>
                     <th class="table-header-cell">Role</th>
+                    <th class="table-header-cell">Specialization</th>
                     <th class="table-header-cell">Status</th>
                   </tr>
                 </thead>
-                <tbody id="accounts-tbody">
-                  <tr><td colspan="4" class="table-cell">Loading...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div id="pending-pane" class="hidden">
-            <div class="table-wrap">
-              <table class="accounts-table">
-                <thead>
-                  <tr class="table-header-row">
-                    <th class="table-header-cell">Username</th>
-                    <th class="table-header-cell">Employee ID</th>
-                    <th class="table-header-cell">Role</th>
-                    <th class="table-header-cell">Submitted</th>
-                  </tr>
-                </thead>
-                <tbody id="pending-tbody">
-                  <tr><td colspan="4" class="table-cell">Loading...</td></tr>
-                </tbody>
+                <tbody id="accounts-tbody"></tbody>
               </table>
             </div>
           </div>
           <div id="citizens-pane" class="hidden">
+            <div class="management-actions" style="margin-bottom:10px;">
+              <input id="citizens-finder-input" class="search-input" type="search" placeholder="Find citizens by username or email" aria-label="Find citizens" />
+            </div>
             <div class="table-wrap">
               <table class="accounts-table">
                 <thead>
@@ -603,20 +601,16 @@
                     <th class="table-header-cell">Username</th>
                     <th class="table-header-cell">Email</th>
                     <th class="table-header-cell">Registered</th>
-                    <th class="table-header-cell">Status</th>
                   </tr>
                 </thead>
-                <tbody id="citizens-tbody">
-                  <tr><td colspan="4" class="table-cell">Loading...</td></tr>
-                </tbody>
+                <tbody id="citizens-tbody"></tbody>
               </table>
             </div>
           </div>
         </div>
         <div class="panel hidden admin-only" id="registration-pane">
           <div class="panel-head">
-            <h3>Register New Staff</h3>
-            <span class="panel-hint">Send a demo OTP flow to onboard administrators, doctors, and nurses.</span>
+            <h3>Register New Account</h3>
             <div class="management-actions">
               <button type="button" id="registration-back-btn" class="chip-btn">View Account Tables</button>
               <button type="button" id="back-to-dashboard-btn" class="chip-btn chip-btn-outline">Back to Dashboard</button>
@@ -653,9 +647,21 @@
               <input id="reg-employee-id" inputmode="numeric" required />
             </div>
             <div class="field">
+              <label class="inputLabel" for="reg-username">Username</label>
+              <input id="reg-username" required />
+            </div>
+            <div class="field">
               <label class="inputLabel" for="reg-email">Work Email</label>
               <input id="reg-email" type="email" required />
               <span id="err-reg-email" class="note hidden" style="color:#b91c1c;">Please enter a valid email address.</span>
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="reg-password">Password</label>
+              <input id="reg-password" type="password" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="reg-confirm-password">Confirm Password</label>
+              <input id="reg-confirm-password" type="password" required />
             </div>
             <div class="field">
               <label class="inputLabel" for="reg-role">Role</label>
@@ -667,12 +673,16 @@
                 <option value="staff">Support Staff</option>
               </select>
             </div>
+            <div class="field hidden" id="reg-doctor-specialization-field">
+              <label class="inputLabel" for="reg-doctor-specialization">Doctor Specialization</label>
+              <input id="reg-doctor-specialization" type="text" placeholder="e.g., Pediatrics" />
+            </div>
             <div id="register-error" class="note" style="display:none;color:#b91c1c;"></div>
             <div id="register-success" class="note" style="display:none;color:#15803d;"></div>
             <div class="actions">
               <button type="submit" id="register-submit-btn" class="btn">
                 <span class="btn-spinner" aria-hidden="true"></span>
-                <span class="btn-label">SEND OTP</span>
+                <span class="btn-label">CREATE ACCOUNT</span>
               </button>
             </div>
           </form>
@@ -704,14 +714,9 @@
                   </tr>
                 </thead>
                 <tbody id="announcements-tbody" class="announcement-rows">
-                  <tr class="announcement-row"><td colspan="3" class="table-cell">Loading...</td></tr>
+                  <tr class="announcement-row"><td colspan="3" class="table-cell">No announcements yet.</td></tr>
                 </tbody>
               </table>
-            </div>
-            <div class="ann-pagination">
-              <div class="pagination-controls">
-                <span class="pagination-info">1-5 of 12</span>
-              </div>
             </div>
           </div>
           <div id="feedback-pane" class="hidden">
@@ -724,9 +729,7 @@
                     <th>Date</th>
                   </tr>
                 </thead>
-                <tbody id="feedback-tbody">
-                  <tr><td colspan="3" class="table-cell">Loading...</td></tr>
-                </tbody>
+                <tbody id="feedback-tbody"></tbody>
               </table>
             </div>
           </div>
@@ -764,16 +767,26 @@
           <form id="schedule-form" novalidate>
             <input id="sched-id" type="hidden" />
             <div class="field">
-              <label class="inputLabel" for="sched-doctor">Doctor</label>
-              <input id="sched-doctor" type="text" required />
+              <label class="inputLabel" for="sched-doctor-id">Doctor</label>
+              <select id="sched-doctor-id" required>
+                <option value="">Select doctor</option>
+              </select>
             </div>
             <div class="field">
               <label class="inputLabel" for="sched-date">Date</label>
               <input id="sched-date" type="date" required />
             </div>
             <div class="field">
-              <label class="inputLabel" for="sched-time">Time</label>
-              <input id="sched-time" type="text" placeholder="e.g., 09:00 - 12:00" required />
+              <label class="inputLabel" for="sched-start-time">Start Time</label>
+              <input id="sched-start-time" type="time" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="sched-end-time">End Time</label>
+              <input id="sched-end-time" type="time" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="sched-notes">Notes</label>
+              <textarea id="sched-notes" rows="3" placeholder="Optional notes"></textarea>
             </div>
             <div id="sched-form-error" class="note" style="display:block;color:#b91c1c;margin-bottom:8px;"></div>
             <div class="actions" style="gap:8px;">
@@ -782,6 +795,15 @@
               <button type="button" id="sched-cancel-btn" class="btn" style="background:#64748b;">Cancel</button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <div id="schedule-success-modal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width:420px;">
+          <h3 class="modal-heading">Schedule Creation Successful</h3>
+          <div class="actions" style="justify-content:center;">
+            <button id="schedule-success-ok-btn" type="button" class="chip-btn">OK</button>
+          </div>
         </div>
       </div>
 
@@ -816,30 +838,88 @@
       <div id="account-modal" class="modal-overlay hidden">
         <div class="modal-content">
           <h3 class="modal-title" id="modal-name"></h3>
-          <div class="modal-group">
-            <label class="modal-label">Email</label>
-            <p class="modal-text" id="modal-email"></p>
+          <div id="modal-view-fields">
+            <div class="modal-group">
+              <label class="modal-label">Email</label>
+              <p class="modal-text" id="modal-email"></p>
+            </div>
+            <div class="modal-group">
+              <label class="modal-label">Role</label>
+              <p class="modal-text" id="modal-role"></p>
+            </div>
+            <div class="modal-group">
+              <label class="modal-label">Status</label>
+              <p class="modal-text" id="modal-status"></p>
+            </div>
+            <div class="modal-group">
+              <label class="modal-label">Employee ID</label>
+              <p class="modal-text" id="modal-contact"></p>
+            </div>
+            <div class="modal-group" id="modal-specialization-group">
+              <label class="modal-label">Specialization</label>
+              <p class="modal-text" id="modal-specialization"></p>
+            </div>
+            <div class="modal-group">
+              <label class="modal-label">Birthday</label>
+              <p class="modal-text" id="modal-bday"></p>
+            </div>
           </div>
-          <div class="modal-group">
-            <label class="modal-label">Role</label>
-            <p class="modal-text" id="modal-role"></p>
-          </div>
-          <div class="modal-group">
-            <label class="modal-label">Status</label>
-            <p class="modal-text" id="modal-status"></p>
-          </div>
-          <div class="modal-group">
-            <label class="modal-label">Employee ID</label>
-            <p class="modal-text" id="modal-contact"></p>
-          </div>
-          <div class="modal-group">
-            <label class="modal-label">Birthday</label>
-            <p class="modal-text" id="modal-bday"></p>
-          </div>
+
+          <form id="modal-edit-form" class="hidden">
+            <div class="modal-group">
+              <label class="modal-label" for="modal-edit-first-name">First Name</label>
+              <input id="modal-edit-first-name" class="search-input" type="text" required />
+            </div>
+            <div class="modal-group">
+              <label class="modal-label" for="modal-edit-middle-name">Middle Name</label>
+              <input id="modal-edit-middle-name" class="search-input" type="text" />
+            </div>
+            <div class="modal-group">
+              <label class="modal-label" for="modal-edit-last-name">Last Name</label>
+              <input id="modal-edit-last-name" class="search-input" type="text" required />
+            </div>
+            <div class="modal-group">
+              <label class="modal-label" for="modal-edit-username">Username</label>
+              <input id="modal-edit-username" class="search-input" type="text" required />
+            </div>
+            <div class="modal-group">
+              <label class="modal-label" for="modal-edit-email">Email</label>
+              <input id="modal-edit-email" class="search-input" type="email" required />
+            </div>
+            <div class="modal-group">
+              <label class="modal-label" for="modal-edit-employee-id">Employee ID</label>
+              <input id="modal-edit-employee-id" class="search-input" type="text" />
+            </div>
+            <div class="modal-group">
+              <label class="modal-label" for="modal-edit-role">Role</label>
+              <select id="modal-edit-role" class="search-input" required>
+                <option value="admin">Admin</option>
+                <option value="doctor">Doctor</option>
+                <option value="nurse">Nurse</option>
+                <option value="specialist">Specialist</option>
+                <option value="staff">Staff</option>
+              </select>
+            </div>
+            <div class="modal-group hidden" id="modal-edit-specialization-group">
+              <label class="modal-label" for="modal-edit-specialization">Doctor Specialization</label>
+              <input id="modal-edit-specialization" class="search-input" type="text" />
+            </div>
+            <div class="modal-group">
+              <label class="modal-label" for="modal-edit-birthday">Birthday</label>
+              <input id="modal-edit-birthday" class="search-input" type="date" />
+            </div>
+          </form>
+
+          <p id="modal-edit-error" class="note hidden" style="color:#b91c1c; margin-top:8px;"></p>
           <div class="actions" id="modal-actions">
             <button id="modal-edit-btn" class="btn">Edit</button>
+            <button id="modal-reset-password-btn" class="btn">Reset Password</button>
             <button id="modal-delete-btn" class="btn btn-delete">Delete</button>
             <button id="modal-close-btn" class="btn btn-close">Close</button>
+          </div>
+          <div class="actions hidden" id="modal-edit-actions">
+            <button id="modal-save-btn" class="btn">Save</button>
+            <button id="modal-cancel-edit-btn" class="btn btn-close">Cancel</button>
           </div>
           <div id="modal-confirm-section" class="modal-confirm-section">
             <p class="modal-confirm-text" id="modal-confirm-text"></p>
@@ -847,55 +927,6 @@
               <button id="modal-confirm-btn" class="btn btn-confirm">Confirm</button>
               <button id="modal-cancel-btn" class="btn btn-cancel">Cancel</button>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div id="pending-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-          <h3 class="modal-title">Pending Registration</h3>
-          <div class="modal-group">
-            <label class="modal-label">Username</label>
-            <p class="modal-text" id="pending-username"></p>
-          </div>
-          <div class="modal-group">
-            <label class="modal-label">Employee ID</label>
-            <p class="modal-text" id="pending-employee-id"></p>
-          </div>
-          <div class="modal-group">
-            <label class="modal-label">Email</label>
-            <p class="modal-text" id="pending-email"></p>
-          </div>
-          <div class="modal-group">
-            <label class="modal-label">Role</label>
-            <p class="modal-text" id="pending-role"></p>
-          </div>
-          <div class="modal-group">
-            <label class="modal-label">Specialization</label>
-            <p class="modal-text" id="pending-specialization"></p>
-          </div>
-          <div class="modal-group">
-            <label class="modal-label">Schedule</label>
-            <p class="modal-text" id="pending-schedule"></p>
-          </div>
-          <div class="modal-group">
-            <label class="modal-label">Submitted</label>
-            <p class="modal-text" id="pending-submitted"></p>
-          </div>
-          <div class="actions">
-            <button id="pending-accept" class="btn">Accept</button>
-            <button id="pending-reject" class="btn btn-delete">Reject</button>
-            <button class="btn btn-close">Close</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="pending-action-confirm-modal" class="modal-overlay hidden">
-        <div class="modal-box">
-          <p id="pending-action-text"></p>
-          <div class="actions">
-            <button id="pending-action-yes" class="btn btn-delete">Yes</button>
-            <button id="pending-action-no" class="btn btn-close">No</button>
           </div>
         </div>
       </div>
@@ -937,6 +968,31 @@
         </div>
       </div>
 
+      <div id="edit-announcement-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+          <h3 class="modal-heading">Edit Announcement</h3>
+          <form id="edit-announcement-form">
+            <input id="edit-announcement-id" type="hidden" />
+            <div class="field">
+              <label class="inputLabel" for="edit-ann-title">Title</label>
+              <input id="edit-ann-title" required />
+            </div>
+            <div class="field">
+              <label class="inputLabel" for="edit-ann-content">Content</label>
+              <textarea id="edit-ann-content" rows="4" required></textarea>
+            </div>
+            <div id="edit-ann-form-error" class="note"></div>
+            <div class="actions">
+              <button id="edit-ann-submit-btn" type="submit" class="btn">
+                <span class="btn-spinner"></span>
+                <span class="btn-label">SAVE CHANGES</span>
+              </button>
+              <button id="edit-ann-cancel-btn" type="button" class="btn btn-close">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <div id="announcement-detail-modal" class="modal-overlay hidden">
         <div class="modal-box">
           <button id="announcement-detail-close" class="modal-close">&times;</button>
@@ -966,42 +1022,6 @@
         </div>
       </div>
 
-      <div id="register-otp-modal" class="modal-overlay hidden">
-        <div class="modal-box">
-          <h3>Complete Registration</h3>
-          <form id="register-otp-form">
-            <div class="field">
-              <label class="inputLabel">OTP (sent to email)</label>
-              <input id="reg-otp" type="text" maxlength="6" required />
-            </div>
-            <div class="field">
-              <label class="inputLabel">Username</label>
-              <input id="reg-username" required />
-            </div>
-            <div class="field">
-              <label class="inputLabel">Password</label>
-              <input id="reg-password" type="password" required />
-            </div>
-            <div class="field">
-              <label class="inputLabel">Confirm Password</label>
-              <input id="reg-confirm-password" type="password" required />
-            </div>
-            <div class="field">
-              <label class="inputLabel">
-                <input id="reg-consent" type="checkbox" required /> I agree to terms
-              </label>
-            </div>
-            <div id="otp-modal-error" class="note"></div>
-            <div id="otp-modal-success" class="note" style="color:#15803d;"></div>
-            <div class="actions">
-              <button id="otp-complete-btn" type="submit" class="btn">Complete Registration</button>
-              <button id="otp-modal-close-btn" type="button" class="btn btn-close">Cancel</button>
-              <button id="register-resend-otp-btn" type="button" class="chip-btn">Resend OTP</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
       <div id="registration-success-modal" class="modal-overlay hidden">
         <div class="modal-box">
           <h3>Registration Complete!</h3>
@@ -1012,9 +1032,21 @@
         </div>
       </div>
 
+      <div id="logout-confirm-modal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width:420px;">
+          <h3 class="modal-heading">Confirm Logout</h3>
+          <p class="note" style="margin-bottom:16px;">Are you sure you want to log out of your account?</p>
+          <div class="actions" style="justify-content:center; gap:10px;">
+            <button id="logout-confirm-yes" type="button" class="btn btn-delete">Yes, log out</button>
+            <button id="logout-confirm-no" type="button" class="btn btn-close">Cancel</button>
+          </div>
+        </div>
+      </div>
+
     </main>
   </div>
 
+  <script src="../js/runtime-config.js"></script>
   <script src="../js/dashboard.js"></script>
 </body>
 

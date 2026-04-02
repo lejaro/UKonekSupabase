@@ -1,14 +1,64 @@
 const sidebar = document.getElementById('sidebar');
 const burger = document.getElementById('burger');
 
-// No backend - static/localStorage only
-const API_BASE = '';
-const isDemoMode = !API_BASE;
+const API_BASE = String(window.UKONEK_CONFIG?.API_BASE || '').trim();
+const isApiMode = API_BASE.length > 0;
+const isDemoMode = Boolean(window.UKONEK_CONFIG?.FORCE_DEMO);
+let authServiceModulePromise = null;
+let staffServiceModulePromise = null;
+let supabaseModulePromise = null;
+let authSessionModulePromise = null;
 
 let cachedSessionUser = null;
 let sessionUserRole = null;
+const DEFAULT_SECTION_ID = 'dashboard-section';
+const STAFF_PRESENCE_TIMEOUT_MS = 2 * 60 * 1000;
+const STAFF_PRESENCE_HEARTBEAT_MS = 60 * 1000;
+const ADMIN_DASHBOARD_REFRESH_MS = 15000;
+let presenceHeartbeatTimer = null;
+let adminDashboardRefreshTimer = null;
+let adminDashboardRefreshInFlight = false;
+const pagePreloader = document.getElementById('page-preloader');
+let pagePreloaderDismissed = false;
+
+function dismissPagePreloader() {
+  if (pagePreloaderDismissed) return;
+  pagePreloaderDismissed = true;
+  if (pagePreloader) {
+    pagePreloader.classList.add('hidden');
+  }
+  document.body.classList.remove('dashboard-loading');
+}
+
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    dismissPagePreloader();
+  }, 2800);
+});
+
+function getSectionFromHash() {
+  const value = String(window.location.hash || '').replace(/^#/, '').trim();
+  if (!value) return null;
+  return document.getElementById(value) ? value : null;
+}
+
+function setSectionHash(sectionId) {
+  if (!sectionId) return;
+  const nextHash = `#${sectionId}`;
+  if (window.location.hash === nextHash) return;
+
+  if (window.history && typeof window.history.replaceState === 'function') {
+    window.history.replaceState(null, '', nextHash);
+    return;
+  }
+
+  window.location.hash = sectionId;
+}
 
 function detectRoleFromTitle() {
+  const storedRole = String(sessionStorage.getItem('ukonek_role') || '').trim().toLowerCase();
+  if (storedRole) return storedRole;
+
   const title = document.title.toLowerCase();
   if (title.includes('admin')) return 'admin';
   if (title.includes('specialist')) return 'specialist';
@@ -16,17 +66,6 @@ function detectRoleFromTitle() {
 }
 
 const DEMO_REGISTERED_USERS = [
-  {
-    username: 'asmith',
-    first_name: 'Alice',
-    last_name: 'Smith',
-    employee_id: 'UK-1001',
-    role: 'doctor',
-    status: 'Active',
-    created_at: '2024-11-05T09:00:00Z',
-    email: 'asmith@ukonek.local',
-    birthday: '1990-03-02'
-  },
   {
     username: 'bcruz',
     first_name: 'Ben',
@@ -48,52 +87,6 @@ const DEMO_REGISTERED_USERS = [
     created_at: '2024-12-01T08:15:00Z',
     email: 'creyes@ukonek.local',
     birthday: '1985-01-14'
-  }
-];
-
-const DEMO_PENDING_USERS = [
-  {
-    username: 'dramos',
-    first_name: 'Dan',
-    last_name: 'Ramos',
-    employee_id: 'UK-2031',
-    role: 'doctor',
-    email: 'dramos@ukonek.local',
-    created_at: '2024-12-12T04:00:00Z',
-    specialization: 'Cardiology',
-    schedule: JSON.stringify({ days: ['Tue', 'Thu'], startHour: 9, endHour: 12 })
-  },
-  {
-    username: 'mgalang',
-    first_name: 'Mira',
-    last_name: 'Galang',
-    employee_id: 'UK-2037',
-    role: 'nurse',
-    email: 'mgalang@ukonek.local',
-    created_at: '2024-12-15T07:45:00Z',
-    specialization: 'Community Health',
-    schedule: JSON.stringify({ days: ['Mon', 'Wed', 'Fri'], startHour: 8, endHour: 11 })
-  }
-];
-
-const DEMO_CITIZENS = [
-  {
-    username: 'jmendoza',
-    email: 'jmendoza@example.com',
-    created_at: '2024-10-05T13:25:00Z',
-    status: 'Active'
-  },
-  {
-    username: 'ldelacruz',
-    email: 'ldelacruz@example.com',
-    created_at: '2024-09-18T06:15:00Z',
-    status: 'Active'
-  },
-  {
-    username: 'rkho',
-    email: 'rkho@example.com',
-    created_at: '2024-11-20T16:40:00Z',
-    status: 'Inactive'
   }
 ];
 
@@ -141,6 +134,46 @@ function state() {
   burger.classList.toggle('is-expanded', expanded);
 }
 
+function loadAuthServiceModule() {
+  if (!authServiceModulePromise) {
+    authServiceModulePromise = import('./services/authService.js').catch((error) => {
+      authServiceModulePromise = null;
+      throw error;
+    });
+  }
+  return authServiceModulePromise;
+}
+
+function loadStaffServiceModule() {
+  if (!staffServiceModulePromise) {
+    staffServiceModulePromise = import('./services/staffService.js').catch((error) => {
+      staffServiceModulePromise = null;
+      throw error;
+    });
+  }
+  return staffServiceModulePromise;
+}
+
+function loadSupabaseModule() {
+  if (!supabaseModulePromise) {
+    supabaseModulePromise = import('./supabase-config.js').catch((error) => {
+      supabaseModulePromise = null;
+      throw error;
+    });
+  }
+  return supabaseModulePromise;
+}
+
+function loadAuthSessionModule() {
+  if (!authSessionModulePromise) {
+    authSessionModulePromise = import('./services/sessionAuth.js').catch((error) => {
+      authSessionModulePromise = null;
+      throw error;
+    });
+  }
+  return authSessionModulePromise;
+}
+
 if (burger) {
   burger.addEventListener('click', () => {
     if (window.innerWidth <= 900) {
@@ -169,8 +202,17 @@ document.addEventListener('click', (e) => {
 state();
 
 async function performLogout() {
-  // Static demo - just reload/redirect
-  window.location.replace('./index.html');
+  try {
+    const authService = await loadAuthServiceModule();
+    await authService.signOutStaff();
+    const authSession = await loadAuthSessionModule();
+    authSession.clearAuthSessionMeta();
+    sessionStorage.removeItem('ukonek_role');
+  } catch (error) {
+    console.warn('Sign out warning:', error);
+  } finally {
+    window.location.replace('./index.html');
+  }
 }
 
 
@@ -184,10 +226,24 @@ const notificationList = document.getElementById('notification-list');
 const notificationEmptyState = document.getElementById('notification-empty');
 const notificationCloseBtn = document.getElementById('notif-close-btn');
 
+function showLogoutConfirmModal() {
+  if (!logoutConfirmModal) return;
+  logoutConfirmModal.classList.remove('hidden');
+}
+
+function hideLogoutConfirmModal() {
+  if (!logoutConfirmModal) return;
+  logoutConfirmModal.classList.add('hidden');
+}
+
+function isLogoutConfirmModalOpen() {
+  return Boolean(logoutConfirmModal && !logoutConfirmModal.classList.contains('hidden'));
+}
+
 if (logoutBtn) {
   logoutBtn.addEventListener('click', () => {
     if (logoutConfirmModal) {
-      logoutConfirmModal.style.display = 'flex';
+      showLogoutConfirmModal();
       return;
     }
     performLogout();
@@ -197,7 +253,7 @@ if (logoutBtn) {
 if (logoutConfirmYesBtn) {
   logoutConfirmYesBtn.addEventListener('click', () => {
     if (logoutConfirmModal) {
-      logoutConfirmModal.style.display = 'none';
+      hideLogoutConfirmModal();
     }
     performLogout();
   });
@@ -206,10 +262,24 @@ if (logoutConfirmYesBtn) {
 if (logoutConfirmNoBtn) {
   logoutConfirmNoBtn.addEventListener('click', () => {
     if (logoutConfirmModal) {
-      logoutConfirmModal.style.display = 'none';
+      hideLogoutConfirmModal();
     }
   });
 }
+
+if (logoutConfirmModal) {
+  logoutConfirmModal.addEventListener('click', (event) => {
+    if (event.target === logoutConfirmModal) {
+      hideLogoutConfirmModal();
+    }
+  });
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && isLogoutConfirmModalOpen()) {
+    hideLogoutConfirmModal();
+  }
+});
 
 if (notifBtn && notificationPanel) {
   notifBtn.addEventListener('click', (event) => {
@@ -228,18 +298,29 @@ async function ensureAuthenticatedSession(force = false) {
     return cachedSessionUser;
   }
 
-  const role = detectRoleFromTitle();
-  const profile = {
-    role,
-    username: 'Demo User',
-    email: 'demo@ukonek.local',
-    first_name: 'Demo',
-    status: 'active'
-  };
+  try {
+    const authService = await loadAuthServiceModule();
+    const profile = await authService.getAuthenticatedStaffProfile();
 
-  cachedSessionUser = profile;
-  sessionUserRole = role;
-  return profile;
+    if (!profile) {
+      window.location.replace('./index.html');
+      return null;
+    }
+
+    cachedSessionUser = profile;
+    sessionUserRole = String(profile.role || detectRoleFromTitle()).toLowerCase();
+    const authSession = await loadAuthSessionModule();
+    authSession.setAuthSessionMeta({
+      role: sessionUserRole,
+      userId: profile?.id || null,
+      email: profile?.email || null
+    });
+    return profile;
+  } catch (error) {
+    console.error('Session validation failed:', error);
+    window.location.replace('./index.html');
+    return null;
+  }
 }
 
 function getSessionRole() {
@@ -249,6 +330,23 @@ function getSessionRole() {
 
 function isAdminUser(user) {
   return String(user?.role || '').trim().toLowerCase() === 'admin';
+}
+
+const SECTION_ROLE_RULES = {
+  'dashboard-section': ['admin'],
+  'users-section': ['admin', 'doctor', 'nurse', 'staff'],
+  'reports-section': ['admin'],
+  'medicine-section': ['admin', 'doctor', 'nurse', 'staff'],
+  'consultation-section': ['admin', 'doctor', 'nurse', 'staff'],
+  'schedule-section': ['admin', 'doctor', 'nurse', 'staff'],
+  'profile-section': ['admin', 'doctor', 'nurse', 'staff']
+};
+
+function isSectionAllowedForRole(sectionId, role) {
+  const roleKey = String(role || '').trim().toLowerCase();
+  const allowed = SECTION_ROLE_RULES[sectionId];
+  if (!allowed || allowed.length === 0) return true;
+  return allowed.includes(roleKey);
 }
 
 function toTitleCase(value) {
@@ -326,10 +424,18 @@ function applyRoleAccess(user) {
     return;
   }
 
-  hideAllSections();
-  clearActiveNav();
+  const registeredPane = document.getElementById('registered-pane');
+  const patientsPane = document.getElementById('citizens-pane');
+  const usersNavBtn = document.querySelector('.nav-btn[data-section="users-section"]');
+
+  if (registeredPane) registeredPane.classList.add('hidden');
+  if (patientsPane) patientsPane.classList.remove('hidden');
+  if (usersNavBtn) {
+    usersNavBtn.dataset.pane = 'citizens-pane';
+  }
+
   updateNonAdminWorkspace(user);
-  if (nonAdminSection) nonAdminSection.classList.remove('hidden');
+  if (nonAdminSection) nonAdminSection.classList.add('hidden');
 }
 
 const MEDICINE_PERMISSIONS = {
@@ -392,14 +498,16 @@ if (navContainer) {
     const isDropdownBtn = el.classList.contains('nav-btn');
     const isDropdownItem = el.classList.contains('dropdown-item');
     const parentItem = el.closest('.nav-item.dropdown');
+    const activeMenu = parentItem ? parentItem.querySelector('.dropdown-menu') : null;
 
-    // Close all dropdowns first
-    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.add('hidden'));
+    // Keep submenu parent open while navigating within dropdown items.
+    if (isDropdownItem && activeMenu) {
+      activeMenu.classList.remove('hidden');
+    }
 
-    // Toggle dropdown if clicking nav-btn
-    if (isDropdownBtn && parentItem) {
-      const menu = parentItem.querySelector('.dropdown-menu');
-      if (menu) menu.classList.toggle('hidden');
+    // Toggle dropdown when clicking a nav button.
+    if (isDropdownBtn && activeMenu) {
+      activeMenu.classList.toggle('hidden');
     }
 
     // Nav activation logic
@@ -420,6 +528,12 @@ if (navContainer) {
     }
   });
 }
+
+document.addEventListener('click', (event) => {
+  if (!sidebar) return;
+  if (sidebar.contains(event.target)) return;
+  document.querySelectorAll('.dropdown-menu').forEach((menu) => menu.classList.add('hidden'));
+});
 
 function parseDateValue(value) {
   if (!value) return null;
@@ -496,7 +610,9 @@ function populateNotificationPanel() {
 
     const meta = document.createElement('span');
     meta.className = 'notif-meta';
-    const timeStamp = item.date ? item.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today';
+    const timeStamp = item.date
+      ? item.date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+      : 'Today';
     meta.textContent = item.detail ? `${timeStamp} • ${item.detail}` : timeStamp;
     li.appendChild(meta);
 
@@ -532,12 +648,22 @@ document.addEventListener('click', (event) => {
 async function showSection(sectionId, options = {}) {
   if (!sectionId) return;
 
+  const user = await ensureAuthenticatedSession();
+  if (!user) return;
+  const role = String(user?.role || getSessionRole()).toLowerCase();
+  if (!isSectionAllowedForRole(sectionId, role)) {
+    showToast('Access denied for this section.', 'warning');
+    if (sectionId !== 'profile-section') {
+      showSection('profile-section');
+    }
+    return;
+  }
+
   const targetSection = document.getElementById(sectionId);
   if (targetSection) {
     targetSection.classList.remove('hidden');
     
     // Dynamic refresh for section content
-    const user = await ensureAuthenticatedSession();
     switch (sectionId) {
       case 'schedule-section':
         loadSchedules(user);
@@ -557,7 +683,13 @@ async function showSection(sectionId, options = {}) {
     const { tab, pane } = options;
 
     if (sectionId === 'users-section') {
-      toggleUsersPane(pane || 'accounts-pane');
+      if (pane === 'registration-pane') {
+        toggleUsersPane('registration-pane');
+      } else {
+        toggleUsersPane('accounts-pane');
+        const defaultPane = isAdminUser(user) ? 'registered-pane' : 'citizens-pane';
+        revealPane(pane || defaultPane);
+      }
     } else if (pane) {
       revealPane(pane);
     }
@@ -608,23 +740,100 @@ function setupPasswordVisibilityToggles(root = document) {
   });
 }
 
-let pendingRegistrationProfile = null;
-
-// --- ADD THESE MISSING DEFINITIONS AT THE TOP OF YOUR SCRIPT ---
 const registerForm = document.getElementById('register-form');
 const registerSubmitBtn = document.getElementById('register-submit-btn');
-const registerOtpModal = document.getElementById('register-otp-modal');
-const registerOtpForm = document.getElementById('register-otp-form');
-const otpModalCloseBtn = document.getElementById('otp-modal-close-btn');
-const otpCompleteBtn = document.getElementById('otp-complete-btn');
 const registrationSuccessModal = document.getElementById('registration-success-modal');
 const regSuccessDashboardBtn = document.getElementById('reg-success-dashboard-btn');
 const regSuccessUsersBtn = document.getElementById('reg-success-users-btn');
 const backToDashboardBtn = document.getElementById('back-to-dashboard-btn');
 const registrationBackBtn = document.getElementById('registration-back-btn');
-const registerResendOtpBtn = document.getElementById('register-resend-otp-btn');
 
-// --- FIXED REGISTRATION HANDLER ---
+async function createStaffAccountDirect(payload) {
+  if (isDemoMode) {
+    await demoDelay();
+    const demoUser = {
+      username: payload.username,
+      first_name: payload.first_name,
+      middle_name: payload.middle_name,
+      last_name: payload.last_name,
+      employee_id: payload.employee_id,
+      role: payload.role,
+      doctor_specialization: payload.doctor_specialization || null,
+      status: payload.status || 'Active',
+      created_at: new Date().toISOString(),
+      email: payload.email,
+      birthday: payload.birthday || ''
+    };
+    DEMO_REGISTERED_USERS.unshift(demoUser);
+    return;
+  }
+
+  if (isApiMode) {
+    const apiPayload = {
+      ...payload,
+      doctor_specialization: payload?.doctor_specialization ?? null,
+      doctorSpecialization: payload?.doctor_specialization ?? null,
+      specialization: payload?.doctor_specialization ?? null,
+      directCreate: true,
+      skipOtp: true
+    };
+
+    const endpoints = [
+      `${API_BASE}/api/staff`,
+      `${API_BASE}/api/staff/create-account`,
+      `${API_BASE}/api/staff/register`
+    ];
+
+    let lastError = null;
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(apiPayload),
+          credentials: 'include'
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.message || `Request failed (${response.status})`);
+        }
+
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error('Unable to create account in API mode.');
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { data, error } = await supabase.rpc('create_staff_account_admin', {
+    p_first_name: payload.first_name,
+    p_middle_name: payload.middle_name,
+    p_last_name: payload.last_name,
+    p_birthday: payload.birthday,
+    p_gender: payload.gender,
+    p_username: payload.username,
+    p_employee_id: payload.employee_id,
+    p_email: payload.email,
+    p_role: payload.role,
+    p_doctor_specialization: payload.doctor_specialization || null,
+    p_password: payload.password,
+    p_consent_given: Boolean(payload.consent_given),
+    p_status: payload.status || 'Active'
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to create account.');
+  }
+
+  if (data && data.error) {
+    throw new Error(data.error);
+  }
+}
+
 if (registerForm) {
   registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -636,8 +845,14 @@ if (registerForm) {
     const birthday = document.getElementById('reg-birthday').value;
     const gender = document.getElementById('reg-gender').value;
     const employee_id = document.getElementById('reg-employee-id').value.trim();
+    const username = document.getElementById('reg-username').value.trim();
     const email = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const confirmPassword = document.getElementById('reg-confirm-password').value;
     const role = document.getElementById('reg-role').value;
+    const doctorSpecialization = document.getElementById('reg-doctor-specialization')
+      ? document.getElementById('reg-doctor-specialization').value.trim()
+      : '';
 
     const err = document.getElementById('register-error');
     const success = document.getElementById('register-success');
@@ -651,9 +866,33 @@ if (registerForm) {
       success.style.display = 'none';
     }
 
-    if (!first_name || !last_name || !email || !role) {
+    if (!first_name || !last_name || !employee_id || !username || !email || !role) {
       if (err) {
         err.textContent = 'Please fill in all required fields.';
+        err.style.display = 'block';
+      }
+      return;
+    }
+
+    if (!password || password.length < 8) {
+      if (err) {
+        err.textContent = 'Password must be at least 8 characters.';
+        err.style.display = 'block';
+      }
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      if (err) {
+        err.textContent = 'Passwords do not match.';
+        err.style.display = 'block';
+      }
+      return;
+    }
+
+    if (role === 'doctor' && !doctorSpecialization) {
+      if (err) {
+        err.textContent = 'Doctor specialization is required for doctor accounts.';
         err.style.display = 'block';
       }
       return;
@@ -663,281 +902,72 @@ if (registerForm) {
     if (registerSubmitBtn) {
       registerSubmitBtn.disabled = true;
       const label = registerSubmitBtn.querySelector('.btn-label');
-      if (label) label.textContent = 'SENDING OTP...';
+      if (label) label.textContent = 'CREATING...';
     }
 
     try {
-      const payload = { first_name, middle_name, last_name, birthday, gender, employee_id, email, role };
+      const payload = {
+        first_name,
+        middle_name: middle_name || null,
+        last_name,
+        birthday: birthday || null,
+        gender: gender || null,
+        username,
+        employee_id,
+        email: email.toLowerCase(),
+        role,
+        doctor_specialization: role === 'doctor' ? doctorSpecialization : null,
+        password,
+        consent_given: true,
+        status: 'Active'
+      };
 
-      if (isDemoMode) {
-        await demoDelay();
-        pendingRegistrationProfile = payload;
-        if (registerOtpModal) registerOtpModal.classList.remove('hidden');
-        if (success) {
-          success.textContent = 'Demo OTP sent. Please continue in the modal.';
-          success.style.display = 'block';
-        }
-        showToast('Demo OTP sent to email', 'info');
-      } else {
-        const response = await fetch(`${API_BASE}/api/staff/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          credentials: 'include'
-        });
+      await createStaffAccountDirect(payload);
 
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Registration failed');
+      if (registerForm) registerForm.reset();
+      if (registrationSuccessModal) registrationSuccessModal.classList.remove('hidden');
 
-        pendingRegistrationProfile = payload;
-        if (registerOtpModal) registerOtpModal.classList.remove('hidden');
-        if (success) {
-          success.textContent = data.message || 'OTP sent to email.';
-          success.style.display = 'block';
-        }
-        showToast('OTP sent to email', 'info');
+      storedAccounts.clear();
+      await loadStaffData();
+
+      if (success) {
+        success.textContent = 'Account created successfully.';
+        success.style.display = 'block';
       }
+      showToast('Account created successfully.', 'success');
 
     } catch (error) {
       if (err) {
-        err.textContent = error.message || 'Unable to submit registration.';
+        err.textContent = error.message || 'Unable to create account.';
         err.style.display = 'block';
       }
     } finally {
       if (registerSubmitBtn) {
         registerSubmitBtn.disabled = false;
         const label = registerSubmitBtn.querySelector('.btn-label');
-        if (label) label.textContent = 'SEND OTP';
+        if (label) label.textContent = 'CREATE ACCOUNT';
       }
     }
   });
 }
 
-// OTP Modal handlers
-if (otpModalCloseBtn) {
-  otpModalCloseBtn.addEventListener('click', () => {
-    if (registerOtpModal) registerOtpModal.classList.add('hidden');
-  });
+const regRoleInput = document.getElementById('reg-role');
+const regDoctorSpecializationField = document.getElementById('reg-doctor-specialization-field');
+const regDoctorSpecializationInput = document.getElementById('reg-doctor-specialization');
+
+function updateRegistrationSpecializationVisibility() {
+  if (!regRoleInput || !regDoctorSpecializationField) return;
+  const isDoctor = String(regRoleInput.value || '').toLowerCase() === 'doctor';
+  regDoctorSpecializationField.classList.toggle('hidden', !isDoctor);
+  if (regDoctorSpecializationInput) {
+    regDoctorSpecializationInput.required = isDoctor;
+    if (!isDoctor) regDoctorSpecializationInput.value = '';
+  }
 }
 
-if (registerOtpModal) {
-  registerOtpModal.addEventListener('click', (event) => {
-    if (event.target === registerOtpModal) {
-      registerOtpModal.classList.add('hidden');
-    }
-  });
-}
-
-if (registerOtpForm) {
-  registerOtpForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-
-    const otpModalError = document.getElementById('otp-modal-error');
-    const otpModalSuccess = document.getElementById('otp-modal-success');
-    const otp = document.getElementById('reg-otp').value.trim();
-    const username = document.getElementById('reg-username').value.trim();
-    const password = document.getElementById('reg-password').value;
-    const confirmPassword = document.getElementById('reg-confirm-password').value;
-    const consentGiven = document.getElementById('reg-consent').checked;
-
-    if (otpModalError) otpModalError.style.display = 'none';
-    if (otpModalSuccess) otpModalSuccess.style.display = 'none';
-
-    if (!pendingRegistrationProfile || !pendingRegistrationProfile.email) {
-      if (otpModalError) {
-        otpModalError.textContent = 'No active registration request found. Please send OTP again.';
-        otpModalError.style.display = 'block';
-      }
-      return;
-    }
-
-    if (!/^\d{6}$/.test(otp)) {
-      if (otpModalError) {
-        otpModalError.textContent = 'Please enter a valid 6-digit OTP.';
-        otpModalError.style.display = 'block';
-      }
-      return;
-    }
-
-    if (!username || !password || !confirmPassword) {
-      if (otpModalError) {
-        otpModalError.textContent = 'Username, password, and confirm password are required.';
-        otpModalError.style.display = 'block';
-      }
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      if (otpModalError) {
-        otpModalError.textContent = 'Passwords do not match.';
-        otpModalError.style.display = 'block';
-      }
-      return;
-    }
-
-    if (!consentGiven) {
-      if (otpModalError) {
-        otpModalError.textContent = 'Consent is required to continue.';
-        otpModalError.style.display = 'block';
-      }
-      return;
-    }
-
-    if (otpCompleteBtn) {
-      otpCompleteBtn.disabled = true;
-      const otpLabel = otpCompleteBtn.querySelector('.btn-label');
-      if (otpLabel) otpLabel.textContent = 'CREATING ACCOUNT...';
-    }
-
-    try {
-      if (isDemoMode) {
-        await demoDelay();
-
-        if (registerOtpModal) registerOtpModal.classList.add('hidden');
-        if (registerForm) registerForm.reset();
-        registerOtpForm.reset();
-
-        const demoUser = {
-          username,
-          first_name: pendingRegistrationProfile?.first_name || username,
-          last_name: pendingRegistrationProfile?.last_name || '',
-          employee_id: pendingRegistrationProfile?.employee_id || `UK-${Date.now()}`,
-          role: pendingRegistrationProfile?.role || 'staff',
-          status: 'Active',
-          created_at: new Date().toISOString(),
-          email: pendingRegistrationProfile?.email || `${username}@demo.local`,
-          birthday: pendingRegistrationProfile?.birthday || ''
-        };
-
-        DEMO_REGISTERED_USERS.unshift(demoUser);
-        const pendingIndex = DEMO_PENDING_USERS.findIndex((entry) => entry.employee_id === demoUser.employee_id);
-        if (pendingIndex > -1) DEMO_PENDING_USERS.splice(pendingIndex, 1);
-        storedAccounts.clear();
-        await Promise.all([loadStaffData(), loadPendingStaffData()]);
-
-        pendingRegistrationProfile = null;
-        if (registrationSuccessModal) registrationSuccessModal.classList.remove('hidden');
-        showToast('Demo account created.', 'success');
-        return;
-      }
-
-      const completeResponse = await fetch(`${API_BASE}/api/staff/complete-registration`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: pendingRegistrationProfile.email,
-          otp,
-          username,
-          password,
-          confirmPassword,
-          consentGiven
-        })
-      });
-
-      const completeData = await completeResponse.json();
-
-      if (!completeResponse.ok) {
-        if (otpModalError) {
-          otpModalError.textContent = completeData.message || 'Unable to complete registration.';
-          otpModalError.style.display = 'block';
-        }
-        return;
-      }
-
-      if (registerOtpModal) registerOtpModal.classList.add('hidden');
-      if (registerForm) registerForm.reset();
-      registerOtpForm.reset();
-      pendingRegistrationProfile = null;
-
-      if (registrationSuccessModal) registrationSuccessModal.classList.remove('hidden');
-    } catch (error) {
-      console.error('Error:', error);
-      if (otpModalError) {
-        otpModalError.textContent = 'Server connection failed.';
-        otpModalError.style.display = 'block';
-      }
-    } finally {
-      if (otpCompleteBtn) {
-        otpCompleteBtn.disabled = false;
-        const otpLabel = otpCompleteBtn.querySelector('.btn-label');
-        if (otpLabel) otpLabel.textContent = 'COMPLETE REGISTRATION';
-      }
-    }
-  });
-}
-
-// Resend OTP
-if (registerResendOtpBtn) {
-  registerResendOtpBtn.addEventListener('click', async (event) => {
-    event.preventDefault();
-
-    if (registerResendOtpBtn.getAttribute('aria-disabled') === 'true') return;
-
-    const err = document.getElementById('register-error');
-    const otpModalError = document.getElementById('otp-modal-error');
-    const otpModalSuccess = document.getElementById('otp-modal-success');
-
-    if (!pendingRegistrationProfile) {
-      if (otpModalError) {
-        otpModalError.textContent = 'No active registration request found. Please send OTP again.';
-        otpModalError.style.display = 'block';
-      }
-      return;
-    }
-
-    if (err) err.style.display = 'none';
-    if (otpModalError) otpModalError.style.display = 'none';
-    if (otpModalSuccess) otpModalSuccess.style.display = 'none';
-
-    registerResendOtpBtn.setAttribute('aria-disabled', 'true');
-    registerResendOtpBtn.style.pointerEvents = 'none';
-    registerResendOtpBtn.style.opacity = '0.65';
-    registerResendOtpBtn.textContent = 'Sending...';
-
-    try {
-      if (isDemoMode) {
-        await demoDelay();
-        if (otpModalSuccess) {
-          otpModalSuccess.style.display = 'block';
-          otpModalSuccess.textContent = 'Demo OTP resent. Please check email.';
-        }
-        showToast('Demo OTP resent.', 'info');
-      } else {
-        const response = await fetch(`${API_BASE}/api/staff/register`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(pendingRegistrationProfile)
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          if (otpModalError) {
-            otpModalError.textContent = data.message || 'Failed to resend OTP.';
-            otpModalError.style.display = 'block';
-          }
-          return;
-        }
-
-        if (otpModalSuccess) {
-          otpModalSuccess.style.display = 'block';
-          otpModalSuccess.textContent = data.message || 'OTP resent. Please check email.';
-        }
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      if (otpModalError) {
-        otpModalError.textContent = 'Server connection failed.';
-        otpModalError.style.display = 'block';
-      }
-    } finally {
-      registerResendOtpBtn.setAttribute('aria-disabled', 'false');
-      registerResendOtpBtn.style.pointerEvents = '';
-      registerResendOtpBtn.style.opacity = '';
-      registerResendOtpBtn.textContent = 'Resend OTP';
-    }
-  });
+if (regRoleInput) {
+  regRoleInput.addEventListener('change', updateRegistrationSpecializationVisibility);
+  updateRegistrationSpecializationVisibility();
 }
 
 // Success modal buttons
@@ -952,7 +982,7 @@ if (regSuccessDashboardBtn) {
 if (regSuccessUsersBtn) {
   regSuccessUsersBtn.addEventListener('click', () => {
     if (registrationSuccessModal) registrationSuccessModal.classList.add('hidden');
-    navigateToSection('users-section', { pane: 'accounts-pane', tab: 'tab-registered' });
+    navigateToSection('users-section', { pane: 'registered-pane' });
   });
 }
 
@@ -967,8 +997,7 @@ if (backToDashboardBtn) {
 if (registrationBackBtn) {
   registrationBackBtn.addEventListener('click', () => {
     toggleUsersPane('accounts-pane');
-    const defaultUsersTab = document.getElementById('tab-registered');
-    if (defaultUsersTab) defaultUsersTab.click();
+    revealPane('registered-pane');
   });
 }
 
@@ -1033,11 +1062,20 @@ function populateProfile(user) {
   const name = document.getElementById('profile-name');
   const email = document.getElementById('profile-email');
   const role = document.getElementById('profile-role');
+  const specializationField = document.getElementById('profile-specialization-field');
+  const specializationInput = document.getElementById('profile-specialization');
   const preview = document.getElementById('profile-pic-preview');
 
   if (name) name.value = user?.first_name || user?.username || '';
   if (email) email.value = user?.email || '';
   if (role) role.value = toTitleCase(user?.role || '');
+
+  const isDoctor = String(user?.role || '').toLowerCase() === 'doctor';
+  if (specializationField) specializationField.classList.toggle('hidden', !isDoctor);
+  if (specializationInput) {
+    specializationInput.value = isDoctor ? getSpecializationValue(user) : '';
+    specializationInput.required = isDoctor;
+  }
 
   if (preview) {
     preview.innerHTML = '';
@@ -1071,22 +1109,52 @@ if (profileSaveBtn) {
   profileSaveBtn.addEventListener('click', async () => {
     const name = document.getElementById('profile-name').value.trim();
     const email = document.getElementById('profile-email').value.trim();
+    const role = String(document.getElementById('profile-role')?.value || '').trim().toLowerCase();
+    const specializationValue = String(document.getElementById('profile-specialization')?.value || '').trim();
     const fileInput = document.getElementById('profile-pic');
 
     const form = new FormData();
     form.append('displayName', name);
     form.append('email', email);
+    if (role === 'doctor') {
+      form.append('doctorSpecialization', specializationValue);
+    }
     if (fileInput && fileInput.files && fileInput.files[0]) {
       form.append('avatar', fileInput.files[0]);
     }
 
     try {
-      const resp = await fetch(`${API_BASE}/api/staff/profile`, {
-        method: 'POST',
-        credentials: 'include',
-        body: form
-      });
-      if (!resp.ok) throw new Error('Failed to save profile');
+      if (isApiMode) {
+        const resp = await fetch(`${API_BASE}/api/staff/profile`, {
+          method: 'POST',
+          credentials: 'include',
+          body: form
+        });
+        if (!resp.ok) throw new Error('Failed to save profile');
+      } else {
+        if (role === 'doctor') {
+          const { supabase } = await loadSupabaseModule();
+          const { data, error } = await supabase.rpc('set_my_doctor_specialization', {
+            p_specialization: specializationValue || null
+          });
+          if (error) {
+            throw new Error(error.message || 'Failed to save specialization');
+          }
+          if (data && data.error) {
+            throw new Error(data.error);
+          }
+        }
+
+        // Backendless mode: keep UI/session profile in sync.
+        cachedSessionUser = {
+          ...(cachedSessionUser || {}),
+          first_name: name || cachedSessionUser?.first_name,
+          email: email || cachedSessionUser?.email,
+          doctor_specialization: role === 'doctor'
+            ? specializationValue
+            : (cachedSessionUser?.doctor_specialization || null)
+        };
+      }
       showToast('Profile updated', 'success');
       // re-sync session/profile
       const user = await ensureAuthenticatedSession();
@@ -1113,62 +1181,375 @@ if (profileCancelBtn) {
   });
 }
 
-// --- Schedule handling (simple calendar + list). Admins can create/update/delete; others view only ---
-async function loadSchedules(user) {
-  let schedules = [];
-  try {
-    const resp = await fetch(`${API_BASE}/api/schedules`, { credentials: 'include' });
-    if (resp.ok) schedules = await resp.json();
-    else schedules = [];
-  } catch (err) {
-    // fallback demo data - now richer
-    schedules = DUMMY_SCHEDULES;
-  }
-  renderSchedules(schedules, user);
+// --- Schedule handling (doctor-based schedules). Admins can create/update/delete; others view only ---
+let cachedScheduleDoctors = [];
+let cachedScheduleEntries = [];
+
+function getDoctorDisplayName(doctor) {
+  const fullName = `${doctor?.first_name || ''} ${doctor?.last_name || ''}`.replace(/\s+/g, ' ').trim();
+  if (fullName) return fullName;
+  return doctor?.username || doctor?.email || 'Doctor';
 }
 
-function renderSchedules(schedules, user) {
+function getSpecializationValue(entity) {
+  return String(
+    entity?.doctor_specialization
+    ?? entity?.doctorSpecialization
+    ?? entity?.specialization
+    ?? ''
+  ).trim();
+}
+
+function getDoctorSpecializationText(doctor) {
+  return getSpecializationValue(doctor) || '—';
+}
+
+function formatScheduleTime(value) {
+  const normalized = normalizeTimeHHMM(value);
+  if (!normalized) return '—';
+
+  const [hours, minutes] = normalized.split(':').map(Number);
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return date.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+
+function normalizeTimeHHMM(value) {
+  const text = String(value || '').trim();
+  const match = text.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return '';
+  const hours = String(Math.min(23, Math.max(0, Number(match[1])))).padStart(2, '0');
+  const minutes = String(Math.min(59, Math.max(0, Number(match[2])))).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function parseLegacyTimeRange(value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return { start: '', end: '' };
+  }
+
+  const parts = text.split('-').map((item) => normalizeTimeHHMM(item));
+  if (parts.length >= 2) {
+    return { start: parts[0], end: parts[1] };
+  }
+
+  return { start: normalizeTimeHHMM(text), end: '' };
+}
+
+function toMinutes(value) {
+  const normalized = normalizeTimeHHMM(value);
+  if (!normalized) return NaN;
+  const [hours, minutes] = normalized.split(':').map(Number);
+  return (hours * 60) + minutes;
+}
+
+function normalizeScheduleRecord(item) {
+  const date = item?.schedule_date || item?.date || '';
+  const doctorId = item?.doctor_staff_id ?? null;
+
+  let start = normalizeTimeHHMM(item?.start_time || '');
+  let end = normalizeTimeHHMM(item?.end_time || '');
+
+  if (!start && item?.time) {
+    const parsed = parseLegacyTimeRange(item.time);
+    start = parsed.start;
+    if (!end) end = parsed.end;
+  }
+
+  return {
+    ...item,
+    doctor_staff_id: doctorId,
+    schedule_date: date,
+    start_time: start,
+    end_time: end
+  };
+}
+
+function getTodayScheduleDateKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isPastScheduleDateValue(value) {
+  const dateText = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) return false;
+  return dateText < getTodayScheduleDateKey();
+}
+
+async function purgePastSchedules(records, user, source = 'doctor_schedules') {
+  const normalized = Array.isArray(records) ? records : [];
+  const expired = normalized.filter((entry) => isPastScheduleDateValue(entry?.schedule_date || entry?.date));
+
+  // Always keep expired items out of the live UI list.
+  const activeRecords = normalized.filter((entry) => !isPastScheduleDateValue(entry?.schedule_date || entry?.date));
+
+  if (!expired.length) return activeRecords;
+
+  const expiredIds = expired
+    .map((entry) => entry?.id)
+    .filter((id) => id !== null && id !== undefined && String(id).trim() !== '');
+
+  if (!expiredIds.length || !isAdminUser(user)) {
+    return activeRecords;
+  }
+
+  try {
+    if (isApiMode || source === 'api') {
+      await Promise.all(expiredIds.map(async (id) => {
+        const response = await fetch(`${API_BASE}/api/schedules/${id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to auto-delete schedule ${id}`);
+        }
+      }));
+    } else {
+      const { supabase } = await loadSupabaseModule();
+      const tableName = source === 'schedules' ? 'schedules' : 'doctor_schedules';
+      const { error } = await supabase.from(tableName).delete().in('id', expiredIds);
+      if (error) throw error;
+    }
+  } catch (error) {
+    console.error('Auto-delete past schedules failed:', error);
+  }
+
+  return activeRecords;
+}
+
+function hasScheduleConflict({ doctorStaffId, scheduleDate, startTime, endTime, excludeId }) {
+  const targetDoctor = String(doctorStaffId || '').trim();
+  const targetDate = String(scheduleDate || '').trim();
+  const startMinutes = toMinutes(startTime);
+  const endMinutes = toMinutes(endTime);
+
+  if (!targetDoctor || !targetDate || !Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) {
+    return false;
+  }
+
+  return cachedScheduleEntries.some((entry) => {
+    if (excludeId && String(entry?.id || '') === String(excludeId)) return false;
+    if (String(entry?.doctor_staff_id || '') !== targetDoctor) return false;
+    if (String(entry?.schedule_date || '') !== targetDate) return false;
+
+    const existingStart = toMinutes(entry?.start_time || '');
+    const existingEnd = toMinutes(entry?.end_time || '');
+    if (!Number.isFinite(existingStart) || !Number.isFinite(existingEnd)) return false;
+
+    return startMinutes < existingEnd && endMinutes > existingStart;
+  });
+}
+
+function renderScheduleDoctors(doctors, user) {
+  const tbody = document.getElementById('schedule-doctors-tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+  if (!doctors.length) {
+    tbody.innerHTML = '<tr><td class="table-cell" colspan="5">No doctor accounts found.</td></tr>';
+    return;
+  }
+
+  doctors.forEach((doctor) => {
+    const tr = document.createElement('tr');
+    const statusText = getStaffPresenceStatus(doctor);
+    const statusClass = getStaffPresenceBadgeClass(doctor);
+    tr.innerHTML = `
+      <td class="table-cell">${getDoctorDisplayName(doctor)}</td>
+      <td class="table-cell">${getDoctorSpecializationText(doctor)}</td>
+      <td class="table-cell">${doctor.email || '—'}</td>
+      <td class="table-cell"><span class="${statusClass}">${statusText}</span></td>
+      <td class="table-cell"></td>
+    `;
+
+    const actionsCell = tr.querySelector('td:last-child');
+    if (isAdminUser(user)) {
+      const setBtn = document.createElement('button');
+      setBtn.type = 'button';
+      setBtn.className = 'chip-btn';
+      setBtn.textContent = 'Set Schedule';
+      setBtn.addEventListener('click', () => openScheduleModal('create', { doctor_staff_id: doctor.id }));
+      actionsCell.appendChild(setBtn);
+    } else {
+      actionsCell.textContent = '-';
+    }
+
+    tbody.appendChild(tr);
+  });
+}
+
+function populateScheduleDoctorSelect(selectedDoctorId = null) {
+  const select = document.getElementById('sched-doctor-id');
+  if (!select) return;
+
+  const selected = selectedDoctorId ? String(selectedDoctorId) : '';
+  select.innerHTML = '<option value="">Select doctor</option>';
+
+  cachedScheduleDoctors.forEach((doctor) => {
+    const option = document.createElement('option');
+    option.value = String(doctor.id);
+    option.textContent = `${getDoctorDisplayName(doctor)}${doctor.email ? ` (${doctor.email})` : ''}`;
+    if (selected && option.value === selected) {
+      option.selected = true;
+    }
+    select.appendChild(option);
+  });
+}
+
+async function loadSchedules(user) {
+  let schedules = [];
+  let doctors = [];
+  let scheduleSource = 'doctor_schedules';
+
+  try {
+    if (isApiMode) {
+      scheduleSource = 'api';
+      const [schedulesResp, staffResp] = await Promise.all([
+        fetch(`${API_BASE}/api/schedules`, { credentials: 'include' }),
+        fetch(`${API_BASE}/api/staff`, { credentials: 'include' })
+      ]);
+
+      if (schedulesResp.ok) {
+        schedules = await schedulesResp.json();
+      }
+
+      if (staffResp.ok) {
+        const staff = await staffResp.json();
+        doctors = (Array.isArray(staff) ? staff : []).filter((item) => String(item?.role || '').toLowerCase() === 'doctor');
+      }
+    } else {
+      const [staffService, supabaseModule] = await Promise.all([loadStaffServiceModule(), loadSupabaseModule()]);
+      const { supabase } = supabaseModule;
+
+      const staff = await staffService.listStaff();
+      doctors = (Array.isArray(staff) ? staff : []).filter((item) => String(item?.role || '').toLowerCase() === 'doctor');
+
+      let scheduleData = [];
+      let scheduleError = null;
+
+      ({ data: scheduleData, error: scheduleError } = await supabase
+        .from('doctor_schedules')
+        .select('*')
+        .order('schedule_date', { ascending: true })
+        .order('start_time', { ascending: true }));
+
+      if (scheduleError) {
+        scheduleSource = 'schedules';
+        const legacyResult = await supabase
+          .from('schedules')
+          .select('*')
+          .order('date', { ascending: true });
+
+        if (legacyResult.error) throw scheduleError;
+        schedules = (legacyResult.data || []).map((item) => ({
+          id: item.id,
+          doctor_name: item.doctor || 'Doctor',
+          schedule_date: item.date,
+          start_time: item.time,
+          end_time: null,
+          notes: null,
+          doctor_staff_id: null
+        }));
+      } else {
+        schedules = scheduleData || [];
+      }
+    }
+  } catch (err) {
+    console.error('Error loading schedules:', err);
+    schedules = [];
+    doctors = [];
+  }
+
+  schedules = (Array.isArray(schedules) ? schedules : []).map(normalizeScheduleRecord);
+  schedules = await purgePastSchedules(schedules, user, scheduleSource);
+  cachedScheduleEntries = [...schedules];
+
+  cachedScheduleDoctors = Array.isArray(doctors) ? [...doctors] : [];
+  populateScheduleDoctorSelect();
+  renderScheduleDoctors(cachedScheduleDoctors, user);
+  renderSchedules(schedules, user, cachedScheduleDoctors);
+}
+
+function renderSchedules(schedules, user, doctors = []) {
   const tbody = document.getElementById('schedule-tbody');
   const calendar = document.getElementById('calendar-container');
   if (!tbody || !calendar) return;
+
+  const doctorMap = new Map((doctors || []).map((doctor) => [String(doctor.id), doctor]));
+
   tbody.innerHTML = '';
   calendar.innerHTML = '';
 
-  // Simple calendar: show upcoming dates as buttons (read-only)
-  const dates = [...new Set(schedules.map(s => s.date))];
+  const dates = [...new Set((schedules || []).map((item) => item.schedule_date || item.date).filter(Boolean))];
   const dateList = document.createElement('div');
   dateList.style.display = 'flex';
   dateList.style.gap = '8px';
-  dates.forEach(d => {
+  dateList.style.flexWrap = 'wrap';
+
+  const showAllBtn = document.createElement('button');
+  showAllBtn.type = 'button';
+  showAllBtn.className = 'chip-btn';
+  showAllBtn.textContent = 'All Dates';
+  showAllBtn.addEventListener('click', () => {
+    Array.from(tbody.querySelectorAll('tr')).forEach((tr) => {
+      tr.style.display = '';
+    });
+  });
+  dateList.appendChild(showAllBtn);
+
+  dates.forEach((dateValue) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'chip-btn';
-    btn.textContent = d;
+    btn.textContent = dateValue;
     btn.addEventListener('click', () => {
-      // filter table to date
-      Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
-        tr.style.display = tr.dataset.date === d ? '' : 'none';
+      Array.from(tbody.querySelectorAll('tr')).forEach((tr) => {
+        tr.style.display = tr.dataset.date === dateValue ? '' : 'none';
       });
     });
     dateList.appendChild(btn);
   });
   calendar.appendChild(dateList);
 
-  schedules.forEach(s => {
+  if (!schedules.length) {
+    tbody.innerHTML = '<tr><td class="table-cell" colspan="6">No schedules found.</td></tr>';
+    return;
+  }
+
+  schedules.forEach((schedule) => {
+    const doctorId = schedule.doctor_staff_id ? String(schedule.doctor_staff_id) : '';
+    const doctor = doctorId ? doctorMap.get(doctorId) : null;
+    const doctorName = schedule.doctor_name || getDoctorDisplayName(doctor) || 'Doctor';
+    const doctorSpecialization = getDoctorSpecializationText(doctor);
+    const scheduleDate = schedule.schedule_date || schedule.date || '—';
+    const startTime = formatScheduleTime(schedule.start_time || schedule.time);
+    const endTime = formatScheduleTime(schedule.end_time);
+
     const tr = document.createElement('tr');
-    tr.dataset.date = s.date;
+    tr.dataset.date = scheduleDate;
     tr.innerHTML = `
-      <td class="table-cell">${s.doctor}</td>
-      <td class="table-cell">${s.date}</td>
-      <td class="table-cell">${s.time}</td>
+      <td class="table-cell">${doctorName}</td>
+      <td class="table-cell">${doctorSpecialization}</td>
+      <td class="table-cell">${scheduleDate}</td>
+      <td class="table-cell">${startTime}</td>
+      <td class="table-cell">${endTime}</td>
       <td class="table-cell"></td>
     `;
+
     const actionsTd = tr.querySelector('td:last-child');
     if (isAdminUser(user)) {
       const editBtn = document.createElement('button');
       editBtn.className = 'btn small outline admin-only';
       editBtn.textContent = 'Edit';
-      editBtn.addEventListener('click', () => openScheduleModal('edit', s));
+      editBtn.addEventListener('click', () => openScheduleModal('edit', schedule));
 
       const delBtn = document.createElement('button');
       delBtn.className = 'btn small btn-delete admin-only';
@@ -1176,8 +1557,17 @@ function renderSchedules(schedules, user) {
       delBtn.addEventListener('click', async () => {
         if (!confirm('Delete this schedule?')) return;
         try {
-          const resp = await fetch(`${API_BASE}/api/schedules/${s.id}`, { method: 'DELETE', credentials: 'include' });
-          if (!resp.ok) throw new Error('Delete failed');
+          if (isApiMode) {
+            const resp = await fetch(`${API_BASE}/api/schedules/${schedule.id}`, { method: 'DELETE', credentials: 'include' });
+            if (!resp.ok) throw new Error('Delete failed');
+          } else {
+            const { supabase } = await loadSupabaseModule();
+            let result = await supabase.from('doctor_schedules').delete().eq('id', schedule.id);
+            if (result.error) {
+              result = await supabase.from('schedules').delete().eq('id', schedule.id);
+            }
+            if (result.error) throw result.error;
+          }
           showToast('Schedule deleted', 'success');
           initProfileAndSchedule();
         } catch (err) {
@@ -1195,27 +1585,19 @@ function renderSchedules(schedules, user) {
     tbody.appendChild(tr);
     attachDetailRow(tr, () => ({
       tag: 'Schedule',
-      title: s.doctor || 'Schedule Detail',
-      subtitle: s.date ? `${s.date} • ${s.time || ''}`.trim() : s.time || '',
+      title: doctorName,
+      subtitle: scheduleDate,
       items: [
-        { label: 'Doctor', value: s.doctor },
-        { label: 'Date', value: s.date },
-        { label: 'Time', value: s.time },
-        { label: 'Schedule ID', value: s.id || '—' }
+        { label: 'Doctor', value: doctorName },
+        { label: 'Specialization', value: doctorSpecialization },
+        { label: 'Date', value: scheduleDate },
+        { label: 'Start Time', value: startTime },
+        { label: 'End Time', value: endTime },
+        { label: 'Notes', value: schedule.notes || '—' },
+        { label: 'Schedule ID', value: schedule.id || '—' }
       ]
     }));
   });
-
-  // enforce hiding of admin-only controls if not admin
-  const sessionUserCheck = async () => {
-    const sessionUser = await ensureAuthenticatedSession();
-    if (!isAdminUser(sessionUser)) {
-      document.querySelectorAll('.admin-only').forEach(e => e.classList.add('hidden'));
-    } else {
-      document.querySelectorAll('.admin-only').forEach(e => e.classList.remove('hidden'));
-    }
-  };
-  sessionUserCheck();
 }
 
 // Schedule editor modal logic
@@ -1223,25 +1605,34 @@ function openScheduleModal(mode = 'create', schedule = null) {
   const modal = document.getElementById('schedule-editor-modal');
   const form = document.getElementById('schedule-form');
   const idInput = document.getElementById('sched-id');
-  const doctorInput = document.getElementById('sched-doctor');
+  const doctorInput = document.getElementById('sched-doctor-id');
   const dateInput = document.getElementById('sched-date');
-  const timeInput = document.getElementById('sched-time');
+  const startInput = document.getElementById('sched-start-time');
+  const endInput = document.getElementById('sched-end-time');
+  const notesInput = document.getElementById('sched-notes');
   const deleteBtn = document.getElementById('sched-delete-btn');
   const errorNode = document.getElementById('sched-form-error');
 
-  if (!modal || !form) return;
+  if (!modal || !form || !idInput || !doctorInput || !dateInput || !startInput || !endInput) return;
+
   errorNode.textContent = '';
+  populateScheduleDoctorSelect(schedule?.doctor_staff_id || null);
+
   if (mode === 'edit' && schedule) {
     idInput.value = schedule.id || '';
-    doctorInput.value = schedule.doctor || '';
-    dateInput.value = schedule.date || '';
-    timeInput.value = schedule.time || '';
+    doctorInput.value = schedule.doctor_staff_id ? String(schedule.doctor_staff_id) : '';
+    dateInput.value = schedule.schedule_date || schedule.date || '';
+    startInput.value = normalizeTimeHHMM(schedule.start_time || schedule.time || '');
+    endInput.value = normalizeTimeHHMM(schedule.end_time || '');
+    if (notesInput) notesInput.value = schedule.notes || '';
     deleteBtn.classList.remove('hidden');
   } else {
     idInput.value = '';
-    doctorInput.value = '';
+    doctorInput.value = schedule?.doctor_staff_id ? String(schedule.doctor_staff_id) : '';
     dateInput.value = '';
-    timeInput.value = '';
+    startInput.value = '';
+    endInput.value = '';
+    if (notesInput) notesInput.value = '';
     deleteBtn.classList.add('hidden');
   }
 
@@ -1253,39 +1644,117 @@ function closeScheduleModal() {
   if (modal) modal.classList.add('hidden');
 }
 
+function showScheduleSuccessModal() {
+  const modal = document.getElementById('schedule-success-modal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function hideScheduleSuccessModal() {
+  const modal = document.getElementById('schedule-success-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
 // submit handler
 const schedForm = document.getElementById('schedule-form');
 if (schedForm) {
   schedForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('sched-id').value;
-    const doctor = document.getElementById('sched-doctor').value.trim();
+    const doctorId = String(document.getElementById('sched-doctor-id').value || '').trim();
     const date = document.getElementById('sched-date').value;
-    const time = document.getElementById('sched-time').value.trim();
+    const startTime = String(document.getElementById('sched-start-time').value || '').trim();
+    const endTime = String(document.getElementById('sched-end-time').value || '').trim();
+    const notes = String(document.getElementById('sched-notes')?.value || '').trim();
     const errorNode = document.getElementById('sched-form-error');
     errorNode.textContent = '';
 
-    if (!doctor || !date || !time) {
-      errorNode.textContent = 'All fields are required.';
+    if (!doctorId || !date || !startTime || !endTime) {
+      errorNode.textContent = 'Doctor, date, start time, and end time are required.';
+      return;
+    }
+
+    if (startTime >= endTime) {
+      errorNode.textContent = 'End time must be after start time.';
+      return;
+    }
+
+    if (hasScheduleConflict({
+      doctorStaffId: doctorId,
+      scheduleDate: date,
+      startTime,
+      endTime,
+      excludeId: id || null
+    })) {
+      errorNode.textContent = 'This doctor already has an overlapping schedule on that date.';
       return;
     }
 
     try {
-      const url = id ? `${API_BASE}/api/schedules/${id}` : `${API_BASE}/api/schedules`;
-      const method = id ? 'PUT' : 'POST';
-      const resp = await fetch(url, {
-        method,
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ doctor, date, time })
-      });
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to save schedule');
+      const selectedDoctor = cachedScheduleDoctors.find((item) => String(item.id) === doctorId);
+      const doctorName = selectedDoctor ? getDoctorDisplayName(selectedDoctor) : 'Doctor';
+
+      if (isApiMode) {
+        const url = id ? `${API_BASE}/api/schedules/${id}` : `${API_BASE}/api/schedules`;
+        const method = id ? 'PUT' : 'POST';
+        const resp = await fetch(url, {
+          method,
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            doctor: doctorName,
+            doctor_staff_id: Number(doctorId),
+            date,
+            start_time: startTime,
+            end_time: endTime,
+            time: `${startTime}-${endTime}`,
+            notes: notes || null
+          })
+        });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.message || 'Failed to save schedule');
+        }
+      } else {
+        const { supabase } = await loadSupabaseModule();
+        const payload = {
+          doctor_staff_id: Number(doctorId),
+          doctor_name: doctorName,
+          schedule_date: date,
+          start_time: startTime,
+          end_time: endTime,
+          notes: notes || null,
+          created_by_staff_id: Number(cachedSessionUser?.id) || null
+        };
+
+        let result;
+        if (id) {
+          result = await supabase.from('doctor_schedules').update(payload).eq('id', id);
+          if (result.error) {
+            result = await supabase
+              .from('schedules')
+              .update({ doctor: doctorName, date, time: `${startTime}-${endTime}` })
+              .eq('id', id);
+          }
+        } else {
+          result = await supabase.from('doctor_schedules').insert(payload);
+          if (result.error) {
+            result = await supabase
+              .from('schedules')
+              .insert({ doctor: doctorName, date, time: `${startTime}-${endTime}` });
+          }
+        }
+
+        if (result.error) throw result.error;
       }
-      showToast(id ? 'Schedule updated' : 'Schedule created', 'success');
+
       closeScheduleModal();
       initProfileAndSchedule();
+
+      if (id) {
+        showToast('Schedule updated', 'success');
+      } else {
+        showScheduleSuccessModal();
+      }
     } catch (err) {
       console.error(err);
       errorNode.textContent = err.message || 'Network error';
@@ -1301,8 +1770,17 @@ if (schedDeleteBtn) {
     if (!id) return;
     if (!confirm('Delete this schedule?')) return;
     try {
-      const resp = await fetch(`${API_BASE}/api/schedules/${id}`, { method: 'DELETE', credentials: 'include' });
-      if (!resp.ok) throw new Error('Delete failed');
+      if (isApiMode) {
+        const resp = await fetch(`${API_BASE}/api/schedules/${id}`, { method: 'DELETE', credentials: 'include' });
+        if (!resp.ok) throw new Error('Delete failed');
+      } else {
+        const { supabase } = await loadSupabaseModule();
+        let result = await supabase.from('doctor_schedules').delete().eq('id', id);
+        if (result.error) {
+          result = await supabase.from('schedules').delete().eq('id', id);
+        }
+        if (result.error) throw result.error;
+      }
       showToast('Schedule deleted', 'success');
       closeScheduleModal();
       initProfileAndSchedule();
@@ -1313,9 +1791,9 @@ if (schedDeleteBtn) {
   });
 }
 
-  // modal cancel
-  const schedCancelBtn = document.getElementById('sched-cancel-btn');
-  if (schedCancelBtn) schedCancelBtn.addEventListener('click', () => closeScheduleModal());
+// modal cancel
+const schedCancelBtn = document.getElementById('sched-cancel-btn');
+if (schedCancelBtn) schedCancelBtn.addEventListener('click', () => closeScheduleModal());
 
 // wire create button to open modal
 const createScheduleBtn = document.getElementById('create-schedule-btn');
@@ -1323,25 +1801,24 @@ if (createScheduleBtn) {
   createScheduleBtn.addEventListener('click', () => openScheduleModal('create'));
 }
 
-function initializeDashboard() {
+const scheduleSuccessOkBtn = document.getElementById('schedule-success-ok-btn');
+if (scheduleSuccessOkBtn) {
+  scheduleSuccessOkBtn.addEventListener('click', () => hideScheduleSuccessModal());
+}
+
+async function initializeDashboard() {
   // Master init - call all content population functions
   initProfileAndSchedule();
   initClinicalData();
-  renderAnnouncements();
+  await refreshAnnouncementsData();
   renderFeedbacks();
   initDashboardData();
-
-  // Auto-activate dashboard section
-  const dashboardSectionEl = document.getElementById('dashboard-section');
-  const dashboardNavItem = document.querySelector('[data-section="dashboard-section"]');
-  if (dashboardSectionEl) dashboardSectionEl.classList.remove('hidden');
-  if (dashboardNavItem) dashboardNavItem.classList.add('is-active');
 }
 
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   initializeDashboard();
-  navigateToSection('dashboard-section');
+  navigateToSection(getSectionFromHash() || DEFAULT_SECTION_ID);
 });
 
 
@@ -1353,23 +1830,56 @@ const reportsSection = document.getElementById('reports-section');
 const newRegistrationSection = document.getElementById('new-registration');
 
 const statTotalStaff = document.getElementById('stat-total-staff');
-const statPendingStaff = document.getElementById('stat-pending-staff');
 const statDoctors = document.getElementById('stat-doctors');
 const statActiveStaff = document.getElementById('stat-active-staff');
 const statAnnouncements = document.getElementById('stat-announcements');
 const statReports = document.getElementById('stat-reports');
-const statCitizens = document.getElementById('stat-citizens');
-const dashboardPendingPreview = document.getElementById('dashboard-pending-preview');
+const statPatients = document.getElementById('stat-citizens');
 const dashboardActivePreview = document.getElementById('dashboard-active-preview');
 const dashboardLastSync = document.getElementById('dashboard-last-sync');
 
 const dashRefreshBtn = document.getElementById('dash-refresh-btn');
-const dashOpenPendingBtn = document.getElementById('dash-open-pending-btn');
 const refreshAccountsBtn = document.getElementById('refresh-accounts-btn');
-const citizensTbody = document.getElementById('citizens-tbody');
-const citizensPane = document.getElementById('citizens-pane');
+const patientsTbody = document.getElementById('citizens-tbody');
+const staffFinderInput = document.getElementById('staff-finder-input');
+const roleFilterInput = document.getElementById('role-filter');
+const citizensFinderInput = document.getElementById('citizens-finder-input');
 const userPaneIds = ['accounts-pane', 'registration-pane'];
 const chartAnimationState = { frameId: null };
+
+function applyStaffFinder() {
+  const query = String(staffFinderInput?.value || '').trim().toLowerCase();
+  const selectedRole = String(roleFilterInput?.value || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('#accounts-tbody tr.account-row');
+  rows.forEach((row) => {
+    const text = row.textContent ? row.textContent.toLowerCase() : '';
+    const rowRole = String(row.getAttribute('data-role') || '').trim().toLowerCase();
+    const matchesQuery = !query || text.includes(query);
+    const matchesRole = !selectedRole || rowRole === selectedRole;
+    row.style.display = matchesQuery && matchesRole ? '' : 'none';
+  });
+}
+
+function applyCitizensFinder() {
+  const query = String(citizensFinderInput?.value || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('#citizens-tbody tr.citizen-row');
+  rows.forEach((row) => {
+    const text = row.textContent ? row.textContent.toLowerCase() : '';
+    row.style.display = !query || text.includes(query) ? '' : 'none';
+  });
+}
+
+if (staffFinderInput) {
+  staffFinderInput.addEventListener('input', applyStaffFinder);
+}
+
+if (roleFilterInput) {
+  roleFilterInput.addEventListener('change', applyStaffFinder);
+}
+
+if (citizensFinderInput) {
+  citizensFinderInput.addEventListener('input', applyCitizensFinder);
+}
 
 function toggleUsersPane(targetId = 'accounts-pane') {
   userPaneIds.forEach((paneId) => {
@@ -1407,11 +1917,22 @@ function clearActiveNav() {
 }
 
 function navigateToSection(sectionId, options = {}) {
+  const targetId = document.getElementById(sectionId) ? sectionId : DEFAULT_SECTION_ID;
+  const currentRole = getSessionRole();
+  const allowedTarget = isSectionAllowedForRole(targetId, currentRole)
+    ? targetId
+    : (isSectionAllowedForRole('users-section', currentRole) ? 'users-section' : 'profile-section');
+
+  if (allowedTarget !== targetId) {
+    showToast('Access denied for this section.', 'warning');
+  }
+
   hideAllSections();
   clearActiveNav();
-  showSection(sectionId, options);
-  const navMatch = document.querySelector(`.nav [data-section="${sectionId}"]`);
+  showSection(allowedTarget, options);
+  const navMatch = document.querySelector(`.nav [data-section="${allowedTarget}"]`);
   if (navMatch) navMatch.classList.add('is-active');
+  setSectionHash(allowedTarget);
 }
 
 
@@ -1441,8 +1962,9 @@ if (tabFeedback && tabAnnouncements && feedbackPane && announcementsPane) {
 // Reports refresh button
 const reportsRefreshBtn = document.getElementById('reports-refresh-btn');
 if (reportsRefreshBtn) {
-  reportsRefreshBtn.addEventListener('click', () => {
-    showToast('Reports data refreshed (placeholder).', 'info');
+  reportsRefreshBtn.addEventListener('click', async () => {
+    await refreshAnnouncementsData();
+    showToast('Reports data refreshed.', 'info');
   });
 }
 
@@ -1453,6 +1975,37 @@ const createAnnouncementForm = document.getElementById('create-announcement-form
 const annSubmitBtn = document.getElementById('ann-submit-btn');
 const annCancelBtn = document.getElementById('ann-cancel-btn');
 const annFormError = document.getElementById('ann-form-error');
+
+const editAnnouncementModal = document.getElementById('edit-announcement-modal');
+const editAnnouncementForm = document.getElementById('edit-announcement-form');
+const editAnnIdInput = document.getElementById('edit-announcement-id');
+const editAnnTitleInput = document.getElementById('edit-ann-title');
+const editAnnContentInput = document.getElementById('edit-ann-content');
+const editAnnSubmitBtn = document.getElementById('edit-ann-submit-btn');
+const editAnnCancelBtn = document.getElementById('edit-ann-cancel-btn');
+const editAnnFormError = document.getElementById('edit-ann-form-error');
+
+let currentAnnouncementDetail = null;
+
+function openEditAnnouncementModal(announcement) {
+  if (!announcement || !editAnnouncementModal || !editAnnouncementForm) return;
+
+  currentAnnouncementDetail = announcement;
+  if (editAnnIdInput) editAnnIdInput.value = String(announcement.id || '');
+  if (editAnnTitleInput) editAnnTitleInput.value = String(announcement.title || '').trim();
+  if (editAnnContentInput) editAnnContentInput.value = String(announcement.content || announcement.body || '').trim();
+  if (editAnnFormError) editAnnFormError.style.display = 'none';
+
+  editAnnouncementModal.classList.remove('hidden');
+}
+
+function closeEditAnnouncementModal() {
+  if (!editAnnouncementModal) return;
+  editAnnouncementModal.classList.add('hidden');
+  if (editAnnouncementForm) editAnnouncementForm.reset();
+  if (editAnnFormError) editAnnFormError.style.display = 'none';
+  currentAnnouncementDetail = null;
+}
 
 if (createAnnouncementBtn && createAnnouncementModal) {
   createAnnouncementBtn.addEventListener('click', () => {
@@ -1498,9 +2051,12 @@ if (createAnnouncementForm && annSubmitBtn) {
     if (spinner) spinner.style.display = 'inline-block';
     if (label) label.textContent = 'PUBLISHING...';
 
-    // Placeholder API call
     try {
-      showToast('Announcement created successfully (placeholder).', 'success');
+      await createAnnouncementEntry({ title, content });
+      await refreshAnnouncementsData();
+      renderDashboardInsights();
+
+      showToast('Announcement created successfully.', 'success');
       if (createAnnouncementModal) createAnnouncementModal.classList.add('hidden');
       createAnnouncementForm.reset();
     } catch (error) {
@@ -1513,6 +2069,64 @@ if (createAnnouncementForm && annSubmitBtn) {
       annSubmitBtn.disabled = false;
       if (spinner) spinner.style.display = 'none';
       if (label) label.textContent = 'PUBLISH ANNOUNCEMENT';
+    }
+  });
+}
+
+if (editAnnCancelBtn) {
+  editAnnCancelBtn.addEventListener('click', () => {
+    closeEditAnnouncementModal();
+  });
+}
+
+if (editAnnouncementModal) {
+  editAnnouncementModal.addEventListener('click', (event) => {
+    if (event.target === editAnnouncementModal) {
+      closeEditAnnouncementModal();
+    }
+  });
+}
+
+if (editAnnouncementForm && editAnnSubmitBtn) {
+  editAnnouncementForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const announcementId = String(editAnnIdInput?.value || '').trim();
+    const title = String(editAnnTitleInput?.value || '').trim();
+    const content = String(editAnnContentInput?.value || '').trim();
+
+    if (!announcementId || !title || !content) {
+      if (editAnnFormError) {
+        editAnnFormError.textContent = 'Announcement ID, title, and content are required.';
+        editAnnFormError.style.display = 'block';
+      }
+      return;
+    }
+
+    editAnnSubmitBtn.disabled = true;
+    const spinner = editAnnSubmitBtn.querySelector('.btn-spinner');
+    const label = editAnnSubmitBtn.querySelector('.btn-label');
+    if (spinner) spinner.style.display = 'inline-block';
+    if (label) label.textContent = 'SAVING...';
+
+    try {
+      await updateAnnouncementEntry(announcementId, { title, content });
+      await refreshAnnouncementsData();
+      renderDashboardInsights();
+
+      closeEditAnnouncementModal();
+      closeDataDetail();
+      showToast('Announcement updated successfully.', 'success');
+    } catch (error) {
+      console.error('Error updating announcement:', error);
+      if (editAnnFormError) {
+        editAnnFormError.textContent = error.message || 'Failed to update announcement.';
+        editAnnFormError.style.display = 'block';
+      }
+    } finally {
+      editAnnSubmitBtn.disabled = false;
+      if (spinner) spinner.style.display = 'none';
+      if (label) label.textContent = 'SAVE CHANGES';
     }
   });
 }
@@ -1544,7 +2158,17 @@ function formatDetailValue(value) {
   if (value === null || value === undefined) return '—';
   if (Array.isArray(value)) return value.length ? value.join(', ') : '—';
   if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? '—' : value.toLocaleString();
+    return Number.isNaN(value.getTime())
+      ? '—'
+      : value.toLocaleString([], {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
   }
   if (typeof value === 'object') {
     return Object.keys(value).length ? JSON.stringify(value, null, 2) : '—';
@@ -1675,8 +2299,7 @@ if (dashboardLink && !dashboardLink.classList.contains('hidden')) {
 // Stored accounts (identifier -> account data)
 const storedAccounts = new Map();
 let latestStaffList = [];
-let latestPendingList = [];
-let latestCitizensList = [];
+let latestPatientsList = [];
 let latestAnnouncementsList = [];
 let latestFeedbackList = [];
 
@@ -1684,16 +2307,168 @@ function formatDateTime(value) {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString();
+  return date.toLocaleString([], {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
+}
+
+function isCurrentlyLoggedInStaffAccount(user) {
+  if (!user?.is_online) return false;
+
+  const lastSeenValue = user?.last_seen;
+  if (!lastSeenValue) return false;
+
+  const lastSeenAt = new Date(lastSeenValue).getTime();
+  if (!Number.isFinite(lastSeenAt)) return false;
+
+  if (Date.now() - lastSeenAt > STAFF_PRESENCE_TIMEOUT_MS) return false;
+
+  return true;
+}
+
+function getStaffPresenceStatus(user) {
+  return isCurrentlyLoggedInStaffAccount(user) ? 'Active' : 'Inactive';
+}
+
+function getStaffPresenceBadgeClass(user) {
+  return isCurrentlyLoggedInStaffAccount(user) ? 'badge-active' : 'badge-inactive';
+}
+
+async function pushPresenceHeartbeat() {
+  if (isDemoMode) return;
+
+  try {
+    const authService = await loadAuthServiceModule();
+    await authService.setStaffPresence(true);
+  } catch (error) {
+    console.warn('Presence heartbeat warning:', error);
+  }
+}
+
+function stopPresenceHeartbeat() {
+  if (!presenceHeartbeatTimer) return;
+  clearInterval(presenceHeartbeatTimer);
+  presenceHeartbeatTimer = null;
+}
+
+function stopAdminDashboardAutoRefresh() {
+  if (!adminDashboardRefreshTimer) return;
+  clearInterval(adminDashboardRefreshTimer);
+  adminDashboardRefreshTimer = null;
+}
+
+function startAdminDashboardAutoRefresh() {
+  if (adminDashboardRefreshTimer) return;
+
+  const runRefresh = async () => {
+    if (adminDashboardRefreshInFlight) return;
+    adminDashboardRefreshInFlight = true;
+    try {
+      await loadStaffData();
+    } catch (_) {
+      // Keep auto-refresh resilient.
+    } finally {
+      adminDashboardRefreshInFlight = false;
+    }
+  };
+
+  adminDashboardRefreshTimer = setInterval(runRefresh, ADMIN_DASHBOARD_REFRESH_MS);
+}
+
+function startPresenceHeartbeat() {
+  if (isDemoMode || presenceHeartbeatTimer) return;
+
+  pushPresenceHeartbeat();
+  presenceHeartbeatTimer = setInterval(pushPresenceHeartbeat, STAFF_PRESENCE_HEARTBEAT_MS);
+}
+
+async function markStaffOfflineBestEffort() {
+  if (isDemoMode) return;
+
+  try {
+    const authService = await loadAuthServiceModule();
+    await authService.setStaffPresence(false);
+  } catch (_) {
+    // best effort on page close/navigation
+  }
+}
+
+function clearSessionAuthStorageBestEffort() {
+  try {
+    const keys = Object.keys(window.sessionStorage || {});
+    for (const key of keys) {
+      if (!key) continue;
+      if (key === 'ukonek_role' || key === 'ukonek.auth.session' || key === 'ukonek.auth.tab_id') {
+        sessionStorage.removeItem(key);
+        continue;
+      }
+
+      if (key.startsWith('sb-') && key.includes('-auth-tab-')) {
+        sessionStorage.removeItem(key);
+      }
+    }
+  } catch (_) {
+    // Ignore storage failures in unload path.
+  }
+}
+
+function sendOfflinePresenceOnUnload() {
+  if (isDemoMode) return;
+
+  try {
+    const config = window.UKONEK_CONFIG || {};
+    const supabaseUrl = String(config.SUPABASE_URL || '').trim();
+    const supabaseAnonKey = String(config.SUPABASE_ANON_KEY || '').trim();
+    if (!supabaseUrl || !supabaseAnonKey) return;
+
+    const keys = Object.keys(window.sessionStorage || {});
+    const authKey = keys.find((key) => key.startsWith('sb-') && key.includes('-auth-tab-'));
+    if (!authKey) return;
+
+    const raw = sessionStorage.getItem(authKey);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    const accessToken = String(parsed?.access_token || '').trim();
+    if (!accessToken) return;
+
+    const url = `${supabaseUrl}/rest/v1/rpc/set_staff_presence`;
+    const body = JSON.stringify({ p_is_online: false });
+
+    // Prefer keepalive fetch; unload-safe on modern browsers.
+    fetch(url, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body
+    }).catch(() => {
+      // Ignore unload path failures.
+    });
+  } catch (_) {
+    // Ignore unload path failures.
+  }
+}
+
+function handleAutoLogoutOnClose() {
+  stopPresenceHeartbeat();
+  stopAdminDashboardAutoRefresh();
+  sendOfflinePresenceOnUnload();
+  markStaffOfflineBestEffort();
 }
 
 function renderDashboardInsights() {
   if (statTotalStaff) statTotalStaff.textContent = String(latestStaffList.length);
-  if (statPendingStaff) statPendingStaff.textContent = String(latestPendingList.length);
 
-  if (!latestAnnouncementsList.length) {
-    latestAnnouncementsList = loadAnnouncements();
-  }
   const announcementsCount = latestAnnouncementsList.length || 0;
   if (statAnnouncements) statAnnouncements.textContent = String(announcementsCount);
 
@@ -1704,27 +2479,13 @@ function renderDashboardInsights() {
   if (statReports) statReports.textContent = String(feedbackCount);
 
   // Citizens count
-  if (statCitizens) statCitizens.textContent = String(latestCitizensList.length || 0);
+  if (statPatients) statPatients.textContent = String(latestPatientsList.length || 0);
 
   const doctorsCount = latestStaffList.filter((user) => String(user.role || '').toLowerCase() === 'doctor').length;
   if (statDoctors) statDoctors.textContent = String(doctorsCount);
 
-  const activeCount = latestStaffList.filter((user) => String(user.status || '').toLowerCase() === 'active').length;
+  const activeCount = latestStaffList.filter(isCurrentlyLoggedInStaffAccount).length;
   if (statActiveStaff) statActiveStaff.textContent = String(activeCount);
-
-  if (dashboardPendingPreview) {
-    const rows = latestPendingList.slice(0, 5);
-    dashboardPendingPreview.innerHTML = rows.length
-      ? rows.map((user) => `
-          <tr>
-            <td class="table-cell">${user.username || '—'}</td>
-            <td class="table-cell">${user.employee_id || '—'}</td>
-            <td class="table-cell">${user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '—'}</td>
-            <td class="table-cell">${formatDateTime(user.created_at)}</td>
-          </tr>
-        `).join('')
-      : '<tr><td class="table-cell" colspan="4">No pending registrations.</td></tr>';
-  }
 
   if (dashboardActivePreview) {
     const rows = latestStaffList.slice(0, 5);
@@ -1733,7 +2494,7 @@ function renderDashboardInsights() {
           <tr>
             <td class="table-cell">${user.username || '—'}</td>
             <td class="table-cell">${user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '—'}</td>
-            <td class="table-cell"><span class="badge-${String(user.status || '').toLowerCase()}">${user.status || '—'}</span></td>
+            <td class="table-cell"><span class="${getStaffPresenceBadgeClass(user)}">${getStaffPresenceStatus(user)}</span></td>
             <td class="table-cell">${formatDateTime(user.created_at)}</td>
           </tr>
         `).join('')
@@ -1741,7 +2502,12 @@ function renderDashboardInsights() {
   }
 
   if (dashboardLastSync) {
-    dashboardLastSync.textContent = `Last synced: ${new Date().toLocaleTimeString()}`;
+    dashboardLastSync.textContent = `Last synced: ${new Date().toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    })}`;
   }
 
   renderDashboardChart();
@@ -1755,12 +2521,10 @@ function renderDashboardChart() {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  if (!latestAnnouncementsList.length) latestAnnouncementsList = loadAnnouncements();
   if (!latestFeedbackList.length) latestFeedbackList = loadFeedbacks();
 
   const metrics = [
     { label: 'Staff', value: latestStaffList.length, color: '#3b82f6' },
-    { label: 'Pending', value: latestPendingList.length, color: '#f97316' },
     { label: 'Announcements', value: latestAnnouncementsList.length || 0, color: '#14b8a6' },
     { label: 'Feedback', value: latestFeedbackList.length || 0, color: '#a855f7' }
   ];
@@ -1917,39 +2681,60 @@ function easeOutCubic(value) {
 }
 
 // Load citizens (mobile app users)
-async function loadCitizenData() {
+async function loadPatientData() {
   let list = [];
 
   if (isDemoMode) {
-    list = DEMO_CITIZENS;
+    list = [];
   } else {
     try {
-      const response = await fetch(`${API_BASE}/api/citizens`, { credentials: 'include' });
-      if (response && response.ok) {
-        list = await response.json();
+      if (isApiMode) {
+        const response = await fetch(`${API_BASE}/api/citizens`, { credentials: 'include' });
+        if (response && response.ok) {
+          list = await response.json();
+        }
+      } else {
+        const { supabase } = await loadSupabaseModule();
+        let data = null;
+        let error = null;
+
+        ({ data, error } = await supabase
+          .from('citizens')
+          .select('username,email,created_at,status')
+          .order('created_at', { ascending: false }));
+
+        if (error) {
+          ({ data, error } = await supabase
+            .from('patients')
+            .select('username,email,created_at,status')
+            .order('created_at', { ascending: false }));
+        }
+
+        if (error) throw error;
+        list = data || [];
       }
     } catch (error) {
       console.error('Error loading citizens:', error);
-      list = DEMO_CITIZENS;
+      list = [];
     }
   }
 
-  latestCitizensList = Array.isArray(list) ? [...list] : [];
+  latestPatientsList = Array.isArray(list) ? [...list] : [];
 
-  if (citizensTbody) {
-    citizensTbody.innerHTML = '';
-    if (latestCitizensList.length === 0) {
-      citizensTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No citizen accounts found.</td></tr>';
+  if (patientsTbody) {
+    patientsTbody.innerHTML = '';
+    if (latestPatientsList.length === 0) {
+      patientsTbody.innerHTML = '<tr><td class="table-cell" colspan="3">No citizen accounts found.</td></tr>';
     } else {
-      latestCitizensList.forEach(user => {
+      latestPatientsList.forEach(user => {
         const row = document.createElement('tr');
+        row.className = 'citizen-row';
         row.innerHTML = `
           <td class="table-cell">${user.username || user.name || '—'}</td>
           <td class="table-cell">${user.email || '—'}</td>
-          <td class="table-cell">${user.created_at ? new Date(user.created_at).toLocaleString() : '—'}</td>
-          <td class="table-cell">${user.status || '—'}</td>
+          <td class="table-cell">${formatDateTime(user.created_at)}</td>
         `;
-        citizensTbody.appendChild(row);
+        patientsTbody.appendChild(row);
         attachDetailRow(row, () => ({
           tag: 'Citizens',
           title: user.username || user.name || 'Citizen Account',
@@ -1957,12 +2742,13 @@ async function loadCitizenData() {
           items: [
             { label: 'Username', value: user.username || user.name || '—' },
             { label: 'Email', value: user.email || '—' },
-            { label: 'Registered', value: user.created_at ? new Date(user.created_at) : '—' },
-            { label: 'Status', value: user.status || '—' }
+            { label: 'Registered', value: user.created_at ? new Date(user.created_at) : '—' }
           ]
         }));
       });
     }
+
+    applyCitizensFinder();
   }
 }
 
@@ -1973,9 +2759,14 @@ async function loadStaffData() {
     staffList = DEMO_REGISTERED_USERS;
   } else {
     try {
-      const response = await fetch(`${API_BASE}/api/staff`, { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch staff');
-      staffList = await response.json();
+      if (isApiMode) {
+        const response = await fetch(`${API_BASE}/api/staff`, { credentials: 'include' });
+        if (!response.ok) throw new Error('Failed to fetch staff');
+        staffList = await response.json();
+      } else {
+        const staffService = await loadStaffServiceModule();
+        staffList = await staffService.listStaff();
+      }
     } catch (error) {
       console.error('Error loading staff:', error);
       staffList = DEMO_REGISTERED_USERS;
@@ -1988,7 +2779,7 @@ async function loadStaffData() {
   if (accountsTbody) {
     accountsTbody.innerHTML = '';
     if (latestStaffList.length === 0) {
-      accountsTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No registered staff accounts found.</td></tr>';
+      accountsTbody.innerHTML = '<tr><td class="table-cell" colspan="5">No registered staff accounts found.</td></tr>';
     } else {
       latestStaffList.forEach(user => {
         const identifier = user.username || user.employee_id || makeDemoId();
@@ -1996,8 +2787,9 @@ async function loadStaffData() {
 
         const roleValue = user.role ? String(user.role) : '';
         const roleLabel = roleValue ? roleValue.charAt(0).toUpperCase() + roleValue.slice(1) : '—';
-        const statusValue = user.status ? String(user.status) : 'Active';
-        const statusSlug = statusValue.toLowerCase().replace(/\s+/g, '-');
+        const specializationLabel = getSpecializationValue(user) || '—';
+        const statusValue = getStaffPresenceStatus(user);
+        const statusClass = getStaffPresenceBadgeClass(user);
 
         const row = document.createElement('tr');
         row.className = 'account-row';
@@ -2007,63 +2799,15 @@ async function loadStaffData() {
           <td class="table-cell">${user.username || '—'}</td>
           <td class="table-cell">${user.employee_id || '—'}</td>
           <td class="table-cell">${roleLabel}</td>
-          <td class="table-cell"><span class="badge-${statusSlug}">${statusValue}</span></td>
+          <td class="table-cell">${specializationLabel}</td>
+          <td class="table-cell"><span class="${statusClass}">${statusValue}</span></td>
         `;
         accountsTbody.appendChild(row);
         attachAccountRowListener(row);
       });
     }
-  }
 
-  renderDashboardInsights();
-}
-
-async function loadPendingStaffData() {
-  let pendingList = [];
-
-  if (isDemoMode) {
-    pendingList = DEMO_PENDING_USERS;
-  } else {
-    try {
-      const response = await fetch(`${API_BASE}/api/staff/pending`, { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch pending staff');
-      pendingList = await response.json();
-    } catch (error) {
-      console.error('Error loading pending staff:', error);
-      pendingList = DEMO_PENDING_USERS;
-    }
-  }
-
-  latestPendingList = Array.isArray(pendingList) ? [...pendingList] : [];
-
-  const pendingTbody = document.getElementById('pending-tbody');
-  if (pendingTbody) {
-    pendingTbody.innerHTML = '';
-    if (latestPendingList.length === 0) {
-      pendingTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No pending registrations.</td></tr>';
-    } else {
-      latestPendingList.forEach(user => {
-        const identifier = user.username || user.employee_id || makeDemoId();
-        storedAccounts.set(identifier, user);
-
-        const roleValue = user.role ? String(user.role) : '';
-        const roleLabel = roleValue ? roleValue.charAt(0).toUpperCase() + roleValue.slice(1) : '—';
-        const createdValue = user.created_at ? new Date(user.created_at).toLocaleString() : '—';
-
-        const row = document.createElement('tr');
-        row.className = 'pending-row';
-        row.setAttribute('data-role', roleValue ? roleValue.toLowerCase() : '');
-        row.setAttribute('data-id', identifier);
-        row.innerHTML = `
-          <td class="table-cell">${user.username || '—'}</td>
-          <td class="table-cell">${user.employee_id || '—'}</td>
-          <td class="table-cell">${roleLabel}</td>
-          <td class="table-cell">${createdValue}</td>
-        `;
-        pendingTbody.appendChild(row);
-        attachPendingRowListener(row);
-      });
-    }
+    applyStaffFinder();
   }
 
   renderDashboardInsights();
@@ -2071,43 +2815,54 @@ async function loadPendingStaffData() {
 
 // Initial load (after auth check)
 async function initDashboardData() {
-  const sessionUser = await ensureAuthenticatedSession();
-  if (!sessionUser) return;
+  try {
+    const sessionUser = await ensureAuthenticatedSession();
+    if (!sessionUser) return;
 
-  applyRoleAccess(sessionUser);
+    startPresenceHeartbeat();
+    applyRoleAccess(sessionUser);
 
-  if (!isAdminUser(sessionUser)) {
-    return;
+    await loadPatientData();
+
+    if (!isAdminUser(sessionUser)) {
+      stopAdminDashboardAutoRefresh();
+      renderDashboardInsights();
+      return;
+    }
+
+    // Do not force section visibility here; active section is managed by navigateToSection.
+    storedAccounts.clear();
+    await loadStaffData();
+    startAdminDashboardAutoRefresh();
+    // Refresh counts after all data loaded
+    renderDashboardInsights();
+  } finally {
+    dismissPagePreloader();
   }
-
-  if (dashboardSection) dashboardSection.classList.remove('hidden');
-  if (dashboardLink) dashboardLink.classList.add('is-active');
-  storedAccounts.clear();
-  await Promise.all([loadStaffData(), loadPendingStaffData(), loadCitizenData()]);
-  // Refresh counts after all data loaded
-  renderDashboardInsights();
 }
 
 initDashboardData();
 
+window.addEventListener('pagehide', () => {
+  handleAutoLogoutOnClose();
+});
+
+window.addEventListener('beforeunload', () => {
+  handleAutoLogoutOnClose();
+});
+
 if (dashRefreshBtn) {
   dashRefreshBtn.addEventListener('click', async () => {
     storedAccounts.clear();
-    await Promise.all([loadStaffData(), loadPendingStaffData(), loadCitizenData()]);
+    await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData()]);
     showToast('Dashboard data refreshed.', 'info');
-  });
-}
-
-if (dashOpenPendingBtn) {
-  dashOpenPendingBtn.addEventListener('click', () => {
-    navigateToSection('users-section', { pane: 'accounts-pane', tab: 'tab-pending' });
   });
 }
 
 if (refreshAccountsBtn) {
   refreshAccountsBtn.addEventListener('click', async () => {
     storedAccounts.clear();
-    await Promise.all([loadStaffData(), loadPendingStaffData(), loadCitizenData()]);
+    await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData()]);
     showToast('Account tables refreshed.', 'info');
   });
 }
@@ -2117,27 +2872,228 @@ function validateEmail(email) {
   return /.+@.+\..+/.test(email);
 }
 
-// Role filter functionality
-const roleFilter = document.getElementById('role-filter');
-if (roleFilter) {
-  roleFilter.addEventListener('change', (e) => {
-    const filterValue = e.target.value.toLowerCase();
-    const accountRows = document.querySelectorAll('.account-row');
-
-    accountRows.forEach(row => {
-      const role = row.getAttribute('data-role');
-      if (filterValue === '' || role === filterValue) {
-        row.style.display = '';
-      } else {
-        row.style.display = 'none';
-      }
-    });
-  });
-}
-
 // Modal state
 let currentAccountData = null;
 let currentAction = null; // 'edit' or 'delete'
+let isAccountEditMode = false;
+
+const modalViewFields = document.getElementById('modal-view-fields');
+const modalEditForm = document.getElementById('modal-edit-form');
+const modalEditActions = document.getElementById('modal-edit-actions');
+const modalEditError = document.getElementById('modal-edit-error');
+
+const modalEditFirstName = document.getElementById('modal-edit-first-name');
+const modalEditMiddleName = document.getElementById('modal-edit-middle-name');
+const modalEditLastName = document.getElementById('modal-edit-last-name');
+const modalEditUsername = document.getElementById('modal-edit-username');
+const modalEditEmail = document.getElementById('modal-edit-email');
+const modalEditEmployeeId = document.getElementById('modal-edit-employee-id');
+const modalEditRole = document.getElementById('modal-edit-role');
+const modalEditSpecialization = document.getElementById('modal-edit-specialization');
+const modalEditSpecializationGroup = document.getElementById('modal-edit-specialization-group');
+const modalEditBirthday = document.getElementById('modal-edit-birthday');
+
+function syncModalSpecializationVisibility() {
+  if (!modalEditRole || !modalEditSpecializationGroup) return;
+  const isDoctor = String(modalEditRole.value || '').toLowerCase() === 'doctor';
+  modalEditSpecializationGroup.classList.toggle('hidden', !isDoctor);
+  if (modalEditSpecialization) {
+    modalEditSpecialization.required = isDoctor;
+    if (!isDoctor) modalEditSpecialization.value = '';
+  }
+}
+
+if (modalEditRole) {
+  modalEditRole.addEventListener('change', syncModalSpecializationVisibility);
+}
+
+function normalizeDateInput(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 10);
+}
+
+function setModalEditError(message = '') {
+  if (!modalEditError) return;
+  const text = String(message || '').trim();
+  modalEditError.textContent = text;
+  modalEditError.classList.toggle('hidden', !text);
+}
+
+function setAccountEditMode(editMode) {
+  isAccountEditMode = Boolean(editMode);
+  if (modalViewFields) modalViewFields.classList.toggle('hidden', isAccountEditMode);
+  if (modalEditForm) modalEditForm.classList.toggle('hidden', !isAccountEditMode);
+
+  const modalActions = document.getElementById('modal-actions');
+  if (modalActions) modalActions.classList.toggle('hidden', isAccountEditMode);
+  if (modalEditActions) modalEditActions.classList.toggle('hidden', !isAccountEditMode);
+  setModalEditError('');
+}
+
+function fillAccountEditForm(user) {
+  if (!user) return;
+  if (modalEditFirstName) modalEditFirstName.value = String(user.first_name || '').trim();
+  if (modalEditMiddleName) modalEditMiddleName.value = String(user.middle_name || '').trim();
+  if (modalEditLastName) modalEditLastName.value = String(user.last_name || '').trim();
+  if (modalEditUsername) modalEditUsername.value = String(user.username || '').trim();
+  if (modalEditEmail) modalEditEmail.value = String(user.email || '').trim();
+  if (modalEditEmployeeId) modalEditEmployeeId.value = String(user.employee_id || '').trim();
+  if (modalEditRole) {
+    const roleValue = String(user.role || 'staff').trim().toLowerCase();
+    modalEditRole.value = roleValue || 'staff';
+  }
+  if (modalEditSpecialization) {
+    modalEditSpecialization.value = getSpecializationValue(user);
+  }
+  if (modalEditBirthday) modalEditBirthday.value = normalizeDateInput(user.birthday);
+  syncModalSpecializationVisibility();
+}
+
+function closeAccountModal() {
+  const modal = document.getElementById('account-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = '';
+  }
+  currentAccountData = null;
+  currentAction = null;
+  setAccountEditMode(false);
+}
+
+async function updateStaffAccountById(staffId, payload) {
+  if (isDemoMode) {
+    const idx = DEMO_REGISTERED_USERS.findIndex((item) => String(item.id || '') === String(staffId));
+    if (idx >= 0) {
+      DEMO_REGISTERED_USERS[idx] = { ...DEMO_REGISTERED_USERS[idx], ...payload };
+    }
+    return DEMO_REGISTERED_USERS[idx] || null;
+  }
+
+  if (isApiMode) {
+    const apiPayload = {
+      ...payload,
+      doctor_specialization: payload?.doctor_specialization ?? null,
+      doctorSpecialization: payload?.doctor_specialization ?? null,
+      specialization: payload?.doctor_specialization ?? null
+    };
+    const requestBody = JSON.stringify(apiPayload);
+    let response = await fetch(`${API_BASE}/api/staff/${staffId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: requestBody
+    });
+
+    if (response.status === 404 || response.status === 405) {
+      response = await fetch(`${API_BASE}/api/staff/${staffId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: requestBody
+      });
+    }
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to update account.');
+    }
+    return data;
+  }
+
+  const staffService = await loadStaffServiceModule();
+  return staffService.updateStaffById(staffId, payload);
+}
+
+async function persistDoctorSpecializationById(staffId, specializationValue) {
+  const normalized = String(specializationValue || '').trim() || null;
+
+  if (isApiMode) {
+    const endpoints = [
+      `${API_BASE}/api/staff/${staffId}/specialization`,
+      `${API_BASE}/api/staff/specialization`
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            staffId,
+            doctor_specialization: normalized,
+            doctorSpecialization: normalized,
+            specialization: normalized
+          })
+        });
+
+        if (response.ok) {
+          return true;
+        }
+      } catch (_) {
+        // Continue to next fallback.
+      }
+    }
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { data, error } = await supabase.rpc('set_staff_specialization_admin', {
+    target_staff_id: staffId,
+    p_specialization: normalized
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to save doctor specialization.');
+  }
+
+  if (data && data.error) {
+    throw new Error(data.error);
+  }
+
+  return true;
+}
+
+async function resetStaffPasswordById(staffId, newPassword) {
+  const normalizedPassword = String(newPassword || '');
+  if (normalizedPassword.length < 8) {
+    throw new Error('Password must be at least 8 characters.');
+  }
+
+  if (isApiMode) {
+    const endpoints = [
+      `${API_BASE}/api/staff/${staffId}/reset-password`,
+      `${API_BASE}/api/staff/reset-password`
+    ];
+
+    let lastError = null;
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ staffId, password: normalizedPassword })
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.message || `Request failed (${response.status})`);
+        }
+
+        return data;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error('Unable to reset password in API mode.');
+  }
+
+  const staffService = await loadStaffServiceModule();
+  return staffService.resetStaffPassword(staffId, normalizedPassword);
+}
 
 function openAccountModal(user) {
   if (!user) return;
@@ -2145,6 +3101,8 @@ function openAccountModal(user) {
   if (!modal) return;
 
   currentAccountData = { ...user };
+  setAccountEditMode(false);
+  fillAccountEditForm(user);
 
   const firstName = String(user.first_name || '').trim();
   const lastName = String(user.last_name || '').trim();
@@ -2159,6 +3117,8 @@ function openAccountModal(user) {
   const modalRole = document.getElementById('modal-role');
   const modalStatus = document.getElementById('modal-status');
   const modalContact = document.getElementById('modal-contact');
+  const modalSpecialization = document.getElementById('modal-specialization');
+  const modalSpecializationGroup = document.getElementById('modal-specialization-group');
   const modalBday = document.getElementById('modal-bday');
   const confirmSection = document.getElementById('modal-confirm-section');
   const modalActions = document.getElementById('modal-actions');
@@ -2169,8 +3129,15 @@ function openAccountModal(user) {
     const roleLabel = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '—';
     modalRole.textContent = roleLabel;
   }
-  if (modalStatus) modalStatus.textContent = user.status || '—';
+  if (modalStatus) modalStatus.textContent = getStaffPresenceStatus(user);
   if (modalContact) modalContact.textContent = user.employee_id || '—';
+  const isDoctor = String(user.role || '').toLowerCase() === 'doctor';
+  if (modalSpecializationGroup) modalSpecializationGroup.classList.toggle('hidden', !isDoctor);
+  if (modalSpecialization) {
+    modalSpecialization.textContent = isDoctor
+      ? (getSpecializationValue(user) || '—')
+      : '—';
+  }
   if (modalBday) modalBday.textContent = birthdayText;
 
   ['address'].forEach(field => {
@@ -2181,6 +3148,7 @@ function openAccountModal(user) {
   if (confirmSection) confirmSection.style.display = 'none';
   if (modalActions) modalActions.style.display = 'flex';
 
+  modal.classList.remove('hidden');
   modal.style.display = 'flex';
 }
 
@@ -2204,8 +3172,9 @@ function attachAccountRowListener(row) {
     const firstName = String(user.first_name || '').trim();
     const lastName = String(user.last_name || '').trim();
     const fullName = `${firstName} ${lastName}`.replace(/\s+/g, ' ').trim();
-    const statusValue = user.status || '—';
+    const statusValue = getStaffPresenceStatus(user);
     const roleLabel = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '—';
+    const specializationValue = getSpecializationValue(user) || '—';
 
     const actions = document.getElementById('account-modal') ? [
       {
@@ -2226,6 +3195,7 @@ function attachAccountRowListener(row) {
         { label: 'Username', value: user.username || '—' },
         { label: 'Employee ID', value: user.employee_id || '—' },
         { label: 'Role', value: roleLabel },
+        { label: 'Specialization', value: specializationValue },
         { label: 'Status', value: statusValue },
         { label: 'Email', value: user.email || '—' },
         { label: 'Birthday', value: user.birthday ? new Date(user.birthday) : '—' }
@@ -2238,161 +3208,12 @@ function attachAccountRowListener(row) {
 // Attach listeners to existing account rows
 document.querySelectorAll('.account-row').forEach(attachAccountRowListener);
 
-// attach listeners to any existing pending rows (none initially)
-document.querySelectorAll('.pending-row').forEach(attachPendingRowListener);
-
-// Tab switching (Registered / Pending / Citizens)
-const tabRegistered = document.getElementById('tab-registered');
-const tabPending = document.getElementById('tab-pending');
-const tabCitizens = document.getElementById('tab-citizens');
-const registeredPane = document.getElementById('registered-pane');
-const pendingPane = document.getElementById('pending-pane');
-const citizensPaneEl = document.getElementById('citizens-pane');
-if (tabRegistered && tabPending && registeredPane && pendingPane && tabCitizens && citizensPaneEl) {
-  tabRegistered.addEventListener('click', () => {
-    tabRegistered.classList.add('active');
-    tabPending.classList.remove('active');
-    tabCitizens.classList.remove('active');
-    registeredPane.classList.remove('hidden');
-    pendingPane.classList.add('hidden');
-    citizensPaneEl.classList.add('hidden');
-  });
-  tabPending.addEventListener('click', () => {
-    tabPending.classList.add('active');
-    tabRegistered.classList.remove('active');
-    tabCitizens.classList.remove('active');
-    pendingPane.classList.remove('hidden');
-    registeredPane.classList.add('hidden');
-    citizensPaneEl.classList.add('hidden');
-  });
-  tabCitizens.addEventListener('click', () => {
-    tabCitizens.classList.add('active');
-    tabRegistered.classList.remove('active');
-    tabPending.classList.remove('active');
-    citizensPaneEl.classList.remove('hidden');
-    registeredPane.classList.add('hidden');
-    pendingPane.classList.add('hidden');
-  });
-}
-
-// Pending modal logic
-function attachPendingRowListener(row) {
-  row.addEventListener('click', () => {
-    const identifier = row.getAttribute('data-id');
-    const stored = storedAccounts.get(identifier);
-    if (!stored) {
-      console.error('Pending account data not found for:', identifier);
-      return;
-    }
-
-    // Populate pending modal fields (create modal elements if absent)
-    const pendingModal = document.getElementById('pending-modal');
-    if (!pendingModal) {
-      console.warn('Pending modal element not found in DOM');
-      return;
-    }
-
-    let scheduleText = '—';
-    if (stored.schedule) {
-      try {
-        const scheduleData = typeof stored.schedule === 'string' ? JSON.parse(stored.schedule) : stored.schedule;
-        if (scheduleData && Array.isArray(scheduleData.days) && scheduleData.days.length > 0) {
-          const startHour = Number.isFinite(scheduleData.startHour) ? `${scheduleData.startHour}:00` : '?';
-          const endHour = Number.isFinite(scheduleData.endHour) ? `${scheduleData.endHour}:00` : '?';
-          scheduleText = `${scheduleData.days.join(', ')} (${startHour} - ${endHour})`;
-        }
-      } catch (error) {
-        scheduleText = String(stored.schedule);
-      }
-    }
-
-    // set values
-    document.getElementById('pending-username').textContent = stored.username || '—';
-    document.getElementById('pending-employee-id').textContent = stored.employee_id || '—';
-    document.getElementById('pending-email').textContent = stored.email || '—';
-    document.getElementById('pending-role').textContent = stored.role ? (stored.role.charAt(0).toUpperCase() + stored.role.slice(1)) : '';
-    document.getElementById('pending-specialization').textContent = stored.specialization || '—';
-    document.getElementById('pending-schedule').textContent = scheduleText;
-    document.getElementById('pending-submitted').textContent = formatDateTime(stored.created_at);
-
-    // show modal
-    pendingModal.style.display = 'flex';
-
-    // accept/reject handlers use global pending-action-confirm-modal
-    const showConfirm = (text, onConfirmAction) => {
-      const global = document.getElementById('pending-action-confirm-modal');
-      if (!global) {
-        console.warn('Pending action confirm modal not found');
-        return;
-      }
-
-      // close the pending modal immediately so the confirmation modal isn't displayed behind it
-      pendingModal.style.display = 'none';
-
-      document.getElementById('pending-action-text').textContent = text;
-      global.style.display = 'flex';
-      const yes = document.getElementById('pending-action-yes');
-      const no = document.getElementById('pending-action-no');
-      const cleanup = () => { global.style.display = 'none'; yes.onclick = null; no.onclick = null; };
-      yes.onclick = () => { cleanup(); onConfirmAction(); };
-      no.onclick = () => { cleanup(); };
-    };
-
-    document.getElementById('pending-accept').onclick = () => {
-      showConfirm('Accept this registration and activate the account?', async () => {
-        try {
-          const res = await fetch(`${API_BASE}/api/staff/approve/${stored.id}`, { method: 'POST', credentials: 'include' });
-          const data = await res.json();
-
-          if (res.ok) {
-            if (data.notificationEmailSent === true) {
-              const recipient = data.notificationEmailRecipient || 'the registrant';
-              showToast(`Account approved. Notification email sent to ${recipient}.`, 'success');
-            } else if (data.notificationEmailSent === false) {
-              const reason = data.notificationError ? ` Reason: ${data.notificationError}` : '';
-              showToast(`Account approved, but notification email failed.${reason}`, 'warning');
-            } else {
-              showToast(data.message || 'Account approved successfully.', 'success');
-            }
-            loadStaffData();
-            loadPendingStaffData();
-          } else {
-            showToast(data.message || 'Approval failed', 'error');
-          }
-        } catch (err) {
-          console.error(err);
-          showToast('Server error', 'error');
-        }
-      });
-    };
-
-    document.getElementById('pending-reject').onclick = () => {
-      showConfirm('Reject this registration? This will permanently delete the submission.', async () => {
-        try {
-          const res = await fetch(`${API_BASE}/api/staff/reject/${stored.id}`, { method: 'POST', credentials: 'include' });
-          const data = await res.json();
-          if (res.ok) {
-            showToast(data.message || 'Account rejected', 'success');
-            loadPendingStaffData();
-          } else {
-            showToast(data.message || 'Rejection failed', 'error');
-          }
-        } catch (err) {
-          console.error(err);
-          showToast('Server error', 'error');
-        }
-      });
-    };
-  });
-}
-
+// Staff/Citizens are now handled as separate panes via users menu items.
 // Modal close button
 const closeModalBtn = document.getElementById('modal-close-btn');
 if (closeModalBtn) {
   closeModalBtn.addEventListener('click', () => {
-    document.getElementById('account-modal').style.display = 'none';
-    currentAccountData = null;
-    currentAction = null;
+    closeAccountModal();
   });
 }
 
@@ -2400,10 +3221,8 @@ if (closeModalBtn) {
 const editBtn = document.getElementById('modal-edit-btn');
 if (editBtn) {
   editBtn.addEventListener('click', () => {
-    currentAction = 'edit';
-    document.getElementById('modal-confirm-text').textContent = 'Are you sure you want to edit this account?';
-    document.getElementById('modal-actions').style.display = 'none';
-    document.getElementById('modal-confirm-section').style.display = 'block';
+    if (!currentAccountData) return;
+    setAccountEditMode(true);
   });
 }
 
@@ -2418,42 +3237,71 @@ if (deleteBtn) {
   });
 }
 
+const resetPasswordBtn = document.getElementById('modal-reset-password-btn');
+if (resetPasswordBtn) {
+  resetPasswordBtn.addEventListener('click', async () => {
+    if (!currentAccountData || !currentAccountData.id) {
+      showToast('Unable to reset password: missing account id.', 'error');
+      return;
+    }
+
+    const newPassword = window.prompt('Enter a new password (minimum 8 characters):', '');
+    if (newPassword === null) return;
+
+    const confirmPassword = window.prompt('Confirm the new password:', '');
+    if (confirmPassword === null) return;
+
+    if (newPassword !== confirmPassword) {
+      showToast('Passwords do not match.', 'error');
+      return;
+    }
+
+    try {
+      resetPasswordBtn.disabled = true;
+      await resetStaffPasswordById(currentAccountData.id, newPassword);
+      showToast('Password reset successfully.', 'success');
+    } catch (error) {
+      console.error('Reset password error:', error);
+      showToast(error?.message || 'Unable to reset password.', 'error');
+    } finally {
+      resetPasswordBtn.disabled = false;
+    }
+  });
+}
+
 // Confirm button
 const confirmBtn = document.getElementById('modal-confirm-btn');
 if (confirmBtn) {
   confirmBtn.addEventListener('click', async () => {
-    if (currentAction === 'edit') {
-      console.log('Editing account:', currentAccountData);
-      alert('Account updated successfully');
-      document.getElementById('account-modal').style.display = 'none';
-      currentAccountData = null;
-      currentAction = null;
-    } else if (currentAction === 'delete') {
+    if (currentAction === 'delete') {
       try {
         if (!currentAccountData || !currentAccountData.id) {
           showToast('Unable to delete: missing account id.', 'error');
           return;
         }
 
-        const response = await fetch(`${API_BASE}/api/staff/${currentAccountData.id}`, {
-          method: 'DELETE',
-          credentials: 'include'
-        });
+        if (isApiMode) {
+          const response = await fetch(`${API_BASE}/api/staff/${currentAccountData.id}`, {
+            method: 'DELETE',
+            credentials: 'include'
+          });
 
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          showToast(data.message || 'Failed to delete account.', 'error');
-          return;
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            showToast(data.message || 'Failed to delete account.', 'error');
+            return;
+          }
+        } else {
+          const staffService = await loadStaffServiceModule();
+          await staffService.deleteStaffAccount(currentAccountData.id);
         }
 
-        document.getElementById('account-modal').style.display = 'none';
+        closeAccountModal();
         document.getElementById('modal-confirm-section').style.display = 'none';
         document.getElementById('modal-actions').style.display = 'flex';
-        currentAccountData = null;
-        currentAction = null;
 
-        await Promise.all([loadStaffData(), loadPendingStaffData()]);
-        showToast(data.message || 'Account deleted successfully.', 'success');
+        await loadStaffData();
+        showToast('Account deleted successfully.', 'success');
       } catch (error) {
         console.error('Delete account error:', error);
         showToast('Server error during deletion.', 'error');
@@ -2472,10 +3320,91 @@ if (cancelBtn) {
   });
 }
 
+const modalSaveBtn = document.getElementById('modal-save-btn');
+if (modalSaveBtn) {
+  modalSaveBtn.addEventListener('click', async (event) => {
+    event.preventDefault();
+    if (!currentAccountData || !currentAccountData.id) {
+      setModalEditError('Missing account id.');
+      return;
+    }
+
+    const username = String(modalEditUsername?.value || '').trim();
+    const email = String(modalEditEmail?.value || '').trim().toLowerCase();
+    const role = String(modalEditRole?.value || '').trim().toLowerCase();
+    const doctorSpecialization = String(modalEditSpecialization?.value || '').trim();
+    const firstName = String(modalEditFirstName?.value || '').trim();
+    const lastName = String(modalEditLastName?.value || '').trim();
+
+    if (!username) {
+      setModalEditError('Username is required.');
+      return;
+    }
+
+    if (!firstName || !lastName) {
+      setModalEditError('First name and last name are required.');
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      setModalEditError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!role) {
+      setModalEditError('Role is required.');
+      return;
+    }
+
+    if (role === 'doctor' && !doctorSpecialization) {
+      setModalEditError('Doctor specialization is required for doctor accounts.');
+      return;
+    }
+
+    const payload = {
+      first_name: firstName,
+      middle_name: String(modalEditMiddleName?.value || '').trim() || null,
+      last_name: lastName,
+      username,
+      email,
+      employee_id: String(modalEditEmployeeId?.value || '').trim() || null,
+      role,
+      doctor_specialization: role === 'doctor' ? doctorSpecialization : null,
+      birthday: String(modalEditBirthday?.value || '').trim() || null
+    };
+
+    try {
+      modalSaveBtn.disabled = true;
+      await updateStaffAccountById(currentAccountData.id, payload);
+      if (role === 'doctor') {
+        await persistDoctorSpecializationById(currentAccountData.id, doctorSpecialization);
+      }
+      showToast('Account updated successfully.', 'success');
+      closeAccountModal();
+      storedAccounts.clear();
+      await loadStaffData();
+    } catch (error) {
+      console.error('Update account error:', error);
+      setModalEditError(error?.message || 'Failed to update account.');
+    } finally {
+      modalSaveBtn.disabled = false;
+    }
+  });
+}
+
+const modalCancelEditBtn = document.getElementById('modal-cancel-edit-btn');
+if (modalCancelEditBtn) {
+  modalCancelEditBtn.addEventListener('click', (event) => {
+    event.preventDefault();
+    setAccountEditMode(false);
+    fillAccountEditForm(currentAccountData);
+  });
+}
+
 // --- Clickable stats to navigate to panes ---
 const statAnnouncementsCard = document.getElementById('stat-announcements-card');
 const statReportsCard = document.getElementById('stat-reports-card');
-const statCitizensCard = document.getElementById('stat-citizens-card');
+const statPatientsCard = document.getElementById('stat-citizens-card');
 
 if (statAnnouncementsCard) {
   statAnnouncementsCard.addEventListener('click', () => {
@@ -2493,14 +3422,10 @@ if (statReportsCard) {
   });
 }
 
-if (statCitizensCard) {
-  statCitizensCard.addEventListener('click', async () => {
-    hideAllSections();
-    if (usersSection) usersSection.classList.remove('hidden');
-    // ensure citizens data is loaded
-    await loadCitizenData();
-    const citizensTabButton = document.getElementById('tab-citizens');
-    if (citizensTabButton) citizensTabButton.click();
+if (statPatientsCard) {
+  statPatientsCard.addEventListener('click', async () => {
+    navigateToSection('users-section', { pane: 'citizens-pane' });
+    await loadPatientData();
   });
 }
 
@@ -2600,32 +3525,6 @@ const DUMMY_MEDICINES = [
   { name: 'Atorvastatin 20mg', qty: 60, unit: 'tabs' }
 ];
 
-const DUMMY_SCHEDULES = [
-  { id: 1, doctor: 'Dr. Jane Smith (Cardiologist)', date: '2024-10-15', time: '09:00 - 12:00' },
-  { id: 2, doctor: 'Dr. John Doe (General)', date: '2024-10-15', time: '14:00 - 17:00' },
-  { id: 3, doctor: 'Dr. Maria Garcia (Pediatrician)', date: '2024-10-16', time: '10:00 - 13:00' },
-  { id: 4, doctor: 'Dr. Ahmed Khan (Neurologist)', date: '2024-10-16', time: '15:00 - 18:00' },
-  { id: 5, doctor: 'Dr. Li Wei (Dermatologist)', date: '2024-10-17', time: '09:00 - 12:00' },
-  { id: 6, doctor: 'Dr. Sarah Johnson (Orthopedist)', date: '2024-10-17', time: '14:00 - 17:00' },
-  { id: 7, doctor: 'Dr. Carlos Rodriguez (ENT)', date: '2024-10-18', time: '10:00 - 13:00' },
-  { id: 8, doctor: 'Dr. Emily Chen (Ophthalmologist)', date: '2024-10-18', time: '15:00 - 18:00' },
-  { id: 9, doctor: 'Dr. Michael Brown (Psychiatrist)', date: '2024-10-19', time: '09:00 - 12:00' },
-  { id: 10, doctor: 'Dr. Anna Novak (Gynecologist)', date: '2024-10-19', time: '14:00 - 17:00' },
-  { id: 11, doctor: 'Dr. Raj Patel (Endocrinologist)', date: '2024-10-20', time: '10:00 - 13:00' },
-  { id: 12, doctor: 'Dr. Lisa Wong (Pulmonologist)', date: '2024-10-20', time: '15:00 - 18:00' }
-];
-
-const DUMMY_ANNOUNCEMENTS = [
-  { id: 'A001', title: 'Flu Vaccination Campaign', preview: 'Annual flu shots available at all clinics starting Oct 15. Free for seniors...', date: '2024-10-14' },
-  { id: 'A002', title: 'New Clinic Hours', preview: 'Saturday consultations now available from 9AM-1PM at Main Branch...', date: '2024-10-12' },
-  { id: 'A003', title: 'Telemedicine Update', preview: 'Improved video quality and mobile app integration for remote consults...', date: '2024-10-10' },
-  { id: 'A004', title: 'Staff Training Session', preview: 'Mandatory HIPAA compliance training on Oct 22, 2PM conference room...', date: '2024-10-09' },
-  { id: 'A005', title: 'Patient Portal Upgrade', preview: 'New features: prescription refill requests, lab result viewing...', date: '2024-10-07' },
-  { id: 'A006', title: 'Holiday Schedule Notice', preview: 'Clinic closed Oct 31 (Halloween) and Nov 1. Emergency line active...', date: '2024-10-05' },
-  { id: 'A007', title: 'New Equipment Arrival', preview: 'Digital X-ray machine installed. Faster diagnostics starting Monday...', date: '2024-10-03' },
-  { id: 'A008', title: 'Insurance Update', preview: 'MediCare+ now accepted. Update your insurance details in patient portal...', date: '2024-10-01' }
-];
-
 const DUMMY_FEEDBACKS = [
   { id: 'F001', from: 'patient123@example.com', subject: 'Excellent service!', date: '2024-10-14', rating: 5 },
   { id: 'F002', from: 'john.doe@email.com', subject: 'Long wait time', date: '2024-10-13', rating: 3 },
@@ -2662,7 +3561,7 @@ function renderConsultations() {
       <td class="table-cell">${c.id}</td>
       <td class="table-cell">${c.patientId}</td>
       <td class="table-cell">${(c.diagnosis||'').substring(0,60)}</td>
-      <td class="table-cell">${new Date(c.created_at).toLocaleString()}</td>
+      <td class="table-cell">${formatDateTime(c.created_at)}</td>
       <td class="table-cell">
         <button class="btn small" data-action="view" data-id="${c.id}">View</button>
         <button class="btn small outline" data-action="prescribe" data-id="${c.id}">Prescribe</button>
@@ -2764,22 +3663,231 @@ async function initClinicalData() {
   renderMedicines();
 }
 
-function loadAnnouncements() {
+function mapAnnouncementRow(item) {
+  const content = String(item?.content || item?.body || item?.preview || '').trim();
+  return {
+    id: item?.id,
+    title: String(item?.title || '').trim(),
+    content,
+    preview: content,
+    date: item?.created_at
+      ? new Date(item.created_at).toISOString().slice(0, 10)
+      : String(item?.date || '').trim(),
+    created_at: item?.created_at || null,
+    updated_at: item?.updated_at || null
+  };
+}
+
+function loadAnnouncementsFromLocalStorage() {
   try {
     const raw = localStorage.getItem('ukonek_announcements');
-    return raw ? JSON.parse(raw) : DUMMY_ANNOUNCEMENTS;
-  } catch (err) {
-    return DUMMY_ANNOUNCEMENTS;
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(mapAnnouncementRow) : [];
+  } catch (_) {
+    return [];
   }
+}
+
+async function listAnnouncementsData() {
+  if (isDemoMode) {
+    return loadAnnouncementsFromLocalStorage();
+  }
+
+  if (isApiMode) {
+    const response = await fetch(`${API_BASE}/api/announcements`, {
+      method: 'GET',
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error('Unable to load announcements.');
+    }
+
+    const data = await response.json().catch(() => ([]));
+    return (Array.isArray(data) ? data : []).map(mapAnnouncementRow);
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { data, error } = await supabase
+    .from('announcements')
+    .select('id,title,content,created_at,updated_at')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load announcements.');
+  }
+
+  return (data || []).map(mapAnnouncementRow);
+}
+
+async function createAnnouncementEntry({ title, content }) {
+  const cleanTitle = String(title || '').trim();
+  const cleanContent = String(content || '').trim();
+
+  if (isDemoMode) {
+    const next = [...loadAnnouncementsFromLocalStorage()];
+    next.unshift({
+      id: (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+        ? crypto.randomUUID()
+        : `ann-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      title: cleanTitle,
+      content: cleanContent,
+      preview: cleanContent,
+      date: new Date().toISOString().slice(0, 10),
+      created_at: new Date().toISOString()
+    });
+    saveToStorage('ukonek_announcements', next);
+    return true;
+  }
+
+  if (isApiMode) {
+    const response = await fetch(`${API_BASE}/api/announcements`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: cleanTitle, content: cleanContent })
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || 'Unable to create announcement.');
+    }
+
+    return true;
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const payload = {
+    title: cleanTitle,
+    content: cleanContent,
+    created_by_staff_id: Number(cachedSessionUser?.id) || null
+  };
+
+  const { error } = await supabase.from('announcements').insert(payload);
+  if (error) {
+    throw new Error(error.message || 'Unable to create announcement.');
+  }
+
+  return true;
+}
+
+async function updateAnnouncementEntry(announcementId, { title, content }) {
+  const cleanTitle = String(title || '').trim();
+  const cleanContent = String(content || '').trim();
+
+  if (isDemoMode) {
+    const all = loadAnnouncementsFromLocalStorage();
+    const next = all.map((item) => {
+      if (String(item.id) !== String(announcementId)) return item;
+      return {
+        ...item,
+        title: cleanTitle,
+        content: cleanContent,
+        preview: cleanContent
+      };
+    });
+    saveToStorage('ukonek_announcements', next);
+    return true;
+  }
+
+  if (isApiMode) {
+    let response = await fetch(`${API_BASE}/api/announcements/${announcementId}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: cleanTitle, content: cleanContent })
+    });
+
+    if (response.status === 404 || response.status === 405) {
+      response = await fetch(`${API_BASE}/api/announcements/${announcementId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: cleanTitle, content: cleanContent })
+      });
+    }
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || 'Unable to update announcement.');
+    }
+
+    return true;
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { error } = await supabase
+    .from('announcements')
+    .update({ title: cleanTitle, content: cleanContent })
+    .eq('id', Number(announcementId));
+
+  if (error) {
+    throw new Error(error.message || 'Unable to update announcement.');
+  }
+
+  return true;
+}
+
+async function deleteAnnouncementEntry(announcementId) {
+  const targetId = String(announcementId || '').trim();
+  if (!targetId) {
+    throw new Error('Announcement ID is required.');
+  }
+
+  if (isDemoMode) {
+    const next = loadAnnouncementsFromLocalStorage().filter((item) => String(item.id) !== targetId);
+    saveToStorage('ukonek_announcements', next);
+    return true;
+  }
+
+  if (isApiMode) {
+    const response = await fetch(`${API_BASE}/api/announcements/${targetId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || 'Unable to delete announcement.');
+    }
+
+    return true;
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { error } = await supabase
+    .from('announcements')
+    .delete()
+    .eq('id', Number(targetId));
+
+  if (error) {
+    throw new Error(error.message || 'Unable to delete announcement.');
+  }
+
+  return true;
+}
+
+async function refreshAnnouncementsData() {
+  try {
+    latestAnnouncementsList = await listAnnouncementsData();
+  } catch (error) {
+    console.error('Failed to refresh announcements:', error);
+    latestAnnouncementsList = [];
+  }
+  renderAnnouncements();
 }
 
 function renderAnnouncements() {
   const tbody = document.getElementById('announcements-tbody');
   if (!tbody) return;
-  const announcements = loadAnnouncements();
-  latestAnnouncementsList = Array.isArray(announcements) ? [...announcements] : [];
+
   tbody.innerHTML = '';
-  announcements.forEach(a => {
+  if (!latestAnnouncementsList.length) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="3" class="table-cell">No announcements yet.</td>';
+    tbody.appendChild(tr);
+  }
+  latestAnnouncementsList.forEach(a => {
     const tr = document.createElement('tr');
     tr.className = 'announcement-row';
     tr.innerHTML = `
@@ -2792,7 +3900,7 @@ function renderAnnouncements() {
   });
   // Update stats
   if (document.getElementById('stat-announcements')) {
-    document.getElementById('stat-announcements').textContent = String(announcements.length);
+    document.getElementById('stat-announcements').textContent = String(latestAnnouncementsList.length);
   }
 }
 
@@ -2816,7 +3924,32 @@ function attachAnnouncementRow(row, announcement) {
         { label: 'Date', value: announcement.date || '—' },
         { label: 'Summary', value: announcement.preview || '—' },
         { label: 'Details', value: announcement.content || announcement.body || announcement.preview || '—' }
-      ]
+      ],
+      actions: isAdminUser(cachedSessionUser)
+        ? [{
+          label: 'Edit',
+          className: 'btn',
+          onClick: () => openEditAnnouncementModal(announcement)
+        }, {
+          label: 'Delete',
+          className: 'btn btn-delete',
+          onClick: async () => {
+            const confirmed = window.confirm('Delete this announcement? This cannot be undone.');
+            if (!confirmed) return;
+
+            try {
+              await deleteAnnouncementEntry(announcement.id);
+              await refreshAnnouncementsData();
+              renderDashboardInsights();
+              closeDataDetail();
+              showToast('Announcement deleted successfully.', 'success');
+            } catch (error) {
+              console.error('Error deleting announcement:', error);
+              showToast(error.message || 'Failed to delete announcement.', 'error');
+            }
+          }
+        }]
+        : []
     }));
   } else {
     row.style.cursor = 'pointer';
@@ -3069,7 +4202,7 @@ function generateReport(title, headers, rows) {
 if (consultReportBtn) {
   consultReportBtn.addEventListener('click', () => {
     const headers = ['ID', 'Patient', 'Diagnosis', 'Date'];
-    const rows = consultations.map(c => [c.id, c.patientId, c.diagnosis, new Date(c.created_at).toLocaleString()]);
+    const rows = consultations.map(c => [c.id, c.patientId, c.diagnosis, formatDateTime(c.created_at)]);
     generateReport('Consultations Report', headers, rows);
   });
 }
@@ -3089,7 +4222,7 @@ function generateUsersReport() {
 }
 
 function generateCitizensReport() {
-  const rows = latestCitizensList.map(c => [c.username || c.name || '', c.email || '', c.created_at || '']);
+  const rows = latestPatientsList.map(c => [c.username || c.name || '', c.email || '', c.created_at || '']);
   generateReport('Citizens Report', ['Username', 'Email', 'Registered'], rows);
 }
 

@@ -4,13 +4,8 @@ const tabLogin = document.getElementById('tab-login');
 const API_BASE = window.location.port === '5500'
     ? `${window.location.protocol}//${window.location.hostname}:5000`
     : '';
-const LOGIN_PAGE_URL = API_BASE ? `${API_BASE}/html/index.html` : '/html/index.html';
-const DASHBOARD_PAGE_URL = API_BASE ? `${API_BASE}/html/dashboard.html` : '/html/dashboard.html';
 
 const loginPanel = document.getElementById('login-panel');
-const forgotPasswordToggle = document.getElementById('forgot-password-toggle');
-const resetForm = document.getElementById('reset-form');
-let passwordResetOtpRequested = false;
 
 const panelTitle = document.getElementById('panel-title');
 const panelDesc = document.getElementById('panel-desc');
@@ -18,11 +13,7 @@ const panelDesc = document.getElementById('panel-desc');
 function clearAuthSensitiveInputs() {
     const sensitiveFieldIds = [
         'username',
-        'password',
-        'reset-email',
-        'reset-otp',
-        'reset-new-password',
-        'reset-confirm-password'
+        'password'
     ];
 
 
@@ -38,30 +29,6 @@ function clearAuthSensitiveInputs() {
     const loginError = document.getElementById('login-error');
     if (loginError) loginError.style.display = 'none';
 
-    setResetOtpStepEnabled(false);
-
-}
-
-function setResetOtpStepEnabled(enabled) {
-    passwordResetOtpRequested = enabled;
-
-    const resetOtpStep = document.getElementById('reset-otp-step');
-    if (resetOtpStep) {
-        resetOtpStep.style.display = enabled ? 'block' : 'none';
-    }
-
-    const otpField = document.getElementById('reset-otp');
-    const newPasswordField = document.getElementById('reset-new-password');
-    const confirmPasswordField = document.getElementById('reset-confirm-password');
-
-    if (otpField) otpField.required = enabled;
-    if (newPasswordField) newPasswordField.required = enabled;
-    if (confirmPasswordField) confirmPasswordField.required = enabled;
-
-    const inlineResetSubmitLabel = document.querySelector('#reset-submit-btn .btn-label');
-    if (inlineResetSubmitLabel) {
-        inlineResetSubmitLabel.textContent = enabled ? 'Reset password' : 'Send OTP';
-    }
 }
 
 function hideAllPanels() {
@@ -77,21 +44,9 @@ tabLogin.addEventListener('click', () => {
     tabLogin.classList.add('active');
     tabLogin.setAttribute('aria-selected', 'true');
     loginPanel.style.display = 'block';
-    if (resetForm) {
-        resetForm.style.display = 'none';
-    }
     panelTitle.textContent = 'Welcome Back';
     panelDesc.textContent = 'Enter your credentials to access the portal';
 });
-
-
-
-if (forgotPasswordToggle && resetForm) {
-    forgotPasswordToggle.addEventListener('click', () => {
-        const isHidden = resetForm.style.display === 'none' || !resetForm.style.display;
-        resetForm.style.display = isHidden ? 'block' : 'none';
-    });
-}
 
 // Flush credentials when auth page loads.
 clearAuthSensitiveInputs();
@@ -113,8 +68,33 @@ function validateEmail(email) {
 
 const loginSubmitBtn = document.getElementById('login-submit-btn');
 const loginSubmitLabel = loginSubmitBtn ? loginSubmitBtn.querySelector('.btn-label') : null;
-const resetSubmitBtn = document.getElementById('reset-submit-btn');
-const resetSubmitLabel = resetSubmitBtn ? resetSubmitBtn.querySelector('.btn-label') : null;
+let authServiceModulePromise = null;
+let authSessionModulePromise = null;
+
+function loadAuthServiceModule() {
+    if (!authServiceModulePromise) {
+        authServiceModulePromise = import('./services/authService.js').catch((error) => {
+            authServiceModulePromise = null;
+            throw error;
+        });
+    }
+    return authServiceModulePromise;
+}
+
+function loadAuthSessionModule() {
+    if (!authSessionModulePromise) {
+        authSessionModulePromise = import('./services/sessionAuth.js').catch((error) => {
+            authSessionModulePromise = null;
+            throw error;
+        });
+    }
+    return authSessionModulePromise;
+}
+
+function resolveDashboardPath(username = '', role = '') {
+    // Unified dashboard shell for all roles.
+    return './dashboard-admin.html';
+}
 
 
 const EYE_OPEN_ICON = `
@@ -167,7 +147,7 @@ let loginLockTimer = null;
 
 function readLoginLockState() {
     try {
-        const raw = localStorage.getItem(LOGIN_LOCK_KEY);
+        const raw = sessionStorage.getItem(LOGIN_LOCK_KEY);
         if (!raw) return { attempts: 0, lockUntil: 0 };
         const parsed = JSON.parse(raw);
         return {
@@ -180,11 +160,11 @@ function readLoginLockState() {
 }
 
 function writeLoginLockState(state) {
-    localStorage.setItem(LOGIN_LOCK_KEY, JSON.stringify(state));
+    sessionStorage.setItem(LOGIN_LOCK_KEY, JSON.stringify(state));
 }
 
 function clearLoginLockState() {
-    localStorage.removeItem(LOGIN_LOCK_KEY);
+    sessionStorage.removeItem(LOGIN_LOCK_KEY);
 }
 
 function getLoginLockRemainingMs() {
@@ -306,19 +286,6 @@ function setLoginLoading(isLoading) {
     applyLoginLockStateUI();
 }
 
-function setResetLoading(isLoading) {
-    if (!resetSubmitBtn) return;
-    resetSubmitBtn.disabled = isLoading;
-    resetSubmitBtn.classList.toggle('is-loading', isLoading);
-    if (resetSubmitLabel) {
-        if (isLoading) {
-            resetSubmitLabel.textContent = passwordResetOtpRequested ? 'Resetting...' : 'Sending...';
-        } else {
-            resetSubmitLabel.textContent = passwordResetOtpRequested ? 'Reset password' : 'Send OTP';
-        }
-    }
-}
-
 // Preloader helper - shows the preloader overlay for `duration` ms then hides it and calls callback
 function showPreloader(duration = 700, cb) {
     const pre = document.getElementById('preloader');
@@ -343,434 +310,73 @@ window.addEventListener('load', () => {
     showPreloader(900);
 });
 
-// Registration Form Handler
-document.getElementById('register-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const first_name = document.getElementById('reg-first-name').value.trim();
-    const middle_name = document.getElementById('reg-middle-name').value.trim();
-    const last_name = document.getElementById('reg-last-name').value.trim();
-    const birthday = document.getElementById('reg-birthday').value;
-    const gender = document.getElementById('reg-gender').value;
-    const employee_id = document.getElementById('reg-employee-id').value.trim();
-    const email = document.getElementById('reg-email').value.trim();
-    const role = document.getElementById('reg-role').value;
-
-    const err = document.getElementById('register-error');
-    const success = document.getElementById('register-success');
-    const emailError = document.getElementById('err-reg-email');
-
-    err.style.display = 'none';
-    success.style.display = 'none';
-    emailError.classList.add('hidden');
-
-    // Validate email
-    if (!email) {
-        emailError.textContent = 'Email is required';
-        emailError.classList.remove('hidden');
-        return;
-    }
-
-    if (!validateEmail(email)) {
-        emailError.textContent = 'Please enter a valid email address';
-        emailError.classList.remove('hidden');
-        return;
-    }
-
-    if (!validateName(first_name) || !validateName(last_name) || (middle_name && !validateName(middle_name))) {
-        err.textContent = 'First and last name must contain letters only. Middle name is optional but must contain letters if provided.';
-        err.style.display = 'block';
-        return;
-    }
-
-    if (!validateNumericString(employee_id)) {
-        err.textContent = 'Employee ID must contain numbers only.';
-        err.style.display = 'block';
-        return;
-    }
-
-    if (!first_name || !last_name || !birthday || !gender || !employee_id || !role) {
-        err.textContent = 'Please complete all required registration fields.';
-        err.style.display = 'block';
-        return;
-    }
-
-    setRegisterLoading(true);
-
-    try {
-        const otpResponse = await fetch(`${API_BASE}/api/staff/register`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                first_name,
-                middle_name,
-                last_name,
-                birthday,
-                gender,
-                employee_id,
-                email,
-                role
-            })
-        });
-
-        const otpData = await otpResponse.json();
-
-        if (!otpResponse.ok) {
-            err.textContent = otpData.message || 'Failed to send OTP.';
-            err.style.display = 'block';
-            return;
-        }
-
-        pendingRegistrationProfile = {
-            first_name,
-            middle_name,
-            last_name,
-            birthday,
-            gender,
-            employee_id,
-            email,
-            role
-        };
-
-        success.style.display = 'block';
-        success.textContent = otpData.message || 'OTP sent. Complete registration in the popup.';
-
-        const otpModalError = document.getElementById('otp-modal-error');
-        const otpModalSuccess = document.getElementById('otp-modal-success');
-        if (otpModalError) otpModalError.style.display = 'none';
-        if (otpModalSuccess) {
-            otpModalSuccess.style.display = 'none';
-            otpModalSuccess.textContent = '';
-        }
-        openRegistrationOtpModal();
-    } catch (error) {
-        console.error('Error:', error);
-        err.textContent = 'Server connection failed.';
-        err.style.display = 'block';
-    } finally {
-        setRegisterLoading(false);
-    }
-});
-
-if (otpModalCloseBtn) {
-    otpModalCloseBtn.addEventListener('click', () => {
-        closeRegistrationOtpModal();
-    });
-}
-
-if (registerOtpModal) {
-    registerOtpModal.addEventListener('click', (event) => {
-        if (event.target === registerOtpModal) {
-            closeRegistrationOtpModal();
-        }
-    });
-}
-
-if (registerOtpForm) {
-    registerOtpForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-
-        const otpModalError = document.getElementById('otp-modal-error');
-        const otpModalSuccess = document.getElementById('otp-modal-success');
-        const otp = document.getElementById('reg-otp') ? document.getElementById('reg-otp').value.trim() : '';
-        const username = document.getElementById('reg-username') ? document.getElementById('reg-username').value.trim() : '';
-        const password = document.getElementById('reg-password') ? document.getElementById('reg-password').value : '';
-        const confirmPassword = document.getElementById('reg-confirm-password') ? document.getElementById('reg-confirm-password').value : '';
-        const consentGiven = document.getElementById('reg-consent') ? document.getElementById('reg-consent').checked : false;
-
-        if (otpModalError) otpModalError.style.display = 'none';
-        if (otpModalSuccess) otpModalSuccess.style.display = 'none';
-
-        if (!pendingRegistrationProfile || !pendingRegistrationProfile.email) {
-            if (otpModalError) {
-                otpModalError.textContent = 'No active registration request found. Please send OTP again.';
-                otpModalError.style.display = 'block';
-            }
-            return;
-        }
-
-        if (!/^\d{6}$/.test(otp)) {
-            if (otpModalError) {
-                otpModalError.textContent = 'Please enter a valid 6-digit OTP.';
-                otpModalError.style.display = 'block';
-            }
-            return;
-        }
-
-        if (!username || !password || !confirmPassword) {
-            if (otpModalError) {
-                otpModalError.textContent = 'Username, password, and confirm password are required.';
-                otpModalError.style.display = 'block';
-            }
-            return;
-        }
-
-        if (password !== confirmPassword) {
-            if (otpModalError) {
-                otpModalError.textContent = 'Passwords do not match.';
-                otpModalError.style.display = 'block';
-            }
-            return;
-        }
-
-        if (!consentGiven) {
-            if (otpModalError) {
-                otpModalError.textContent = 'Consent is required to continue.';
-                otpModalError.style.display = 'block';
-            }
-            return;
-        }
-
-        setOtpModalLoading(true);
-
-        try {
-            const completeResponse = await fetch(`${API_BASE}/api/staff/complete-registration`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: pendingRegistrationProfile.email,
-                    otp,
-                    username,
-                    password,
-                    confirmPassword,
-                    consentGiven
-                })
-            });
-
-            const completeData = await completeResponse.json();
-
-            if (!completeResponse.ok) {
-                if (otpModalError) {
-                    otpModalError.textContent = completeData.message || 'Unable to complete registration.';
-                    otpModalError.style.display = 'block';
-                }
-                return;
-            }
-
-            closeRegistrationOtpModal();
-            document.getElementById('register-form').reset();
-            if (registerOtpForm) registerOtpForm.reset();
-            pendingRegistrationProfile = null;
-
-            const successModal = document.getElementById('registration-success-modal');
-            successModal.classList.remove('hidden');
-        } catch (error) {
-            console.error('Error:', error);
-            if (otpModalError) {
-                otpModalError.textContent = 'Server connection failed.';
-                otpModalError.style.display = 'block';
-            }
-        } finally {
-            setOtpModalLoading(false);
-        }
-    });
-}
-
-if (registerResendOtpBtn) {
-    registerResendOtpBtn.addEventListener('click', async (event) => {
-        event.preventDefault();
-
-        if (registerResendOtpBtn.getAttribute('aria-disabled') === 'true') {
-            return;
-        }
-
-        const err = document.getElementById('register-error');
-        const otpModalError = document.getElementById('otp-modal-error');
-        const otpModalSuccess = document.getElementById('otp-modal-success');
-
-        if (!pendingRegistrationProfile) {
-            if (otpModalError) {
-                otpModalError.textContent = 'No active registration request found. Please send OTP again.';
-                otpModalError.style.display = 'block';
-            }
-            return;
-        }
-
-        err.style.display = 'none';
-        if (otpModalError) otpModalError.style.display = 'none';
-        if (otpModalSuccess) otpModalSuccess.style.display = 'none';
-
-        registerResendOtpBtn.setAttribute('aria-disabled', 'true');
-        registerResendOtpBtn.style.pointerEvents = 'none';
-        registerResendOtpBtn.style.opacity = '0.65';
-        registerResendOtpBtn.textContent = 'Sending...';
-
-        try {
-            const response = await fetch(`${API_BASE}/api/staff/register`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(pendingRegistrationProfile)
-            });
-            const data = await response.json();
-
-            if (!response.ok) {
-                if (otpModalError) {
-                    otpModalError.textContent = data.message || 'Failed to resend OTP.';
-                    otpModalError.style.display = 'block';
-                }
-                return;
-            }
-
-            if (otpModalSuccess) {
-                otpModalSuccess.style.display = 'block';
-                otpModalSuccess.textContent = data.message || 'OTP resent. Please check your email.';
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            if (otpModalError) {
-                otpModalError.textContent = 'Server connection failed.';
-                otpModalError.style.display = 'block';
-            }
-        } finally {
-            registerResendOtpBtn.setAttribute('aria-disabled', 'false');
-            registerResendOtpBtn.style.pointerEvents = '';
-            registerResendOtpBtn.style.opacity = '';
-            registerResendOtpBtn.textContent = 'Resend OTP';
-        }
-    });
-}
-
 // Login Form Handler
-document.getElementById('login-form').addEventListener('submit', async (e) => {
+const loginForm = document.getElementById('login-form');
+if (loginForm) {
+loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    // Local (dev) sign-in override: do not call backend, simply validate and go to dashboard
     const username = document.getElementById('username') ? document.getElementById('username').value.trim() : '';
     const password = document.getElementById('password') ? document.getElementById('password').value : '';
     const err = document.getElementById('login-error');
-    if (err) err.style.display = 'none';
+    if (err) {
+        err.style.display = 'none';
+        err.textContent = '';
+    }
+
+    if (isLoginLocked()) {
+        applyLoginLockStateUI();
+        return;
+    }
 
     if (!username || !password) {
         if (err) {
-            err.textContent = 'Please enter username and password.';
+            err.textContent = 'Please enter email and password.';
             err.style.display = 'block';
         }
         return;
     }
 
-    // Show a short preloader then navigate locally to dashboard (no backend required)
-    showPreloader(700, () => {
-        // Use local relative path to dashboard
-        window.location.href = './dashboard.html';
-    });
+    setLoginLoading(true);
+
+    try {
+        const authService = await loadAuthServiceModule();
+        await authService.signInStaff({ identifier: username, password });
+        const profile = await authService.getAuthenticatedStaffProfile();
+        const role = profile?.role || profile?.staff_role || profile?.user_role || '';
+        const authSession = await loadAuthSessionModule();
+
+        sessionStorage.setItem('ukonek_role', String(role || '').trim().toLowerCase());
+        authSession.setAuthSessionMeta({
+            role: String(role || '').trim().toLowerCase(),
+            userId: profile?.id || null,
+            email: profile?.email || null
+        });
+
+        resetInvalidLoginAttempts();
+        showPreloader(700, () => {
+            window.location.href = resolveDashboardPath(username, role);
+        });
+    } catch (error) {
+        const message = String(error?.message || 'Unable to sign in. Please try again.');
+        const invalidCredentials = /invalid email or password|invalid credentials/i.test(message);
+
+        if (invalidCredentials) {
+            const state = recordInvalidLoginAttempt();
+            if (state.lockUntil > Date.now()) {
+                applyLoginLockStateUI();
+                return;
+            }
+        }
+
+        if (err) {
+            err.textContent = message;
+            err.style.display = 'block';
+        }
+    } finally {
+        setLoginLoading(false);
+    }
 });
+}
 
 applyLoginLockStateUI();
 setupPasswordVisibilityToggles();
-
-// Reset Form Handler
-document.getElementById('reset-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const msg = document.getElementById('reset-msg');
-    const resetEmail = document.getElementById('reset-email').value.trim();
-    const resetOtp = document.getElementById('reset-otp') ? document.getElementById('reset-otp').value.trim() : '';
-    const resetNewPassword = document.getElementById('reset-new-password') ? document.getElementById('reset-new-password').value : '';
-    const resetConfirmPassword = document.getElementById('reset-confirm-password') ? document.getElementById('reset-confirm-password').value : '';
-
-    msg.style.display = 'none';
-
-    if (!resetEmail) {
-        msg.style.display = 'block';
-        msg.style.color = '#dc2626';
-        msg.textContent = 'Please enter your email address.';
-        return;
-    }
-
-    if (!validateEmail(resetEmail)) {
-        msg.style.display = 'block';
-        msg.style.color = '#dc2626';
-        msg.textContent = 'Please enter a valid email address.';
-        return;
-    }
-
-    if (passwordResetOtpRequested) {
-        if (!/^\d{6}$/.test(resetOtp)) {
-            msg.style.display = 'block';
-            msg.style.color = '#dc2626';
-            msg.textContent = 'Please enter a valid 6-digit OTP.';
-            return;
-        }
-
-        if (!resetNewPassword || !resetConfirmPassword) {
-            msg.style.display = 'block';
-            msg.style.color = '#dc2626';
-            msg.textContent = 'Please enter and confirm your new password.';
-            return;
-        }
-
-        if (resetNewPassword.length < 6) {
-            msg.style.display = 'block';
-            msg.style.color = '#dc2626';
-            msg.textContent = 'Password must be at least 6 characters.';
-            return;
-        }
-
-        if (resetNewPassword !== resetConfirmPassword) {
-            msg.style.display = 'block';
-            msg.style.color = '#dc2626';
-            msg.textContent = 'Passwords do not match.';
-            return;
-        }
-    }
-
-    setResetLoading(true);
-
-    try {
-        if (!passwordResetOtpRequested) {
-            const response = await fetch(`${API_BASE}/api/staff/forgot-password`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: resetEmail })
-            });
-
-            const data = await response.json();
-
-            msg.style.display = 'block';
-            if (response.ok) {
-                msg.style.color = '#15803d';
-                msg.textContent = data.message || 'If the email exists, a reset OTP has been sent.';
-                setResetOtpStepEnabled(true);
-            } else {
-                msg.style.color = '#dc2626';
-                msg.textContent = data.message || 'Failed to request password reset OTP.';
-            }
-            return;
-        }
-
-        const response = await fetch(`${API_BASE}/api/staff/reset-password`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                email: resetEmail,
-                otp: resetOtp,
-                password: resetNewPassword,
-                confirmPassword: resetConfirmPassword
-            })
-        });
-
-        const data = await response.json();
-
-        msg.style.display = 'block';
-        if (response.ok) {
-            msg.style.color = '#15803d';
-            msg.textContent = data.message || 'Password reset successful. You can now log in.';
-            if (resetForm) resetForm.reset();
-            setResetOtpStepEnabled(false);
-        } else {
-            msg.style.color = '#dc2626';
-            msg.textContent = data.message || 'Failed to reset password.';
-        }
-    } catch (error) {
-        console.error('Reset request error:', error);
-        msg.style.display = 'block';
-        msg.style.color = '#dc2626';
-        msg.textContent = 'Server connection failed.';
-    } finally {
-        setResetLoading(false);
-    }
-});
-
-setResetOtpStepEnabled(false);

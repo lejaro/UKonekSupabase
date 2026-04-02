@@ -1408,6 +1408,10 @@ select:focus {
     display: none !important;
 }
 
+body.dashboard-loading {
+    overflow: hidden;
+}
+
 .sidebar.collapsed .brand-subtext,
 .sidebar.collapsed .sidebar-section-label,
 .sidebar.collapsed .sidebar-footer-copy {
