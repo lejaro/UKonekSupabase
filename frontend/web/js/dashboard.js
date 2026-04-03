@@ -368,6 +368,32 @@ function getDisplayFirstName(user) {
   return String(user?.username || '').trim() || 'User';
 }
 
+function isDoctorRole(value) {
+  return String(value || '').trim().toLowerCase() === 'doctor';
+}
+
+function getDoctorDisplayName(doctor) {
+  if (!doctor) return 'Doctor';
+  const first = String(doctor.first_name || '').trim();
+  const last = String(doctor.last_name || '').trim();
+  const full = `${first} ${last}`.trim();
+  return full || doctor.username || 'Doctor';
+}
+
+function getSpecializationValue(user) {
+  return String(
+    user?.doctor_specialization ||
+    user?.doctorSpecialization ||
+    user?.specialization ||
+    ''
+  ).trim();
+}
+
+function getDoctorSpecializationText(doctor) {
+  const value = getSpecializationValue(doctor);
+  return value || '—';
+}
+
 function updateNonAdminWorkspace(user) {
   const role = String(user?.role || '').trim().toLowerCase();
   const roleTitle = toTitleCase(role);
@@ -399,11 +425,13 @@ function updateNonAdminWorkspace(user) {
 
 function applyRoleAccess(user) {
   const adminAccess = isAdminUser(user);
-  if (!adminAccess) {
-    document.querySelectorAll('.admin-only').forEach((element) => {
+  document.querySelectorAll('.admin-only').forEach((element) => {
+    if (adminAccess) {
+      element.classList.remove('hidden');
+    } else {
       element.classList.add('hidden');
-    });
-  }
+    }
+  });
 
   sessionUserRole = String(user?.role || detectRoleFromTitle()).trim().toLowerCase() || sessionUserRole;
 
@@ -428,10 +456,10 @@ function applyRoleAccess(user) {
   const patientsPane = document.getElementById('citizens-pane');
   const usersNavBtn = document.querySelector('.nav-btn[data-section="users-section"]');
 
-  if (registeredPane) registeredPane.classList.add('hidden');
-  if (patientsPane) patientsPane.classList.remove('hidden');
+  if (registeredPane) registeredPane.classList.remove('hidden');
+  if (patientsPane) patientsPane.classList.add('hidden');
   if (usersNavBtn) {
-    usersNavBtn.dataset.pane = 'citizens-pane';
+    usersNavBtn.dataset.pane = 'registered-pane';
   }
 
   updateNonAdminWorkspace(user);
@@ -440,6 +468,8 @@ function applyRoleAccess(user) {
 
 const MEDICINE_PERMISSIONS = {
   admin: { adjust: false, add: false },
+  doctor: { adjust: true, add: false },
+  nurse: { adjust: true, add: false },
   specialist: { adjust: true, add: false },
   staff: { adjust: true, add: true }
 };
@@ -676,6 +706,9 @@ async function showSection(sectionId, options = {}) {
         initClinicalData();
         break;
       case 'dashboard-section':
+        if (isAdminUser(user) && latestStaffList.length === 0) {
+          await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData()]);
+        }
         renderDashboardInsights();
         break;
       // Add more as needed
@@ -683,6 +716,12 @@ async function showSection(sectionId, options = {}) {
     const { tab, pane } = options;
 
     if (sectionId === 'users-section') {
+      if (isAdminUser(user) && latestStaffList.length === 0) {
+        await loadStaffData();
+      }
+      if (latestPatientsList.length === 0) {
+        await loadPatientData();
+      }
       if (pane === 'registration-pane') {
         toggleUsersPane('registration-pane');
       } else {
@@ -1079,14 +1118,65 @@ function populateProfile(user) {
 
   if (preview) {
     preview.innerHTML = '';
-    if (user?.profilePicture) {
+    const storedPicture = getStoredProfilePicture(user);
+    if (storedPicture || user?.profilePicture) {
       const img = document.createElement('img');
-      img.src = user.profilePicture;
+      img.src = storedPicture || user.profilePicture;
       img.style.maxWidth = '120px';
       img.style.borderRadius = '6px';
       preview.appendChild(img);
     }
   }
+}
+
+function getProfilePictureStorageKey(user) {
+  const userId = String(user?.id || '').trim();
+  const email = String(user?.email || '').trim().toLowerCase();
+  return `ukonek.profile.picture.${userId || email || 'current'}`;
+}
+
+function getStoredProfilePicture(user) {
+  try {
+    return localStorage.getItem(getProfilePictureStorageKey(user)) || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function persistProfilePicture(user, dataUrl) {
+  if (!dataUrl) return;
+  try {
+    localStorage.setItem(getProfilePictureStorageKey(user), dataUrl);
+  } catch (error) {
+    console.warn('Unable to persist profile picture locally:', error);
+  }
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Unable to read selected file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function saveMyProfileToSupabase({ displayName, role, specialization }) {
+  const { supabase } = await loadSupabaseModule();
+  const { data, error } = await supabase.rpc('update_my_staff_profile', {
+    p_display_name: displayName,
+    p_doctor_specialization: role === 'doctor' ? (specialization || null) : null
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to update profile.');
+  }
+
+  if (data && data.error) {
+    throw new Error(data.error);
+  }
+
+  return data;
 }
 
 const profilePicInput = document.getElementById('profile-pic');
@@ -1119,50 +1209,93 @@ if (profileSaveBtn) {
     if (role === 'doctor') {
       form.append('doctorSpecialization', specializationValue);
     }
+    if (!name) {
+      showToast('Display name is required.', 'error');
+      return;
+    }
+
+    if (role === 'doctor' && !specializationValue) {
+      showToast('Doctor specialization is required.', 'error');
+      return;
+    }
+
+    let profilePictureDataUrl = '';
     if (fileInput && fileInput.files && fileInput.files[0]) {
       form.append('avatar', fileInput.files[0]);
+      profilePictureDataUrl = await readFileAsDataUrl(fileInput.files[0]);
     }
 
     try {
-      if (isApiMode) {
-        const resp = await fetch(`${API_BASE}/api/staff/profile`, {
-          method: 'POST',
-          credentials: 'include',
-          body: form
-        });
-        if (!resp.ok) throw new Error('Failed to save profile');
-      } else {
-        if (role === 'doctor') {
-          const { supabase } = await loadSupabaseModule();
-          const { data, error } = await supabase.rpc('set_my_doctor_specialization', {
-            p_specialization: specializationValue || null
-          });
-          if (error) {
-            throw new Error(error.message || 'Failed to save specialization');
-          }
-          if (data && data.error) {
-            throw new Error(data.error);
-          }
-        }
+      profileSaveBtn.disabled = true;
 
-        // Backendless mode: keep UI/session profile in sync.
-        cachedSessionUser = {
-          ...(cachedSessionUser || {}),
-          first_name: name || cachedSessionUser?.first_name,
-          email: email || cachedSessionUser?.email,
-          doctor_specialization: role === 'doctor'
-            ? specializationValue
-            : (cachedSessionUser?.doctor_specialization || null)
-        };
+      let saved = false;
+      if (isApiMode) {
+        try {
+          const resp = await fetch(`${API_BASE}/api/staff/profile`, {
+            method: 'POST',
+            credentials: 'include',
+            body: form
+          });
+
+          if (resp.ok) {
+            saved = true;
+          }
+        } catch (_) {
+          // Fall back to Supabase RPC when API profile route is unavailable.
+        }
       }
+
+      if (!saved && !isDemoMode) {
+        await saveMyProfileToSupabase({
+          displayName: name,
+          role,
+          specialization: specializationValue
+        });
+      }
+
+      cachedSessionUser = {
+        ...(cachedSessionUser || {}),
+        first_name: name || cachedSessionUser?.first_name,
+        email: email || cachedSessionUser?.email,
+        doctor_specialization: role === 'doctor' ? specializationValue : null
+      };
+
+      if (profilePictureDataUrl) {
+        persistProfilePicture(cachedSessionUser, profilePictureDataUrl);
+        cachedSessionUser.profilePicture = profilePictureDataUrl;
+      }
+
+      const user = await ensureAuthenticatedSession(true);
+      if (user) {
+        if (profilePictureDataUrl) {
+          user.profilePicture = profilePictureDataUrl;
+        }
+        populateProfile(user);
+        applyRoleAccess(user);
+      }
+
+      if (fileInput) {
+        fileInput.value = '';
+      }
+
       showToast('Profile updated', 'success');
-      // re-sync session/profile
-      const user = await ensureAuthenticatedSession();
-      if (user) populateProfile(user);
+      if (isAdminUser(cachedSessionUser)) {
+        await loadStaffData();
+      }
     } catch (err) {
       console.error(err);
-      showToast('Unable to save profile (offline placeholder)', 'error');
+      showToast(err?.message || 'Unable to save profile.', 'error');
+    } finally {
+      profileSaveBtn.disabled = false;
     }
+  });
+}
+
+const profileForm = document.getElementById('profile-form');
+if (profileForm) {
+  profileForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (profileSaveBtn) profileSaveBtn.click();
   });
 }
 
@@ -1170,7 +1303,7 @@ if (profileSaveBtn) {
 const profileCancelBtn = document.getElementById('profile-cancel-btn');
 if (profileCancelBtn) {
   profileCancelBtn.addEventListener('click', async () => {
-    const user = await ensureAuthenticatedSession();
+    const user = await ensureAuthenticatedSession(true);
     if (user) populateProfile(user);
     else {
       const form = document.getElementById('profile-form');
@@ -1184,25 +1317,6 @@ if (profileCancelBtn) {
 // --- Schedule handling (doctor-based schedules). Admins can create/update/delete; others view only ---
 let cachedScheduleDoctors = [];
 let cachedScheduleEntries = [];
-
-function getDoctorDisplayName(doctor) {
-  const fullName = `${doctor?.first_name || ''} ${doctor?.last_name || ''}`.replace(/\s+/g, ' ').trim();
-  if (fullName) return fullName;
-  return doctor?.username || doctor?.email || 'Doctor';
-}
-
-function getSpecializationValue(entity) {
-  return String(
-    entity?.doctor_specialization
-    ?? entity?.doctorSpecialization
-    ?? entity?.specialization
-    ?? ''
-  ).trim();
-}
-
-function getDoctorSpecializationText(doctor) {
-  return getSpecializationValue(doctor) || '—';
-}
 
 function formatScheduleTime(value) {
   const normalized = normalizeTimeHHMM(value);
@@ -1423,23 +1537,77 @@ async function loadSchedules(user) {
 
       if (staffResp.ok) {
         const staff = await staffResp.json();
-        doctors = (Array.isArray(staff) ? staff : []).filter((item) => String(item?.role || '').toLowerCase() === 'doctor');
+        doctors = (Array.isArray(staff) ? staff : []).filter((item) => isDoctorRole(item?.role));
+      }
+
+      if (!schedulesResp.ok || !staffResp.ok || doctors.length === 0 || schedules.length === 0) {
+        const [staffService, supabaseModule] = await Promise.all([loadStaffServiceModule(), loadSupabaseModule()]);
+        const { supabase } = supabaseModule;
+
+        if (doctors.length === 0) {
+          const fallbackStaff = await staffService.listStaff();
+          doctors = (Array.isArray(fallbackStaff) ? fallbackStaff : []).filter((item) => isDoctorRole(item?.role));
+        }
+
+        if (schedules.length === 0) {
+          let scheduleData = [];
+          let scheduleError = null;
+
+          ({ data: scheduleData, error: scheduleError } = await supabase
+            .from('doctor_schedules')
+            .select('*')
+            .order('schedule_date', { ascending: true })
+            .order('start_time', { ascending: true }));
+
+          if (scheduleError) {
+            scheduleSource = 'schedules';
+            const legacyResult = await supabase
+              .from('schedules')
+              .select('*')
+              .order('date', { ascending: true });
+
+            if (!legacyResult.error) {
+              schedules = (legacyResult.data || []).map((item) => ({
+                id: item.id,
+                doctor_name: item.doctor || 'Doctor',
+                schedule_date: item.date,
+                start_time: item.time,
+                end_time: null,
+                notes: null,
+                doctor_staff_id: null
+              }));
+            }
+          } else {
+            scheduleSource = 'doctor_schedules';
+            schedules = scheduleData || [];
+          }
+        }
       }
     } else {
       const [staffService, supabaseModule] = await Promise.all([loadStaffServiceModule(), loadSupabaseModule()]);
       const { supabase } = supabaseModule;
 
-      const staff = await staffService.listStaff();
-      doctors = (Array.isArray(staff) ? staff : []).filter((item) => String(item?.role || '').toLowerCase() === 'doctor');
+      const staffRpc = await supabase.rpc('list_staff_accounts');
+      const staff = !staffRpc.error
+        ? (Array.isArray(staffRpc.data) ? staffRpc.data : [])
+        : await staffService.listStaff();
+      doctors = (Array.isArray(staff) ? staff : []).filter((item) => isDoctorRole(item?.role));
 
-      let scheduleData = [];
-      let scheduleError = null;
+      const scheduleRpc = await supabase.rpc('list_doctor_schedules');
+      if (!scheduleRpc.error) {
+        schedules = Array.isArray(scheduleRpc.data) ? scheduleRpc.data : [];
+      }
 
-      ({ data: scheduleData, error: scheduleError } = await supabase
-        .from('doctor_schedules')
-        .select('*')
-        .order('schedule_date', { ascending: true })
-        .order('start_time', { ascending: true }));
+      let scheduleData = schedules;
+      let scheduleError = scheduleRpc.error || null;
+
+      if (!scheduleData.length) {
+        ({ data: scheduleData, error: scheduleError } = await supabase
+          .from('doctor_schedules')
+          .select('*')
+          .order('schedule_date', { ascending: true })
+          .order('start_time', { ascending: true }));
+      }
 
       if (scheduleError) {
         scheduleSource = 'schedules';
@@ -1476,6 +1644,112 @@ async function loadSchedules(user) {
   populateScheduleDoctorSelect();
   renderScheduleDoctors(cachedScheduleDoctors, user);
   renderSchedules(schedules, user, cachedScheduleDoctors);
+}
+
+async function upsertScheduleRecord({ id, doctorId, doctorName, date, startTime, endTime, notes }) {
+  const apiPayload = {
+    doctor: doctorName,
+    doctor_staff_id: Number(doctorId),
+    date,
+    start_time: startTime,
+    end_time: endTime,
+    time: `${startTime}-${endTime}`,
+    notes: notes || null
+  };
+
+  if (isApiMode) {
+    try {
+      const url = id ? `${API_BASE}/api/schedules/${id}` : `${API_BASE}/api/schedules`;
+      const method = id ? 'PUT' : 'POST';
+      const resp = await fetch(url, {
+        method,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(apiPayload)
+      });
+
+      if (resp.ok) {
+        return true;
+      }
+    } catch (_) {
+      // Fall back to Supabase path below.
+    }
+  }
+
+  const { supabase } = await loadSupabaseModule();
+
+  const rpcPayload = {
+    p_id: id ? Number(id) : null,
+    p_doctor_staff_id: Number(doctorId),
+    p_schedule_date: date,
+    p_start_time: startTime,
+    p_end_time: endTime,
+    p_notes: notes || null
+  };
+
+  const rpcResult = await supabase.rpc('upsert_doctor_schedule_admin', rpcPayload);
+  if (!rpcResult.error) {
+    return true;
+  }
+  const payload = {
+    doctor_staff_id: Number(doctorId),
+    doctor_name: doctorName,
+    schedule_date: date,
+    start_time: startTime,
+    end_time: endTime,
+    notes: notes || null,
+    created_by_staff_id: Number(cachedSessionUser?.id) || null
+  };
+
+  let result;
+  if (id) {
+    result = await supabase.from('doctor_schedules').update(payload).eq('id', id);
+    if (result.error) {
+      result = await supabase
+        .from('schedules')
+        .update({ doctor: doctorName, date, time: `${startTime}-${endTime}` })
+        .eq('id', id);
+    }
+  } else {
+    result = await supabase.from('doctor_schedules').insert(payload);
+    if (result.error) {
+      result = await supabase
+        .from('schedules')
+        .insert({ doctor: doctorName, date, time: `${startTime}-${endTime}` });
+    }
+  }
+
+  if (result.error) throw result.error;
+  return true;
+}
+
+async function deleteScheduleRecordById(id) {
+  if (isApiMode) {
+    try {
+      const resp = await fetch(`${API_BASE}/api/schedules/${id}`, { method: 'DELETE', credentials: 'include' });
+      if (resp.ok) {
+        return true;
+      }
+    } catch (_) {
+      // Fall back to Supabase path below.
+    }
+  }
+
+  const { supabase } = await loadSupabaseModule();
+
+  const rpcResult = await supabase.rpc('delete_doctor_schedule_admin', {
+    p_id: Number(id)
+  });
+  if (!rpcResult.error) {
+    return true;
+  }
+
+  let result = await supabase.from('doctor_schedules').delete().eq('id', id);
+  if (result.error) {
+    result = await supabase.from('schedules').delete().eq('id', id);
+  }
+  if (result.error) throw result.error;
+  return true;
 }
 
 function renderSchedules(schedules, user, doctors = []) {
@@ -1557,17 +1831,7 @@ function renderSchedules(schedules, user, doctors = []) {
       delBtn.addEventListener('click', async () => {
         if (!confirm('Delete this schedule?')) return;
         try {
-          if (isApiMode) {
-            const resp = await fetch(`${API_BASE}/api/schedules/${schedule.id}`, { method: 'DELETE', credentials: 'include' });
-            if (!resp.ok) throw new Error('Delete failed');
-          } else {
-            const { supabase } = await loadSupabaseModule();
-            let result = await supabase.from('doctor_schedules').delete().eq('id', schedule.id);
-            if (result.error) {
-              result = await supabase.from('schedules').delete().eq('id', schedule.id);
-            }
-            if (result.error) throw result.error;
-          }
+          await deleteScheduleRecordById(schedule.id);
           showToast('Schedule deleted', 'success');
           initProfileAndSchedule();
         } catch (err) {
@@ -1693,59 +1957,15 @@ if (schedForm) {
       const selectedDoctor = cachedScheduleDoctors.find((item) => String(item.id) === doctorId);
       const doctorName = selectedDoctor ? getDoctorDisplayName(selectedDoctor) : 'Doctor';
 
-      if (isApiMode) {
-        const url = id ? `${API_BASE}/api/schedules/${id}` : `${API_BASE}/api/schedules`;
-        const method = id ? 'PUT' : 'POST';
-        const resp = await fetch(url, {
-          method,
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            doctor: doctorName,
-            doctor_staff_id: Number(doctorId),
-            date,
-            start_time: startTime,
-            end_time: endTime,
-            time: `${startTime}-${endTime}`,
-            notes: notes || null
-          })
-        });
-        if (!resp.ok) {
-          const data = await resp.json().catch(() => ({}));
-          throw new Error(data.message || 'Failed to save schedule');
-        }
-      } else {
-        const { supabase } = await loadSupabaseModule();
-        const payload = {
-          doctor_staff_id: Number(doctorId),
-          doctor_name: doctorName,
-          schedule_date: date,
-          start_time: startTime,
-          end_time: endTime,
-          notes: notes || null,
-          created_by_staff_id: Number(cachedSessionUser?.id) || null
-        };
-
-        let result;
-        if (id) {
-          result = await supabase.from('doctor_schedules').update(payload).eq('id', id);
-          if (result.error) {
-            result = await supabase
-              .from('schedules')
-              .update({ doctor: doctorName, date, time: `${startTime}-${endTime}` })
-              .eq('id', id);
-          }
-        } else {
-          result = await supabase.from('doctor_schedules').insert(payload);
-          if (result.error) {
-            result = await supabase
-              .from('schedules')
-              .insert({ doctor: doctorName, date, time: `${startTime}-${endTime}` });
-          }
-        }
-
-        if (result.error) throw result.error;
-      }
+      await upsertScheduleRecord({
+        id,
+        doctorId,
+        doctorName,
+        date,
+        startTime,
+        endTime,
+        notes
+      });
 
       closeScheduleModal();
       initProfileAndSchedule();
@@ -1770,17 +1990,7 @@ if (schedDeleteBtn) {
     if (!id) return;
     if (!confirm('Delete this schedule?')) return;
     try {
-      if (isApiMode) {
-        const resp = await fetch(`${API_BASE}/api/schedules/${id}`, { method: 'DELETE', credentials: 'include' });
-        if (!resp.ok) throw new Error('Delete failed');
-      } else {
-        const { supabase } = await loadSupabaseModule();
-        let result = await supabase.from('doctor_schedules').delete().eq('id', id);
-        if (result.error) {
-          result = await supabase.from('schedules').delete().eq('id', id);
-        }
-        if (result.error) throw result.error;
-      }
+      await deleteScheduleRecordById(id);
       showToast('Schedule deleted', 'success');
       closeScheduleModal();
       initProfileAndSchedule();
@@ -1812,12 +2022,12 @@ async function initializeDashboard() {
   initClinicalData();
   await refreshAnnouncementsData();
   renderFeedbacks();
-  initDashboardData();
+  await initDashboardData();
 }
 
 // Initialize on DOM ready
-document.addEventListener('DOMContentLoaded', () => {
-  initializeDashboard();
+document.addEventListener('DOMContentLoaded', async () => {
+  await initializeDashboard();
   navigateToSection(getSectionFromHash() || DEFAULT_SECTION_ID);
 });
 
@@ -2481,7 +2691,7 @@ function renderDashboardInsights() {
   // Citizens count
   if (statPatients) statPatients.textContent = String(latestPatientsList.length || 0);
 
-  const doctorsCount = latestStaffList.filter((user) => String(user.role || '').toLowerCase() === 'doctor').length;
+  const doctorsCount = latestStaffList.filter((user) => isDoctorRole(user?.role)).length;
   if (statDoctors) statDoctors.textContent = String(doctorsCount);
 
   const activeCount = latestStaffList.filter(isCurrentlyLoggedInStaffAccount).length;
@@ -2680,6 +2890,31 @@ function easeOutCubic(value) {
   return 1 - Math.pow(1 - value, 3);
 }
 
+function normalizeCitizenRecord(record) {
+  const firstName = String(record?.firstname || '').trim();
+  const surname = String(record?.surname || '').trim();
+  const fullName = [firstName, surname].filter(Boolean).join(' ').trim();
+  const contactNumber = String(record?.contact_number || record?.contactNumber || '').trim();
+
+  return {
+    ...record,
+    username: record?.username || fullName || record?.name || '',
+    name: fullName || record?.name || record?.username || '',
+    contact_number: contactNumber
+  };
+}
+
+async function listCitizensFromSupabase() {
+  const { supabase } = await loadSupabaseModule();
+  const { data, error } = await supabase
+    .from('citizens')
+    .select('username,firstname,surname,email,contact_number,created_at')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (Array.isArray(data) ? data : []).map(normalizeCitizenRecord);
+}
+
 // Load citizens (mobile app users)
 async function loadPatientData() {
   let list = [];
@@ -2691,27 +2926,14 @@ async function loadPatientData() {
       if (isApiMode) {
         const response = await fetch(`${API_BASE}/api/citizens`, { credentials: 'include' });
         if (response && response.ok) {
-          list = await response.json();
+          const payload = await response.json();
+          list = (Array.isArray(payload) ? payload : []).map(normalizeCitizenRecord);
+        } else {
+          // Fallback to direct Supabase read when API route is unavailable.
+          list = await listCitizensFromSupabase();
         }
       } else {
-        const { supabase } = await loadSupabaseModule();
-        let data = null;
-        let error = null;
-
-        ({ data, error } = await supabase
-          .from('citizens')
-          .select('username,email,created_at,status')
-          .order('created_at', { ascending: false }));
-
-        if (error) {
-          ({ data, error } = await supabase
-            .from('patients')
-            .select('username,email,created_at,status')
-            .order('created_at', { ascending: false }));
-        }
-
-        if (error) throw error;
-        list = data || [];
+        list = await listCitizensFromSupabase();
       }
     } catch (error) {
       console.error('Error loading citizens:', error);
@@ -2724,7 +2946,7 @@ async function loadPatientData() {
   if (patientsTbody) {
     patientsTbody.innerHTML = '';
     if (latestPatientsList.length === 0) {
-      patientsTbody.innerHTML = '<tr><td class="table-cell" colspan="3">No citizen accounts found.</td></tr>';
+      patientsTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No citizen accounts found.</td></tr>';
     } else {
       latestPatientsList.forEach(user => {
         const row = document.createElement('tr');
@@ -2732,6 +2954,7 @@ async function loadPatientData() {
         row.innerHTML = `
           <td class="table-cell">${user.username || user.name || '—'}</td>
           <td class="table-cell">${user.email || '—'}</td>
+          <td class="table-cell">${user.contact_number || '—'}</td>
           <td class="table-cell">${formatDateTime(user.created_at)}</td>
         `;
         patientsTbody.appendChild(row);
@@ -2742,6 +2965,7 @@ async function loadPatientData() {
           items: [
             { label: 'Username', value: user.username || user.name || '—' },
             { label: 'Email', value: user.email || '—' },
+            { label: 'Contact Number', value: user.contact_number || '—' },
             { label: 'Registered', value: user.created_at ? new Date(user.created_at) : '—' }
           ]
         }));
@@ -2750,6 +2974,19 @@ async function loadPatientData() {
 
     applyCitizensFinder();
   }
+}
+
+async function listStaffFromSupabase() {
+  const { supabase } = await loadSupabaseModule();
+
+  const rpcResult = await supabase.rpc('list_staff_accounts');
+  if (!rpcResult.error) {
+    return Array.isArray(rpcResult.data) ? rpcResult.data : [];
+  }
+
+  const staffService = await loadStaffServiceModule();
+  const staff = await staffService.listStaff();
+  return Array.isArray(staff) ? staff : [];
 }
 
 async function loadStaffData() {
@@ -2761,15 +2998,25 @@ async function loadStaffData() {
     try {
       if (isApiMode) {
         const response = await fetch(`${API_BASE}/api/staff`, { credentials: 'include' });
-        if (!response.ok) throw new Error('Failed to fetch staff');
-        staffList = await response.json();
+        if (response.ok) {
+          const payload = await response.json();
+          staffList = Array.isArray(payload) ? payload : [];
+        }
+
+        // Keep admin/staff views working even when API is unavailable or returns empty.
+        if (!response.ok || staffList.length === 0) {
+          staffList = await listStaffFromSupabase();
+        }
       } else {
-        const staffService = await loadStaffServiceModule();
-        staffList = await staffService.listStaff();
+        staffList = await listStaffFromSupabase();
       }
     } catch (error) {
       console.error('Error loading staff:', error);
-      staffList = DEMO_REGISTERED_USERS;
+      try {
+        staffList = await listStaffFromSupabase();
+      } catch (_) {
+        staffList = DEMO_REGISTERED_USERS;
+      }
     }
   }
 
@@ -2823,6 +3070,8 @@ async function initDashboardData() {
     applyRoleAccess(sessionUser);
 
     await loadPatientData();
+    storedAccounts.clear();
+    await loadStaffData();
 
     if (!isAdminUser(sessionUser)) {
       stopAdminDashboardAutoRefresh();
@@ -2831,8 +3080,6 @@ async function initDashboardData() {
     }
 
     // Do not force section visibility here; active section is managed by navigateToSection.
-    storedAccounts.clear();
-    await loadStaffData();
     startAdminDashboardAutoRefresh();
     // Refresh counts after all data loaded
     renderDashboardInsights();
@@ -2840,8 +3087,6 @@ async function initDashboardData() {
     dismissPagePreloader();
   }
 }
-
-initDashboardData();
 
 window.addEventListener('pagehide', () => {
   handleAutoLogoutOnClose();
@@ -4222,8 +4467,8 @@ function generateUsersReport() {
 }
 
 function generateCitizensReport() {
-  const rows = latestPatientsList.map(c => [c.username || c.name || '', c.email || '', c.created_at || '']);
-  generateReport('Citizens Report', ['Username', 'Email', 'Registered'], rows);
+  const rows = latestPatientsList.map(c => [c.username || c.name || '', c.email || '', c.contact_number || '', c.created_at || '']);
+  generateReport('Citizens Report', ['Username', 'Email', 'Contact Number', 'Registered'], rows);
 }
 
 // wire up simple global report triggers (if buttons exist elsewhere)

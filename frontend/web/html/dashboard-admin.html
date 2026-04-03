@@ -292,6 +292,15 @@
             <span class="nav-icon" aria-hidden="true">💊</span>
             <span class="label">Medicine Inventory</span>
           </a>
+          <a href="#" class="nav-item" data-section="consultation-section" title="Consultations">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 12h6M12 9v6" />
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+            </span>
+            <span class="label">Consultations</span>
+          </a>
         </nav>
 
         <div class="sidebar-footer">
@@ -405,7 +414,7 @@
             <p class="stat-foot">Licensed specialists</p>
           </article>
 
-          <article class="stat-card fade-in-up" style="animation-delay: 0.1s;">
+          <article class="stat-card fade-in-up" id="stat-announcements-card" style="animation-delay: 0.1s; cursor:pointer;">
             <div class="stat-card-metric">
               <span class="stat-card-icon stat-icon-violet" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -423,7 +432,7 @@
             <p class="stat-foot">City-wide updates</p>
           </article>
 
-          <article class="stat-card fade-in-up" style="animation-delay: 0.12s;">
+          <article class="stat-card fade-in-up" id="stat-reports-card" style="animation-delay: 0.12s; cursor:pointer;">
             <div class="stat-card-metric">
               <span class="stat-card-icon stat-icon-rose" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -439,7 +448,7 @@
             <p class="stat-foot">Citizen responses</p>
           </article>
 
-          <article class="stat-card fade-in-up" style="animation-delay: 0.14s;">
+          <article class="stat-card fade-in-up" id="stat-citizens-card" style="animation-delay: 0.14s; cursor:pointer;">
             <div class="stat-card-metric">
               <span class="stat-card-icon stat-icon-slate" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -471,6 +480,50 @@
             </div>
             <div class="stats-chart-meta">
               <ul id="dashboard-chart-legend" class="stats-chart-legend hidden"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel fade-in-up" style="animation-delay: 0.16s; margin-top:18px;">
+          <div class="panel-head">
+            <h3>Recent Staff</h3>
+            <span class="panel-hint" id="dashboard-last-sync">Last synced: —</span>
+          </div>
+          <div class="table-wrap">
+            <table class="accounts-table compact-table">
+              <thead>
+                <tr class="table-header-row">
+                  <th class="table-header-cell">Username</th>
+                  <th class="table-header-cell">Role</th>
+                  <th class="table-header-cell">Status</th>
+                  <th class="table-header-cell">Registered</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-active-preview"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="non-admin-section" class="section-top hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h3 id="non-admin-title">Workspace</h3>
+            <span class="panel-hint" id="non-admin-subtitle">Track your daily operations and coordinate with the admin team for account-related requests.</span>
+          </div>
+          <div class="table-wrap p-20">
+            <p id="non-admin-permissions" class="note" style="margin-bottom:16px;">Admin Command Center modules are restricted to admin accounts.</p>
+            <div class="modal-group">
+              <label class="modal-label">Username</label>
+              <p class="modal-text" id="non-admin-username">—</p>
+            </div>
+            <div class="modal-group">
+              <label class="modal-label">Role</label>
+              <p class="modal-text" id="non-admin-role">—</p>
+            </div>
+            <div class="modal-group">
+              <label class="modal-label">Email</label>
+              <p class="modal-text" id="non-admin-email">—</p>
             </div>
           </div>
         </div>
@@ -507,6 +560,7 @@
               </div>
               <div class="actions">
                 <button type="button" id="profile-save-btn" class="btn">Save Profile</button>
+                <button type="button" id="profile-cancel-btn" class="chip-btn">Cancel</button>
               </div>
             </form>
           </div>
@@ -592,7 +646,7 @@
           </div>
           <div id="citizens-pane" class="hidden">
             <div class="management-actions" style="margin-bottom:10px;">
-              <input id="citizens-finder-input" class="search-input" type="search" placeholder="Find citizens by username or email" aria-label="Find citizens" />
+              <input id="citizens-finder-input" class="search-input" type="search" placeholder="Find citizens by username, email, or contact number" aria-label="Find citizens" />
             </div>
             <div class="table-wrap">
               <table class="accounts-table">
@@ -600,6 +654,7 @@
                   <tr class="table-header-row">
                     <th class="table-header-cell">Username</th>
                     <th class="table-header-cell">Email</th>
+                    <th class="table-header-cell">Contact Number</th>
                     <th class="table-header-cell">Registered</th>
                   </tr>
                 </thead>
@@ -732,6 +787,33 @@
                 <tbody id="feedback-tbody"></tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="consultation-section" class="section-top hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Consultations</h3>
+            <span class="panel-hint">Record and review patient consultations.</span>
+            <div class="management-actions">
+              <button id="open-consult-modal-btn" class="chip-btn">New Consultation</button>
+              <button id="consult-report-btn" class="chip-btn chip-btn-outline">Generate Report</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="accounts-table">
+              <thead>
+                <tr class="table-header-row">
+                  <th class="table-header-cell">ID</th>
+                  <th class="table-header-cell">Patient</th>
+                  <th class="table-header-cell">Diagnosis</th>
+                  <th class="table-header-cell">Date</th>
+                  <th class="table-header-cell">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="consultations-tbody"></tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -1046,8 +1128,8 @@
     </main>
   </div>
 
-  <script src="../js/runtime-config.js"></script>
-  <script src="../js/dashboard.js"></script>
+  <script src="../js/runtime-config.js?v=20260403b"></script>
+  <script src="../js/dashboard.js?v=20260403b"></script>
 </body>
 
 </html>
