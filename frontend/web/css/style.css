@@ -325,6 +325,52 @@ select:focus {
     animation: modalSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+#announcement-detail-modal .modal-box {
+    position: relative;
+    text-align: left;
+}
+
+#announcement-detail-close.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.18);
+    color: #334155;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#announcement-detail-close.modal-close:hover {
+    background: rgba(148, 163, 184, 0.3);
+}
+
+#announcement-detail-title {
+    margin: 0 0 10px;
+    padding-right: 36px;
+}
+
+#announcement-detail-date,
+#announcement-detail-visibility {
+    margin: 0 0 6px;
+    color: #64748b;
+    font-size: 13px;
+}
+
+#announcement-detail-body {
+    margin-top: 12px;
+    color: #0f172a;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
 @keyframes modalSlideIn {
     from {
         transform: translateY(-20px) scale(0.97);
@@ -377,6 +423,29 @@ select:focus {
 
 .modal-btn {
     margin-top: 8px;
+}
+
+.dialog-modal-box {
+    max-width: 420px;
+    text-align: center;
+}
+
+.dialog-message {
+    margin-bottom: 16px;
+}
+
+#dialog-modal .field {
+    text-align: left;
+}
+
+.dialog-error {
+    margin-bottom: 10px;
+    color: #b91c1c;
+}
+
+.dialog-actions {
+    justify-content: center;
+    gap: 10px;
 }
 
 /* Schedule Days Styling */
@@ -545,15 +614,25 @@ select:focus {
 
 .sidebar {
     box-sizing: border-box;
-    flex: 0 0 260px;
-    width: 260px;
-    min-height: 100vh;
+    flex: 0 0 280px;
+    width: 280px;
+    min-height: 0;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    bottom: 10px;
+    z-index: 30;
     background: linear-gradient(180deg, #002b8f 0%, #012165 100%);
     color: #fff;
     padding: 18px 14px;
-    transition: width 0.25s, transform 0.25s;
+    border-radius: 18px;
+    transition: flex-basis 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+                width 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+                padding 0.48s cubic-bezier(0.22, 1, 0.36, 1);
     box-shadow: 8px 0 26px rgba(2, 6, 23, 0.14);
     overflow: hidden;
+    will-change: width, flex-basis, transform;
 }
 
 
@@ -583,6 +662,9 @@ select:focus {
     gap: 10px;
     margin-bottom: 16px;
     padding: 0 4px;
+    transition: gap 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+                margin-bottom 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+                padding 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sidebar .brand-stack {
@@ -590,6 +672,11 @@ select:focus {
     flex-direction: column;
     flex: 1 1 auto;
     min-width: 0;
+    max-width: 180px;
+    overflow: hidden;
+    transition: opacity 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+                max-width 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+                flex-basis 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sidebar .brand-subtext {
@@ -598,6 +685,8 @@ select:focus {
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: rgba(219, 233, 255, 0.7);
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-section-label {
@@ -607,6 +696,9 @@ select:focus {
     text-transform: uppercase;
     color: rgba(219, 233, 255, 0.6);
     font-weight: 700;
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                margin 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .hidden {
@@ -624,7 +716,15 @@ select:focus {
 }
 
 .sidebar .logo {
-    flex: 0 0 40px
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+    transition: opacity 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+                width 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+                height 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+                flex-basis 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+                margin 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sidebar .brand-text {
@@ -632,6 +732,8 @@ select:focus {
     font-size: 18px;
     line-height: 1;
     white-space: nowrap;
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar .brand-row .control-btns {
@@ -655,7 +757,8 @@ select:focus {
     justify-content: center;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 10px;
-    transition: border-color 0.2s ease, background 0.2s ease;
+    transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
 }
@@ -677,7 +780,8 @@ select:focus {
     justify-content: center;
     width: 18px;
     height: 18px;
-    transition: opacity 0.18s ease, transform 0.18s ease;
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .burger-menu {
@@ -729,7 +833,12 @@ select:focus {
 }
 
 .sidebar.collapsed .brand-text {
-    display: none
+    opacity: 0;
+    visibility: hidden;
+    max-width: 0;
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar .nav {
@@ -752,7 +861,7 @@ select:focus {
     color: #dbe9ff;
     text-decoration: none;
     padding: 11px 10px;
-    border-radius: 8px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -763,7 +872,51 @@ select:focus {
     font-size: inherit;
     width: 100%;
     text-align: left;
-    transition: background 0.2s ease, transform 0.2s ease;
+    transition: background 0.2s ease,
+                transform 0.2s ease,
+                justify-content 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                gap 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar .nav > a.nav-item,
+.sidebar .nav > .nav-item.dropdown > .nav-btn,
+.sidebar .nav .dropdown-item,
+.sidebar .nav > a.nav-item.is-active,
+.sidebar .nav > .nav-item.dropdown > .nav-btn.is-active {
+    border-radius: 12px !important;
+}
+
+.sidebar .nav > a.nav-item,
+.sidebar .nav > .nav-item.dropdown > .nav-btn {
+    box-sizing: border-box;
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+.sidebar .nav > a.nav-item:hover,
+.sidebar .nav > .nav-item.dropdown > .nav-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.sidebar .nav > a.nav-item.is-active,
+.sidebar .nav > .nav-item.dropdown > .nav-btn.is-active {
+    background: rgba(255, 255, 255, 0.17);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.sidebar .nav a.is-active,
+.sidebar .nav .nav-btn.is-active {
+    box-shadow: none;
+}
+
+.sidebar .nav > a.nav-item:focus-visible,
+.sidebar .nav > .nav-item.dropdown > .nav-btn:focus-visible,
+.sidebar .nav .dropdown-item:hover,
+.sidebar .nav .dropdown-item:focus-visible,
+.sidebar .nav .dropdown-item.is-active {
+    border-color: rgba(255, 255, 255, 0.2);
 }
 
 .sidebar .nav a.is-active,
@@ -796,6 +949,14 @@ select:focus {
     margin-left: auto;
     font-size: 14px;
     opacity: 0.85;
+    transform: rotate(90deg);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar .nav-item.dropdown.open .arrow {
+    transform: rotate(0deg);
+    opacity: 1;
 }
 
 .sidebar .nav .dropdown-menu {
@@ -803,14 +964,31 @@ select:focus {
     flex-direction: column;
     gap: 4px;
     margin-left: 8px;
-    margin-top: 4px
+    margin-top: 4px;
+    max-height: 240px;
+    opacity: 1;
+    transform: translateY(0);
+    overflow: hidden;
+    transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                margin-top 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar .nav .dropdown-menu.hidden {
+    display: flex !important;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-6px);
+    margin-top: 0;
+    pointer-events: none;
 }
 
 .sidebar .nav .dropdown-item {
     color: #dbe9ff;
     text-decoration: none;
     padding: 8px 10px;
-    border-radius: 6px;
+    border-radius: 12px;
     display: block;
     font-size: 13px;
     border: 0;
@@ -831,42 +1009,6 @@ select:focus {
     cursor: pointer
 }
 
-.sidebar-footer {
-    margin-top: auto;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 10px 12px;
-}
-
-.sidebar-footer-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #34d399;
-    box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.22);
-    flex: 0 0 10px;
-}
-
-.sidebar-footer-copy {
-    min-width: 0;
-}
-
-.sidebar-footer-title {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 700;
-    color: #f4f8ff;
-}
-
-.sidebar-footer-sub {
-    margin: 1px 0 0;
-    font-size: 11px;
-    color: rgba(219, 233, 255, 0.75);
-}
 
 .sidebar.slid {
     transform: translateX(0);
@@ -876,7 +1018,16 @@ select:focus {
 .mainview {
     flex: 1;
     background: linear-gradient(180deg, #f7f9fc 0%, #eef3fb 100%);
+    margin: 10px 10px 10px 300px;
+    min-height: calc(100vh - 20px);
+    border-radius: 18px;
+    overflow-y: auto;
     padding: 20px 24px 100px;
+    transition: margin-left 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sidebar.collapsed ~ .mainview {
+    margin-left: 92px;
 }
 
 .topbar {
@@ -973,9 +1124,44 @@ select:focus {
     color: #6b7280
 }
 
-.profile-img {
-    flex: 0 0 40px
+.role-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 15px;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+    user-select: none;
 }
+
+.role-logo svg {
+    width: 20px;
+    height: 20px;
+    color: #fff;
+}
+
+.role-logo-lg {
+    width: 52px;
+    height: 52px;
+    font-size: 18px;
+}
+
+.role-logo-lg svg {
+    width: 24px;
+    height: 24px;
+}
+
+.role-logo-admin { background: linear-gradient(145deg, #2563eb, #1d4ed8); }
+.role-logo-doctor { background: linear-gradient(145deg, #0ea5e9, #0284c7); }
+.role-logo-nurse { background: linear-gradient(145deg, #10b981, #059669); }
+.role-logo-staff { background: linear-gradient(145deg, #7c3aed, #6d28d9); }
+.role-logo-specialist { background: linear-gradient(145deg, #f59e0b, #d97706); }
+.role-logo-citizen { background: linear-gradient(145deg, #475569, #334155); }
+.role-logo-default { background: linear-gradient(145deg, #64748b, #475569); }
 
 /* Profile edit grid */
 .profile-grid {
@@ -1097,6 +1283,7 @@ select:focus {
         left: 0;
         top: 0;
         bottom: 0;
+        border-radius: 0;
         transform: translateX(-110%);
         z-index: 40
     }
@@ -1106,6 +1293,9 @@ select:focus {
     }
 
     .mainview {
+        margin: 0;
+        min-height: 100vh;
+        border-radius: 0;
         padding: 12px
     }
 }
@@ -1373,13 +1563,7 @@ select:focus {
     border-radius: 8px
 }
 
-.profile-img {
-    width: 40px;
-    height: 40px;
-    background: linear-gradient(145deg, #c7d2fe 0%, #818cf8 100%);
-    border-radius: 50%;
-    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
-}
+
 
 /* dropdown menu hidden handled by .hidden class */
 
@@ -1397,7 +1581,10 @@ select:focus {
 }
 
 .sidebar .nav a .label {
-    margin-left: 8px
+    margin-left: 8px;
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                margin 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar.collapsed .nav a .label,
@@ -1409,10 +1596,22 @@ select:focus {
     overflow: hidden;
     margin: 0;
     pointer-events: none;
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                margin 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar.collapsed .nav .dropdown-menu {
-    display: none !important;
+    opacity: 0;
+    visibility: hidden;
+    max-height: 0;
+    margin-top: 0;
+    transform: translateY(-6px);
+    display: flex !important;
+    pointer-events: none;
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar.collapsed .nav a,
@@ -1479,28 +1678,50 @@ body.dashboard-loading {
 }
 
 .sidebar.collapsed .brand-subtext,
-.sidebar.collapsed .sidebar-section-label,
-.sidebar.collapsed .sidebar-footer-copy {
-    display: none;
+.sidebar.collapsed .sidebar-section-label {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar.collapsed .brand-stack {
-    display: none;
+    opacity: 0;
+    visibility: hidden;
+    flex: 0 0 0;
+    max-width: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar.collapsed .logo {
-    display: none;
+    opacity: 0;
+    visibility: hidden;
+    flex: 0 0 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar.collapsed .brand-row {
     justify-content: center;
     padding: 0;
+    gap: 0;
     margin-bottom: 12px;
 }
 
 .sidebar.collapsed .brand-row .control-btns {
     margin-left: 0;
-    width: 100%;
+    width: auto;
     justify-content: center;
 }
 
@@ -1511,24 +1732,6 @@ body.dashboard-loading {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-}
-
-.sidebar.collapsed .sidebar-footer {
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    margin-inline: auto;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-}
-
-.sidebar.collapsed .sidebar-footer-dot {
-    flex: none;
-    margin: 0;
-    box-shadow: none;
 }
 
 /* back button visibility rules */

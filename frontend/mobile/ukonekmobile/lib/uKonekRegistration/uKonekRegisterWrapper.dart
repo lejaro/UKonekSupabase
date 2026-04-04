@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:ukonekmobile/uKonekPreviewPage.dart';
 import 'steps/personal_info_step.dart';
 import 'steps/contact_address_step.dart';
@@ -41,7 +41,7 @@ class _uKonekRegisterWrapperState
   DateTime? selectedDate;
   String    selectedSex  = 'Male';
   bool      idVerified   = false;
-  File?     idImage;
+  XFile?    idImage;
 
   static const _primary   = Color(0xFF0A2E6E);
   static const _primary2  = Color(0xFF1565C0);

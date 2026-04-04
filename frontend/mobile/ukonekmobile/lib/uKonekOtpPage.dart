@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
-import 'uKonekLoginPage.dart';
+import 'uKonekCredentialsPage.dart';
 
 class uKonekOtpPage extends StatefulWidget {
   final String firstName;
@@ -15,8 +15,6 @@ class uKonekOtpPage extends StatefulWidget {
   final String emergencyName;
   final String emergencyContact;
   final String relation;
-  final String username;
-  final String password;
   final bool idVerified;
 
   const uKonekOtpPage({
@@ -33,8 +31,6 @@ class uKonekOtpPage extends StatefulWidget {
     required this.emergencyName,
     required this.emergencyContact,
     required this.relation,
-    required this.username,
-    required this.password,
     required this.idVerified,
   });
 
@@ -43,28 +39,23 @@ class uKonekOtpPage extends StatefulWidget {
 }
 
 class _uKonekOtpPageState extends State<uKonekOtpPage> {
-  bool _isVerifying = false;
-  bool _isSubmitting = false;
+  bool _isSending = false;
+  bool _isChecking = false;
+  bool _linkSent = false;
+  final TextEditingController _otpController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sendMagicLink();
+    });
   }
 
   @override
   void dispose() {
+    _otpController.dispose();
     super.dispose();
-  }
-
-  Future<void> _verifyOtp() async {
-    setState(() => _isVerifying = true);
-    try {
-      await _submitRegistration('magic_link');
-    } finally {
-      if (mounted) {
-        setState(() => _isVerifying = false);
-      }
-    }
   }
 
   String? _toIsoDate(String date) {
@@ -78,18 +69,21 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
     return '${parsed.year.toString().padLeft(4, '0')}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _submitRegistration(String otp) async {
-    if (_isSubmitting) return;
+  Future<void> _sendMagicLink() async {
+    if (_isSending) return;
     final dateOfBirth = _toIsoDate(widget.dob);
 
     if (dateOfBirth == null) {
-      _showSnack('Invalid birth date format. Please go back and select your date again.', isError: true);
+      _showSnack(
+        'Invalid birth date format. Please go back and select your date again.',
+        isError: true,
+      );
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    setState(() => _isSending = true);
     try {
-      await ApiService.registerCitizen(payload: {
+      await ApiService.startCitizenEmailVerification(payload: {
         'firstname': widget.firstName.trim(),
         'surname': widget.surname.trim(),
         'middle_initial': widget.middleName.trim(),
@@ -102,20 +96,56 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
         'emergency_contact_complete_name': widget.emergencyName.trim(),
         'emergency_contact_contact_number': widget.emergencyContact.trim(),
         'relation': widget.relation.trim(),
-        'username': widget.username.trim(),
-        'password': widget.password,
-        'confirmPassword': widget.password,
-        'otp': otp,
       });
 
       if (!mounted) return;
-      _showSnack('✅ Account registered successfully. You can now sign in.');
-      await Future.delayed(const Duration(milliseconds: 700));
+      setState(() => _linkSent = true);
+      _showSnack('Verification email sent. Enter the OTP code from your email.');
+    } catch (error) {
       if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
+      final message = error.toString().replaceFirst('Exception: ', '');
+      _showSnack(message, isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
+  }
+
+  Future<void> _continueAfterVerification() async {
+    if (_isChecking) return;
+    final otp = _otpController.text.trim();
+    if (otp.length < 8) {
+      _showSnack('Please enter the 8-digit OTP code from your email.', isError: true);
+      return;
+    }
+    setState(() => _isChecking = true);
+    try {
+      await ApiService.verifyCitizenEmailOtp(email: widget.email, otp: otp);
+
+      if (!mounted) return;
+      Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const uKonekLoginPage()),
-        (route) => false,
+        MaterialPageRoute(
+          builder: (_) => uKonekCredentialsPage(
+            firstName: widget.firstName,
+            middleName: widget.middleName,
+            surname: widget.surname,
+            nameExtension: '',
+            dob: widget.dob,
+            age: widget.age,
+            contact: widget.contact,
+            sex: widget.sex,
+            email: widget.email,
+            address: widget.address,
+            emergencyName: widget.emergencyName,
+            emergencyContact: widget.emergencyContact,
+            relation: widget.relation,
+            idImage: null,
+            idVerified: widget.idVerified,
+            extractedOcrText: '',
+          ),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
@@ -123,7 +153,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
       _showSnack(message, isError: true);
     } finally {
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        setState(() => _isChecking = false);
       }
     }
   }
@@ -202,7 +232,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
                               color: Color(0xFF1976D2), size: 32),
                           const SizedBox(height: 10),
                           const Text(
-                            "Your verification magic link will be sent to",
+                            "Your OTP code will be sent to",
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontSize: 14, color: Colors.black54),
@@ -219,7 +249,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
                           ),
                           const SizedBox(height: 6),
                           const Text(
-                            "Create your account below, then open the link from your inbox (or spam folder).",
+                            "A verification email will be sent using Supabase built-in email.",
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontSize: 12, color: Colors.black45),
@@ -241,37 +271,61 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
-                        "This screen now uses email magic link verification. No numeric OTP code is required.",
+                        "Phase 1: verify email using OTP code.\nPhase 2: create username and password after verification.",
                         style: TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
                         textAlign: TextAlign.center,
                       ),
                     ),
 
                     const SizedBox(height: 28),
+                    TextField(
+                      controller: _otpController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 8,
+                      decoration: const InputDecoration(
+                        labelText: 'OTP Code',
+                        hintText: 'Enter 8-digit code',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_isSending)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            SizedBox(width: 10),
+                            Text('Sending OTP code...'),
+                          ],
+                        ),
+                      ),
+                    if (!_isSending && _linkSent)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          'OTP code sent to your email.',
+                          style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
+                        ),
+                      ),
 
-                    // ── Verify Button ─────────────────────────
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0D47A1),
-                          padding:
-                          const EdgeInsets.symmetric(vertical: 14),
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        onPressed: (_isVerifying || _isSubmitting) ? null : _verifyOtp,
-                        child: (_isVerifying || _isSubmitting)
-                            ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2),
-                        )
-                            : const Text(
-                              "CREATE ACCOUNT & SEND MAGIC LINK",
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16),
+                        onPressed: (_isSending || _isChecking)
+                            ? null
+                            : _continueAfterVerification,
+                        child: const Text(
+                          'VERIFY OTP & CONTINUE',
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -279,7 +333,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
                     const SizedBox(height: 20),
 
                     const Text(
-                      "After creation, wait for admin approval and try to log in after an hour or two.",
+                      "Use the latest OTP code from your email, then tap Continue.",
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.black45, fontSize: 13),
                     ),

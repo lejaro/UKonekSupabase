@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -10,7 +10,7 @@ class IdVerificationStep extends StatefulWidget {
   final String surname;
   final String middleName;
   final DateTime? dob;
-  final Function(bool, File?) onVerified;
+  final Function(bool, XFile?) onVerified;
 
   const IdVerificationStep({
     super.key,
@@ -29,7 +29,7 @@ class IdVerificationStep extends StatefulWidget {
 class _IdVerificationStepState
     extends State<IdVerificationStep> {
 
-  File?   _idImage;
+  XFile?  _idImage;
   bool    _isVerifying = false;
   bool    _idVerified  = false;
   String  _statusMessage = '';
@@ -85,11 +85,23 @@ class _IdVerificationStepState
         source: ImageSource.gallery, imageQuality: 85);
     if (picked != null) {
       setState(() {
-        _idImage       = File(picked.path);
+        _idImage       = picked;
         _isVerifying   = true;
         _idVerified    = false;
         _statusMessage = '';
       });
+
+      if (kIsWeb) {
+        setState(() {
+          _isVerifying = false;
+          _idVerified = true;
+          _statusMessage =
+              'ID uploaded from desktop. Automatic OCR check is skipped on web.';
+        });
+        widget.onVerified(_idVerified, _idImage);
+        return;
+      }
+
       _processOCR();
     }
   }
@@ -98,12 +110,15 @@ class _IdVerificationStepState
     if (kIsWeb) {
       setState(() {
         _isVerifying   = false;
-        _statusMessage = 'OCR not supported on Web.';
+        _idVerified = true;
+        _statusMessage =
+            'ID uploaded. Automatic OCR check is skipped on web.';
       });
+      widget.onVerified(_idVerified, _idImage);
       return;
     }
     try {
-      final inputImage    = InputImage.fromFile(_idImage!);
+      final inputImage = InputImage.fromFilePath(_idImage!.path);
       final recognizer    = TextRecognizer(
           script: TextRecognitionScript.latin);
       final recognizedText= await recognizer.processImage(inputImage);
@@ -211,10 +226,23 @@ class _IdVerificationStepState
                   if (_idImage != null)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(20),
-                      child: Image.file(
-                        _idImage!,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+                      child: FutureBuilder<Uint8List>(
+                        future: _idImage!.readAsBytes(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return const SizedBox(
+                              height: 220,
+                              child: Center(
+                                child: CircularProgressIndicator(color: _primary),
+                              ),
+                            );
+                          }
+                          return Image.memory(
+                            snapshot.data!,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          );
+                        },
                       ),
                     ),
                   // Empty state

@@ -180,6 +180,7 @@ if (burger) {
       sidebar.classList.toggle('slid');
       sidebar.classList.remove('collapsed');
     } else {
+      closeSidebarDropdownMenus();
       sidebar.classList.toggle('collapsed');
     }
     state();
@@ -225,6 +226,37 @@ const notificationPanel = document.getElementById('notification-panel');
 const notificationList = document.getElementById('notification-list');
 const notificationEmptyState = document.getElementById('notification-empty');
 const notificationCloseBtn = document.getElementById('notif-close-btn');
+
+function getNotificationDismissStorageKey() {
+  const today = new Date();
+  const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const userKey = String(cachedSessionUser?.id || sessionUserRole || 'guest').trim();
+  return `ukonek_notif_dismissed_${userKey}_${dateKey}`;
+}
+
+function getDismissedNotificationIds() {
+  try {
+    const raw = localStorage.getItem(getNotificationDismissStorageKey());
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed.map((value) => String(value)) : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function setDismissedNotificationIds(idSet) {
+  localStorage.setItem(
+    getNotificationDismissStorageKey(),
+    JSON.stringify(Array.from(idSet))
+  );
+}
+
+function dismissNotification(id) {
+  if (!id) return;
+  const dismissed = getDismissedNotificationIds();
+  dismissed.add(String(id));
+  setDismissedNotificationIds(dismissed);
+}
 
 function showLogoutConfirmModal() {
   if (!logoutConfirmModal) return;
@@ -290,6 +322,115 @@ if (notifBtn && notificationPanel) {
 
 if (notificationCloseBtn) {
   notificationCloseBtn.addEventListener('click', () => hideNotificationPanel());
+}
+
+const dialogModal = document.getElementById('dialog-modal');
+const dialogTitle = document.getElementById('dialog-title');
+const dialogMessage = document.getElementById('dialog-message');
+const dialogInput1Wrap = document.getElementById('dialog-input-1-wrap');
+const dialogInput1Label = document.getElementById('dialog-input-1-label');
+const dialogInput1 = document.getElementById('dialog-input-1');
+const dialogInput2Wrap = document.getElementById('dialog-input-2-wrap');
+const dialogInput2Label = document.getElementById('dialog-input-2-label');
+const dialogInput2 = document.getElementById('dialog-input-2');
+const dialogError = document.getElementById('dialog-error');
+const dialogConfirmBtn = document.getElementById('dialog-confirm-btn');
+const dialogCancelBtn = document.getElementById('dialog-cancel-btn');
+
+let activeDialogResolver = null;
+
+function closeDialogModal(result = { confirmed: false, values: [] }) {
+  if (dialogModal) dialogModal.classList.add('hidden');
+  if (activeDialogResolver) {
+    activeDialogResolver(result);
+    activeDialogResolver = null;
+  }
+}
+
+function openDialogModal({
+  title = 'Confirm',
+  message = '',
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  inputs = []
+} = {}) {
+  if (!dialogModal) {
+    return Promise.resolve({ confirmed: false, values: [] });
+  }
+
+  if (dialogTitle) dialogTitle.textContent = title;
+  if (dialogMessage) dialogMessage.textContent = message;
+  if (dialogConfirmBtn) dialogConfirmBtn.textContent = confirmText;
+  if (dialogCancelBtn) dialogCancelBtn.textContent = cancelText;
+  if (dialogError) {
+    dialogError.textContent = '';
+    dialogError.classList.add('hidden');
+  }
+
+  const inputConfigs = Array.isArray(inputs) ? inputs.slice(0, 2) : [];
+  const first = inputConfigs[0] || null;
+  const second = inputConfigs[1] || null;
+
+  if (dialogInput1Wrap && dialogInput1 && dialogInput1Label) {
+    if (first) {
+      dialogInput1Wrap.classList.remove('hidden');
+      dialogInput1Label.textContent = first.label || 'Input';
+      dialogInput1.type = first.type || 'text';
+      dialogInput1.placeholder = first.placeholder || '';
+      dialogInput1.value = first.initialValue || '';
+    } else {
+      dialogInput1Wrap.classList.add('hidden');
+      dialogInput1.value = '';
+    }
+  }
+
+  if (dialogInput2Wrap && dialogInput2 && dialogInput2Label) {
+    if (second) {
+      dialogInput2Wrap.classList.remove('hidden');
+      dialogInput2Label.textContent = second.label || 'Input';
+      dialogInput2.type = second.type || 'text';
+      dialogInput2.placeholder = second.placeholder || '';
+      dialogInput2.value = second.initialValue || '';
+    } else {
+      dialogInput2Wrap.classList.add('hidden');
+      dialogInput2.value = '';
+    }
+  }
+
+  dialogModal.classList.remove('hidden');
+  setTimeout(() => {
+    if (first && dialogInput1) dialogInput1.focus();
+    else if (dialogConfirmBtn) dialogConfirmBtn.focus();
+  }, 0);
+
+  return new Promise((resolve) => {
+    activeDialogResolver = resolve;
+  });
+}
+
+if (dialogCancelBtn) {
+  dialogCancelBtn.addEventListener('click', () => closeDialogModal({ confirmed: false, values: [] }));
+}
+
+if (dialogConfirmBtn) {
+  dialogConfirmBtn.addEventListener('click', () => {
+    const values = [];
+    if (dialogInput1Wrap && !dialogInput1Wrap.classList.contains('hidden') && dialogInput1) {
+      values.push(String(dialogInput1.value || '').trim());
+    }
+    if (dialogInput2Wrap && !dialogInput2Wrap.classList.contains('hidden') && dialogInput2) {
+      values.push(String(dialogInput2.value || '').trim());
+    }
+    closeDialogModal({ confirmed: true, values });
+  });
+}
+
+if (dialogModal) {
+  dialogModal.addEventListener('click', (event) => {
+    if (event.target === dialogModal) {
+      closeDialogModal({ confirmed: false, values: [] });
+    }
+  });
 }
 
 async function ensureAuthenticatedSession(force = false) {
@@ -394,6 +535,69 @@ function getDoctorSpecializationText(doctor) {
   return value || '—';
 }
 
+function getRoleLogoConfig(roleValue) {
+  const key = String(roleValue || '').trim().toLowerCase();
+  switch (key) {
+    case 'admin':
+      return { className: 'role-logo-admin', label: 'Admin', icon: 'shield' };
+    case 'doctor':
+      return { className: 'role-logo-doctor', label: 'Doctor', icon: 'stethoscope' };
+    case 'nurse':
+      return { className: 'role-logo-nurse', label: 'Nurse', icon: 'heart' };
+    case 'specialist':
+      return { className: 'role-logo-specialist', label: 'Specialist', icon: 'spark' };
+    case 'staff':
+      return { className: 'role-logo-staff', label: 'Staff', icon: 'briefcase' };
+    case 'citizen':
+      return { className: 'role-logo-citizen', label: 'Citizen', icon: 'user' };
+    default:
+      return { className: 'role-logo-default', label: 'User', icon: 'user' };
+  }
+}
+
+function getRoleLogoSvg(iconName) {
+  switch (iconName) {
+    case 'shield':
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7 3v6c0 5-3.5 9.5-7 11-3.5-1.5-7-6-7-11V5l7-3z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    case 'stethoscope':
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v5a4 4 0 0 0 8 0V3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10 12v2a4 4 0 0 0 8 0v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="18" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+    case 'heart':
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.4-9-8.5C1.3 9.2 3 6 6.3 6c2.1 0 3.2 1.2 3.7 2 .5-.8 1.6-2 3.7-2C17 6 18.7 9.2 17 12.5 15 16.6 8 21 8 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    case 'spark':
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M18.5 15l.9 2.1L21.5 18l-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+    case 'briefcase':
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+    default:
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 20a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  }
+}
+
+function applyRoleLogos(roleValue) {
+  const config = getRoleLogoConfig(roleValue);
+  const targets = [
+    document.getElementById('topbar-role-logo'),
+    document.getElementById('profile-role-logo')
+  ];
+  const roleClasses = [
+    'role-logo-admin',
+    'role-logo-doctor',
+    'role-logo-nurse',
+    'role-logo-specialist',
+    'role-logo-staff',
+    'role-logo-citizen',
+    'role-logo-default'
+  ];
+
+  targets.forEach((node) => {
+    if (!node) return;
+    node.classList.remove(...roleClasses);
+    node.classList.add(config.className);
+    node.innerHTML = getRoleLogoSvg(config.icon);
+    node.title = config.label;
+    node.setAttribute('aria-label', `${config.label} role icon`);
+  });
+}
+
 function updateNonAdminWorkspace(user) {
   const role = String(user?.role || '').trim().toLowerCase();
   const roleTitle = toTitleCase(role);
@@ -426,8 +630,12 @@ function updateNonAdminWorkspace(user) {
 function applyRoleAccess(user) {
   const adminAccess = isAdminUser(user);
   document.querySelectorAll('.admin-only').forEach((element) => {
+    const isSectionContainer = element.classList.contains('section-top');
     if (adminAccess) {
-      element.classList.remove('hidden');
+      // Keep section visibility controlled by navigation helpers.
+      if (!isSectionContainer) {
+        element.classList.remove('hidden');
+      }
     } else {
       element.classList.add('hidden');
     }
@@ -445,6 +653,8 @@ function applyRoleAccess(user) {
     const roleText = String(user?.role || 'Staff');
     userRoleNode.textContent = roleText.charAt(0).toUpperCase() + roleText.slice(1);
   }
+  applyRoleLogos(user?.role || 'staff');
+  applyConsultationAccess();
 
   const nonAdminSection = document.getElementById('non-admin-section');
   if (adminAccess) {
@@ -456,10 +666,10 @@ function applyRoleAccess(user) {
   const patientsPane = document.getElementById('citizens-pane');
   const usersNavBtn = document.querySelector('.nav-btn[data-section="users-section"]');
 
-  if (registeredPane) registeredPane.classList.remove('hidden');
-  if (patientsPane) patientsPane.classList.add('hidden');
+  if (registeredPane) registeredPane.classList.add('hidden');
+  if (patientsPane) patientsPane.classList.remove('hidden');
   if (usersNavBtn) {
-    usersNavBtn.dataset.pane = 'registered-pane';
+    usersNavBtn.dataset.pane = 'citizens-pane';
   }
 
   updateNonAdminWorkspace(user);
@@ -474,6 +684,10 @@ const MEDICINE_PERMISSIONS = {
   staff: { adjust: true, add: true }
 };
 
+const CONSULTATION_PERMISSIONS = {
+  doctor: { consult: true, prescribe: true }
+};
+
 function canAdjustMedicineInventory(role = getSessionRole()) {
   const key = (role || '').toLowerCase();
   return Boolean(MEDICINE_PERMISSIONS[key]?.adjust);
@@ -482,6 +696,25 @@ function canAdjustMedicineInventory(role = getSessionRole()) {
 function canAddNewMedicine(role = getSessionRole()) {
   const key = (role || '').toLowerCase();
   return Boolean(MEDICINE_PERMISSIONS[key]?.add);
+}
+
+function canConsultPatients(role = getSessionRole()) {
+  const key = (role || '').toLowerCase();
+  return Boolean(CONSULTATION_PERMISSIONS[key]?.consult);
+}
+
+function canCreatePrescriptions(role = getSessionRole()) {
+  const key = (role || '').toLowerCase();
+  return Boolean(CONSULTATION_PERMISSIONS[key]?.prescribe);
+}
+
+function applyConsultationAccess() {
+  const canConsult = canConsultPatients();
+  const consultBtn = document.getElementById('open-consult-modal-btn');
+  if (consultBtn) {
+    consultBtn.classList.toggle('hidden', !canConsult);
+    consultBtn.disabled = !canConsult;
+  }
 }
 
 window.addEventListener('pageshow', async (event) => {
@@ -512,6 +745,16 @@ if (searchInput) {
 
 // Dropdown toggle + unified nav handler (no more overlaps)
 const navContainer = document.querySelector('.nav');
+
+function closeSidebarDropdownMenus(exceptItem = null) {
+  document.querySelectorAll('.nav-item.dropdown').forEach((item) => {
+    if (exceptItem && item === exceptItem) return;
+    item.classList.remove('open');
+    const menu = item.querySelector('.dropdown-menu');
+    if (menu) menu.classList.add('hidden');
+  });
+}
+
 if (navContainer) {
   navContainer.addEventListener('click', (e) => {
     const el = e.target.closest('[data-section], .nav-btn');
@@ -532,12 +775,17 @@ if (navContainer) {
 
     // Keep submenu parent open while navigating within dropdown items.
     if (isDropdownItem && activeMenu) {
+      closeSidebarDropdownMenus(parentItem);
       activeMenu.classList.remove('hidden');
+      if (parentItem) parentItem.classList.add('open');
     }
 
     // Toggle dropdown when clicking a nav button.
     if (isDropdownBtn && activeMenu) {
-      activeMenu.classList.toggle('hidden');
+      const willOpen = activeMenu.classList.contains('hidden');
+      closeSidebarDropdownMenus(parentItem);
+      activeMenu.classList.toggle('hidden', !willOpen);
+      if (parentItem) parentItem.classList.toggle('open', willOpen);
     }
 
     // Nav activation logic
@@ -552,6 +800,8 @@ if (navContainer) {
       if (isDropdownItem && parentItem) {
         const parentBtn = parentItem.querySelector('.nav-btn');
         if (parentBtn) parentBtn.classList.add('is-active');
+      } else if (!isDropdownBtn) {
+        closeSidebarDropdownMenus();
       }
 
       showSection(sectionId || el.getAttribute('data-section'), sectionOptions);
@@ -562,7 +812,7 @@ if (navContainer) {
 document.addEventListener('click', (event) => {
   if (!sidebar) return;
   if (sidebar.contains(event.target)) return;
-  document.querySelectorAll('.dropdown-menu').forEach((menu) => menu.classList.add('hidden'));
+  closeSidebarDropdownMenus();
 });
 
 function parseDateValue(value) {
@@ -590,25 +840,34 @@ function getTodayNotifications() {
 
   latestAnnouncementsList.forEach((announcement) => {
     if (!isToday(announcement?.date)) return;
+    const parsedDate = parseDateValue(announcement?.date);
+    const id = `announcement:${announcement?.id || announcement?.title || ''}:${parsedDate ? parsedDate.toISOString().slice(0, 10) : ''}`;
     items.push({
+      id,
       type: 'Announcement',
       title: announcement?.title || 'Announcement',
       detail: announcement?.preview || announcement?.content || '',
-      date: parseDateValue(announcement?.date)
+      date: parsedDate
     });
   });
 
   latestFeedbackList.forEach((feedback) => {
     if (!isToday(feedback?.date)) return;
+    const parsedDate = parseDateValue(feedback?.date);
+    const id = `feedback:${feedback?.id || feedback?.subject || ''}:${parsedDate ? parsedDate.toISOString().slice(0, 10) : ''}`;
     items.push({
+      id,
       type: 'Feedback',
       title: feedback?.subject || 'Feedback received',
       detail: feedback?.from || 'Anonymous',
-      date: parseDateValue(feedback?.date)
+      date: parsedDate
     });
   });
 
-  return items.sort((a, b) => {
+  const dismissed = getDismissedNotificationIds();
+  return items
+    .filter((item) => !dismissed.has(String(item.id)))
+    .sort((a, b) => {
     const aTime = a.date ? a.date.getTime() : 0;
     const bTime = b.date ? b.date.getTime() : 0;
     return bTime - aTime;
@@ -629,14 +888,20 @@ function populateNotificationPanel() {
 
   items.forEach((item) => {
     const li = document.createElement('li');
+    li.style.display = 'flex';
+    li.style.justifyContent = 'space-between';
+    li.style.alignItems = 'flex-start';
+
+    const body = document.createElement('div');
+    body.style.flex = '1';
     const typeLabel = document.createElement('span');
     typeLabel.className = 'notif-type';
     typeLabel.textContent = item.type;
-    li.appendChild(typeLabel);
+    body.appendChild(typeLabel);
 
     const strong = document.createElement('strong');
     strong.textContent = item.title;
-    li.appendChild(strong);
+    body.appendChild(strong);
 
     const meta = document.createElement('span');
     meta.className = 'notif-meta';
@@ -644,7 +909,26 @@ function populateNotificationPanel() {
       ? item.date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
       : 'Today';
     meta.textContent = item.detail ? `${timeStamp} • ${item.detail}` : timeStamp;
-    li.appendChild(meta);
+    body.appendChild(meta);
+
+    li.appendChild(body);
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.textContent = '×';
+    clearBtn.setAttribute('aria-label', 'Clear notification');
+    clearBtn.style.background = 'transparent';
+    clearBtn.style.border = 'none';
+    clearBtn.style.cursor = 'pointer';
+    clearBtn.style.fontSize = '18px';
+    clearBtn.style.lineHeight = '1';
+    clearBtn.style.color = '#8a93a0';
+    clearBtn.style.marginLeft = '10px';
+    clearBtn.addEventListener('click', () => {
+      dismissNotification(item.id);
+      populateNotificationPanel();
+    });
+    li.appendChild(clearBtn);
 
     notificationList.appendChild(li);
   });
@@ -707,7 +991,7 @@ async function showSection(sectionId, options = {}) {
         break;
       case 'dashboard-section':
         if (isAdminUser(user) && latestStaffList.length === 0) {
-          await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData()]);
+          await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData(), refreshFeedbackData()]);
         }
         renderDashboardInsights();
         break;
@@ -716,18 +1000,24 @@ async function showSection(sectionId, options = {}) {
     const { tab, pane } = options;
 
     if (sectionId === 'users-section') {
+      const defaultPane = isAdminUser(user) ? 'registered-pane' : 'citizens-pane';
+      const targetPane = pane || defaultPane;
+
       if (isAdminUser(user) && latestStaffList.length === 0) {
         await loadStaffData();
       }
-      if (latestPatientsList.length === 0) {
+
+      // Always refresh citizens when opening the Citizens pane (or for non-admin default view)
+      // to avoid stale/empty first-render tables.
+      if (targetPane === 'citizens-pane' || !isAdminUser(user) || latestPatientsList.length === 0) {
         await loadPatientData();
       }
+
       if (pane === 'registration-pane') {
         toggleUsersPane('registration-pane');
       } else {
         toggleUsersPane('accounts-pane');
-        const defaultPane = isAdminUser(user) ? 'registered-pane' : 'citizens-pane';
-        revealPane(pane || defaultPane);
+        revealPane(targetPane);
       }
     } else if (pane) {
       revealPane(pane);
@@ -1103,7 +1393,6 @@ function populateProfile(user) {
   const role = document.getElementById('profile-role');
   const specializationField = document.getElementById('profile-specialization-field');
   const specializationInput = document.getElementById('profile-specialization');
-  const preview = document.getElementById('profile-pic-preview');
 
   if (name) name.value = user?.first_name || user?.username || '';
   if (email) email.value = user?.email || '';
@@ -1115,50 +1404,7 @@ function populateProfile(user) {
     specializationInput.value = isDoctor ? getSpecializationValue(user) : '';
     specializationInput.required = isDoctor;
   }
-
-  if (preview) {
-    preview.innerHTML = '';
-    const storedPicture = getStoredProfilePicture(user);
-    if (storedPicture || user?.profilePicture) {
-      const img = document.createElement('img');
-      img.src = storedPicture || user.profilePicture;
-      img.style.maxWidth = '120px';
-      img.style.borderRadius = '6px';
-      preview.appendChild(img);
-    }
-  }
-}
-
-function getProfilePictureStorageKey(user) {
-  const userId = String(user?.id || '').trim();
-  const email = String(user?.email || '').trim().toLowerCase();
-  return `ukonek.profile.picture.${userId || email || 'current'}`;
-}
-
-function getStoredProfilePicture(user) {
-  try {
-    return localStorage.getItem(getProfilePictureStorageKey(user)) || '';
-  } catch (_) {
-    return '';
-  }
-}
-
-function persistProfilePicture(user, dataUrl) {
-  if (!dataUrl) return;
-  try {
-    localStorage.setItem(getProfilePictureStorageKey(user), dataUrl);
-  } catch (error) {
-    console.warn('Unable to persist profile picture locally:', error);
-  }
-}
-
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('Unable to read selected file.'));
-    reader.readAsDataURL(file);
-  });
+  applyRoleLogos(user?.role || 'staff');
 }
 
 async function saveMyProfileToSupabase({ displayName, role, specialization }) {
@@ -1179,21 +1425,6 @@ async function saveMyProfileToSupabase({ displayName, role, specialization }) {
   return data;
 }
 
-const profilePicInput = document.getElementById('profile-pic');
-if (profilePicInput) {
-  profilePicInput.addEventListener('change', (e) => {
-    const preview = document.getElementById('profile-pic-preview');
-    preview.innerHTML = '';
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const img = document.createElement('img');
-    img.src = URL.createObjectURL(file);
-    img.style.maxWidth = '120px';
-    img.style.borderRadius = '6px';
-    preview.appendChild(img);
-  });
-}
-
 const profileSaveBtn = document.getElementById('profile-save-btn');
 if (profileSaveBtn) {
   profileSaveBtn.addEventListener('click', async () => {
@@ -1201,7 +1432,6 @@ if (profileSaveBtn) {
     const email = document.getElementById('profile-email').value.trim();
     const role = String(document.getElementById('profile-role')?.value || '').trim().toLowerCase();
     const specializationValue = String(document.getElementById('profile-specialization')?.value || '').trim();
-    const fileInput = document.getElementById('profile-pic');
 
     const form = new FormData();
     form.append('displayName', name);
@@ -1217,12 +1447,6 @@ if (profileSaveBtn) {
     if (role === 'doctor' && !specializationValue) {
       showToast('Doctor specialization is required.', 'error');
       return;
-    }
-
-    let profilePictureDataUrl = '';
-    if (fileInput && fileInput.files && fileInput.files[0]) {
-      form.append('avatar', fileInput.files[0]);
-      profilePictureDataUrl = await readFileAsDataUrl(fileInput.files[0]);
     }
 
     try {
@@ -1260,22 +1484,10 @@ if (profileSaveBtn) {
         doctor_specialization: role === 'doctor' ? specializationValue : null
       };
 
-      if (profilePictureDataUrl) {
-        persistProfilePicture(cachedSessionUser, profilePictureDataUrl);
-        cachedSessionUser.profilePicture = profilePictureDataUrl;
-      }
-
       const user = await ensureAuthenticatedSession(true);
       if (user) {
-        if (profilePictureDataUrl) {
-          user.profilePicture = profilePictureDataUrl;
-        }
         populateProfile(user);
         applyRoleAccess(user);
-      }
-
-      if (fileInput) {
-        fileInput.value = '';
       }
 
       showToast('Profile updated', 'success');
@@ -1308,8 +1520,6 @@ if (profileCancelBtn) {
     else {
       const form = document.getElementById('profile-form');
       if (form) form.reset();
-      const preview = document.getElementById('profile-pic-preview');
-      if (preview) preview.innerHTML = '';
     }
   });
 }
@@ -1398,12 +1608,33 @@ function isPastScheduleDateValue(value) {
   return dateText < getTodayScheduleDateKey();
 }
 
+function isScheduleExpired(entry) {
+  const scheduleDate = String(entry?.schedule_date || entry?.date || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(scheduleDate)) return false;
+
+  if (isPastScheduleDateValue(scheduleDate)) return true;
+
+  const today = getTodayScheduleDateKey();
+  if (scheduleDate !== today) return false;
+
+  const end = normalizeTimeHHMM(entry?.end_time || '');
+  if (!end) return false;
+
+  const [endHour, endMinute] = end.split(':').map((item) => Number(item));
+  if (!Number.isFinite(endHour) || !Number.isFinite(endMinute)) return false;
+
+  const now = new Date();
+  const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+  const endMinutes = (endHour * 60) + endMinute;
+  return endMinutes < nowMinutes;
+}
+
 async function purgePastSchedules(records, user, source = 'doctor_schedules') {
   const normalized = Array.isArray(records) ? records : [];
-  const expired = normalized.filter((entry) => isPastScheduleDateValue(entry?.schedule_date || entry?.date));
+  const expired = normalized.filter((entry) => isScheduleExpired(entry));
 
   // Always keep expired items out of the live UI list.
-  const activeRecords = normalized.filter((entry) => !isPastScheduleDateValue(entry?.schedule_date || entry?.date));
+  const activeRecords = normalized.filter((entry) => !isScheduleExpired(entry));
 
   if (!expired.length) return activeRecords;
 
@@ -1829,7 +2060,13 @@ function renderSchedules(schedules, user, doctors = []) {
       delBtn.className = 'btn small btn-delete admin-only';
       delBtn.textContent = 'Delete';
       delBtn.addEventListener('click', async () => {
-        if (!confirm('Delete this schedule?')) return;
+        const confirmation = await openDialogModal({
+          title: 'Delete Schedule',
+          message: 'Delete this schedule?',
+          confirmText: 'Delete',
+          cancelText: 'Cancel'
+        });
+        if (!confirmation.confirmed) return;
         try {
           await deleteScheduleRecordById(schedule.id);
           showToast('Schedule deleted', 'success');
@@ -1969,11 +2206,12 @@ if (schedForm) {
 
       closeScheduleModal();
       initProfileAndSchedule();
+      navigateToSection('schedule-section');
 
       if (id) {
         showToast('Schedule updated', 'success');
       } else {
-        showScheduleSuccessModal();
+        showToast('Schedule created successfully', 'success');
       }
     } catch (err) {
       console.error(err);
@@ -1988,12 +2226,19 @@ if (schedDeleteBtn) {
   schedDeleteBtn.addEventListener('click', async () => {
     const id = document.getElementById('sched-id').value;
     if (!id) return;
-    if (!confirm('Delete this schedule?')) return;
+    const confirmation = await openDialogModal({
+      title: 'Delete Schedule',
+      message: 'Delete this schedule?',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    });
+    if (!confirmation.confirmed) return;
     try {
       await deleteScheduleRecordById(id);
       showToast('Schedule deleted', 'success');
       closeScheduleModal();
       initProfileAndSchedule();
+      navigateToSection('schedule-section');
     } catch (err) {
       console.error(err);
       showToast('Unable to delete schedule', 'error');
@@ -2020,8 +2265,7 @@ async function initializeDashboard() {
   // Master init - call all content population functions
   initProfileAndSchedule();
   initClinicalData();
-  await refreshAnnouncementsData();
-  renderFeedbacks();
+  await Promise.all([refreshAnnouncementsData(), refreshFeedbackData()]);
   await initDashboardData();
 }
 
@@ -2173,7 +2417,7 @@ if (tabFeedback && tabAnnouncements && feedbackPane && announcementsPane) {
 const reportsRefreshBtn = document.getElementById('reports-refresh-btn');
 if (reportsRefreshBtn) {
   reportsRefreshBtn.addEventListener('click', async () => {
-    await refreshAnnouncementsData();
+    await Promise.all([refreshAnnouncementsData(), refreshFeedbackData()]);
     showToast('Reports data refreshed.', 'info');
   });
 }
@@ -2204,6 +2448,8 @@ function openEditAnnouncementModal(announcement) {
   if (editAnnIdInput) editAnnIdInput.value = String(announcement.id || '');
   if (editAnnTitleInput) editAnnTitleInput.value = String(announcement.title || '').trim();
   if (editAnnContentInput) editAnnContentInput.value = String(announcement.content || announcement.body || '').trim();
+  const visibilitySelect = document.getElementById('edit-ann-visibility');
+  if (visibilitySelect) visibilitySelect.value = String(announcement.visibility || 'all').trim();
   if (editAnnFormError) editAnnFormError.style.display = 'none';
 
   editAnnouncementModal.classList.remove('hidden');
@@ -2246,6 +2492,7 @@ if (createAnnouncementForm && annSubmitBtn) {
     e.preventDefault();
     const title = document.getElementById('ann-title').value.trim();
     const content = document.getElementById('ann-content').value.trim();
+    const visibility = (document.getElementById('ann-visibility')?.value || 'all').trim();
 
     if (!title || !content) {
       if (annFormError) {
@@ -2262,7 +2509,7 @@ if (createAnnouncementForm && annSubmitBtn) {
     if (label) label.textContent = 'PUBLISHING...';
 
     try {
-      await createAnnouncementEntry({ title, content });
+      await createAnnouncementEntry({ title, content, visibility });
       await refreshAnnouncementsData();
       renderDashboardInsights();
 
@@ -2304,6 +2551,7 @@ if (editAnnouncementForm && editAnnSubmitBtn) {
     const announcementId = String(editAnnIdInput?.value || '').trim();
     const title = String(editAnnTitleInput?.value || '').trim();
     const content = String(editAnnContentInput?.value || '').trim();
+    const visibility = (document.getElementById('edit-ann-visibility')?.value || 'all').trim();
 
     if (!announcementId || !title || !content) {
       if (editAnnFormError) {
@@ -2320,12 +2568,11 @@ if (editAnnouncementForm && editAnnSubmitBtn) {
     if (label) label.textContent = 'SAVING...';
 
     try {
-      await updateAnnouncementEntry(announcementId, { title, content });
+      await updateAnnouncementEntry(announcementId, { title, content, visibility });
       await refreshAnnouncementsData();
       renderDashboardInsights();
 
       closeEditAnnouncementModal();
-      closeDataDetail();
       showToast('Announcement updated successfully.', 'success');
     } catch (error) {
       console.error('Error updating announcement:', error);
@@ -2352,6 +2599,7 @@ if (createAnnouncementTopBtn && createAnnouncementModal) {
 // Announcement detail modal logic
 const announcementDetailModal = document.getElementById('announcement-detail-modal');
 const announcementDetailClose = document.getElementById('announcement-detail-close');
+const announcementDetailDelete = document.getElementById('announcement-detail-delete');
 const announcementDetailTitle = document.getElementById('announcement-detail-title');
 const announcementDetailBody = document.getElementById('announcement-detail-body');
 const announcementDetailDate = document.getElementById('announcement-detail-date');
@@ -2486,16 +2734,53 @@ document.addEventListener('keydown', (event) => {
   if (notificationPanel && !notificationPanel.classList.contains('hidden')) {
     hideNotificationPanel();
   }
+  if (dialogModal && !dialogModal.classList.contains('hidden')) {
+    closeDialogModal({ confirmed: false, values: [] });
+  }
 });
 
 if (announcementDetailModal) {
   announcementDetailModal.addEventListener('click', (e) => {
     if (e.target === announcementDetailModal || e.target.classList.contains('modal-close')) {
       announcementDetailModal.classList.add('hidden');
+      currentAnnouncementDetail = null;
     }
   });
 }
-if (announcementDetailClose) announcementDetailClose.addEventListener('click', () => announcementDetailModal.classList.add('hidden'));
+if (announcementDetailClose) {
+  announcementDetailClose.addEventListener('click', () => {
+    announcementDetailModal.classList.add('hidden');
+    currentAnnouncementDetail = null;
+  });
+}
+
+if (announcementDetailDelete) {
+  announcementDetailDelete.addEventListener('click', async () => {
+    if (!isAdminUser(cachedSessionUser)) return;
+    const announcementId = currentAnnouncementDetail?.id;
+    if (!announcementId) return;
+
+    const confirmation = await openDialogModal({
+      title: 'Delete Announcement',
+      message: 'Delete this announcement? This cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    });
+    if (!confirmation.confirmed) return;
+
+    try {
+      await deleteAnnouncementEntry(announcementId);
+      await refreshAnnouncementsData();
+      renderDashboardInsights();
+      announcementDetailModal.classList.add('hidden');
+      currentAnnouncementDetail = null;
+      showToast('Announcement deleted successfully.', 'success');
+    } catch (error) {
+      console.error('Error deleting announcement:', error);
+      showToast(error.message || 'Failed to delete announcement.', 'error');
+    }
+  });
+}
 
 
 
@@ -2682,9 +2967,6 @@ function renderDashboardInsights() {
   const announcementsCount = latestAnnouncementsList.length || 0;
   if (statAnnouncements) statAnnouncements.textContent = String(announcementsCount);
 
-  if (!latestFeedbackList.length) {
-    latestFeedbackList = loadFeedbacks();
-  }
   const feedbackCount = latestFeedbackList.length || 0;
   if (statReports) statReports.textContent = String(feedbackCount);
 
@@ -2730,8 +3012,6 @@ function renderDashboardChart() {
   if (!canvas || typeof canvas.getContext !== 'function') return;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-
-  if (!latestFeedbackList.length) latestFeedbackList = loadFeedbacks();
 
   const metrics = [
     { label: 'Staff', value: latestStaffList.length, color: '#3b82f6' },
@@ -3099,7 +3379,7 @@ window.addEventListener('beforeunload', () => {
 if (dashRefreshBtn) {
   dashRefreshBtn.addEventListener('click', async () => {
     storedAccounts.clear();
-    await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData()]);
+    await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData(), refreshFeedbackData()]);
     showToast('Dashboard data refreshed.', 'info');
   });
 }
@@ -3107,7 +3387,7 @@ if (dashRefreshBtn) {
 if (refreshAccountsBtn) {
   refreshAccountsBtn.addEventListener('click', async () => {
     storedAccounts.clear();
-    await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData()]);
+    await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData(), refreshFeedbackData()]);
     showToast('Account tables refreshed.', 'info');
   });
 }
@@ -3490,11 +3770,28 @@ if (resetPasswordBtn) {
       return;
     }
 
-    const newPassword = window.prompt('Enter a new password (minimum 8 characters):', '');
-    if (newPassword === null) return;
+    const passwordDialog = await openDialogModal({
+      title: 'Reset Password',
+      message: 'Enter and confirm the new password (minimum 8 characters).',
+      confirmText: 'Reset Password',
+      cancelText: 'Cancel',
+      inputs: [
+        {
+          label: 'New Password',
+          type: 'password',
+          placeholder: 'Minimum 8 characters'
+        },
+        {
+          label: 'Confirm Password',
+          type: 'password',
+          placeholder: 'Re-enter new password'
+        }
+      ]
+    });
+    if (!passwordDialog.confirmed) return;
 
-    const confirmPassword = window.prompt('Confirm the new password:', '');
-    if (confirmPassword === null) return;
+    const newPassword = String(passwordDialog.values?.[0] || '');
+    const confirmPassword = String(passwordDialog.values?.[1] || '');
 
     if (newPassword !== confirmPassword) {
       showToast('Passwords do not match.', 'error');
@@ -3695,14 +3992,21 @@ const medicineSection = document.getElementById('medicine-section');
 const medicineForm = document.getElementById('medicine-form');
 const medicineTbody = document.getElementById('medicine-tbody');
 const medicineReportBtn = document.getElementById('medicine-report-btn');
+const medicineArchivedToggleBtn = document.getElementById('medicine-archived-toggle-btn');
+const medicineArchivedPanel = document.getElementById('medicine-archived-panel');
+const medicineArchivedTbody = document.getElementById('medicine-archived-tbody');
 
 function openConsultationModal(prefill = {}) {
   if (!consultationModal) return;
   if (consultationForm) consultationForm.reset();
-  if (prefill.patientId) {
-    const patientInput = document.getElementById('consult-patient-id');
-    if (patientInput) patientInput.value = prefill.patientId;
-  }
+  const patientInput = document.getElementById('consult-patient-id');
+  const symptomsInput = document.getElementById('consult-symptoms');
+  const diagnosisInput = document.getElementById('consult-diagnosis');
+  const notesInput = document.getElementById('consult-notes');
+  if (patientInput && prefill.patientId) patientInput.value = prefill.patientId;
+  if (symptomsInput && prefill.symptoms) symptomsInput.value = prefill.symptoms;
+  if (diagnosisInput && prefill.diagnosis) diagnosisInput.value = prefill.diagnosis;
+  if (notesInput && prefill.notes) notesInput.value = prefill.notes;
   consultationModal.classList.remove('hidden');
 }
 
@@ -3713,7 +4017,13 @@ function closeConsultationModal() {
 }
 
 if (openConsultModalBtn) {
-  openConsultModalBtn.addEventListener('click', () => openConsultationModal());
+  openConsultModalBtn.addEventListener('click', () => {
+    if (!canConsultPatients()) {
+      showToast('Only doctors can create consultations.', 'warning');
+      return;
+    }
+    openConsultationModal();
+  });
 }
 
 if (consultationCancelBtn) {
@@ -3727,61 +4037,11 @@ if (consultationModal) {
 }
 
 let consultations = [];
+let consultationQueueTickets = [];
 let medicines = [];
+let archivedMedicines = [];
 let prescriptions = [];
-
-// === DUMMY DATA ARRAYS ===
-const DUMMY_CONSULTATIONS = [
-  {
-    id: 'C-20240101',
-    patientId: 'CIT-1001',
-    symptoms: 'Fever, dry cough, fatigue',
-    diagnosis: 'Seasonal Influenza',
-    notes: 'Advise rest and plenty of fluids. Prescribe antiviral if symptoms persist.',
-    created_at: '2024-12-10T09:15:00Z'
-  },
-  {
-    id: 'C-20240115',
-    patientId: 'CIT-1042',
-    symptoms: 'Persistent headache and blurred vision',
-    diagnosis: 'Hypertension monitoring',
-    notes: 'Adjust maintenance meds. Schedule follow-up in two weeks.',
-    created_at: '2024-12-12T13:40:00Z'
-  },
-  {
-    id: 'C-20240128',
-    patientId: 'CIT-1110',
-    symptoms: 'Shortness of breath, mild chest tightness',
-    diagnosis: 'Asthma exacerbation',
-    notes: 'Nebulization done onsite. Prescribe inhaled corticosteroid.',
-    created_at: '2024-12-15T08:05:00Z'
-  }
-];
-
-const DUMMY_MEDICINES = [
-  { name: 'Paracetamol 500mg', qty: 150, unit: 'tabs' },
-  { name: 'Amoxicillin 500mg', qty: 80, unit: 'capsules' },
-  { name: 'Ibuprofen 400mg', qty: 120, unit: 'tabs' },
-  { name: 'Metformin 500mg', qty: 200, unit: 'tabs' },
-  { name: 'Amlodipine 5mg', qty: 90, unit: 'tabs' },
-  { name: 'Salbutamol Inhaler', qty: 25, unit: 'units' },
-  { name: 'Insulin 100IU/ml', qty: 12, unit: 'vials' },
-  { name: 'Losartan 50mg', qty: 75, unit: 'tabs' },
-  { name: 'Atorvastatin 20mg', qty: 60, unit: 'tabs' }
-];
-
-const DUMMY_FEEDBACKS = [
-  { id: 'F001', from: 'patient123@example.com', subject: 'Excellent service!', date: '2024-10-14', rating: 5 },
-  { id: 'F002', from: 'john.doe@email.com', subject: 'Long wait time', date: '2024-10-13', rating: 3 },
-  { id: 'F003', from: 'sarah.wilson@outlook.com', subject: 'Very professional doctor', date: '2024-10-12', rating: 5 },
-  { id: 'F004', from: 'mike.johnson@gmail.com', subject: 'Prescription issue', date: '2024-10-11', rating: 2 },
-  { id: 'F005', from: 'emily.chen@yahoo.com', subject: 'Great follow-up care', date: '2024-10-10', rating: 4 },
-  { id: 'F006', from: 'david.lee@protonmail.com', subject: 'Clean facility, friendly staff', date: '2024-10-09', rating: 5 },
-  { id: 'F007', from: 'lisa.martinez@icloud.com', subject: 'Billing confusion', date: '2024-10-08', rating: 3 },
-  { id: 'F008', from: 'robert.taylor@gmail.com', subject: 'Outstanding emergency service', date: '2024-10-07', rating: 5 },
-  { id: 'F009', from: 'anna.kovacs@hotmail.com', subject: 'Appointment scheduling easy', date: '2024-10-06', rating: 4 }
-];
-
+let isArchivedMedicinesVisible = false;
 
 function loadFromStorage(key) {
   try {
@@ -3799,20 +4059,58 @@ function saveToStorage(key, data) {
 
 function renderConsultations() {
   if (!consultationsTbody) return;
+  const allowPrescribe = canCreatePrescriptions();
+  const allowConsult = canConsultPatients();
+  const combinedRows = [...consultationQueueTickets, ...consultations];
   consultationsTbody.innerHTML = '';
-  consultations.slice().reverse().forEach(c => {
+  if (!Array.isArray(combinedRows) || combinedRows.length === 0) {
+    consultationsTbody.innerHTML = '<tr><td class="table-cell" colspan="5">No consultations or now serving patients yet.</td></tr>';
+    return;
+  }
+  const consultationRows = consultations.slice().reverse();
+  const orderedRows = [...consultationQueueTickets, ...consultationRows];
+
+  orderedRows.forEach(c => {
+    const isQueueServing = c.rowType === 'queue-serving';
+    const diagnosisText = isQueueServing ? 'Awaiting consultation' : (c.diagnosis || '').substring(0, 60);
+    const actionButtons = isQueueServing
+      ? `${allowConsult ? `<button class="btn small" data-action="consult" data-id="${c.id}">Consult</button>` : ''}`
+      : `
+        <button class="btn small" data-action="view" data-id="${c.id}">View</button>
+        ${allowPrescribe ? `<button class="btn small outline" data-action="prescribe" data-id="${c.id}">Prescribe</button>` : ''}
+      `;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="table-cell">${c.id}</td>
       <td class="table-cell">${c.patientId}</td>
-      <td class="table-cell">${(c.diagnosis||'').substring(0,60)}</td>
+      <td class="table-cell">${diagnosisText}</td>
       <td class="table-cell">${formatDateTime(c.created_at)}</td>
       <td class="table-cell">
-        <button class="btn small" data-action="view" data-id="${c.id}">View</button>
-        <button class="btn small outline" data-action="prescribe" data-id="${c.id}">Prescribe</button>
+        ${actionButtons}
       </td>
     `;
     consultationsTbody.appendChild(tr);
+
+    if (isQueueServing) {
+      attachDetailRow(tr, () => ({
+        tag: 'Now Serving',
+        title: c.patientId || 'Queue Patient',
+        subtitle: c.id,
+        items: [
+          { label: 'Queue Ticket', value: c.id },
+          { label: 'Patient ID', value: c.patientId },
+          { label: 'Queue Number', value: c.queueNumber > 0 ? `#${String(c.queueNumber).padStart(3, '0')}` : '—' },
+          { label: 'Service', value: c.serviceLabel || '—' },
+          { label: 'Symptoms', value: c.symptoms || '—' },
+          { label: 'Reason', value: c.notes || '—' },
+          { label: 'Status', value: c.queueStatus || 'serving' },
+          { label: 'Since', value: new Date(c.created_at) }
+        ]
+      }));
+      return;
+    }
+
     attachDetailRow(tr, () => ({
       tag: 'Consultation',
       title: c.patientId || 'Consultation Record',
@@ -3829,12 +4127,262 @@ function renderConsultations() {
   });
 }
 
+function mapConsultationRow(item) {
+  const consultationId = String(item?.id || '').trim();
+  return {
+    id: consultationId ? `C-${consultationId}` : `C-${Date.now()}`,
+    dbId: Number(item?.id) || null,
+    rowType: 'consultation',
+    patientId: String(item?.patient_identifier || item?.patient_id || '').trim(),
+    symptoms: String(item?.symptoms || '').trim(),
+    diagnosis: String(item?.diagnosis || '').trim(),
+    notes: String(item?.notes || '').trim(),
+    created_at: item?.consulted_at || item?.created_at || new Date().toISOString(),
+    doctor_staff_id: Number(item?.doctor_staff_id) || null
+  };
+}
+
+function mapNowServingQueueRow(item) {
+  const ticketId = Number(item?.id) || 0;
+  const citizenId = Number(item?.citizen?.id || 0);
+  const patientId = citizenId > 0
+    ? `CIT-${citizenId}`
+    : (String(item?.ticket_code || '').trim() || `QUEUE-${ticketId || Date.now()}`);
+  const queueNumber = Number(item?.queue_number || 0);
+  const serviceLabel = String(item?.service_label || '').trim() || 'General Consultation';
+  const status = String(item?.status || '').trim().toLowerCase();
+
+  return {
+    id: ticketId > 0 ? `Q-${ticketId}` : `Q-${Date.now()}`,
+    dbId: null,
+    rowType: 'queue-serving',
+    queueTicketId: ticketId > 0 ? ticketId : null,
+    patientId,
+    symptoms: String(item?.symptoms || '').trim(),
+    diagnosis: '',
+    notes: String(item?.reason || '').trim(),
+    created_at: item?.served_at || item?.created_at || new Date().toISOString(),
+    serviceLabel,
+    queueNumber,
+    queueStatus: status || 'serving'
+  };
+}
+
+function resolveCitizenIdFromIdentifier(patientIdentifier) {
+  const raw = String(patientIdentifier || '').trim();
+  if (!raw) return null;
+  const directMatch = /^CIT-(\d+)$/i.exec(raw);
+  if (directMatch) {
+    const parsed = Number(directMatch[1]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return numeric;
+  }
+  return null;
+}
+
+async function listConsultationData() {
+  if (isDemoMode || isApiMode) {
+    const fallback = loadFromStorage('ukonek_consultations');
+    return Array.isArray(fallback) ? fallback : [];
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { data, error } = await supabase
+    .from('consultations')
+    .select('id,patient_identifier,symptoms,diagnosis,notes,consulted_at,created_at,doctor_staff_id')
+    .order('consulted_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load consultations.');
+  }
+
+  return (data || []).map(mapConsultationRow);
+}
+
+async function listNowServingQueueForConsultation() {
+  if (isDemoMode || isApiMode) {
+    return [];
+  }
+
+  const today = new Date();
+  const queueDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  const { supabase } = await loadSupabaseModule();
+  const { data, error } = await supabase
+    .from('queue_tickets')
+    .select('id,queue_number,ticket_code,service_label,status,reason,symptoms,created_at,served_at,citizen:citizens(id,firstname,surname,email)')
+    .eq('queue_date', queueDate)
+    .eq('status', 'serving')
+    .order('queue_number', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load now serving queue tickets.');
+  }
+
+  return (data || []).map(mapNowServingQueueRow);
+}
+
+async function refreshConsultationData() {
+  try {
+    const [consultationRows, queueRows] = await Promise.all([
+      listConsultationData(),
+      listNowServingQueueForConsultation()
+    ]);
+    consultations = consultationRows;
+    consultationQueueTickets = queueRows;
+  } catch (error) {
+    console.error('Failed to refresh consultations:', error);
+    consultations = [];
+    consultationQueueTickets = [];
+  }
+  renderConsultations();
+}
+
+async function createConsultationEntry({ patientId, symptoms, diagnosis, notes }) {
+  const cleanPatientId = String(patientId || '').trim();
+  const cleanSymptoms = String(symptoms || '').trim();
+  const cleanDiagnosis = String(diagnosis || '').trim();
+  const cleanNotes = String(notes || '').trim();
+
+  if (isDemoMode || isApiMode) {
+    const entry = {
+      id: `C-${Date.now()}`,
+      patientId: cleanPatientId,
+      symptoms: cleanSymptoms,
+      diagnosis: cleanDiagnosis,
+      notes: cleanNotes,
+      created_at: new Date().toISOString()
+    };
+    consultations.push(entry);
+    saveToStorage('ukonek_consultations', consultations);
+    return entry;
+  }
+
+  const doctorStaffId = Number(cachedSessionUser?.id) || null;
+  if (!doctorStaffId) {
+    throw new Error('Unable to resolve the logged-in doctor account.');
+  }
+
+  const payload = {
+    patient_identifier: cleanPatientId,
+    patient_citizen_id: resolveCitizenIdFromIdentifier(cleanPatientId),
+    doctor_staff_id: doctorStaffId,
+    symptoms: cleanSymptoms || null,
+    diagnosis: cleanDiagnosis,
+    notes: cleanNotes || null,
+    consulted_at: new Date().toISOString()
+  };
+
+  const { supabase } = await loadSupabaseModule();
+  const { data, error } = await supabase
+    .from('consultations')
+    .insert(payload)
+    .select('id,patient_identifier,symptoms,diagnosis,notes,consulted_at,created_at,doctor_staff_id')
+    .single();
+
+  if (error) {
+    throw new Error(error.message || 'Unable to save consultation.');
+  }
+
+  return mapConsultationRow(data);
+}
+
+async function createPrescriptionEntry({ patientId, consultationDbId, items }) {
+  const cleanPatientId = String(patientId || '').trim();
+  if (!cleanPatientId) {
+    throw new Error('Patient ID required.');
+  }
+
+  const normalizedItems = Array.isArray(items)
+    ? items
+        .map((it) => ({
+          name: String(it?.name || '').trim(),
+          qty: Number(it?.qty) || 0,
+          unit: String(it?.unit || '').trim(),
+          dosage: String(it?.dosage || '').trim(),
+          frequency: String(it?.frequency || '').trim(),
+          instructions: String(it?.instructions || '').trim(),
+          additionalInfo: String(it?.additionalInfo || '').trim()
+        }))
+        .filter((it) => it.name && it.qty > 0)
+    : [];
+
+  if (!normalizedItems.length) {
+    throw new Error('Add at least one medicine.');
+  }
+
+  if (isDemoMode || isApiMode) {
+    const pres = {
+      id: `P-${Date.now()}`,
+      patient: cleanPatientId,
+      items: normalizedItems,
+      created_at: new Date().toISOString()
+    };
+    prescriptions.push(pres);
+    saveToStorage('ukonek_prescriptions', prescriptions);
+    return pres;
+  }
+
+  const doctorStaffId = Number(cachedSessionUser?.id) || null;
+  if (!doctorStaffId) {
+    throw new Error('Unable to resolve the logged-in doctor account.');
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const headerPayload = {
+    consultation_id: Number.isFinite(Number(consultationDbId)) ? Number(consultationDbId) : null,
+    patient_identifier: cleanPatientId,
+    doctor_staff_id: doctorStaffId,
+    issued_at: new Date().toISOString()
+  };
+
+  const { data: header, error: headerError } = await supabase
+    .from('prescription_headers')
+    .insert(headerPayload)
+    .select('id')
+    .single();
+
+  if (headerError) {
+    throw new Error(headerError.message || 'Unable to create prescription header.');
+  }
+
+  const headerId = Number(header?.id) || null;
+  if (!headerId) {
+    throw new Error('Invalid prescription header ID.');
+  }
+
+  const itemRows = normalizedItems.map((it) => ({
+    prescription_id: headerId,
+    medicine_name: it.name,
+    quantity: it.qty,
+    unit: it.unit || null,
+    dosage: it.dosage || null,
+    frequency: it.frequency || null,
+    instructions: it.instructions || null,
+    additional_info: it.additionalInfo || null
+  }));
+
+  const { error: itemsError } = await supabase
+    .from('prescription_items')
+    .insert(itemRows);
+
+  if (itemsError) {
+    throw new Error(itemsError.message || 'Unable to save prescription items.');
+  }
+
+  return { id: `P-${headerId}`, patient: cleanPatientId, items: normalizedItems };
+}
+
 function renderMedicines() {
   if (!medicineTbody) return;
 
   const role = getSessionRole();
   const allowAdjust = canAdjustMedicineInventory(role);
   const allowAddNew = canAddNewMedicine(role);
+  const allowRemove = canAddNewMedicine(role);
 
   const medicineFormEl = document.getElementById('medicine-form');
   if (medicineFormEl) {
@@ -3846,6 +4394,10 @@ function renderMedicines() {
   }
 
   medicineTbody.innerHTML = '';
+  if (!Array.isArray(medicines) || medicines.length === 0) {
+    medicineTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No medicine inventory yet.</td></tr>';
+    return;
+  }
   medicines.forEach(m => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -3871,6 +4423,14 @@ function renderMedicines() {
 
       actionsTd.appendChild(addBtn);
       actionsTd.appendChild(subBtn);
+      if (allowRemove) {
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn small outline';
+        removeBtn.dataset.action = 'remove';
+        removeBtn.dataset.name = m.name;
+        removeBtn.textContent = 'Remove';
+        actionsTd.appendChild(removeBtn);
+      }
     } else {
       actionsTd.textContent = 'View only';
     }
@@ -3889,24 +4449,450 @@ function renderMedicines() {
   });
 }
 
-async function initClinicalData() {
-  await ensureAuthenticatedSession().catch(() => null);
-  consultations = loadFromStorage('ukonek_consultations');
-  if (!Array.isArray(consultations) || consultations.length === 0) {
-    consultations = [...DUMMY_CONSULTATIONS];
-    saveToStorage('ukonek_consultations', consultations);
+function mapMedicineRow(item) {
+  return {
+    id: Number(item?.id) || null,
+    name: String(item?.name || '').trim(),
+    qty: Math.max(0, Number(item?.qty) || 0),
+    unit: String(item?.unit || '').trim(),
+    archived_at: item?.archived_at || null,
+    created_at: item?.created_at || null,
+    updated_at: item?.updated_at || null
+  };
+}
+
+async function listMedicineData() {
+  if (isDemoMode || isApiMode) {
+    return [];
   }
 
-  medicines = loadFromStorage('ukonek_medicine_inventory');
-  if (!Array.isArray(medicines) || medicines.length === 0) {
-    medicines = [...DUMMY_MEDICINES];
-    saveToStorage('ukonek_medicine_inventory', medicines);
+  const { supabase } = await loadSupabaseModule();
+  const { data, error } = await supabase
+    .from('medicines')
+    .select('id,name,qty,unit,archived_at,created_at,updated_at')
+    .is('archived_at', null)
+    .order('name', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load medicines.');
   }
 
-  prescriptions = loadFromStorage('ukonek_prescriptions') || [];
-  renderConsultations();
+  return (data || []).map(mapMedicineRow);
+}
+
+async function listArchivedMedicineData() {
+  if (isDemoMode || isApiMode) {
+    return [];
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { data, error } = await supabase
+    .from('medicines')
+    .select('id,name,qty,unit,archived_at,created_at,updated_at')
+    .not('archived_at', 'is', null)
+    .order('archived_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load archived medicines.');
+  }
+
+  return (data || []).map(mapMedicineRow);
+}
+
+function renderArchivedMedicines() {
+  if (!medicineArchivedPanel || !medicineArchivedTbody || !medicineArchivedToggleBtn) return;
+
+  medicineArchivedPanel.classList.toggle('hidden', !isArchivedMedicinesVisible);
+  medicineArchivedToggleBtn.textContent = isArchivedMedicinesVisible ? 'Hide Archived' : 'Show Archived';
+
+  if (!isArchivedMedicinesVisible) {
+    return;
+  }
+
+  medicineArchivedTbody.innerHTML = '';
+  if (!Array.isArray(archivedMedicines) || archivedMedicines.length === 0) {
+    medicineArchivedTbody.innerHTML = '<tr><td class="table-cell" colspan="5">No archived medicines.</td></tr>';
+    return;
+  }
+
+  const canRestore = canAddNewMedicine(getSessionRole());
+  const canHardDelete = isAdminUser(cachedSessionUser);
+  archivedMedicines.forEach((m) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="table-cell">${m.name}</td>
+      <td class="table-cell">${m.qty}</td>
+      <td class="table-cell">${m.unit || ''}</td>
+      <td class="table-cell">${formatDateTime(m.archived_at)}</td>
+      <td class="table-cell"></td>
+    `;
+
+    const actionCell = tr.querySelector('td:last-child');
+    if (canRestore) {
+      const restoreBtn = document.createElement('button');
+      restoreBtn.className = 'btn small';
+      restoreBtn.dataset.action = 'restore';
+      restoreBtn.dataset.id = String(m.id || '');
+      restoreBtn.textContent = 'Restore';
+      actionCell.appendChild(restoreBtn);
+    }
+    if (canHardDelete) {
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn small outline';
+      deleteBtn.dataset.action = 'hard-delete';
+      deleteBtn.dataset.id = String(m.id || '');
+      deleteBtn.textContent = 'Delete Permanently';
+      actionCell.appendChild(deleteBtn);
+    }
+    if (!canRestore && !canHardDelete) {
+      actionCell.textContent = 'View only';
+    }
+
+    medicineArchivedTbody.appendChild(tr);
+  });
+}
+
+async function refreshArchivedMedicineData() {
+  try {
+    archivedMedicines = await listArchivedMedicineData();
+  } catch (error) {
+    console.error('Failed to refresh archived medicines:', error);
+    archivedMedicines = [];
+  }
+  renderArchivedMedicines();
+}
+
+async function refreshMedicineData() {
+  try {
+    medicines = await listMedicineData();
+  } catch (error) {
+    console.error('Failed to refresh medicines:', error);
+    medicines = [];
+  }
   renderMedicines();
 }
+
+async function upsertMedicineEntry({ name, qty, unit }) {
+  const cleanName = String(name || '').trim();
+  const cleanUnit = String(unit || '').trim();
+  const quantity = Math.max(0, Number(qty) || 0);
+  if (!cleanName) {
+    throw new Error('Medicine name required.');
+  }
+
+  if (isDemoMode || isApiMode) {
+    const idx = medicines.findIndex((m) => String(m.name || '').toLowerCase() === cleanName.toLowerCase());
+    if (idx >= 0) {
+      medicines[idx].qty = Number(medicines[idx].qty) + quantity;
+      medicines[idx].unit = cleanUnit || medicines[idx].unit;
+    } else {
+      medicines.push({ id: null, name: cleanName, qty: quantity, unit: cleanUnit });
+    }
+    return;
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const existing = medicines.find((m) => String(m.name || '').toLowerCase() === cleanName.toLowerCase()) || null;
+
+  if (existing?.id) {
+    const payload = {
+      qty: Math.max(0, Number(existing.qty || 0) + quantity),
+      unit: cleanUnit || existing.unit || null
+    };
+    const { error } = await supabase
+      .from('medicines')
+      .update(payload)
+      .eq('id', Number(existing.id));
+    if (error) {
+      throw new Error(error.message || 'Unable to update medicine.');
+    }
+    return;
+  }
+
+  const payload = {
+    name: cleanName,
+    qty: quantity,
+    unit: cleanUnit || null,
+    created_by_staff_id: Number(cachedSessionUser?.id) || null
+  };
+  const { error } = await supabase.from('medicines').insert(payload);
+  if (error) {
+    throw new Error(error.message || 'Unable to add medicine.');
+  }
+}
+
+async function adjustMedicineQuantityByName(name, delta) {
+  const target = medicines.find((m) => String(m.name || '') === String(name || ''));
+  if (!target?.id) return;
+
+  const nextQty = Math.max(0, Number(target.qty || 0) + Number(delta || 0));
+
+  if (isDemoMode || isApiMode) {
+    target.qty = nextQty;
+    return;
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { error } = await supabase
+    .from('medicines')
+    .update({ qty: nextQty })
+    .eq('id', Number(target.id));
+
+  if (error) {
+    throw new Error(error.message || 'Unable to update medicine quantity.');
+  }
+}
+
+async function addMedicineStockByName(name, amount) {
+  const qty = Number(amount) || 0;
+  if (qty <= 0) {
+    throw new Error('Add quantity must be greater than zero.');
+  }
+  await adjustMedicineQuantityByName(name, qty);
+}
+
+async function reduceMedicineStockByName(name, amount) {
+  const qty = Number(amount) || 0;
+  if (qty <= 0) {
+    throw new Error('Subtract quantity must be greater than zero.');
+  }
+  await adjustMedicineQuantityByName(name, -qty);
+}
+
+async function removeMedicineEntryByName(name) {
+  const target = medicines.find((m) => String(m.name || '') === String(name || ''));
+  if (!target) return;
+
+  if (isDemoMode || isApiMode) {
+    medicines = medicines.filter((m) => String(m.name || '') !== String(name || ''));
+    return;
+  }
+
+  if (!target.id) {
+    return;
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { error } = await supabase
+    .from('medicines')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', Number(target.id));
+
+  if (error) {
+    throw new Error(error.message || 'Unable to archive medicine.');
+  }
+}
+
+async function restoreMedicineEntryById(id) {
+  const targetId = Number(id);
+  if (!targetId) return;
+
+  if (isDemoMode || isApiMode) {
+    const target = archivedMedicines.find((m) => Number(m.id) === targetId);
+    if (!target) return;
+    archivedMedicines = archivedMedicines.filter((m) => Number(m.id) !== targetId);
+    medicines.push({ ...target, archived_at: null });
+    return;
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { error } = await supabase
+    .from('medicines')
+    .update({ archived_at: null })
+    .eq('id', targetId);
+
+  if (error) {
+    throw new Error(error.message || 'Unable to restore medicine.');
+  }
+}
+
+async function permanentlyDeleteArchivedMedicineById(id) {
+  const targetId = Number(id);
+  if (!targetId) return;
+
+  if (isDemoMode || isApiMode) {
+    archivedMedicines = archivedMedicines.filter((m) => Number(m.id) !== targetId);
+    return;
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { error } = await supabase
+    .from('medicines')
+    .delete()
+    .eq('id', targetId)
+    .not('archived_at', 'is', null);
+
+  if (error) {
+    throw new Error(error.message || 'Unable to permanently delete medicine.');
+  }
+}
+
+function getClinicalMigrationStorageKey() {
+  const userId = Number(cachedSessionUser?.id) || 0;
+  return `ukonek_clinical_migrated_v1_${userId}`;
+}
+
+function parseIsoOrNow(value) {
+  const parsed = new Date(String(value || '').trim());
+  if (Number.isNaN(parsed.getTime())) {
+    return new Date().toISOString();
+  }
+  return parsed.toISOString();
+}
+
+async function migrateLegacyClinicalStorageIfNeeded() {
+  if (isDemoMode || isApiMode) return;
+
+  const doctorStaffId = Number(cachedSessionUser?.id) || 0;
+  if (!doctorStaffId || !canConsultPatients()) return;
+
+  const migrationKey = getClinicalMigrationStorageKey();
+  try {
+    const rawMigrationState = localStorage.getItem(migrationKey);
+    if (rawMigrationState) {
+      const parsedState = JSON.parse(rawMigrationState);
+      if (parsedState && parsedState.hadFailure === false) {
+        return;
+      }
+    }
+  } catch (_) {
+    // Ignore parse issues and attempt migration again.
+  }
+
+  const legacyConsultations = loadFromStorage('ukonek_consultations');
+  const legacyPrescriptions = loadFromStorage('ukonek_prescriptions');
+  const consultList = Array.isArray(legacyConsultations) ? legacyConsultations : [];
+  const prescriptionList = Array.isArray(legacyPrescriptions) ? legacyPrescriptions : [];
+
+  const { supabase } = await loadSupabaseModule();
+  let hadFailure = false;
+
+  // Dedupe against existing records for this doctor to avoid duplicate migrations.
+  const { data: existingConsultations } = await supabase
+    .from('consultations')
+    .select('patient_identifier,diagnosis,consulted_at,doctor_staff_id')
+    .eq('doctor_staff_id', doctorStaffId);
+  const existingConsultationSet = new Set(
+    (existingConsultations || []).map((row) => {
+      const patientIdentifier = String(row?.patient_identifier || '').trim();
+      const diagnosis = String(row?.diagnosis || '').trim().toLowerCase();
+      const consultedAt = parseIsoOrNow(row?.consulted_at);
+      return `${patientIdentifier}::${diagnosis}::${consultedAt}`;
+    })
+  );
+
+  for (const entry of consultList) {
+    const patientIdentifier = String(entry?.patientId || '').trim();
+    const diagnosis = String(entry?.diagnosis || '').trim();
+    if (!patientIdentifier || !diagnosis) continue;
+
+    const consultedAt = parseIsoOrNow(entry?.created_at);
+    const dedupeKey = `${patientIdentifier}::${diagnosis.toLowerCase()}::${consultedAt}`;
+    if (existingConsultationSet.has(dedupeKey)) continue;
+
+    const payload = {
+      patient_identifier: patientIdentifier,
+      patient_citizen_id: resolveCitizenIdFromIdentifier(patientIdentifier),
+      doctor_staff_id: doctorStaffId,
+      symptoms: String(entry?.symptoms || '').trim() || null,
+      diagnosis,
+      notes: String(entry?.notes || '').trim() || null,
+      consulted_at: consultedAt
+    };
+
+    const { error } = await supabase.from('consultations').insert(payload);
+    if (error) {
+      hadFailure = true;
+      console.error('Legacy consultation migration failed:', error);
+      continue;
+    }
+
+    existingConsultationSet.add(dedupeKey);
+  }
+
+  for (const entry of prescriptionList) {
+    const patientIdentifier = String(entry?.patient || entry?.patientId || '').trim();
+    const items = Array.isArray(entry?.items) ? entry.items : [];
+    if (!patientIdentifier || !items.length) continue;
+
+    const issuedAt = parseIsoOrNow(entry?.created_at);
+    const { data: header, error: headerError } = await supabase
+      .from('prescription_headers')
+      .insert({
+        consultation_id: null,
+        patient_identifier: patientIdentifier,
+        doctor_staff_id: doctorStaffId,
+        issued_at: issuedAt
+      })
+      .select('id')
+      .single();
+
+    if (headerError) {
+      hadFailure = true;
+      console.error('Legacy prescription header migration failed:', headerError);
+      continue;
+    }
+
+    const prescriptionId = Number(header?.id) || 0;
+    if (!prescriptionId) {
+      hadFailure = true;
+      continue;
+    }
+
+    const itemRows = items
+      .map((it) => ({
+        prescription_id: prescriptionId,
+        medicine_name: String(it?.name || '').trim(),
+        quantity: Number(it?.qty) || 0,
+        unit: String(it?.unit || '').trim() || null
+      }))
+      .filter((it) => it.medicine_name && it.quantity > 0);
+
+    if (!itemRows.length) continue;
+
+    const { error: itemsError } = await supabase
+      .from('prescription_items')
+      .insert(itemRows);
+
+    if (itemsError) {
+      hadFailure = true;
+      console.error('Legacy prescription item migration failed:', itemsError);
+    }
+  }
+
+  if (!hadFailure) {
+    localStorage.removeItem('ukonek_consultations');
+    localStorage.removeItem('ukonek_prescriptions');
+  }
+
+  localStorage.setItem(
+    migrationKey,
+    JSON.stringify({
+      completedAt: new Date().toISOString(),
+      hadFailure
+    })
+  );
+}
+
+async function initClinicalData() {
+  await ensureAuthenticatedSession().catch(() => null);
+  await migrateLegacyClinicalStorageIfNeeded();
+  await refreshConsultationData();
+
+  await Promise.all([refreshMedicineData(), refreshArchivedMedicineData()]);
+
+  if (isDemoMode || isApiMode) {
+    prescriptions = loadFromStorage('ukonek_prescriptions') || [];
+  } else {
+    prescriptions = [];
+  }
+  renderConsultations();
+}
+
+document.addEventListener('ukonek:queue-updated', async () => {
+  if (!consultationSection || consultationSection.classList.contains('hidden')) return;
+  await refreshConsultationData();
+});
 
 function mapAnnouncementRow(item) {
   const content = String(item?.content || item?.body || item?.preview || '').trim();
@@ -3918,6 +4904,22 @@ function mapAnnouncementRow(item) {
     date: item?.created_at
       ? new Date(item.created_at).toISOString().slice(0, 10)
       : String(item?.date || '').trim(),
+    created_at: item?.created_at || null,
+    updated_at: item?.updated_at || null
+  };
+}
+
+function mapFeedbackRow(item) {
+  const message = String(item?.message || item?.content || '').trim();
+  return {
+    id: item?.id,
+    from: String(item?.from_email || item?.from || 'Anonymous').trim() || 'Anonymous',
+    subject: String(item?.subject || '').trim() || 'Feedback',
+    message,
+    date: item?.created_at
+      ? new Date(item.created_at).toISOString().slice(0, 10)
+      : String(item?.date || '').trim(),
+    rating: Number.isFinite(Number(item?.rating)) ? Number(item.rating) : null,
     created_at: item?.created_at || null,
     updated_at: item?.updated_at || null
   };
@@ -3965,9 +4967,10 @@ async function listAnnouncementsData() {
   return (data || []).map(mapAnnouncementRow);
 }
 
-async function createAnnouncementEntry({ title, content }) {
+async function createAnnouncementEntry({ title, content, visibility }) {
   const cleanTitle = String(title || '').trim();
   const cleanContent = String(content || '').trim();
+  const cleanVisibility = String(visibility || 'all').trim();
 
   if (isDemoMode) {
     const next = [...loadAnnouncementsFromLocalStorage()];
@@ -3978,6 +4981,7 @@ async function createAnnouncementEntry({ title, content }) {
       title: cleanTitle,
       content: cleanContent,
       preview: cleanContent,
+      visibility: cleanVisibility,
       date: new Date().toISOString().slice(0, 10),
       created_at: new Date().toISOString()
     });
@@ -3990,7 +4994,7 @@ async function createAnnouncementEntry({ title, content }) {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: cleanTitle, content: cleanContent })
+      body: JSON.stringify({ title: cleanTitle, content: cleanContent, visibility: cleanVisibility })
     });
 
     if (!response.ok) {
@@ -4005,6 +5009,7 @@ async function createAnnouncementEntry({ title, content }) {
   const payload = {
     title: cleanTitle,
     content: cleanContent,
+    visibility: cleanVisibility,
     created_by_staff_id: Number(cachedSessionUser?.id) || null
   };
 
@@ -4016,9 +5021,10 @@ async function createAnnouncementEntry({ title, content }) {
   return true;
 }
 
-async function updateAnnouncementEntry(announcementId, { title, content }) {
+async function updateAnnouncementEntry(announcementId, { title, content, visibility }) {
   const cleanTitle = String(title || '').trim();
   const cleanContent = String(content || '').trim();
+  const cleanVisibility = String(visibility || 'all').trim();
 
   if (isDemoMode) {
     const all = loadAnnouncementsFromLocalStorage();
@@ -4028,7 +5034,8 @@ async function updateAnnouncementEntry(announcementId, { title, content }) {
         ...item,
         title: cleanTitle,
         content: cleanContent,
-        preview: cleanContent
+        preview: cleanContent,
+        visibility: cleanVisibility
       };
     });
     saveToStorage('ukonek_announcements', next);
@@ -4040,7 +5047,7 @@ async function updateAnnouncementEntry(announcementId, { title, content }) {
       method: 'PATCH',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: cleanTitle, content: cleanContent })
+      body: JSON.stringify({ title: cleanTitle, content: cleanContent, visibility: cleanVisibility })
     });
 
     if (response.status === 404 || response.status === 405) {
@@ -4048,7 +5055,7 @@ async function updateAnnouncementEntry(announcementId, { title, content }) {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: cleanTitle, content: cleanContent })
+        body: JSON.stringify({ title: cleanTitle, content: cleanContent, visibility: cleanVisibility })
       });
     }
 
@@ -4063,7 +5070,7 @@ async function updateAnnouncementEntry(announcementId, { title, content }) {
   const { supabase } = await loadSupabaseModule();
   const { error } = await supabase
     .from('announcements')
-    .update({ title: cleanTitle, content: cleanContent })
+    .update({ title: cleanTitle, content: cleanContent, visibility: cleanVisibility })
     .eq('id', Number(announcementId));
 
   if (error) {
@@ -4122,23 +5129,72 @@ async function refreshAnnouncementsData() {
   renderAnnouncements();
 }
 
+async function listFeedbackData() {
+  if (isDemoMode) {
+    return [];
+  }
+
+  if (isApiMode) {
+    const response = await fetch(`${API_BASE}/api/feedbacks`, {
+      method: 'GET',
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error('Unable to load feedbacks.');
+    }
+
+    const data = await response.json().catch(() => ([]));
+    return (Array.isArray(data) ? data : []).map(mapFeedbackRow);
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { data, error } = await supabase
+    .from('feedbacks')
+    .select('id,from_email,subject,message,rating,created_at,updated_at')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load feedbacks.');
+  }
+
+  return (data || []).map(mapFeedbackRow);
+}
+
+async function refreshFeedbackData() {
+  try {
+    latestFeedbackList = await listFeedbackData();
+  } catch (error) {
+    console.error('Failed to refresh feedbacks:', error);
+    latestFeedbackList = [];
+  }
+  renderFeedbacks();
+}
+
 function renderAnnouncements() {
   const tbody = document.getElementById('announcements-tbody');
   if (!tbody) return;
+  const canManageAnnouncements = isAdminUser(cachedSessionUser);
 
   tbody.innerHTML = '';
   if (!latestAnnouncementsList.length) {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td colspan="3" class="table-cell">No announcements yet.</td>';
+    tr.innerHTML = '<td colspan="1" class="table-cell">No announcements yet.</td>';
     tbody.appendChild(tr);
   }
   latestAnnouncementsList.forEach(a => {
     const tr = document.createElement('tr');
     tr.className = 'announcement-row';
+    const deleteButton = canManageAnnouncements
+      ? '<button class="btn-delete-announcement" title="Delete announcement" style="background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px; color: #e53935;">×</button>'
+      : '';
     tr.innerHTML = `
-      <td class="table-cell">${a.title}</td>
-      <td class="table-cell">${(a.preview || '').substring(0, 80)}${(a.preview || '').length > 80 ? '...' : ''}</td>
-      <td class="table-cell">${a.date}</td>
+      <td class="table-cell" style="padding-right:12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <span style="font-weight:600;">${a.title}</span>
+          ${deleteButton}
+        </div>
+      </td>
     `;
     tbody.appendChild(tr);
     attachAnnouncementRow(tr, a);
@@ -4151,72 +5207,71 @@ function renderAnnouncements() {
 
 function openAnnouncementDetailLegacy(announcement) {
   if (!announcementDetailModal) return;
+  currentAnnouncementDetail = announcement || null;
   if (announcementDetailTitle) announcementDetailTitle.textContent = announcement.title || 'Announcement';
   if (announcementDetailBody) announcementDetailBody.textContent = announcement.content || announcement.body || announcement.preview || '—';
   if (announcementDetailDate) announcementDetailDate.textContent = announcement.date || '';
+  const visibilityNode = document.getElementById('announcement-detail-visibility');
+  if (visibilityNode) {
+    const rawVisibility = String(announcement?.visibility || 'all').trim().toLowerCase();
+    const visibilityLabel = rawVisibility === 'staff'
+      ? 'Staff Only'
+      : rawVisibility === 'citizen'
+        ? 'Citizens Only'
+        : 'Staff and Citizens';
+    visibilityNode.textContent = `Visible To: ${visibilityLabel}`;
+  }
+  const detailDeleteBtn = document.getElementById('announcement-detail-delete');
+  if (detailDeleteBtn) {
+    detailDeleteBtn.style.display = isAdminUser(cachedSessionUser) ? '' : 'none';
+  }
   announcementDetailModal.classList.remove('hidden');
 }
 
 function attachAnnouncementRow(row, announcement) {
   if (!row) return;
-  if (dataDetailModal) {
-    attachDetailRow(row, () => ({
-      tag: 'Announcement',
-      title: announcement.title || 'Announcement',
-      subtitle: announcement.date || '',
-      items: [
-        { label: 'Title', value: announcement.title || '—' },
-        { label: 'Date', value: announcement.date || '—' },
-        { label: 'Summary', value: announcement.preview || '—' },
-        { label: 'Details', value: announcement.content || announcement.body || announcement.preview || '—' }
-      ],
-      actions: isAdminUser(cachedSessionUser)
-        ? [{
-          label: 'Edit',
-          className: 'btn',
-          onClick: () => openEditAnnouncementModal(announcement)
-        }, {
-          label: 'Delete',
-          className: 'btn btn-delete',
-          onClick: async () => {
-            const confirmed = window.confirm('Delete this announcement? This cannot be undone.');
-            if (!confirmed) return;
 
-            try {
-              await deleteAnnouncementEntry(announcement.id);
-              await refreshAnnouncementsData();
-              renderDashboardInsights();
-              closeDataDetail();
-              showToast('Announcement deleted successfully.', 'success');
-            } catch (error) {
-              console.error('Error deleting announcement:', error);
-              showToast(error.message || 'Failed to delete announcement.', 'error');
-            }
-          }
-        }]
-        : []
-    }));
-  } else {
-    row.style.cursor = 'pointer';
-    row.addEventListener('click', () => openAnnouncementDetailLegacy(announcement));
+  // Add delete button handler
+  const deleteBtn = row.querySelector('.btn-delete-announcement');
+  if (deleteBtn && isAdminUser(cachedSessionUser)) {
+    deleteBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const confirmation = await openDialogModal({
+        title: 'Delete Announcement',
+        message: 'Delete this announcement?',
+        confirmText: 'Delete',
+        cancelText: 'Cancel'
+      });
+      if (!confirmation.confirmed) return;
+      
+      try {
+        await deleteAnnouncementEntry(announcement.id);
+        await refreshAnnouncementsData();
+        renderDashboardInsights();
+        showToast('Announcement deleted successfully.', 'success');
+      } catch (error) {
+        console.error('Error deleting announcement:', error);
+        showToast(error.message || 'Failed to delete announcement.', 'error');
+      }
+    });
   }
-}
 
-function loadFeedbacks() {
-  try {
-    const raw = localStorage.getItem('ukonek_feedback');
-    return raw ? JSON.parse(raw) : DUMMY_FEEDBACKS;
-  } catch (err) {
-    return DUMMY_FEEDBACKS;
-  }
+  // Click row to view full content.
+  row.style.cursor = 'pointer';
+  row.addEventListener('click', (e) => {
+    if (deleteBtn && (e.target === deleteBtn || deleteBtn.contains(e.target))) return;
+    openAnnouncementDetailLegacy(announcement);
+  });
 }
 
 function renderFeedbacks() {
   const tbody = document.getElementById('feedback-tbody');
   if (!tbody) return;
-  const feedbacks = loadFeedbacks();
-  latestFeedbackList = Array.isArray(feedbacks) ? [...feedbacks] : [];
+  const feedbacks = Array.isArray(latestFeedbackList) ? [...latestFeedbackList] : [];
   tbody.innerHTML = '';
+  if (!feedbacks.length) {
+    tbody.innerHTML = '<tr><td class="table-cell" colspan="3">No feedback yet.</td></tr>';
+  }
   feedbacks.forEach(f => {
     const tr = document.createElement('tr');
     tr.className = 'feedback-row';
@@ -4234,6 +5289,7 @@ function renderFeedbacks() {
         { label: 'From', value: f.from },
         { label: 'Subject', value: f.subject },
         { label: 'Date', value: f.date },
+        { label: 'Message', value: f.message || '—' },
         { label: 'Rating', value: typeof f.rating !== 'undefined' ? `${f.rating} / 5` : '—' }
       ]
     }));
@@ -4249,23 +5305,31 @@ initClinicalData();
 
 // Consultation form submit
 if (consultationForm) {
-  consultationForm.addEventListener('submit', (e) => {
+  consultationForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!canConsultPatients()) {
+      showToast('Only doctors can create consultations.', 'warning');
+      return;
+    }
     const patientId = document.getElementById('consult-patient-id').value.trim();
     const symptoms = document.getElementById('consult-symptoms').value.trim();
     const diagnosis = document.getElementById('consult-diagnosis').value.trim();
     const notes = document.getElementById('consult-notes').value.trim();
     if (!patientId || !diagnosis) { showToast('Patient ID and diagnosis required', 'warning'); return; }
-    const entry = { id: `C-${Date.now()}`, patientId, symptoms, diagnosis, notes, created_at: new Date().toISOString() };
-    consultations.push(entry);
-    saveToStorage('ukonek_consultations', consultations);
-    renderConsultations();
-    if (consultationModal) {
-      closeConsultationModal();
-    } else {
-      consultationForm.reset();
+
+    try {
+      await createConsultationEntry({ patientId, symptoms, diagnosis, notes });
+      await refreshConsultationData();
+      if (consultationModal) {
+        closeConsultationModal();
+      } else {
+        consultationForm.reset();
+      }
+      showToast('Consultation saved', 'success');
+    } catch (error) {
+      console.error('Failed to save consultation:', error);
+      showToast(error.message || 'Unable to save consultation.', 'error');
     }
-    showToast('Consultation saved', 'success');
   });
 }
 
@@ -4273,13 +5337,24 @@ if (consultationForm) {
 const consultAddPrescBtn = document.getElementById('consult-add-prescription');
 if (consultAddPrescBtn && prescriptionModal) {
   consultAddPrescBtn.addEventListener('click', () => {
-    if (prescriptionModal) prescriptionModal.classList.remove('hidden');
-    // prefill patient id if available
+    if (!canCreatePrescriptions()) {
+      showToast('Only doctors can create prescriptions.', 'warning');
+      return;
+    }
     const pid = document.getElementById('consult-patient-id')?.value || '';
-    if (prescriptionPatient) prescriptionPatient.value = pid;
-    prescriptionLines.innerHTML = '';
-    addPrescriptionLine();
+    openPrescriptionModalForPatient(pid, null);
   });
+}
+
+function openPrescriptionModalForPatient(patientId = '', consultationDbId = null) {
+  if (!prescriptionModal) return;
+  prescriptionModal.classList.remove('hidden');
+  if (prescriptionPatient) prescriptionPatient.value = patientId || '';
+  if (prescriptionForm) {
+    prescriptionForm.dataset.consultationDbId = consultationDbId ? String(consultationDbId) : '';
+  }
+  prescriptionLines.innerHTML = '';
+  addPrescriptionLine();
 }
 
 function addPrescriptionLine() {
@@ -4302,11 +5377,16 @@ if (addPrescriptionLineBtn) addPrescriptionLineBtn.addEventListener('click', add
 
 if (cancelPrescriptionBtn) cancelPrescriptionBtn.addEventListener('click', () => {
   if (prescriptionModal) prescriptionModal.classList.add('hidden');
+  if (prescriptionForm) prescriptionForm.dataset.consultationDbId = '';
 });
 
 if (prescriptionForm) {
-  prescriptionForm.addEventListener('submit', (e) => {
+  prescriptionForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!canCreatePrescriptions()) {
+      showToast('Only doctors can create prescriptions.', 'warning');
+      return;
+    }
     const patient = prescriptionPatient.value.trim();
     if (!patient) { showToast('Patient ID required', 'warning'); return; }
     const items = [];
@@ -4318,28 +5398,42 @@ if (prescriptionForm) {
       if (name && qty > 0) items.push({ name, qty });
     }
     if (items.length === 0) { showToast('Add at least one medicine', 'warning'); return; }
-    const pres = { id: `P-${Date.now()}`, patient, items, created_at: new Date().toISOString() };
-    prescriptions.push(pres);
-    saveToStorage('ukonek_prescriptions', prescriptions);
+
+    try {
+      await createPrescriptionEntry({
+        patientId: patient,
+        consultationDbId: Number(prescriptionForm.dataset.consultationDbId || '0') || null,
+        items: items.map((it) => {
+          const med = medicines.find((m) => String(m.name || '') === String(it.name || ''));
+          return { name: it.name, qty: it.qty, unit: med?.unit || '' };
+        })
+      });
+    } catch (error) {
+      console.error('Failed to save prescription:', error);
+      showToast(error.message || 'Unable to create prescription.', 'error');
+      return;
+    }
 
     // decrement inventory where possible
-    items.forEach(it => {
-      const idx = medicines.findIndex(m => m.name === it.name);
-      if (idx >= 0) {
-        medicines[idx].qty = Math.max(0, Number(medicines[idx].qty) - Number(it.qty));
+    try {
+      for (const it of items) {
+        await reduceMedicineStockByName(it.name, Number(it.qty));
       }
-    });
-    saveToStorage('ukonek_medicine_inventory', medicines);
-    renderMedicines();
+      await refreshMedicineData();
+    } catch (error) {
+      console.error('Failed to update medicine inventory after prescription:', error);
+      showToast(error.message || 'Prescription saved, but inventory update failed.', 'warning');
+    }
 
     if (prescriptionModal) prescriptionModal.classList.add('hidden');
+    prescriptionForm.dataset.consultationDbId = '';
     showToast('Prescription created and inventory updated', 'success');
   });
 }
 
 // Medicine form submit
 if (medicineForm) {
-  medicineForm.addEventListener('submit', (e) => {
+  medicineForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!canAddNewMedicine()) {
       showToast('You only have view access to the inventory.', 'warning');
@@ -4349,23 +5443,21 @@ if (medicineForm) {
     const qty = Number(document.getElementById('med-qty').value) || 0;
     const unit = document.getElementById('med-unit').value.trim();
     if (!name) { showToast('Medicine name required', 'warning'); return; }
-    const idx = medicines.findIndex(m => m.name.toLowerCase() === name.toLowerCase());
-    if (idx >= 0) {
-      medicines[idx].qty = Number(medicines[idx].qty) + qty; // treat as adding stock
-      medicines[idx].unit = unit || medicines[idx].unit;
-    } else {
-      medicines.push({ name, qty, unit });
+    try {
+      await upsertMedicineEntry({ name, qty, unit });
+      await refreshMedicineData();
+      medicineForm.reset();
+      showToast('Medicine added/updated', 'success');
+    } catch (error) {
+      console.error('Failed to save medicine:', error);
+      showToast(error.message || 'Unable to save medicine.', 'error');
     }
-    saveToStorage('ukonek_medicine_inventory', medicines);
-    renderMedicines();
-    medicineForm.reset();
-    showToast('Medicine added/updated', 'success');
   });
 }
 
 // medicine +/- actions
 if (medicineTbody) {
-  medicineTbody.addEventListener('click', (e) => {
+  medicineTbody.addEventListener('click', async (e) => {
     const btn = e.target.closest('button');
     if (!btn) return;
     const action = btn.getAttribute('data-action');
@@ -4375,17 +5467,119 @@ if (medicineTbody) {
       showToast('You only have view access to the inventory.', 'warning');
       return;
     }
-    const idx = medicines.findIndex(m => m.name === name);
-    if (idx < 0) return;
-    if (action === 'add') {
-      const add = Number(prompt('Enter quantity to add', '1')) || 0;
-      medicines[idx].qty = Number(medicines[idx].qty) + add;
-    } else if (action === 'sub') {
-      const sub = Number(prompt('Enter quantity to subtract', '1')) || 0;
-      medicines[idx].qty = Math.max(0, Number(medicines[idx].qty) - sub);
+    const target = medicines.find(m => m.name === name);
+    if (!target) return;
+    try {
+      if (action === 'add') {
+        const addDialog = await openDialogModal({
+          title: 'Add Quantity',
+          message: 'Enter quantity to add.',
+          confirmText: 'Apply',
+          cancelText: 'Cancel',
+          inputs: [
+            {
+              label: 'Quantity',
+              type: 'number',
+              initialValue: '1',
+              placeholder: 'Enter amount'
+            }
+          ]
+        });
+        if (!addDialog.confirmed) return;
+        const add = Number(addDialog.values?.[0] || '0') || 0;
+        await addMedicineStockByName(target.name, add);
+        showToast('Medicine quantity increased.', 'success');
+      } else if (action === 'sub') {
+        const subDialog = await openDialogModal({
+          title: 'Subtract Quantity',
+          message: 'Enter quantity to subtract.',
+          confirmText: 'Apply',
+          cancelText: 'Cancel',
+          inputs: [
+            {
+              label: 'Quantity',
+              type: 'number',
+              initialValue: '1',
+              placeholder: 'Enter amount'
+            }
+          ]
+        });
+        if (!subDialog.confirmed) return;
+        const sub = Number(subDialog.values?.[0] || '0') || 0;
+        await reduceMedicineStockByName(target.name, sub);
+        showToast('Medicine quantity reduced.', 'success');
+      } else if (action === 'remove') {
+        if (!canAddNewMedicine()) {
+          showToast('Only users with inventory management access can remove medicines.', 'warning');
+          return;
+        }
+        const removeDialog = await openDialogModal({
+          title: 'Remove Medicine',
+          message: `Remove ${target.name} from inventory?`,
+          confirmText: 'Remove',
+          cancelText: 'Cancel'
+        });
+        if (!removeDialog.confirmed) return;
+        await removeMedicineEntryByName(target.name);
+        showToast('Medicine removed.', 'success');
+      }
+      await Promise.all([refreshMedicineData(), refreshArchivedMedicineData()]);
+    } catch (error) {
+      console.error('Medicine action failed:', error);
+      showToast(error.message || 'Unable to update inventory.', 'error');
     }
-    saveToStorage('ukonek_medicine_inventory', medicines);
-    renderMedicines();
+  });
+}
+
+if (medicineArchivedToggleBtn) {
+  medicineArchivedToggleBtn.addEventListener('click', async () => {
+    isArchivedMedicinesVisible = !isArchivedMedicinesVisible;
+    if (isArchivedMedicinesVisible) {
+      await refreshArchivedMedicineData();
+    } else {
+      renderArchivedMedicines();
+    }
+  });
+}
+
+if (medicineArchivedTbody) {
+  medicineArchivedTbody.addEventListener('click', async (event) => {
+    const btn = event.target.closest('button');
+    if (!btn) return;
+    const action = btn.getAttribute('data-action');
+    const id = Number(btn.getAttribute('data-id') || '0');
+    if (!id) return;
+
+    try {
+      if (action === 'restore') {
+        if (!canAddNewMedicine()) {
+          showToast('Only users with inventory management access can restore medicines.', 'warning');
+          return;
+        }
+        await restoreMedicineEntryById(id);
+        await Promise.all([refreshMedicineData(), refreshArchivedMedicineData()]);
+        showToast('Medicine restored.', 'success');
+      } else if (action === 'hard-delete') {
+        if (!isAdminUser(cachedSessionUser)) {
+          showToast('Only admins can permanently delete medicines.', 'warning');
+          return;
+        }
+        const confirmation = await openDialogModal({
+          title: 'Delete Permanently',
+          message: 'This will permanently delete the archived medicine record. Continue?',
+          confirmText: 'Delete',
+          cancelText: 'Cancel'
+        });
+        if (!confirmation.confirmed) return;
+
+        await permanentlyDeleteArchivedMedicineById(id);
+        await Promise.all([refreshMedicineData(), refreshArchivedMedicineData()]);
+        showToast('Archived medicine permanently deleted.', 'success');
+      }
+    } catch (error) {
+      console.error('Failed to restore medicine:', error);
+      showToast(error.message || 'Unable to update archived medicine.', 'error');
+    }
   });
 }
 
@@ -4396,9 +5590,19 @@ if (consultationsTbody) {
     if (!btn) return;
     const action = btn.getAttribute('data-action');
     const id = btn.getAttribute('data-id');
-    const entry = consultations.find(c => c.id === id);
+    const entry = [...consultationQueueTickets, ...consultations].find(c => c.id === id);
     if (!action || !entry) return;
-    if (action === 'view') {
+    if (action === 'consult') {
+      if (!canConsultPatients()) {
+        showToast('Only doctors can create consultations.', 'warning');
+        return;
+      }
+      openConsultationModal({
+        patientId: entry.patientId || '',
+        symptoms: entry.symptoms || '',
+        notes: entry.notes || ''
+      });
+    } else if (action === 'view') {
       openDataDetail({
         tag: 'Consultation',
         title: entry.patientId || 'Consultation Detail',
@@ -4413,8 +5617,15 @@ if (consultationsTbody) {
         ]
       });
     } else if (action === 'prescribe') {
+      if (!canCreatePrescriptions()) {
+        showToast('Only doctors can create prescriptions.', 'warning');
+        return;
+      }
       if (prescriptionModal) prescriptionModal.classList.remove('hidden');
       if (prescriptionPatient) prescriptionPatient.value = entry.patientId || '';
+      if (prescriptionForm) {
+        prescriptionForm.dataset.consultationDbId = Number(entry.dbId) ? String(entry.dbId) : '';
+      }
       prescriptionLines.innerHTML = '';
       addPrescriptionLine();
     }

@@ -1,13 +1,13 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'uKonekCredentialsPage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'uKonekOtpPage.dart';
 
 class uKonekPreviewPage extends StatelessWidget {
   final String firstName, middleName, surname, nameExtension, familyNumber;
   final String dob, age, contact, sex, email, address;
   final String emergencyName, emergencyContact, relation;
-  final File?  idImage;
+  final XFile? idImage;
   final bool   idVerified;
   final String extractedOcrText;
 
@@ -351,15 +351,26 @@ class uKonekPreviewPage extends StatelessWidget {
           if (idImage != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: kIsWeb
-                  ? Image.network(idImage!.path,
-                  width: double.infinity,
-                  height: 170,
-                  fit: BoxFit.cover)
-                  : Image.file(idImage!,
-                  width: double.infinity,
-                  height: 170,
-                  fit: BoxFit.cover),
+              child: FutureBuilder<Uint8List>(
+                future: idImage!.readAsBytes(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const SizedBox(
+                      height: 170,
+                      child: Center(
+                        child: CircularProgressIndicator(color: _primary),
+                      ),
+                    );
+                  }
+
+                  return Image.memory(
+                    snapshot.data!,
+                    width: double.infinity,
+                    height: 170,
+                    fit: BoxFit.cover,
+                  );
+                },
+              ),
             )
           else
             Container(
@@ -393,11 +404,10 @@ class uKonekPreviewPage extends StatelessWidget {
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => uKonekCredentialsPage(
+            builder: (_) => uKonekOtpPage(
               firstName:        firstName,
               middleName:       middleName,
               surname:          surname,
-              nameExtension:    nameExtension,
               dob:              dob,
               age:              age,
               contact:          contact,
@@ -407,16 +417,14 @@ class uKonekPreviewPage extends StatelessWidget {
               emergencyName:    emergencyName,
               emergencyContact: emergencyContact,
               relation:         relation,
-              idImage:          idImage,
               idVerified:       idVerified,
-              extractedOcrText: extractedOcrText,
             ),
           ),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('SUBMIT & CONTINUE',
+            Text('VERIFY EMAIL FIRST',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,

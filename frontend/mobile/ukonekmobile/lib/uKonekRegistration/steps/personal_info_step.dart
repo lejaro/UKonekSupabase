@@ -192,8 +192,9 @@ class PersonalInfoStep extends StatelessWidget {
                   color: Colors.redAccent)),
         ),
         validator: (v) {
-          if (required && (v == null || v.trim().isEmpty))
+          if (required && (v == null || v.trim().isEmpty)) {
             return 'Required';
+          }
           return null;
         },
       ),

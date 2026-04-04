@@ -87,9 +87,9 @@ class _OnboardingPageState extends State<OnboardingPage>
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const uKonekMenuPage(),
+        pageBuilder: (_, _, _) => const uKonekMenuPage(),
         transitionDuration: const Duration(milliseconds: 500),
-        transitionsBuilder: (_, anim, __, child) =>
+        transitionsBuilder: (_, anim, _, child) =>
             FadeTransition(opacity: anim, child: child),
       ),
     );

@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'services/api_service.dart';
 import 'uKonekLoginPage.dart';
 
 class uKonekCredentialsPage extends StatefulWidget {
@@ -9,7 +9,7 @@ class uKonekCredentialsPage extends StatefulWidget {
   final String dob, age, contact, sex, email, address;
   final String emergencyName, emergencyContact, relation;
   final String extractedOcrText;
-  final File?  idImage;
+  final XFile? idImage;
   final bool   idVerified;
 
   const uKonekCredentialsPage({
@@ -157,36 +157,45 @@ class _uKonekCredentialsPageState
     );
   }
 
+  String? _toIsoDate(String date) {
+    final parts = date.split('/');
+    if (parts.length != 3) return null;
+    final month = int.tryParse(parts[0]);
+    final day = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
+    if (month == null || day == null || year == null) return null;
+    final parsed = DateTime(year, month, day);
+    return '${parsed.year.toString().padLeft(4, '0')}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
+  }
+
   // ── Submit (unchanged logic) ──────────────────────────────────
   Future<void> _submitRegistration() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
 
     try {
-      final supabase = Supabase.instance.client;
-      final AuthResponse res = await supabase.auth.signUp(
-        email:    widget.email.trim().toLowerCase(),
-        password: passwordController.text,
-      );
-
-      if (res.user != null) {
-        await supabase.from('citizens').insert({
-          'auth_user_id':                     res.user!.id,
-          'firstname':                        widget.firstName.trim(),
-          'surname':                          widget.surname.trim(),
-          'middle_initial':                   widget.middleName.trim(),
-          'date_of_birth':                    widget.dob,
-          'age':                              int.tryParse(widget.age) ?? 0,
-          'contact_number':                   widget.contact,
-          'sex':                              widget.sex,
-          'email':                            widget.email.trim().toLowerCase(),
-          'complete_address':                 widget.address,
-          'username':                         usernameController.text.trim(),
-          'emergency_contact_complete_name':  widget.emergencyName,
-          'emergency_contact_contact_number': widget.emergencyContact,
-          'relation':                         widget.relation,
-        });
+      final dateOfBirth = _toIsoDate(widget.dob);
+      if (dateOfBirth == null) {
+        throw Exception('Invalid birth date format. Please go back and select your date again.');
       }
+
+      await ApiService.completeCitizenRegistration(payload: {
+        'firstname': widget.firstName.trim(),
+        'surname': widget.surname.trim(),
+        'middle_initial': widget.middleName.trim(),
+        'date_of_birth': dateOfBirth,
+        'age': int.tryParse(widget.age.trim()) ?? 0,
+        'contact_number': widget.contact.trim(),
+        'sex': widget.sex.trim(),
+        'email': widget.email.trim().toLowerCase(),
+        'complete_address': widget.address.trim(),
+        'emergency_contact_complete_name': widget.emergencyName.trim(),
+        'emergency_contact_contact_number': widget.emergencyContact.trim(),
+        'relation': widget.relation.trim(),
+        'username': usernameController.text.trim(),
+        'password': passwordController.text,
+      });
+
       _showSuccessDialog();
     } catch (e) {
       _snackBar('Error: $e', Colors.redAccent);
@@ -558,7 +567,7 @@ class _uKonekCredentialsPageState
                 color: _success, size: 32),
           ),
           const SizedBox(height: 16),
-          const Text('Check Your Email',
+          const Text('Account Ready',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -566,7 +575,7 @@ class _uKonekCredentialsPageState
               )),
           const SizedBox(height: 10),
           const Text(
-              'Please check your email for the verification link to activate your account.',
+              'Your email is verified and your profile is complete. You can now sign in.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,

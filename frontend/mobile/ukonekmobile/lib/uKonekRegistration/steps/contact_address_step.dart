@@ -215,8 +215,9 @@ class ContactAddressStep extends StatelessWidget {
         decoration: _decoration(label, icon),
         validator: (v) {
           if (v == null || v.trim().isEmpty) return 'Required';
-          if (isEmail && (!v.contains('@') || !v.contains('.')))
+          if (isEmail && (!v.contains('@') || !v.contains('.'))) {
             return 'Invalid email';
+          }
           return null;
         },
       ),

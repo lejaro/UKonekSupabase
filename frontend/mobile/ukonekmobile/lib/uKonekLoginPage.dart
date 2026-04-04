@@ -38,11 +38,14 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
   void initState() {
     super.initState();
     _animController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 700));
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
-        .animate(CurvedAnimation(
-        parent: _animController, curve: Curves.easeOutCubic));
+        .animate(
+          CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
+        );
     _animController.forward();
   }
 
@@ -77,6 +80,51 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
     });
   }
 
+  Future<void> _resendVerificationOtp() async {
+    final email = usernameController.text.trim().toLowerCase();
+    if (email.isEmpty || !email.contains('@')) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter your email first, then tap Resend OTP.'),
+          backgroundColor: Colors.redAccent,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await ApiService.requestCitizenOtp(
+        email: email,
+        purpose: 'email_verification',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'OTP magic link sent. Please check your email to verify your account.',
+          ),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   // ── Login logic ───────────────────────────────────────────────
   Future<void> login() async {
     if (_isLocked || _isLoading) return;
@@ -94,36 +142,82 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
       setState(() => _attemptsLeft = 3);
 
       final user = response['user'] as Map<String, dynamic>?;
-      final displayName = (user?['username'] as String?)?.trim().isNotEmpty == true
+      final displayName =
+          (user?['username'] as String?)?.trim().isNotEmpty == true
           ? user!['username'] as String
           : usernameController.text.trim();
 
       Navigator.pushAndRemoveUntil(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, _, _) =>
-              uKonekDashboardPage(username: displayName),
+          pageBuilder: (_, _, _) => uKonekDashboardPage(username: displayName),
           transitionDuration: const Duration(milliseconds: 500),
           transitionsBuilder: (_, animation, _, child) =>
               FadeTransition(opacity: animation, child: child),
         ),
-            (route) => false,
+        (route) => false,
       );
     } catch (error) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
-      setState(() => _attemptsLeft--);
-      passwordController.clear();
+      final loginError = error is LoginFailureException ? error : null;
+      final message =
+          loginError?.message ??
+          error.toString().replaceFirst('Exception: ', '');
+      final countsAsAttempt = loginError?.countsAsAttempt ?? false;
 
-      if (_attemptsLeft <= 0) {
+      if (loginError?.type == LoginFailureType.unverifiedEmail) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Email not verified yet. Tap RESEND OTP to receive the magic link.',
+            ),
+            backgroundColor: Colors.orange.shade700,
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'RESEND OTP',
+              textColor: Colors.white,
+              onPressed: _resendVerificationOtp,
+            ),
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        if (countsAsAttempt) {
+          _attemptsLeft--;
+        }
+      });
+
+      if (countsAsAttempt) {
+        passwordController.clear();
+      }
+
+      if (countsAsAttempt && _attemptsLeft <= 0) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Too many failed attempts. Please wait 60 seconds.'),
+            backgroundColor: Colors.redAccent,
+            duration: Duration(seconds: 2),
+          ),
+        );
         _startLockout();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              "${error.toString().replaceFirst('Exception: ', '')} ($_attemptsLeft attempt${_attemptsLeft == 1 ? '' : 's'} left)"),
-          backgroundColor: Colors.redAccent,
-          duration: const Duration(seconds: 2),
-        ));
+        final suffix = countsAsAttempt
+            ? ' ($_attemptsLeft attempt${_attemptsLeft == 1 ? '' : 's'} left)'
+            : '';
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$message$suffix'),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
     }
   }
@@ -160,51 +254,70 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                         padding: const EdgeInsets.fromLTRB(28, 28, 28, 0),
                         child: Column(
                           children: [
-                            Row(children: [
-                              GestureDetector(
-                                onTap: () => Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) => const uKonekMenuPage()),
-                                      (route) => false,
-                                ),
-                                child: Container(
-                                  width: 38, height: 38,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.18),
-                                    borderRadius: BorderRadius.circular(12),
+                            Row(
+                              children: [
+                                GestureDetector(
+                                  onTap: () => Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const uKonekMenuPage(),
+                                    ),
+                                    (route) => false,
                                   ),
-                                  child: const Icon(
+                                  child: Container(
+                                    width: 38,
+                                    height: 38,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.18),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(
                                       Icons.arrow_back_ios_new_rounded,
                                       color: Colors.white,
-                                      size: 18),
+                                      size: 18,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ]),
+                              ],
+                            ),
                             const SizedBox(height: 24),
                             Container(
-                              width: 70, height: 70,
+                              width: 70,
+                              height: 70,
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
-                                boxShadow: [BoxShadow(
+                                boxShadow: [
+                                  BoxShadow(
                                     color: Colors.black.withOpacity(0.15),
                                     blurRadius: 20,
-                                    offset: const Offset(0, 8))],
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
                               ),
-                              child: const Icon(Icons.favorite_rounded,
-                                  color: _primary, size: 34),
+                              child: const Icon(
+                                Icons.favorite_rounded,
+                                color: _primary,
+                                size: 34,
+                              ),
                             ),
                             const SizedBox(height: 14),
-                            const Text("Welcome Back",
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold)),
+                            const Text(
+                              "Welcome Back",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            const Text("Sign in to your U-Konek account",
-                                style: TextStyle(
-                                    color: Colors.white70, fontSize: 13)),
+                            const Text(
+                              "Sign in to your U-Konek account",
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
+                            ),
                             const SizedBox(height: 36),
                           ],
                         ),
@@ -216,10 +329,13 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(28),
-                          boxShadow: [BoxShadow(
+                          boxShadow: [
+                            BoxShadow(
                               color: Colors.black.withOpacity(0.08),
                               blurRadius: 30,
-                              offset: const Offset(0, 10))],
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
                         ),
                         padding: const EdgeInsets.all(28),
                         child: Form(
@@ -227,16 +343,22 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text("Sign In",
-                                  style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF1A1A2E))),
+                              const Text(
+                                "Sign In",
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1A1A2E),
+                                ),
+                              ),
                               const SizedBox(height: 4),
-                              Text("Enter your credentials to continue",
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade500)),
+                              Text(
+                                "Enter your credentials to continue",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
                               const SizedBox(height: 24),
 
                               // Username
@@ -250,7 +372,8 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                                     return "Email is required";
                                   }
                                   final value = v.trim();
-                                  if (!value.contains('@') || !value.contains('.')) {
+                                  if (!value.contains('@') ||
+                                      !value.contains('.')) {
                                     return "Enter a valid email address";
                                   }
                                   return null;
@@ -275,13 +398,16 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                                   ),
                                   onPressed: _isLocked
                                       ? null
-                                      : () => setState(() =>
-                                  _obscurePassword = !_obscurePassword),
+                                      : () => setState(
+                                          () => _obscurePassword =
+                                              !_obscurePassword,
+                                        ),
                                 ),
-                                validator: (v) =>
-                                (v == null || v.isEmpty)
-                                  ? "Password is required"
-                                  : (v.length < 8 ? "Password must be at least 8 characters" : null),
+                                validator: (v) => (v == null || v.isEmpty)
+                                    ? "Password is required"
+                                    : (v.length < 8
+                                          ? "Password must be at least 8 characters"
+                                          : null),
                               ),
 
                               const SizedBox(height: 10),
@@ -300,14 +426,18 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                                   onPressed: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                        builder: (_) =>
-                                        const uKonekForgotPasswordPage()),
+                                      builder: (_) =>
+                                          const uKonekForgotPasswordPage(),
+                                    ),
                                   ),
-                                  child: const Text("Forgot password?",
-                                      style: TextStyle(
-                                          color: _primary,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600)),
+                                  child: const Text(
+                                    "Forgot password?",
+                                    style: TextStyle(
+                                      color: _primary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
                               ),
 
@@ -315,27 +445,36 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
 
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 10),
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.blue.shade50,
                                   border: Border.all(
-                                      color: Colors.blue.shade200),
+                                    color: Colors.blue.shade200,
+                                  ),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Row(children: [
-                                  Icon(Icons.info_outline_rounded,
-                                      color: Colors.blue.shade700, size: 18),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      "Use your registered citizen email address.",
-                                      style: TextStyle(
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline_rounded,
+                                      color: Colors.blue.shade700,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        "Use your registered citizen email address.",
+                                        style: TextStyle(
                                           fontSize: 11,
                                           color: Colors.blue.shade800,
-                                          fontWeight: FontWeight.w600),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ]),
+                                  ],
+                                ),
                               ),
 
                               const SizedBox(height: 16),
@@ -350,45 +489,52 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                                         : _primary,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
-                                        vertical: 16),
+                                      vertical: 16,
+                                    ),
                                     shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                        BorderRadius.circular(16)),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
                                     elevation: _isLocked ? 0 : 4,
                                     shadowColor: _primary.withOpacity(0.4),
                                   ),
-                                  onPressed:
-                                  (_isLoading || _isLocked) ? null : login,
+                                  onPressed: (_isLoading || _isLocked)
+                                      ? null
+                                      : login,
                                   child: _isLoading
                                       ? const SizedBox(
-                                      width: 20, height: 20,
-                                      child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2))
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
                                       : Row(
-                                    mainAxisAlignment:
-                                    MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        _isLocked
-                                            ? "Locked — ${_lockSecondsLeft}s"
-                                            : "SIGN IN",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                            letterSpacing: 1.2,
-                                            color: _isLocked
-                                                ? Colors.grey
-                                                : Colors.white),
-                                      ),
-                                      if (!_isLocked) ...[
-                                        const SizedBox(width: 8),
-                                        const Icon(
-                                            Icons.arrow_forward_rounded,
-                                            size: 18),
-                                      ]
-                                    ],
-                                  ),
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              _isLocked
+                                                  ? "Locked — ${_lockSecondsLeft}s"
+                                                  : "SIGN IN",
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 15,
+                                                letterSpacing: 1.2,
+                                                color: _isLocked
+                                                    ? Colors.grey
+                                                    : Colors.white,
+                                              ),
+                                            ),
+                                            if (!_isLocked) ...[
+                                              const SizedBox(width: 8),
+                                              const Icon(
+                                                Icons.arrow_forward_rounded,
+                                                size: 18,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
                                 ),
                               ),
 
@@ -399,23 +545,27 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                                 child: RichText(
                                   text: TextSpan(
                                     style: const TextStyle(
-                                        fontSize: 13, color: Colors.black54),
+                                      fontSize: 13,
+                                      color: Colors.black54,
+                                    ),
                                     children: [
                                       const TextSpan(
-                                          text: "Don't have an account? "),
+                                        text: "Don't have an account? ",
+                                      ),
                                       TextSpan(
                                         text: "Register here",
                                         style: const TextStyle(
-                                            color: _primary,
-                                            fontWeight: FontWeight.bold,
-                                            decoration:
-                                            TextDecoration.underline),
+                                          color: _primary,
+                                          fontWeight: FontWeight.bold,
+                                          decoration: TextDecoration.underline,
+                                        ),
                                         recognizer: TapGestureRecognizer()
                                           ..onTap = () => Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                                builder: (_) =>
-                                                const uKonekRegisterWrapper()),
+                                              builder: (_) =>
+                                                  const uKonekRegisterWrapper(),
+                                            ),
                                           ),
                                       ),
                                     ],
@@ -444,21 +594,26 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded,
-              color: Colors.orange, size: 16),
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.orange,
+            size: 16,
+          ),
           const SizedBox(width: 6),
           Text(
             "$_attemptsLeft attempt${_attemptsLeft == 1 ? '' : 's'} remaining",
             style: const TextStyle(
-                color: Colors.orange,
-                fontSize: 12,
-                fontWeight: FontWeight.w600),
+              color: Colors.orange,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(width: 10),
           Row(
             children: List.generate(3, (i) {
               return Container(
-                width: 10, height: 10,
+                width: 10,
+                height: 10,
                 margin: const EdgeInsets.only(right: 5),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -492,23 +647,26 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Account temporarily locked",
-                    style: TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13)),
+                const Text(
+                  "Account temporarily locked",
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
                 const SizedBox(height: 3),
                 Text(
                   "Too many failed attempts. Try again in $_lockSecondsLeft second${_lockSecondsLeft == 1 ? '' : 's'}.",
-                  style:
-                  TextStyle(color: Colors.red.shade400, fontSize: 12),
+                  style: TextStyle(color: Colors.red.shade400, fontSize: 12),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 10),
           SizedBox(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -516,14 +674,16 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                   value: _lockSecondsLeft / 60,
                   strokeWidth: 3.5,
                   backgroundColor: Colors.red.shade100,
-                  valueColor:
-                  const AlwaysStoppedAnimation<Color>(Colors.red),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.red),
                 ),
-                Text("$_lockSecondsLeft",
-                    style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.red)),
+                Text(
+                  "$_lockSecondsLeft",
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
               ],
             ),
           ),
@@ -554,25 +714,31 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
         prefixIcon: Icon(icon, color: _primary.withOpacity(0.6), size: 20),
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor:
-        enabled ? const Color(0xFFF8FAFF) : const Color(0xFFEEEEEE),
-        contentPadding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        fillColor: enabled ? const Color(0xFFF8FAFF) : const Color(0xFFEEEEEE),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFFDDE3F0))),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFDDE3F0)),
+        ),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFFDDE3F0))),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFDDE3F0)),
+        ),
         disabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: Colors.grey.shade200)),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: _primary, width: 1.8)),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _primary, width: 1.8),
+        ),
         errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.redAccent)),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.redAccent),
+        ),
       ),
     );
   }
