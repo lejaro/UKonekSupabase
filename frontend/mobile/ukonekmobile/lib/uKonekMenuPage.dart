@@ -133,7 +133,7 @@ class _uKonekMenuPageState extends State<uKonekMenuPage>
 
                       // ── Label ─────────────────────────────────
                       const Align(
-                        alignment: Alignment.centerLeft,
+                        alignment: Alignment.center,
                         child: Text(
                           "GET STARTED",
                           style: TextStyle(
@@ -149,7 +149,7 @@ class _uKonekMenuPageState extends State<uKonekMenuPage>
                       // ── Register Button ───────────────────────
                       _buildPrimaryButton(
                         label: "CREATE ACCOUNT",
-                        subtitle: "New to U-Konek? Register here",
+                        subtitle: "New to U-Konek+? Register here",
                         icon: Icons.person_add_outlined,
                         onTap: () => Navigator.push(
                           context,
@@ -226,7 +226,7 @@ class _uKonekMenuPageState extends State<uKonekMenuPage>
         ),
         const SizedBox(height: 18),
         const Text(
-          "U-KONEK",
+          "U-KONEK+",
           style: TextStyle(
             color: Colors.white,
             fontSize: 34,

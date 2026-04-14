@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:ukonekmobile/uKonekMedicineScheduler.dart';
 import 'services/api_service.dart';
 import 'uKonekJoinQueuePage.dart';
 import 'uKonekHealthRecordsPage.dart';
 import 'uKonekProfilePage.dart';
-import 'uKonekDoctorSchedulesPage.dart';
+import 'uKonekMedicineScheduler.dart';
 import 'uKonekFeedbackPage.dart';
-import 'uKonekQueueTabPage.dart';
 
 // ── Design tokens ──────────────────────────────────────────────
 class _C {
@@ -852,7 +852,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
           () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => const uKonekDoctorSchedulesPage(),
+              builder: (_) => const uKonekMedicineSchedulerPage(),
             ),
           ),
         ),
@@ -1109,6 +1109,11 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               final isSelected = _selectedTab == i;
               return GestureDetector(
                 onTap: () {
+                  if (i == 1) {
+                    Navigator.push(context, MaterialPageRoute(
+                        builder: (context) => const uKonekMedicineSchedulerPage()));
+                    return;
+                  }
                   if (i == 3) {
                     _navigateToProfile();
                     return;
@@ -1117,7 +1122,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const uKonekQueueTabPage(),
+                        builder: (_) => const uKonekJoinQueuePage(),
                       ),
                     ).then((_) => _refreshQueueDashboard());
                     return;

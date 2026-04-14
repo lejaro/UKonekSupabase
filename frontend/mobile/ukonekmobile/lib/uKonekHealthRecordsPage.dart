@@ -120,7 +120,7 @@ class _uKonekHealthRecordsPageState
                           color: Colors.white70, fontSize: 12)),
                 ],
               )),
-              Container(
+             /*Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -133,7 +133,7 @@ class _uKonekHealthRecordsPageState
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                     )),
-              ),
+              ),*/
             ]),
             const SizedBox(height: 18),
             _buildSearchBar(),
