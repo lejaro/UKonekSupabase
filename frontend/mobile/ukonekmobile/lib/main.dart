@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; 
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'uKonekOnBoardingPage.dart';
 import 'uKonekMenuPage.dart'; 
 
@@ -31,7 +31,7 @@ class UKonekApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
-        fontFamily: 'Inter',
+        fontFamily: 'Poppins',
       ),
       
       home: session != null ? const uKonekMenuPage() : const OnboardingPage(),

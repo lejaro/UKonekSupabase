@@ -312,7 +312,7 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                             ),
                             const SizedBox(height: 4),
                             const Text(
-                              "Sign in to your U-Konek account",
+                              "Sign in to your U-Konek+ account",
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 13,

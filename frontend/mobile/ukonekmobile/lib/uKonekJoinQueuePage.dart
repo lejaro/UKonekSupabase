@@ -1,19 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-
 import 'services/api_service.dart';
 
 class _C {
-  static const primary = Color(0xFF0A2E6E);
-  static const primaryMid = Color(0xFF1565C0);
-  static const bg = Color(0xFFF0F4FA);
+  static const primary = Color(0xFF0D47A1);
+  static const primaryMid = Color(0xFF1976D2);
+  static const bg = Color(0xFFF4F7FE);
   static const surface = Colors.white;
-  static const textDark = Color(0xFF1A2740);
-  static const textMuted = Color(0xFF8A93A0);
-  static const divider = Color(0xFFEEF1F6);
-  static const success = Color(0xFF10B981);
-  static const shadow = Color(0x0A000000);
+  static const textDark = Color(0xFF1A1A2E);
+  static const textMuted = Color(0xFF667085);
   static const fieldBorder = Color(0xFFDDE3F0);
+  static const success = Color(0xFF079455);
 }
 
 class uKonekJoinQueuePage extends StatefulWidget {
@@ -24,414 +22,209 @@ class uKonekJoinQueuePage extends StatefulWidget {
 }
 
 class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
+  late Future<QueueDashboardSnapshot> _dashboardFuture;
   late Future<List<QueueServiceOption>> _servicesFuture;
+  Timer? _refreshTimer;
 
-  final _reasonController = TextEditingController();
-  final _symptomsController = TextEditingController();
-
+  // Form State
   QueueServiceOption? _selectedService;
   String _citizenType = 'regular';
+  final _reasonController = TextEditingController();
+  final _symptomsController = TextEditingController();
   bool _isSubmitting = false;
-
-  QueueTicket? _ticket;
-  QueueDashboardSnapshot? _dashboard;
 
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshDashboard());
+  }
+
+  void _loadInitialData() {
+    _dashboardFuture = ApiService.getMyQueueDashboard();
     _servicesFuture = ApiService.listAvailableQueueServices();
+  }
+
+  void _refreshDashboard() {
+    if (!mounted) return;
+    setState(() {
+      _dashboardFuture = ApiService.getMyQueueDashboard();
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _reasonController.dispose();
     _symptomsController.dispose();
     super.dispose();
   }
 
-  Future<void> _submitJoinQueue() async {
-    if (_isSubmitting) return;
-    if (_selectedService == null) {
-      _showSnack('Please select a healthcare service.');
-      return;
-    }
+  // ── FIX: REFACTORED JOIN LOGIC (No async inside setState) ──────────
+  Future<void> _handleJoin() async {
+    if (_selectedService == null) return _showSnack("Please select a service.");
+    if (_reasonController.text.trim().isEmpty) return _showSnack("Reason is required.");
 
-    final reason = _reasonController.text.trim();
-    final symptoms = _symptomsController.text.trim();
-
-    if (reason.isEmpty) {
-      _showSnack('Please enter your reason for visit.');
-      return;
-    }
-    if (symptoms.isEmpty) {
-      _showSnack('Please enter your current condition/symptoms.');
-      return;
-    }
-
+    // 1. Set loading state synchronously
     setState(() => _isSubmitting = true);
 
     try {
-      final ticket = await ApiService.joinQueue(
-        QueueJoinRequest(
-          serviceKey: _selectedService!.serviceKey,
-          serviceLabel: _selectedService!.serviceLabel,
-          citizenType: _citizenType,
-          reason: reason,
-          symptoms: symptoms,
-        ),
-      );
+      // 2. Perform ASYNC work outside of setState
+      await ApiService.joinQueue(QueueJoinRequest(
+        serviceKey: _selectedService!.serviceKey,
+        serviceLabel: _selectedService!.serviceLabel,
+        citizenType: _citizenType,
+        reason: _reasonController.text.trim(),
+        symptoms: _symptomsController.text.trim(),
+      ));
 
-      final snapshot = await ApiService.getMyQueueDashboard();
-
-      if (!mounted) return;
-      setState(() {
-        _ticket = ticket;
-        _dashboard = snapshot;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      _showSnack(error.toString().replaceFirst('Exception: ', ''));
-    } finally {
+      // 3. Only update the UI state after the work is finished
+      if (mounted) {
+        _refreshDashboard();
+        setState(() => _isSubmitting = false);
+      }
+    } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
+        _showSnack(e.toString().replaceFirst('Exception: ', ''));
       }
     }
   }
 
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  String _citizenLabel(String key) {
-    switch (key) {
-      case 'pwd':
-        return 'PWD';
-      case 'pregnant':
-        return 'Pregnant';
-      default:
-        return 'Regular';
-    }
-  }
-
-  String _formatMinutes(int minutes) {
-    final value = minutes < 0 ? 0 : minutes;
-    final h = value ~/ 60;
-    final m = value % 60;
-    if (h <= 0) return '$m min';
-    if (m == 0) return '$h hr';
-    return '$h hr $m min';
-  }
-
-  String _queueNo(int? number) {
-    if (number == null || number <= 0) return '--';
-    return '#${number.toString().padLeft(3, '0')}';
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: _C.primary,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasTicket = _ticket != null;
     return Scaffold(
       backgroundColor: _C.bg,
-      appBar: AppBar(
-        backgroundColor: _C.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: Text(hasTicket ? 'Queue Confirmation' : 'Join Queue'),
+      body: Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: FutureBuilder<QueueDashboardSnapshot>(
+              future: _dashboardFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final data = snapshot.data;
+                if (data != null && data.hasActiveQueue) {
+                  return _buildActiveTicketView(data);
+                } else {
+                  return _buildJoinQueueForm();
+                }
+              },
+            ),
+          ),
+        ],
       ),
-      body: hasTicket ? _buildTicketView() : _buildJoinForm(),
-      bottomNavigationBar: hasTicket ? null : _buildBottomAction(),
     );
   }
 
-  Widget _buildJoinForm() {
+  // ── 1. JOIN FORM VIEW ──────────────────────────────────────────────
+  Widget _buildJoinQueueForm() {
     return FutureBuilder<List<QueueServiceOption>>(
       future: _servicesFuture,
       builder: (context, snapshot) {
-        final loading = snapshot.connectionState == ConnectionState.waiting;
-        final services = snapshot.data ?? const <QueueServiceOption>[];
-
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
-          children: [
-            if (loading)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      SizedBox(width: 10),
-                      Text('Loading available services for today...'),
-                    ],
-                  ),
-                ),
-              )
-            else if (snapshot.hasError)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Unable to load available services.',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton(
-                        onPressed: () {
-                          setState(() {
-                            _servicesFuture =
-                                ApiService.listAvailableQueueServices();
-                          });
-                        },
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else if (services.isEmpty)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('No healthcare services available today.'),
-                ),
-              )
-            else
-              _buildServiceList(services),
-            const SizedBox(height: 16),
-            _sectionLabel('Citizen Type'),
-            const SizedBox(height: 8),
-            _buildCitizenTypeSelector(),
-            const SizedBox(height: 16),
-            _sectionLabel('Reason for Visit'),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _reasonController,
-              maxLines: 2,
-              decoration: _inputDecoration('Enter reason for visit'),
-            ),
-            const SizedBox(height: 16),
-            _sectionLabel('Symptoms / Current Condition'),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _symptomsController,
-              maxLines: 3,
-              decoration: _inputDecoration('Describe your current condition'),
-            ),
-          ],
+        final services = snapshot.data ?? [];
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionLabel("Healthcare Service"),
+              const SizedBox(height: 12),
+              ...services.map((s) => _serviceCard(s)),
+              const SizedBox(height: 24),
+              _sectionLabel("Priority Category"),
+              _buildTypeSelector(),
+              const SizedBox(height: 24),
+              _sectionLabel("Medical Details"),
+              const SizedBox(height: 12),
+              _textField(_reasonController, "Reason for Visit", 2),
+              const SizedBox(height: 12),
+              _textField(_symptomsController, "Symptoms (Optional)", 3),
+              const SizedBox(height: 32),
+              _submitButton(),
+              const SizedBox(height: 100),
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildServiceList(List<QueueServiceOption> services) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionLabel('Available Services Today'),
-        const SizedBox(height: 8),
-        ...services.map((service) {
-          final selected = _selectedService?.serviceKey == service.serviceKey;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 10),
+  // ── 2. ACTIVE TICKET VIEW (INTEGRATED PEOPLE AHEAD) ────────────────
+  Widget _buildActiveTicketView(QueueDashboardSnapshot queue) {
+    int myNum = queue.myQueueNumber ?? 0;
+    int currentNum = queue.currentlyServingQueueNumber ?? 0;
+    int peopleAhead = myNum - currentNum;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          _buildPeopleAheadBanner(peopleAhead, currentNum),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
-              color: selected ? _C.primaryMid.withOpacity(0.08) : _C.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: selected ? _C.primaryMid : _C.fieldBorder,
-                width: selected ? 1.4 : 1,
-              ),
-              boxShadow: const [
-                BoxShadow(
-                  color: _C.shadow,
-                  blurRadius: 8,
-                  offset: Offset(0, 3),
-                ),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(32),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20)],
+            ),
+            child: Column(
+              children: [
+                QrImageView(data: queue.ticketCode, size: 180),
+                const SizedBox(height: 20),
+                Text('#${myNum.toString().padLeft(3, '0')}',
+                    style: const TextStyle(fontSize: 52, fontWeight: FontWeight.w900, color: _C.textDark)),
+                Text(queue.serviceLabel.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, color: _C.textMuted, fontSize: 12)),
+                const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Divider()),
+                _detailRow("Your Status", peopleAhead <= 0 ? "NOW SERVING" : "WAITING"),
+                _detailRow("Estimated Wait", "${queue.estimatedWaitMinutes} mins"),
               ],
             ),
-            child: ListTile(
-              onTap: () {
-                setState(() {
-                  _selectedService = service;
-                });
-              },
-              title: Text(
-                service.serviceLabel,
-                style: const TextStyle(
-                  color: _C.textDark,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              subtitle: Text(
-                '${service.doctorCount} doctor(s) available',
-                style: const TextStyle(color: _C.textMuted),
-              ),
-              trailing: Icon(
-                selected ? Icons.check_circle : Icons.radio_button_unchecked,
-                color: selected ? _C.primaryMid : _C.textMuted,
-              ),
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
-  Widget _buildCitizenTypeSelector() {
-    final values = ['regular', 'pwd', 'pregnant'];
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: values.map((value) {
-        final selected = _citizenType == value;
-        return ChoiceChip(
-          selected: selected,
-          label: Text(_citizenLabel(value)),
-          onSelected: (_) {
-            setState(() => _citizenType = value);
-          },
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildTicketView() {
-    final ticket = _ticket!;
-    final dashboard = _dashboard ?? QueueDashboardSnapshot.empty;
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: _C.surface,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: const [
-              BoxShadow(color: _C.shadow, blurRadius: 14, offset: Offset(0, 5)),
-            ],
           ),
-          child: Column(
-            children: [
-              Text(
-                'Queue Number ${_queueNo(ticket.queueNumber)}',
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  color: _C.primary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                ticket.serviceLabel,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: _C.textMuted,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 16),
-              QrImageView(
-                data: ticket.ticketCode,
-                version: QrVersions.auto,
-                size: 180,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                ticket.ticketCode,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
-                  color: _C.textDark,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _infoRow(
-                'Currently Serving',
-                _queueNo(dashboard.currentlyServingQueueNumber),
-              ),
-              _infoRow(
-                'Your Queue Number',
-                _queueNo(dashboard.myQueueNumber ?? ticket.queueNumber),
-              ),
-              _infoRow(
-                'Estimated Waiting Time',
-                _formatMinutes(
-                  dashboard.estimatedWaitMinutes > 0
-                      ? dashboard.estimatedWaitMinutes
-                      : ticket.estimatedWaitMinutes,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 50,
-          child: ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: _C.primaryMid),
-            child: const Text('DONE'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBottomAction() {
-    final canSubmit = _selectedService != null && !_isSubmitting;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 26),
-      decoration: const BoxDecoration(
-        color: _C.surface,
-        boxShadow: [
-          BoxShadow(color: _C.shadow, blurRadius: 16, offset: Offset(0, -3)),
         ],
       ),
-      child: SizedBox(
-        height: 52,
-        child: ElevatedButton(
-          onPressed: canSubmit ? _submitJoinQueue : null,
-          style: ElevatedButton.styleFrom(backgroundColor: _C.primaryMid),
-          child: _isSubmitting
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : const Text('CONFIRM & JOIN QUEUE'),
-        ),
-      ),
     );
   }
 
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
+  // ── UI HELPERS ─────────────────────────────────────────────────────
+
+  Widget _buildPeopleAheadBanner(int ahead, int current) {
+    bool isTurn = ahead <= 0;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isTurn ? _C.success.withOpacity(0.1) : _C.primaryMid.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
         children: [
-          Text(
-            label,
-            style: const TextStyle(color: _C.textMuted, fontSize: 13),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(
-              color: _C.textDark,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
+          Icon(isTurn ? Icons.check_circle : Icons.groups_rounded,
+              color: isTurn ? _C.success : _C.primaryMid),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("CURRENTLY SERVING: #$current",
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isTurn ? _C.success : _C.primaryMid)),
+                Text(isTurn ? "PLEASE PROCEED TO WINDOW" : "There are $ahead people ahead of you",
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: isTurn ? _C.success : _C.textDark)),
+              ],
             ),
           ),
         ],
@@ -439,35 +232,106 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
     );
   }
 
-  InputDecoration _inputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(color: _C.textMuted),
-      filled: true,
-      fillColor: _C.surface,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _C.fieldBorder),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _C.fieldBorder),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _C.primaryMid, width: 1.5),
+  Widget _serviceCard(QueueServiceOption s) {
+    bool isSel = _selectedService?.serviceKey == s.serviceKey;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedService = s),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSel ? _C.primary.withOpacity(0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isSel ? _C.primary : Colors.transparent, width: 2),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.medical_services_outlined, color: isSel ? _C.primary : _C.textMuted),
+            const SizedBox(width: 16),
+            Text(s.serviceLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const Spacer(),
+            Icon(isSel ? Icons.check_circle_rounded : Icons.radio_button_unchecked, color: isSel ? _C.primary : Colors.grey.shade300),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _sectionLabel(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: _C.textDark,
-        fontSize: 14,
-        fontWeight: FontWeight.w800,
+  Widget _submitButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 58,
+      child: ElevatedButton(
+        onPressed: _isSubmitting ? null : _handleJoin,
+        style: ElevatedButton.styleFrom(backgroundColor: _C.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
+        child: _isSubmitting
+            ? const CircularProgressIndicator(color: Colors.white)
+            : const Text("JOIN QUEUE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
     );
   }
+
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 60, 24, 25), // Adjusted left padding for the icon
+      decoration: const BoxDecoration(
+        color: _C.primary,
+        borderRadius: BorderRadius.only(bottomRight: Radius.circular(40)),
+      ),
+      child: Row(
+        children: [
+          // THE NEW BACK BUTTON
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+            onPressed: () {
+              // This takes the user back to the Dashboard/Previous Screen
+              Navigator.pop(context);
+            },
+          ),
+          const SizedBox(width: 4),
+          const Expanded(
+            child: Text(
+              "Queue Tracker",
+              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+          ),
+          // REFRESH BUTTON
+          IconButton(
+            onPressed: _refreshDashboard,
+            icon: const Icon(Icons.refresh, color: Colors.white70),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypeSelector() {
+    final types = ['regular', 'pwd', 'pregnant'];
+    return Row(
+      children: types.map((t) => Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() => _citizenType = t),
+          child: Container(
+            margin: const EdgeInsets.all(4),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(color: _citizenType == t ? _C.primary : Colors.white, borderRadius: BorderRadius.circular(12)),
+            child: Center(child: Text(t.toUpperCase(), style: TextStyle(color: _citizenType == t ? Colors.white : _C.textMuted, fontSize: 10, fontWeight: FontWeight.bold))),
+          ),
+        ),
+      )).toList(),
+    );
+  }
+
+  Widget _textField(TextEditingController c, String hint, int lines) => TextField(
+    controller: c, maxLines: lines,
+    decoration: InputDecoration(hintText: hint, filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+  );
+
+  Widget _sectionLabel(String t) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(t, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: _C.textDark)));
+
+  Widget _detailRow(String l, String v) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(l, style: const TextStyle(color: _C.textMuted)), Text(v, style: const TextStyle(fontWeight: FontWeight.bold))]),
+  );
 }
