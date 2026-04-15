@@ -516,7 +516,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   return Column(
                     children: [
                       _staffTile(
-                        item.doctorName,
                         specialization,
                         time,
                         _C.success,
@@ -540,8 +539,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   Widget _staffTile(
-    String name,
-    String role,
+    String specialization,
     String time,
     Color statusColor,
     String statusLabel,
@@ -566,7 +564,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  specialization,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -575,7 +573,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$role • $time',
+                  time,
                   style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
                 ),
               ],

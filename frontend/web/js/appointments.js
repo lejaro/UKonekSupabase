@@ -1,4 +1,4 @@
-// Queue Management Module (drag-and-drop board)
+// Queue Management Module
 
 const appointments = (() => {
   const COMPLETED_PURGE_GRACE_SECONDS = 10;
@@ -12,7 +12,6 @@ const appointments = (() => {
     if (!queueSection) return;
 
     setupEventListeners();
-    setupDragDropHandlers();
     setupTicketModalHandlers();
     await loadQueueTickets();
   };
@@ -66,30 +65,17 @@ const appointments = (() => {
         if (Number.isFinite(ticketId)) {
           await markServingCompleted(ticketId);
         }
+        return;
       }
-    });
-  };
 
-  const setupDragDropHandlers = () => {
-    document.querySelectorAll('.queue-card-list[data-lane]').forEach((laneElement) => {
-      laneElement.addEventListener('dragover', (event) => {
-        event.preventDefault();
-        laneElement.classList.add('is-drop-target');
-      });
-
-      laneElement.addEventListener('dragleave', () => {
-        laneElement.classList.remove('is-drop-target');
-      });
-
-      laneElement.addEventListener('drop', async (event) => {
-        event.preventDefault();
-        laneElement.classList.remove('is-drop-target');
-
-        const ticketId = Number(event.dataTransfer?.getData('text/plain') || 0);
-        const targetLane = String(laneElement.dataset.lane || '').trim();
-        if (!ticketId || !targetLane) return;
-        await moveTicketToLane(ticketId, targetLane);
-      });
+      const moveBtn = event.target.closest('[data-action="ticket-move"]');
+      if (moveBtn) {
+        const ticketId = Number(moveBtn.getAttribute('data-ticket-id'));
+        const targetLane = String(moveBtn.getAttribute('data-target-lane') || '').trim();
+        if (Number.isFinite(ticketId) && targetLane) {
+          await moveTicketToLane(ticketId, targetLane);
+        }
+      }
     });
   };
 
@@ -177,9 +163,9 @@ const appointments = (() => {
     const scoped = getScopedQueueTickets();
     const buckets = categorizeTickets(scoped);
 
-    renderLaneCards('queue-waiting-list', buckets.waiting, 'No waiting tickets.');
-    renderLaneCards('queue-oncall-list', buckets.onCall, 'No on-call tickets.');
-    renderLaneCards('queue-serving-list', buckets.serving, 'No one is currently serving.', true);
+    renderLaneCards('queue-waiting-list', buckets.waiting, 'No waiting tickets.', 'waiting');
+    renderLaneCards('queue-oncall-list', buckets.onCall, 'No on-call tickets.', 'on_call');
+    renderLaneCards('queue-serving-list', buckets.serving, 'No one is currently serving.', 'serving', true);
     updateLaneCount('queue-waiting-count', buckets.waiting.length);
     updateLaneCount('queue-oncall-count', buckets.onCall.length);
     updateLaneCount('queue-serving-count', buckets.serving.length);
@@ -187,7 +173,31 @@ const appointments = (() => {
     updateSummaryBadge(buckets.waiting.length, buckets.onCall.length);
   };
 
-  const renderLaneCards = (containerId, tickets, emptyText, allowComplete = false) => {
+  const getLaneActionButtons = (lane, ticketId) => {
+    if (lane === 'waiting') {
+      return `
+        <button class="queue-ticket-btn" type="button" data-action="ticket-move" data-target-lane="on_call" data-ticket-id="${ticketId}">On Call</button>
+        <button class="queue-ticket-btn" type="button" data-action="ticket-move" data-target-lane="serving" data-ticket-id="${ticketId}">Serve Now</button>
+      `;
+    }
+
+    if (lane === 'on_call') {
+      return `
+        <button class="queue-ticket-btn" type="button" data-action="ticket-move" data-target-lane="waiting" data-ticket-id="${ticketId}">Back to Waiting</button>
+        <button class="queue-ticket-btn" type="button" data-action="ticket-move" data-target-lane="serving" data-ticket-id="${ticketId}">Serve Now</button>
+      `;
+    }
+
+    if (lane === 'serving') {
+      return `
+        <button class="queue-ticket-btn" type="button" data-action="ticket-move" data-target-lane="on_call" data-ticket-id="${ticketId}">Back to On Call</button>
+      `;
+    }
+
+    return '';
+  };
+
+  const renderLaneCards = (containerId, tickets, emptyText, lane, allowComplete = false) => {
     const container = document.getElementById(containerId);
     if (!container) return;
 
@@ -204,8 +214,9 @@ const appointments = (() => {
         const citizenName = formatCitizenName(ticket.citizen);
         const serviceLabel = String(ticket.service_label || '').trim() || 'General Consultation';
         const citizenType = formatCitizenType(ticket.citizen_type);
+        const laneActions = getLaneActionButtons(lane, ticket.id);
         return `
-          <div class="queue-ticket-card" draggable="true" data-ticket-id="${ticket.id}">
+          <div class="queue-ticket-card" data-ticket-id="${ticket.id}">
             <div class="queue-ticket-top">
               <span class="queue-ticket-queue">#${queueNumber > 0 ? String(queueNumber).padStart(3, '0') : '-'}</span>
               <span class="queue-ticket-code">${ticketCode}</span>
@@ -213,6 +224,7 @@ const appointments = (() => {
             <div class="queue-ticket-name">${citizenName}</div>
             <div class="queue-ticket-meta">${serviceLabel} • ${citizenType}</div>
             <div class="queue-ticket-actions">
+              ${laneActions}
               <button class="queue-ticket-btn" type="button" data-action="ticket-info" data-ticket-id="${ticket.id}">Info</button>
               ${allowComplete ? `<button class="queue-ticket-btn" type="button" data-action="ticket-complete" data-ticket-id="${ticket.id}">Complete</button>` : ''}
             </div>
@@ -222,11 +234,6 @@ const appointments = (() => {
       .join('');
 
     container.querySelectorAll('.queue-ticket-card').forEach((card) => {
-      card.addEventListener('dragstart', (event) => {
-        const ticketId = String(card.getAttribute('data-ticket-id') || '');
-        event.dataTransfer?.setData('text/plain', ticketId);
-      });
-
       card.addEventListener('click', (event) => {
         const actionBtn = event.target.closest('[data-action]');
         if (actionBtn) return;

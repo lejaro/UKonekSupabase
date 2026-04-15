@@ -387,7 +387,6 @@
             <div class="dropdown-menu hidden">
               <a href="#" class="dropdown-item admin-only" data-section="users-section" data-pane="registered-pane">Staffs</a>
               <a href="#" class="dropdown-item" data-section="users-section" data-pane="citizens-pane">Citizens</a>
-              <a href="#" class="dropdown-item admin-only" data-section="users-section" data-pane="registration-pane">Staff Registration</a>
             </div>
           </div>
 
@@ -759,6 +758,7 @@
           </div>
           <div id="registered-pane">
             <div class="management-actions" style="margin-bottom:10px;">
+              <button id="staff-register-btn" class="chip-btn admin-only" type="button">Staff Registration</button>
               <input id="staff-finder-input" class="search-input" type="search" placeholder="Find staff by name, role, specialization, or employee ID" aria-label="Find staff" />
               <select id="role-filter" class="search-input" aria-label="Filter staff by role">
                 <option value="">All roles</option>
@@ -999,7 +999,7 @@
         <div class="panel">
           <div class="panel-head">
             <h3>Queue Today</h3>
-            <span class="panel-hint">Drag tickets between Waiting, On Call, and Now Serving.</span>
+            <span class="panel-hint">Use the action buttons on each card to move tickets between Waiting, On Call, and Now Serving.</span>
             <span id="queue-current-serving-badge" class="panel-hint" style="padding: 6px 10px; border-radius: 999px; background: #e0f2fe; color: #0369a1; font-weight: 700;">Current serving: none</span>
             <span id="queue-summary-badge" class="panel-hint" style="padding: 6px 10px; border-radius: 999px; background: #f1f5f9; color: #475569; font-weight: 700;">Waiting: 0 | On Call: 0</span>
             <div class="management-actions">

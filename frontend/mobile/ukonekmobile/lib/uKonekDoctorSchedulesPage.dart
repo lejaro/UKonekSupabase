@@ -187,18 +187,10 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            item.doctorName,
+                                            specialization,
                                             style: const TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            specialization,
-                                            style: const TextStyle(
-                                              color: Colors.black54,
-                                              fontWeight: FontWeight.w500,
                                             ),
                                           ),
                                           const SizedBox(height: 12),

@@ -2293,6 +2293,7 @@ const dashboardActivePreview = document.getElementById('dashboard-active-preview
 const dashboardLastSync = document.getElementById('dashboard-last-sync');
 
 const dashRefreshBtn = document.getElementById('dash-refresh-btn');
+const staffRegisterBtn = document.getElementById('staff-register-btn');
 const refreshAccountsBtn = document.getElementById('refresh-accounts-btn');
 const patientsTbody = document.getElementById('citizens-tbody');
 const staffFinderInput = document.getElementById('staff-finder-input');
@@ -3389,6 +3390,12 @@ if (refreshAccountsBtn) {
     storedAccounts.clear();
     await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData(), refreshFeedbackData()]);
     showToast('Account tables refreshed.', 'info');
+  });
+}
+
+if (staffRegisterBtn) {
+  staffRegisterBtn.addEventListener('click', () => {
+    navigateToSection('users-section', { pane: 'registration-pane' });
   });
 }
 
