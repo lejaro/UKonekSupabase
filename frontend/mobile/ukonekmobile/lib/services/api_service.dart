@@ -414,6 +414,7 @@ class ApiService {
           'firstname': payload['firstname'],
           'surname': payload['surname'],
           'middle_initial': payload['middle_initial'] ?? '',
+          'family_number': payload['family_number'] ?? '',
           'date_of_birth': payload['date_of_birth'],
           'age': payload['age'],
           'contact_number': payload['contact_number'] ?? '',
@@ -495,6 +496,7 @@ class ApiService {
         'p_emergency_contact_contact_number':
             payload['emergency_contact_contact_number'] ?? '',
         'p_relation': payload['relation'] ?? '',
+        'p_family_number': payload['family_number'] ?? '',
         'p_username': username,
       },
     );

@@ -6,6 +6,7 @@ class uKonekOtpPage extends StatefulWidget {
   final String firstName;
   final String middleName;
   final String surname;
+  final String familyNumber;
   final String dob;
   final String age;
   final String contact;
@@ -22,6 +23,7 @@ class uKonekOtpPage extends StatefulWidget {
     required this.firstName,
     required this.middleName,
     required this.surname,
+    required this.familyNumber,
     required this.dob,
     required this.age,
     required this.contact,
@@ -87,6 +89,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
         'firstname': widget.firstName.trim(),
         'surname': widget.surname.trim(),
         'middle_initial': widget.middleName.trim(),
+        'family_number': widget.familyNumber.trim(),
         'date_of_birth': dateOfBirth,
         'age': int.tryParse(widget.age.trim()) ?? 0,
         'contact_number': widget.contact.trim(),
@@ -131,6 +134,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
             firstName: widget.firstName,
             middleName: widget.middleName,
             surname: widget.surname,
+            familyNumber: widget.familyNumber,
             nameExtension: '',
             dob: widget.dob,
             age: widget.age,

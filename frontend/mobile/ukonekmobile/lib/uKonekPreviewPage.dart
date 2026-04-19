@@ -408,6 +408,7 @@ class uKonekPreviewPage extends StatelessWidget {
               firstName:        firstName,
               middleName:       middleName,
               surname:          surname,
+              familyNumber:     familyNumber,
               dob:              dob,
               age:              age,
               contact:          contact,
