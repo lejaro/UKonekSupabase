@@ -188,7 +188,7 @@ class _uKonekRegisterWrapperState
                 onSexChanged: (v) =>
                     setState(() => selectedSex = v),
               ),
-              ContactAddressStep(
+              uKonekContactStep(
                 formKey:  _step2Key,
                 contact:  contactController,
                 email:    emailController,
