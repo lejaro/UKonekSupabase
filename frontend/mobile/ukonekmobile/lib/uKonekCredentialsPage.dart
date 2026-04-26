@@ -187,6 +187,27 @@ class _uKonekCredentialsPageState
           'relation':                         widget.relation,
         });
       }
+<<<<<<< HEAD
+=======
+
+      await ApiService.completeCitizenRegistration(payload: {
+        'firstname': widget.firstName.trim(),
+        'surname': widget.surname.trim(),
+        'middle_initial': widget.middleName.trim(),
+        'date_of_birth': dateOfBirth,
+        'age': int.tryParse(widget.age.trim()) ?? 0,
+        'contact_number': widget.contact.trim(),
+        'sex': widget.sex.trim(),
+        'email': widget.email.trim().toLowerCase(),
+        'complete_address': widget.address.trim(),
+        'emergency_contact_complete_name': widget.emergencyName.trim(),
+        'emergency_contact_contact_number': widget.emergencyContact.trim(),
+        'relation': widget.relation.trim(),
+        'username': usernameController.text.trim(),
+        'password': passwordController.text,
+      });
+
+>>>>>>> parent of ac9d4b4 (Family number implemented)
       _showSuccessDialog();
     } catch (e) {
       _snackBar('Error: $e', Colors.redAccent);

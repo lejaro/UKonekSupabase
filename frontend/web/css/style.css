@@ -2077,56 +2077,6 @@ body.dashboard-loading {
     gap: 10px;
 }
 
-#citizens-family-groups {
-    display: grid;
-    gap: 10px;
-}
-
-.citizen-family-group-card {
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    background: #f8fafc;
-    overflow: hidden;
-}
-
-.citizen-family-group-header {
-    width: 100%;
-    border: 0;
-    background: #eef2ff;
-    color: #1e293b;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 12px;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.citizen-family-member-list {
-    list-style: none;
-    margin: 0;
-    padding: 8px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.citizen-family-member-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-}
-
-.citizen-family-member-item span {
-    color: #64748b;
-    font-size: 12px;
-}
-
 .management-toolbar {
     display: flex;
     justify-content: space-between;
@@ -2185,10 +2135,6 @@ body.dashboard-loading {
     .hero-actions,
     .management-actions {
         justify-content: flex-start;
-    }
-
-    .citizen-family-group-header {
-        font-size: 12px;
     }
 }
 

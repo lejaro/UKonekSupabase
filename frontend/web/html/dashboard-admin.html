@@ -785,25 +785,21 @@
           </div>
           <div id="citizens-pane" class="hidden">
             <div class="management-actions" style="margin-bottom:10px;">
-              <input id="citizens-finder-input" class="search-input" type="search" placeholder="Find citizens by username, email, contact number, or family number" aria-label="Find citizens" />
-              <button id="citizens-view-toggle-btn" class="chip-btn chip-btn-outline" type="button">Grouped View</button>
+              <input id="citizens-finder-input" class="search-input" type="search" placeholder="Find citizens by username, email, or contact number" aria-label="Find citizens" />
             </div>
-            <div id="citizens-table-wrap" class="table-wrap">
+            <div class="table-wrap">
               <table class="accounts-table">
                 <thead>
                   <tr class="table-header-row">
                     <th class="table-header-cell">Username</th>
                     <th class="table-header-cell">Email</th>
                     <th class="table-header-cell">Contact Number</th>
-                    <th class="table-header-cell">Family Number</th>
-                    <th class="table-header-cell">Family Members</th>
                     <th class="table-header-cell">Registered</th>
                   </tr>
                 </thead>
                 <tbody id="citizens-tbody"></tbody>
               </table>
             </div>
-            <div id="citizens-family-groups" class="hidden"></div>
           </div>
         </div>
         <div class="panel hidden admin-only" id="registration-pane">
@@ -1064,11 +1060,11 @@
             </div>
             <div class="field">
               <label class="inputLabel" for="sched-start-time">Start Time</label>
-              <input id="sched-start-time" type="time" min="07:00" max="17:00" required />
+              <input id="sched-start-time" type="time" required />
             </div>
             <div class="field">
               <label class="inputLabel" for="sched-end-time">End Time</label>
-              <input id="sched-end-time" type="time" min="07:00" max="17:00" required />
+              <input id="sched-end-time" type="time" required />
             </div>
             <div class="field">
               <label class="inputLabel" for="sched-notes">Notes</label>

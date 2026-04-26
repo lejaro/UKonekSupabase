@@ -395,7 +395,10 @@ class uKonekPreviewPage extends StatelessWidget {
               firstName:        firstName,
               middleName:       middleName,
               surname:          surname,
+<<<<<<< HEAD:frontend/mobile/ukonekmobile/lib/uKonekRegistration/uKonekPreviewPage.dart
               nameExtension:    nameExtension,
+=======
+>>>>>>> parent of ac9d4b4 (Family number implemented):frontend/mobile/ukonekmobile/lib/uKonekPreviewPage.dart
               dob:              dob,
               age:              age,
               contact:          contact,
