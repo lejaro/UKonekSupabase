@@ -1,9 +1,9 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'uKonekPreviewPage.dart';
-import 'steps/uKonekPersonalStep.dart';
-import 'steps/uKonekContactStep.dart';
-import 'steps/uKonekMedicalStep.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:ukonekmobile/uKonekPreviewPage.dart';
+import 'steps/personal_info_step.dart';
+import 'steps/contact_address_step.dart';
+import 'steps/id_verification_step.dart';
 
 class uKonekRegisterWrapper extends StatefulWidget {
   const uKonekRegisterWrapper({super.key});
@@ -26,6 +26,7 @@ class _uKonekRegisterWrapperState
   final middleNameController     = TextEditingController();
   final lastNameController       = TextEditingController();
   final nameExtensionController  = TextEditingController();
+  final familyNumberExtensionController = TextEditingController();
   final ageController            = TextEditingController();
   final contactController        = TextEditingController();
   final emailController          = TextEditingController();
@@ -40,11 +41,11 @@ class _uKonekRegisterWrapperState
   DateTime? selectedDate;
   String    selectedSex  = 'Male';
   bool      idVerified   = false;
-  File?     idImage;
+  XFile?    idImage;
 
-  static const _primary   = Color(0xFF0077B6);
-  static const _primary2  = Color(0xFF0096C7);
-  static const _bg        = Color(0xFFF0F7FA);
+  static const _primary   = Color(0xFF0A2E6E);
+  static const _primary2  = Color(0xFF1565C0);
+  static const _bg        = Color(0xFFF0F4FA);
   static const _surface   = Colors.white;
   static const _textDark  = Color(0xFF1A2740);
   static const _textMuted = Color(0xFF8A93A0);
@@ -54,7 +55,7 @@ class _uKonekRegisterWrapperState
   static const _steps = [
     {'label': 'Personal',  'icon': Icons.person_outline_rounded},
     {'label': 'Contact',   'icon': Icons.contact_mail_outlined},
-    {'label': 'Medical History', 'icon': Icons.medical_information_outlined},
+    {'label': 'Verify ID', 'icon': Icons.shield_outlined},
   ];
 
   Future<void> pickDate() async {
@@ -137,6 +138,7 @@ class _uKonekRegisterWrapperState
           middleName:       middleNameController.text,
           surname:          lastNameController.text,
           nameExtension:    nameExtensionController.text,
+          familyNumber: familyNumberExtensionController.text,
           dob:              selectedDate != null
               ? '${selectedDate!.month}/${selectedDate!.day}/${selectedDate!.year}'
               : '',
@@ -172,12 +174,13 @@ class _uKonekRegisterWrapperState
             onPageChanged: (p) =>
                 setState(() => _currentStep = p),
             children: [
-              uKonekPersonalStep(
+              PersonalInfoStep(
                 formKey:      _step1Key,
                 firstName:    firstNameController,
                 middleName:   middleNameController,
                 lastName:     lastNameController,
                 nameExtension:nameExtensionController,
+                familyNumber: familyNumberExtensionController,
                 age:          ageController,
                 onPickDate:   pickDate,
                 selectedDate: selectedDate,
@@ -185,7 +188,7 @@ class _uKonekRegisterWrapperState
                 onSexChanged: (v) =>
                     setState(() => selectedSex = v),
               ),
-              uKonekContactStep(
+              ContactAddressStep(
                 formKey:  _step2Key,
                 contact:  contactController,
                 email:    emailController,
@@ -196,7 +199,7 @@ class _uKonekRegisterWrapperState
                 eContact: emergencyContactController,
                 relation: relationController,
               ),
-              uKonekMedicalStep(
+              IdVerificationStep(
                 firstName: firstNameController.text,
                 surname:   lastNameController.text,
                 middleName:middleNameController.text,
@@ -207,10 +210,6 @@ class _uKonekRegisterWrapperState
                     idImage    = file;
                   });
                 },
-                  onDataChanged: (data) {
-                    // handle form data here
-                    print(data); // or store it
-                  },
               ),
             ],
           ),
@@ -265,7 +264,7 @@ class _uKonekRegisterWrapperState
             const Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Patient Registration',
+                Text('Create Account',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -273,7 +272,7 @@ class _uKonekRegisterWrapperState
                       letterSpacing: -0.3,
                     )),
                 SizedBox(height: 2),
-                Text('Tell us about yourself',
+                Text('Fill in your information below',
                     style: TextStyle(
                         color: Colors.white70, fontSize: 12)),
               ],

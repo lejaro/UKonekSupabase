@@ -1,15 +1,15 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'uKonekDentalLoginPage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'services/api_service.dart';
+import 'uKonekLoginPage.dart';
 
 class uKonekCredentialsPage extends StatefulWidget {
-  final String firstName, middleName, surname, nameExtension;
+  final String firstName, middleName, surname, familyNumber, nameExtension;
   final String dob, age, contact, sex, email, address;
   final String emergencyName, emergencyContact, relation;
   final String extractedOcrText;
-  final File?  idImage;
+  final XFile? idImage;
   final bool   idVerified;
 
   const uKonekCredentialsPage({
@@ -17,6 +17,7 @@ class uKonekCredentialsPage extends StatefulWidget {
     required this.firstName,
     required this.middleName,
     required this.surname,
+    required this.familyNumber,
     required this.nameExtension,
     required this.dob,
     required this.age,
@@ -50,13 +51,13 @@ class _uKonekCredentialsPageState
   bool _agreedToTerms   = false;
   bool _isSubmitting    = false;
 
-  static const _primary   = Color(0xFF0077B6);
-  static const _primary2  = Color(0xFF0096C7);
-  static const _bg        = Color(0xFFF0F7FA);
+  static const _primary   = Color(0xFF0A2E6E);
+  static const _primary2  = Color(0xFF1565C0);
+  static const _bg        = Color(0xFFF0F4FA);
   static const _surface   = Colors.white;
   static const _textDark  = Color(0xFF1A2740);
   static const _textMuted = Color(0xFF8A93A0);
-  static const _fieldBg   = Color(0xFFF0F9FF);
+  static const _fieldBg   = Color(0xFFF8FAFF);
   static const _fieldBdr  = Color(0xFFDDE3F0);
   static const _success   = Color(0xFF10B981);
 
@@ -157,43 +158,33 @@ class _uKonekCredentialsPageState
     );
   }
 
+  String? _toIsoDate(String date) {
+    final parts = date.split('/');
+    if (parts.length != 3) return null;
+    final month = int.tryParse(parts[0]);
+    final day = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
+    if (month == null || day == null || year == null) return null;
+    final parsed = DateTime(year, month, day);
+    return '${parsed.year.toString().padLeft(4, '0')}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
+  }
+
   // ── Submit (unchanged logic) ──────────────────────────────────
   Future<void> _submitRegistration() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
 
     try {
-      final supabase = Supabase.instance.client;
-      final AuthResponse res = await supabase.auth.signUp(
-        email:    widget.email.trim().toLowerCase(),
-        password: passwordController.text,
-      );
-
-      if (res.user != null) {
-        await supabase.from('citizens').insert({
-          'auth_user_id':                     res.user!.id,
-          'firstname':                        widget.firstName.trim(),
-          'surname':                          widget.surname.trim(),
-          'middle_initial':                   widget.middleName.trim(),
-          'date_of_birth':                    widget.dob,
-          'age':                              int.tryParse(widget.age) ?? 0,
-          'contact_number':                   widget.contact,
-          'sex':                              widget.sex,
-          'email':                            widget.email.trim().toLowerCase(),
-          'complete_address':                 widget.address,
-          'username':                         usernameController.text.trim(),
-          'emergency_contact_complete_name':  widget.emergencyName,
-          'emergency_contact_contact_number': widget.emergencyContact,
-          'relation':                         widget.relation,
-        });
+      final dateOfBirth = _toIsoDate(widget.dob);
+      if (dateOfBirth == null) {
+        throw Exception('Invalid birth date format. Please go back and select your date again.');
       }
-<<<<<<< HEAD
-=======
 
       await ApiService.completeCitizenRegistration(payload: {
         'firstname': widget.firstName.trim(),
         'surname': widget.surname.trim(),
         'middle_initial': widget.middleName.trim(),
+        'family_number': widget.familyNumber.trim(),
         'date_of_birth': dateOfBirth,
         'age': int.tryParse(widget.age.trim()) ?? 0,
         'contact_number': widget.contact.trim(),
@@ -207,7 +198,6 @@ class _uKonekCredentialsPageState
         'password': passwordController.text,
       });
 
->>>>>>> parent of ac9d4b4 (Family number implemented)
       _showSuccessDialog();
     } catch (e) {
       _snackBar('Error: $e', Colors.redAccent);
@@ -456,7 +446,7 @@ class _uKonekCredentialsPageState
             const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Create Account',
+                Text('Set Credentials',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 20,
@@ -464,7 +454,7 @@ class _uKonekCredentialsPageState
                       letterSpacing: -0.4,
                     )),
                 SizedBox(height: 2),
-                Text('Set up your login credentials.',
+                Text('Almost there! Create your login info.',
                     style: TextStyle(
                         color: Colors.white70, fontSize: 12)),
               ],
@@ -579,7 +569,7 @@ class _uKonekCredentialsPageState
                 color: _success, size: 32),
           ),
           const SizedBox(height: 16),
-          const Text('Check Your Email',
+          const Text('Account Ready',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -587,7 +577,7 @@ class _uKonekCredentialsPageState
               )),
           const SizedBox(height: 10),
           const Text(
-              'Please check your email for the verification link to activate your account.',
+              'Your email is verified and your profile is complete. You can now sign in.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
@@ -609,7 +599,7 @@ class _uKonekCredentialsPageState
               onPressed: () => Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(
-                    builder: (_) => const uKonekDentalLoginPage()),
+                    builder: (_) => const uKonekLoginPage()),
                     (route) => false,
               ),
               child: const Text('GO TO SIGN IN',
