@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-class ContactAddressStep extends StatelessWidget {
+class uKonekContactStep extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController contact;
   final TextEditingController email;
@@ -12,7 +12,7 @@ class ContactAddressStep extends StatelessWidget {
   final TextEditingController eContact;
   final TextEditingController relation;
 
-  const ContactAddressStep({
+  const uKonekContactStep({
     super.key,
     required this.formKey,
     required this.contact,
@@ -25,11 +25,11 @@ class ContactAddressStep extends StatelessWidget {
     required this.relation,
   });
 
-  static const _primary   = Color(0xFF0A2E6E);
-  static const _primary2  = Color(0xFF1565C0);
+  static const _primary   = Color(0xFF0077B6);
+  static const _primary2  = Color(0xFF0096C7);
   static const _textDark  = Color(0xFF1A2740);
   static const _textMuted = Color(0xFF8A93A0);
-  static const _fieldBg   = Color(0xFFF8FAFF);
+  static const _fieldBg   = Color(0xFFF0F9FF);
   static const _fieldBdr  = Color(0xFFDDE3F0);
 
   @override
@@ -215,9 +215,8 @@ class ContactAddressStep extends StatelessWidget {
         decoration: _decoration(label, icon),
         validator: (v) {
           if (v == null || v.trim().isEmpty) return 'Required';
-          if (isEmail && (!v.contains('@') || !v.contains('.'))) {
+          if (isEmail && (!v.contains('@') || !v.contains('.')))
             return 'Invalid email';
-          }
           return null;
         },
       ),

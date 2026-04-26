@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'uKonekRegistration/uKonekRegisterWrapper.dart';
-import 'uKonekLoginPage.dart';
+import 'uKonekDentalLoginPage.dart';
 
 class uKonekMenuPage extends StatefulWidget {
   const uKonekMenuPage({super.key});

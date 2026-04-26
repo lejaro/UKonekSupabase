@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
-import 'uKonekMenuPage.dart';
+import 'uKonekDentalLoginPage.dart';
 
 // ── Shared design tokens ───────────────────────────────────────
 class _C {
-  static const primary    = Color(0xFF0A2E6E);
-  static const primaryMid = Color(0xFF1565C0);
-  static const bg         = Color(0xFFF8FAFF);
+  static const primary    = Color(0xFF0077B6);
+  static const primaryMid = Color(0xFF0096C7);
+  static const bg         = Color(0xFFF0F9FF);
   static const textDark   = Color(0xFF1A2740);
   static const textMuted  = Color(0xFF8A93A0);
 }
 
-class OnboardingPage extends StatefulWidget {
-  const OnboardingPage({super.key});
+class uKonekDentalOnboarding extends StatefulWidget {
+  const uKonekDentalOnboarding({super.key});
 
   @override
-  State<OnboardingPage> createState() => _OnboardingPageState();
+  State<uKonekDentalOnboarding> createState() => _uKonekDentalOnboardingPageState();
 }
 
-class _OnboardingPageState extends State<OnboardingPage>
+class _uKonekDentalOnboardingPageState extends State<uKonekDentalOnboarding>
     with SingleTickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
@@ -27,25 +27,25 @@ class _OnboardingPageState extends State<OnboardingPage>
 
   final List<Map<String, dynamic>> _onboardingData = [
     {
-      'title':       'Welcome to U-Konek+ 👋',
-      'subtitle':    'Your barangay health center, in your pocket.',
-      'description': 'Skip long queues and manage your health services anytime, anywhere with ease.',
+      'title':       'Welcome to DentCare+ 🦷',
+      'subtitle':    'Your dental clinic, in your pocket.',
+      'description': 'Book appointments and manage your dental care anytime, anywhere with ease.',
       'icon':        Icons.volunteer_activism_rounded,
       'color':       const Color(0xFF10B981),
       'bgColor':     const Color(0xFFECFDF5),
     },
     {
-      'title':       'No More Waiting in Line',
-      'subtitle':    'Join the queue digitally.',
-      'description': 'Get your number, track your turn in real-time — no need to wait onsite.',
-      'icon':        Icons.confirmation_number_rounded,
-      'color':       const Color(0xFF1565C0),
+      'title':       'Easy Appointment Booking',
+      'subtitle':    'Schedule visits with ease.',
+      'description': 'Pick your service, choose a date and time — confirmed instantly.',
+      'icon':        Icons.calendar_month_rounded,
+      'color':       const Color(0xFF0096C7),
       'bgColor':     const Color(0xFFEFF6FF),
     },
     {
-      'title':       'Stay on Top of Your Health',
-      'subtitle':    'Reminders & appointments made simple.',
-      'description': 'Book visits, track check-ups, and receive reminders for your medicines.',
+      'title':       'Track Your Dental History',
+      'subtitle':    'Records and prescriptions in one place.',
+      'description': 'View treatment records, prescriptions, and upcoming appointments anytime.',
       'icon':        Icons.notifications_active_rounded,
       'color':       const Color(0xFF7B1FA2),
       'bgColor':     const Color(0xFFF5F3FF),
@@ -87,9 +87,9 @@ class _OnboardingPageState extends State<OnboardingPage>
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, _, _) => const uKonekMenuPage(),
+        pageBuilder: (_, __, ___) => const uKonekDentalLoginPage(),
         transitionDuration: const Duration(milliseconds: 500),
-        transitionsBuilder: (_, anim, _, child) =>
+        transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
       ),
     );

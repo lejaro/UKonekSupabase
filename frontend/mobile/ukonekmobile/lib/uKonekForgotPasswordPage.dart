@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
-import 'uKonekLoginPage.dart';
+import 'uKonekDentalLoginPage.dart';
 
 class uKonekForgotPasswordPage extends StatefulWidget {
   const uKonekForgotPasswordPage({super.key});

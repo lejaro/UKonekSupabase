@@ -1,13 +1,13 @@
-import 'dart:typed_data';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'uKonekOtpPage.dart';
+import '../uKonekCredentialsPage.dart';
 
 class uKonekPreviewPage extends StatelessWidget {
-  final String firstName, middleName, surname, nameExtension, familyNumber;
+  final String firstName, middleName, surname, nameExtension;
   final String dob, age, contact, sex, email, address;
   final String emergencyName, emergencyContact, relation;
-  final XFile? idImage;
+  final File?  idImage;
   final bool   idVerified;
   final String extractedOcrText;
 
@@ -17,7 +17,6 @@ class uKonekPreviewPage extends StatelessWidget {
     required this.middleName,
     required this.surname,
     required this.nameExtension,
-    required this.familyNumber,
     required this.dob,
     required this.age,
     required this.contact,
@@ -32,9 +31,9 @@ class uKonekPreviewPage extends StatelessWidget {
     this.extractedOcrText = '',
   });
 
-  static const _primary   = Color(0xFF0A2E6E);
-  static const _primary2  = Color(0xFF1565C0);
-  static const _bg        = Color(0xFFF0F4FA);
+  static const _primary   = Color(0xFF0077B6);
+  static const _primary2  = Color(0xFF0096C7);
+  static const _bg        = Color(0xFFF0F7FA);
   static const _surface   = Colors.white;
   static const _textDark  = Color(0xFF1A2740);
   static const _textMuted = Color(0xFF8A93A0);
@@ -60,7 +59,6 @@ class uKonekPreviewPage extends StatelessWidget {
                   _Row('First Name',       firstName),
                   _Row('Middle Name',      middleName),
                   _Row('Name Extension',   nameExtension),
-                  _Row('Family Number',   familyNumber),
                   _Row('Surname',          surname),
                   _Row('Date of Birth',    dob),
                   _Row('Age',              age),
@@ -130,7 +128,7 @@ class uKonekPreviewPage extends StatelessWidget {
             const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Review Details',
+                Text('Review Your Info',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 20,
@@ -138,7 +136,7 @@ class uKonekPreviewPage extends StatelessWidget {
                       letterSpacing: -0.4,
                     )),
                 SizedBox(height: 2),
-                Text('Confirm your info before submitting',
+                Text('Check everything before creating your account',
                     style: TextStyle(
                         color: Colors.white70, fontSize: 12)),
               ],
@@ -351,26 +349,15 @@ class uKonekPreviewPage extends StatelessWidget {
           if (idImage != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: FutureBuilder<Uint8List>(
-                future: idImage!.readAsBytes(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const SizedBox(
-                      height: 170,
-                      child: Center(
-                        child: CircularProgressIndicator(color: _primary),
-                      ),
-                    );
-                  }
-
-                  return Image.memory(
-                    snapshot.data!,
-                    width: double.infinity,
-                    height: 170,
-                    fit: BoxFit.cover,
-                  );
-                },
-              ),
+              child: kIsWeb
+                  ? Image.network(idImage!.path,
+                  width: double.infinity,
+                  height: 170,
+                  fit: BoxFit.cover)
+                  : Image.file(idImage!,
+                  width: double.infinity,
+                  height: 170,
+                  fit: BoxFit.cover),
             )
           else
             Container(
@@ -404,11 +391,11 @@ class uKonekPreviewPage extends StatelessWidget {
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => uKonekOtpPage(
+            builder: (_) => uKonekCredentialsPage(
               firstName:        firstName,
               middleName:       middleName,
               surname:          surname,
-              familyNumber:     familyNumber,
+              nameExtension:    nameExtension,
               dob:              dob,
               age:              age,
               contact:          contact,
@@ -418,14 +405,16 @@ class uKonekPreviewPage extends StatelessWidget {
               emergencyName:    emergencyName,
               emergencyContact: emergencyContact,
               relation:         relation,
+              idImage:          idImage,
               idVerified:       idVerified,
+              extractedOcrText: extractedOcrText,
             ),
           ),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('VERIFY EMAIL FIRST',
+            Text('SUBMIT & CONTINUE',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,

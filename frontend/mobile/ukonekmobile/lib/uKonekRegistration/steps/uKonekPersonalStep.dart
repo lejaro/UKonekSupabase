@@ -1,26 +1,24 @@
 import 'package:flutter/material.dart';
 
-class PersonalInfoStep extends StatelessWidget {
+class uKonekPersonalStep extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController firstName;
   final TextEditingController middleName;
   final TextEditingController lastName;
   final TextEditingController nameExtension;
-  final TextEditingController familyNumber;
   final TextEditingController age;
   final DateTime? selectedDate;
   final VoidCallback onPickDate;
   final String selectedSex;
   final Function(String) onSexChanged;
 
-  const PersonalInfoStep({
+  const uKonekPersonalStep({
     super.key,
     required this.formKey,
     required this.firstName,
     required this.middleName,
     required this.lastName,
     required this.nameExtension,
-    required this.familyNumber,
     required this.age,
     required this.onPickDate,
     this.selectedDate,
@@ -28,11 +26,11 @@ class PersonalInfoStep extends StatelessWidget {
     required this.onSexChanged,
   });
 
-  static const _primary   = Color(0xFF0A2E6E);
-  static const _primary2  = Color(0xFF1565C0);
+  static const _primary   = Color(0xFF0077B6);
+  static const _primary2  = Color(0xFF0096C7);
   static const _textDark  = Color(0xFF1A2740);
   static const _textMuted = Color(0xFF8A93A0);
-  static const _fieldBg   = Color(0xFFF8FAFF);
+  static const _fieldBg   = Color(0xFFF0F9FF);
   static const _fieldBdr  = Color(0xFFDDE3F0);
 
   @override
@@ -55,7 +53,7 @@ class PersonalInfoStep extends StatelessWidget {
                 )),
             const SizedBox(height: 4),
             Text(
-                'Enter your information as it appears on your ID.',
+                'Enter your basic personal information.',
                 style: TextStyle(
                     fontSize: 13, color: Colors.grey.shade500)),
             const SizedBox(height: 24),
@@ -80,9 +78,6 @@ class PersonalInfoStep extends StatelessWidget {
                       required: false, hint: 'Jr/III')),
                 ],
               ),
-              _field('Family Number', familyNumber,
-                  Icons.badge_outlined,
-                  required: false, hint: 'Optional'),
             ]),
             const SizedBox(height: 16),
 
@@ -192,9 +187,8 @@ class PersonalInfoStep extends StatelessWidget {
                   color: Colors.redAccent)),
         ),
         validator: (v) {
-          if (required && (v == null || v.trim().isEmpty)) {
+          if (required && (v == null || v.trim().isEmpty))
             return 'Required';
-          }
           return null;
         },
       ),

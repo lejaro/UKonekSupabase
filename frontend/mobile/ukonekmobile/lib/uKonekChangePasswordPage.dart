@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
-import 'uKonekLoginPage.dart';
+import 'uKonekDentalLoginPage.dart';
 
 class uKonekChangePasswordPage extends StatefulWidget {
   final String email;
@@ -383,7 +383,7 @@ class _uKonekChangePasswordPageState
             onPressed: () => Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
-                  builder: (_) => const uKonekLoginPage()),
+                  builder: (_) => const uKonekDentalLoginPage()),
                   (route) => false,
             ),
             child: const Row(
