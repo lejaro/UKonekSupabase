@@ -477,10 +477,8 @@ const SECTION_ROLE_RULES = {
   'dashboard-section': ['admin'],
   'users-section': ['admin', 'doctor', 'nurse', 'staff'],
   'reports-section': ['admin'],
-  'analytics-section': ['admin'],
   'medicine-section': ['admin', 'doctor', 'nurse', 'staff'],
   'consultation-section': ['admin', 'doctor', 'nurse', 'staff'],
-  'queue-section': ['admin', 'doctor', 'nurse', 'staff'],
   'schedule-section': ['admin', 'doctor', 'nurse', 'staff'],
   'profile-section': ['admin', 'doctor', 'nurse', 'staff']
 };
@@ -1175,7 +1173,7 @@ if (registerForm) {
     const last_name = document.getElementById('reg-last-name').value.trim();
     const birthday = document.getElementById('reg-birthday').value;
     const gender = document.getElementById('reg-gender').value;
-    const employee_id = ensureEmployeeId().trim();
+    const employee_id = document.getElementById('reg-employee-id').value.trim();
     const username = document.getElementById('reg-username').value.trim();
     const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
@@ -1197,7 +1195,7 @@ if (registerForm) {
       success.style.display = 'none';
     }
 
-    if (!first_name || !last_name || !username || !email || !role) {
+    if (!first_name || !last_name || !employee_id || !username || !email || !role) {
       if (err) {
         err.textContent = 'Please fill in all required fields.';
         err.style.display = 'block';
@@ -1350,47 +1348,6 @@ if (employeeIdInput) {
   });
 }
 
-function generateEmployeeId() {
-  const now = new Date();
-  const year = String(now.getFullYear()).slice(-2);
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const random = String(Math.floor(Math.random() * 9000) + 1000);
-  return `${year}${month}${day}${random}`;
-}
-
-function ensureEmployeeId(force = false) {
-  if (!employeeIdInput) return '';
-  const current = String(employeeIdInput.value || '').trim();
-  if (!current || force) {
-    const generated = generateEmployeeId();
-    employeeIdInput.value = generated;
-    return generated;
-  }
-  return current;
-}
-
-function applyInputValidationFilters() {
-  const nameInputs = document.querySelectorAll('[data-validate="name"]');
-  const numberInputs = document.querySelectorAll('[data-validate="number"]');
-
-  nameInputs.forEach((input) => {
-    input.addEventListener('input', () => {
-      const current = String(input.value || '');
-      const sanitized = current.replace(/[^a-zA-Z .'-]/g, '');
-      if (sanitized !== current) input.value = sanitized;
-    });
-  });
-
-  numberInputs.forEach((input) => {
-    input.addEventListener('input', () => {
-      const current = String(input.value || '');
-      const sanitized = current.replace(/\D/g, '');
-      if (sanitized !== current) input.value = sanitized;
-    });
-  });
-}
-
 // Email validation
 const emailInput = document.getElementById('reg-email');
 if (emailInput) {
@@ -1418,8 +1375,6 @@ setupPasswordVisibilityToggles();
 // Init registration section handlers after DOM load
 document.addEventListener('DOMContentLoaded', () => {
   setupPasswordVisibilityToggles();
-  applyInputValidationFilters();
-  ensureEmployeeId();
 });
 
 // --- Profile & Schedule role-based helpers ---
@@ -2370,6 +2325,8 @@ const roleFilterInput = document.getElementById('role-filter');
 const citizensFinderInput = document.getElementById('citizens-finder-input');
 const userPaneIds = ['accounts-pane', 'registration-pane'];
 const chartAnimationState = { frameId: null };
+let citizensViewMode = 'table';
+const expandedFamilyGroups = new Set();
 
 function applyStaffFinder() {
   const query = String(staffFinderInput?.value || '').trim().toLowerCase();
@@ -2512,6 +2469,28 @@ if (roleFilterInput) {
 
 if (citizensFinderInput) {
   citizensFinderInput.addEventListener('input', applyCitizensFinder);
+}
+
+if (citizensViewToggleBtn) {
+  citizensViewToggleBtn.addEventListener('click', () => {
+    citizensViewMode = citizensViewMode === 'table' ? 'grouped' : 'table';
+    const showGrouped = citizensViewMode === 'grouped';
+    if (citizensTableWrap) citizensTableWrap.classList.toggle('hidden', showGrouped);
+    if (citizensFamilyGroups) citizensFamilyGroups.classList.toggle('hidden', !showGrouped);
+    citizensViewToggleBtn.textContent = showGrouped ? 'Table View' : 'Grouped View';
+  });
+}
+
+if (citizensFamilyGroups) {
+  citizensFamilyGroups.addEventListener('click', (event) => {
+    const toggleBtn = event.target.closest('[data-action="toggle-family-group"]');
+    if (!toggleBtn) return;
+    const familyNumber = String(toggleBtn.getAttribute('data-family-number') || '').trim();
+    if (!familyNumber) return;
+    if (expandedFamilyGroups.has(familyNumber)) expandedFamilyGroups.delete(familyNumber);
+    else expandedFamilyGroups.add(familyNumber);
+    applyCitizensFinder();
+  });
 }
 
 function toggleUsersPane(targetId = 'accounts-pane') {
@@ -3354,43 +3333,26 @@ function normalizeCitizenRecord(record) {
   const surname = String(record?.surname || '').trim();
   const fullName = [firstName, surname].filter(Boolean).join(' ').trim();
   const contactNumber = String(record?.contact_number || record?.contactNumber || '').trim();
+  const familyNumber = String(record?.family_number || record?.familyNumber || '').trim();
 
   return {
     ...record,
     username: record?.username || fullName || record?.name || '',
     name: fullName || record?.name || record?.username || '',
-    contact_number: contactNumber
+    contact_number: contactNumber,
+    family_number: familyNumber
   };
 }
 
 async function listCitizensFromSupabase() {
   const { supabase } = await loadSupabaseModule();
-
-  // Prefer RPC, then fall back to direct table reads for older schemas.
-  const rpcResult = await supabase.rpc('api_get_citizens', {
-    p_name: null
-  });
-  if (!rpcResult.error) {
-    return (Array.isArray(rpcResult.data) ? rpcResult.data : []).map(normalizeCitizenRecord);
-  }
-
-  const modernResult = await supabase
+  const { data, error } = await supabase
     .from('citizens')
     .select('username,firstname,surname,email,contact_number,family_number,created_at')
     .order('created_at', { ascending: false });
-  if (!modernResult.error) {
-    return (Array.isArray(modernResult.data) ? modernResult.data : []).map(normalizeCitizenRecord);
-  }
 
-  const legacyResult = await supabase
-    .from('citizens')
-    .select('id,username,firstname,surname,email,contact_number,age,date_of_birth,created_at')
-    .order('created_at', { ascending: false });
-  if (!legacyResult.error) {
-    return (Array.isArray(legacyResult.data) ? legacyResult.data : []).map(normalizeCitizenRecord);
-  }
-
-  throw rpcResult.error || modernResult.error || legacyResult.error;
+  if (error) throw error;
+  return (Array.isArray(data) ? data : []).map(normalizeCitizenRecord);
 }
 
 // Load citizens (mobile app users)
@@ -3574,7 +3536,6 @@ if (refreshAccountsBtn) {
 if (staffRegisterBtn) {
   staffRegisterBtn.addEventListener('click', () => {
     navigateToSection('users-section', { pane: 'registration-pane' });
-    ensureEmployeeId(true);
   });
 }
 
@@ -4166,11 +4127,6 @@ const consultReportBtn = document.getElementById('consult-report-btn');
 const openConsultModalBtn = document.getElementById('open-consult-modal-btn');
 const consultationModal = document.getElementById('consultation-modal');
 const consultationCancelBtn = document.getElementById('consultation-cancel-btn');
-const consultationStatusFilter = document.getElementById('consultation-status-filter');
-const consultationDateFromInput = document.getElementById('consultation-date-from');
-const consultationDateToInput = document.getElementById('consultation-date-to');
-const consultationFilterClearBtn = document.getElementById('consultation-filter-clear-btn');
-const consultationSummaryBadge = document.getElementById('consultation-summary-badge');
 
 const prescriptionModal = document.getElementById('prescription-modal');
 const prescriptionForm = document.getElementById('prescription-form');
@@ -4191,86 +4147,13 @@ function openConsultationModal(prefill = {}) {
   if (!consultationModal) return;
   if (consultationForm) consultationForm.reset();
   const patientInput = document.getElementById('consult-patient-id');
-  const patientNameInput = document.getElementById('consult-patient-name');
-  const patientAgeInput = document.getElementById('consult-patient-age');
   const symptomsInput = document.getElementById('consult-symptoms');
   const diagnosisInput = document.getElementById('consult-diagnosis');
   const notesInput = document.getElementById('consult-notes');
-
-  const fallbackQueuePatient = Array.isArray(consultationQueueTickets) && consultationQueueTickets.length > 0
-    ? consultationQueueTickets[0]
-    : null;
-  const resolvedPatientId = String(
-    prefill.patientId
-    || fallbackQueuePatient?.patientId
-    || ''
-  ).trim();
-
-  if (patientInput) {
-    patientInput.value = resolvedPatientId;
-    patientInput.readOnly = true;
-  }
-
-  const resolvePatientDisplay = (patientId) => {
-    const citizenId = resolveCitizenIdFromIdentifier(patientId);
-    const citizen = Number.isFinite(Number(citizenId))
-      ? latestPatientsList.find((item) => Number(item?.id) === Number(citizenId))
-      : null;
-    const queuePatient = Array.isArray(consultationQueueTickets)
-      ? consultationQueueTickets.find((item) => String(item?.patientId || '').trim() === patientId)
-      : null;
-
-    const first = String(citizen?.firstname || citizen?.first_name || '').trim();
-    const last = String(citizen?.surname || citizen?.last_name || '').trim();
-    const fullName = `${first} ${last}`.trim() || String(queuePatient?.queuePatientName || '').trim();
-
-    const toAge = (value) => {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : null;
-    };
-
-    let age = toAge(citizen?.age);
-    if (age === null) {
-      age = toAge(queuePatient?.queuePatientAge);
-    }
-    if (age === null) {
-      const dobRaw = String(
-        citizen?.date_of_birth
-        || citizen?.birth_date
-        || queuePatient?.queuePatientDateOfBirth
-        || ''
-      ).trim();
-      if (dobRaw) {
-        const dob = new Date(dobRaw);
-        if (!Number.isNaN(dob.getTime())) {
-          const now = new Date();
-          age = now.getFullYear() - dob.getFullYear();
-          const monthDiff = now.getMonth() - dob.getMonth();
-          const dayDiff = now.getDate() - dob.getDate();
-          if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) age -= 1;
-          if (!Number.isFinite(age) || age < 0) age = null;
-        }
-      }
-    }
-
-    return {
-      name: fullName || patientId || 'Unknown patient',
-      ageText: age === null ? '—' : `${age} years old`
-    };
-  };
-
-  const patientDisplay = resolvePatientDisplay(resolvedPatientId);
-  if (patientNameInput) patientNameInput.value = patientDisplay.name;
-  if (patientAgeInput) patientAgeInput.value = patientDisplay.ageText;
-
+  if (patientInput && prefill.patientId) patientInput.value = prefill.patientId;
   if (symptomsInput && prefill.symptoms) symptomsInput.value = prefill.symptoms;
   if (diagnosisInput && prefill.diagnosis) diagnosisInput.value = prefill.diagnosis;
   if (notesInput && prefill.notes) notesInput.value = prefill.notes;
-
-  if (!resolvedPatientId) {
-    showToast('No awaiting patient found. Select a patient from Now Serving first.', 'warning');
-  }
-
   consultationModal.classList.remove('hidden');
 }
 
@@ -4278,10 +4161,6 @@ function closeConsultationModal() {
   if (!consultationModal) return;
   consultationModal.classList.add('hidden');
   if (consultationForm) consultationForm.reset();
-  const patientNameInput = document.getElementById('consult-patient-name');
-  const patientAgeInput = document.getElementById('consult-patient-age');
-  if (patientNameInput) patientNameInput.value = '';
-  if (patientAgeInput) patientAgeInput.value = '';
 }
 
 if (openConsultModalBtn) {
@@ -4290,16 +4169,7 @@ if (openConsultModalBtn) {
       showToast('Only doctors can create consultations.', 'warning');
       return;
     }
-    // Open the enhanced consultation modal (vitals, PE, labs, follow-up)
-    const enhModal = document.getElementById('enhanced-consult-modal');
-    const enhForm = document.getElementById('enhanced-consult-form');
-    if (enhModal) {
-      if (enhForm) enhForm.reset();
-      enhModal.classList.remove('hidden');
-    } else {
-      // Fallback to old modal if enhanced modal not present
-      openConsultationModal();
-    }
+    openConsultationModal();
   });
 }
 
@@ -4319,160 +4189,6 @@ let medicines = [];
 let archivedMedicines = [];
 let prescriptions = [];
 let isArchivedMedicinesVisible = false;
-const consultationFilters = {
-  status: 'all',
-  from: '',
-  to: '',
-  hasUserDateSelection: false
-};
-
-function extractDateKey(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return '';
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, '0');
-  const day = String(parsed.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function getTodayDateKey() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function applyConsultationFilters(rows) {
-  const status = String(consultationFilters.status || 'all').trim().toLowerCase();
-  const fromDate = String(consultationFilters.from || '').trim();
-  const toDate = String(consultationFilters.to || '').trim();
-  const hasExplicitDateRange = consultationFilters.hasUserDateSelection && Boolean(fromDate || toDate);
-  const todayDateKey = getTodayDateKey();
-
-  return (Array.isArray(rows) ? rows : []).filter((entry) => {
-    const isAwaiting = entry?.rowType === 'queue-serving';
-
-    if (status === 'awaiting' && !isAwaiting) return false;
-    if (status === 'done' && isAwaiting) return false;
-
-    const entryDate = extractDateKey(entry?.created_at);
-
-    if (hasExplicitDateRange) {
-      if (!entryDate) return false;
-      if (fromDate && entryDate < fromDate) return false;
-      if (toDate && entryDate > toDate) return false;
-    } else {
-      // Default scope: show patients to be consulted and patients consulted today only.
-      if (!isAwaiting && entryDate !== todayDateKey) return false;
-    }
-
-    return true;
-  });
-}
-
-function applyConsultationFilterBindings() {
-  const rerender = () => renderConsultations();
-
-  if (consultationStatusFilter) {
-    consultationStatusFilter.addEventListener('change', () => {
-      consultationFilters.status = String(consultationStatusFilter.value || 'all').trim().toLowerCase() || 'all';
-      rerender();
-    });
-  }
-
-  if (consultationDateFromInput) {
-    consultationDateFromInput.addEventListener('change', () => {
-      consultationFilters.from = String(consultationDateFromInput.value || '').trim();
-      consultationFilters.hasUserDateSelection = true;
-      rerender();
-    });
-  }
-
-  if (consultationDateToInput) {
-    consultationDateToInput.addEventListener('change', () => {
-      consultationFilters.to = String(consultationDateToInput.value || '').trim();
-      consultationFilters.hasUserDateSelection = true;
-      rerender();
-    });
-  }
-
-  if (consultationFilterClearBtn) {
-    consultationFilterClearBtn.addEventListener('click', () => {
-      consultationFilters.status = 'all';
-      consultationFilters.from = '';
-      consultationFilters.to = '';
-      consultationFilters.hasUserDateSelection = false;
-
-      if (consultationStatusFilter) consultationStatusFilter.value = 'all';
-      if (consultationDateFromInput) consultationDateFromInput.value = '';
-      if (consultationDateToInput) consultationDateToInput.value = '';
-
-      rerender();
-    });
-  }
-}
-
-function getConsultationStatusMeta(entry) {
-  const isAwaiting = entry?.rowType === 'queue-serving';
-  if (isAwaiting) {
-    return {
-      label: 'Awaiting',
-      className: 'consultation-status-badge awaiting'
-    };
-  }
-  return {
-    label: 'Done',
-    className: 'consultation-status-badge done'
-  };
-}
-
-function getConsultationPatientMeta(entry) {
-  const patientId = String(entry?.patientId || '').trim() || 'Unknown';
-  const citizenId = resolveCitizenIdFromIdentifier(patientId);
-  const citizen = Number.isFinite(Number(citizenId))
-    ? (Array.isArray(latestPatientsList)
-      ? latestPatientsList.find((item) => Number(item?.id) === Number(citizenId))
-      : null)
-    : null;
-
-  const first = String(citizen?.firstname || citizen?.first_name || '').trim();
-  const last = String(citizen?.surname || citizen?.last_name || '').trim();
-  const fullName = `${first} ${last}`.trim();
-
-  return {
-    displayName: fullName || patientId,
-    patientId
-  };
-}
-
-function formatConsultationDateTime(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '—';
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return raw;
-
-  const dateText = parsed.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
-  const timeText = parsed.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit'
-  });
-  return `${dateText} ${timeText}`;
-}
-
-function updateConsultationSummaryBadge(rows) {
-  if (!consultationSummaryBadge) return;
-  const list = Array.isArray(rows) ? rows : [];
-  const awaiting = list.filter((item) => item?.rowType === 'queue-serving').length;
-  const done = list.length - awaiting;
-  consultationSummaryBadge.textContent = `Awaiting: ${awaiting} | Done: ${done}`;
-}
 
 function loadFromStorage(key) {
   try {
@@ -4495,28 +4211,15 @@ function renderConsultations() {
   const combinedRows = [...consultationQueueTickets, ...consultations];
   consultationsTbody.innerHTML = '';
   if (!Array.isArray(combinedRows) || combinedRows.length === 0) {
-    consultationsTbody.innerHTML = '<tr><td class="table-cell" colspan="6">No consultations or now serving patients yet.</td></tr>';
+    consultationsTbody.innerHTML = '<tr><td class="table-cell" colspan="5">No consultations or now serving patients yet.</td></tr>';
     return;
   }
   const consultationRows = consultations.slice().reverse();
   const orderedRows = [...consultationQueueTickets, ...consultationRows];
-  const filteredRows = applyConsultationFilters(orderedRows);
-  updateConsultationSummaryBadge(filteredRows);
 
-  if (!filteredRows.length) {
-    consultationsTbody.innerHTML = '<tr><td class="table-cell" colspan="6">No records match the selected consultation filters.</td></tr>';
-    return;
-  }
-
-  filteredRows.forEach(c => {
+  orderedRows.forEach(c => {
     const isQueueServing = c.rowType === 'queue-serving';
-    const statusMeta = getConsultationStatusMeta(c);
-    const patientMeta = getConsultationPatientMeta(c);
-    const diagnosisText = isQueueServing
-      ? (c.symptoms ? `Awaiting consultation • Symptoms: ${c.symptoms}` : 'Awaiting consultation')
-      : (c.diagnosis || c.notes || 'No diagnosis recorded yet');
-    const shortSummary = diagnosisText.length > 96 ? `${diagnosisText.slice(0, 93)}...` : diagnosisText;
-    const prettyDate = formatConsultationDateTime(c.created_at);
+    const diagnosisText = isQueueServing ? 'Awaiting consultation' : (c.diagnosis || '').substring(0, 60);
     const actionButtons = isQueueServing
       ? `${allowConsult ? `<button class="btn small" data-action="consult" data-id="${c.id}">Consult</button>` : ''}`
       : `
@@ -4525,18 +4228,13 @@ function renderConsultations() {
       `;
 
     const tr = document.createElement('tr');
-    tr.className = 'consultation-row';
     tr.innerHTML = `
-      <td class="table-cell consultation-record-cell">${c.id}</td>
-      <td class="table-cell consultation-patient-cell">
-        <div class="consultation-patient-name">${patientMeta.displayName}</div>
-        <div class="consultation-patient-id">${patientMeta.patientId}</div>
-      </td>
-      <td class="table-cell consultation-summary-cell" title="${diagnosisText}">${shortSummary}</td>
-      <td class="table-cell"><span class="${statusMeta.className}">${statusMeta.label}</span></td>
-      <td class="table-cell consultation-date-cell">${prettyDate}</td>
-      <td class="table-cell consultation-actions-cell">
-        ${actionButtons || '<span class="consultation-actions-empty">No actions</span>'}
+      <td class="table-cell">${c.id}</td>
+      <td class="table-cell">${c.patientId}</td>
+      <td class="table-cell">${diagnosisText}</td>
+      <td class="table-cell">${formatDateTime(c.created_at)}</td>
+      <td class="table-cell">
+        ${actionButtons}
       </td>
     `;
     consultationsTbody.appendChild(tr);
@@ -4594,9 +4292,6 @@ function mapConsultationRow(item) {
 function mapNowServingQueueRow(item) {
   const ticketId = Number(item?.id) || 0;
   const citizenId = Number(item?.citizen?.id || 0);
-  const queueFirst = String(item?.citizen?.firstname || '').trim();
-  const queueLast = String(item?.citizen?.surname || '').trim();
-  const queuePatientName = `${queueFirst} ${queueLast}`.trim();
   const patientId = citizenId > 0
     ? `CIT-${citizenId}`
     : (String(item?.ticket_code || '').trim() || `QUEUE-${ticketId || Date.now()}`);
@@ -4616,10 +4311,7 @@ function mapNowServingQueueRow(item) {
     created_at: item?.served_at || item?.created_at || new Date().toISOString(),
     serviceLabel,
     queueNumber,
-    queueStatus: status || 'serving',
-    queuePatientName,
-    queuePatientAge: Number(item?.citizen?.age || 0) || null,
-    queuePatientDateOfBirth: String(item?.citizen?.date_of_birth || '').trim() || null
+    queueStatus: status || 'serving'
   };
 }
 
@@ -4663,48 +4355,21 @@ async function listNowServingQueueForConsultation() {
   }
 
   const today = new Date();
-  const fallbackQueueDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  const activeStatuses = new Set(['waiting', 'on_call', 'serving']);
+  const queueDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const { supabase } = await loadSupabaseModule();
   const { data, error } = await supabase
     .from('queue_tickets')
-    .select('id,queue_date,queue_number,ticket_code,service_label,status,reason,symptoms,created_at,served_at,citizen:citizens(id,firstname,surname,email,age,date_of_birth)')
+    .select('id,queue_number,ticket_code,service_label,status,reason,symptoms,created_at,served_at,citizen:citizens(id,firstname,surname,email)')
+    .eq('queue_date', queueDate)
+    .eq('status', 'serving')
     .order('queue_number', { ascending: true });
 
   if (error) {
     throw new Error(error.message || 'Unable to load now serving queue tickets.');
   }
 
-  const rows = Array.isArray(data) ? data : [];
-
-  const dates = rows
-    .map((item) => String(item?.queue_date || '').trim())
-    .filter(Boolean);
-
-  const hasFallbackDate = dates.includes(fallbackQueueDate);
-  let activeQueueDate = hasFallbackDate ? fallbackQueueDate : '';
-
-  if (!activeQueueDate) {
-    const activeDates = rows
-      .filter((item) => activeStatuses.has(String(item?.status || '').trim().toLowerCase()))
-      .map((item) => String(item?.queue_date || '').trim())
-      .filter(Boolean)
-      .sort();
-    if (activeDates.length > 0) {
-      activeQueueDate = activeDates[activeDates.length - 1];
-    }
-  }
-
-  if (!activeQueueDate) {
-    const sortedDates = [...dates].sort();
-    activeQueueDate = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : fallbackQueueDate;
-  }
-
-  return rows
-    .filter((item) => String(item?.queue_date || '').trim() === activeQueueDate)
-    .filter((item) => String(item?.status || '').trim().toLowerCase() === 'serving')
-    .map(mapNowServingQueueRow);
+  return (data || []).map(mapNowServingQueueRow);
 }
 
 async function refreshConsultationData() {
@@ -4786,7 +4451,6 @@ async function createPrescriptionEntry({ patientId, consultationDbId, items }) {
           unit: String(it?.unit || '').trim(),
           dosage: String(it?.dosage || '').trim(),
           frequency: String(it?.frequency || '').trim(),
-          durationDays: Number(it?.durationDays) || 0,
           instructions: String(it?.instructions || '').trim(),
           additionalInfo: String(it?.additionalInfo || '').trim()
         }))
@@ -4844,7 +4508,6 @@ async function createPrescriptionEntry({ patientId, consultationDbId, items }) {
     unit: it.unit || null,
     dosage: it.dosage || null,
     frequency: it.frequency || null,
-    duration_days: it.durationDays > 0 ? it.durationDays : null,
     instructions: it.instructions || null,
     additional_info: it.additionalInfo || null
   }));
@@ -5373,8 +5036,6 @@ async function initClinicalData() {
   renderConsultations();
 }
 
-applyConsultationFilterBindings();
-
 document.addEventListener('ukonek:queue-updated', async () => {
   if (!consultationSection || consultationSection.classList.contains('hidden')) return;
   await refreshConsultationData();
@@ -5801,23 +5462,16 @@ if (consultationForm) {
     const symptoms = document.getElementById('consult-symptoms').value.trim();
     const diagnosis = document.getElementById('consult-diagnosis').value.trim();
     const notes = document.getElementById('consult-notes').value.trim();
-    const submitAction = String(e.submitter?.dataset?.next || '').trim().toLowerCase();
     if (!patientId || !diagnosis) { showToast('Patient ID and diagnosis required', 'warning'); return; }
 
     try {
-      const consultationEntry = await createConsultationEntry({ patientId, symptoms, diagnosis, notes });
-
+      await createConsultationEntry({ patientId, symptoms, diagnosis, notes });
       await refreshConsultationData();
       if (consultationModal) {
         closeConsultationModal();
       } else {
         consultationForm.reset();
       }
-
-      if (submitAction === 'prescribe') {
-        openPrescriptionModalForPatient(patientId, consultationEntry?.dbId || null);
-      }
-
       showToast('Consultation saved', 'success');
     } catch (error) {
       console.error('Failed to save consultation:', error);
@@ -5860,32 +5514,10 @@ function addPrescriptionLine() {
     </select>
     <label class="inputLabel">Quantity</label>
     <input type="number" class="pres-qty" value="1" min="1" required />
-    <label class="inputLabel">Dosage</label>
-    <input type="text" class="pres-dosage" placeholder="e.g., 500mg" required />
-    <label class="inputLabel">Dosages per day</label>
-    <input type="number" class="pres-doses-per-day" value="2" min="1" max="12" required />
-    <div class="pres-frequency-preview">Will save as: 2 time(s) per day</div>
-    <label class="inputLabel">Duration (days)</label>
-    <input type="number" class="pres-duration-days" value="3" min="1" max="30" required />
-    <label class="inputLabel">Instructions</label>
-    <input type="text" class="pres-instructions" placeholder="e.g., After meals" />
     <button type="button" class="btn small" data-action="remove-line">Remove</button>
   `;
   prescriptionLines.appendChild(line);
   line.querySelector('[data-action="remove-line"]').addEventListener('click', () => line.remove());
-
-  const dosesInput = line.querySelector('.pres-doses-per-day');
-  const previewNode = line.querySelector('.pres-frequency-preview');
-  const syncFrequencyPreview = () => {
-    const dosesPerDay = Number(dosesInput?.value || 0);
-    const safeValue = Number.isFinite(dosesPerDay) && dosesPerDay > 0 ? dosesPerDay : 1;
-    if (previewNode) {
-      previewNode.textContent = `Will save as: ${safeValue} time(s) per day`;
-    }
-  };
-
-  dosesInput?.addEventListener('input', syncFrequencyPreview);
-  syncFrequencyPreview();
 }
 
 if (addPrescriptionLineBtn) addPrescriptionLineBtn.addEventListener('click', addPrescriptionLine);
@@ -5907,33 +5539,10 @@ if (prescriptionForm) {
     const items = [];
     const selects = prescriptionForm.querySelectorAll('.pres-med');
     const qtys = prescriptionForm.querySelectorAll('.pres-qty');
-    const dosages = prescriptionForm.querySelectorAll('.pres-dosage');
-    const dosesPerDayInputs = prescriptionForm.querySelectorAll('.pres-doses-per-day');
-    const durationDaysInputs = prescriptionForm.querySelectorAll('.pres-duration-days');
-    const instructionsInputs = prescriptionForm.querySelectorAll('.pres-instructions');
     for (let i = 0; i < selects.length; i++) {
       const name = selects[i].value;
       const qty = Number(qtys[i].value) || 0;
-      const dosage = String(dosages[i]?.value || '').trim();
-      const dosesPerDay = Number(dosesPerDayInputs[i]?.value) || 0;
-      const durationDays = Number(durationDaysInputs[i]?.value) || 0;
-      const instructions = String(instructionsInputs[i]?.value || '').trim();
-
-      if (name && qty > 0) {
-        if (!dosage || dosesPerDay <= 0 || durationDays <= 0) {
-          showToast('Each medicine requires dosage, dosages per day, and duration.', 'warning');
-          return;
-        }
-        items.push({
-          name,
-          qty,
-          dosage,
-          dosesPerDay,
-          frequency: `${dosesPerDay} time(s) per day`,
-          durationDays,
-          instructions
-        });
-      }
+      if (name && qty > 0) items.push({ name, qty });
     }
     if (items.length === 0) { showToast('Add at least one medicine', 'warning'); return; }
 
@@ -5943,15 +5552,7 @@ if (prescriptionForm) {
         consultationDbId: Number(prescriptionForm.dataset.consultationDbId || '0') || null,
         items: items.map((it) => {
           const med = medicines.find((m) => String(m.name || '') === String(it.name || ''));
-          return {
-            name: it.name,
-            qty: it.qty,
-            unit: med?.unit || '',
-            dosage: it.dosage,
-            frequency: it.frequency,
-            durationDays: it.durationDays,
-            instructions: it.instructions
-          };
+          return { name: it.name, qty: it.qty, unit: med?.unit || '' };
         })
       });
     } catch (error) {
@@ -5960,23 +5561,20 @@ if (prescriptionForm) {
       return;
     }
 
-    // In Supabase mode, stock is deducted atomically by DB trigger during prescription item insert.
-    if (isDemoMode || isApiMode) {
-      try {
-        for (const it of items) {
-          await reduceMedicineStockByName(it.name, Number(it.qty));
-        }
-      } catch (error) {
-        console.error('Failed to update medicine inventory after prescription:', error);
-        showToast(error.message || 'Prescription saved, but inventory update failed.', 'warning');
+    // decrement inventory where possible
+    try {
+      for (const it of items) {
+        await reduceMedicineStockByName(it.name, Number(it.qty));
       }
+      await refreshMedicineData();
+    } catch (error) {
+      console.error('Failed to update medicine inventory after prescription:', error);
+      showToast(error.message || 'Prescription saved, but inventory update failed.', 'warning');
     }
-
-    await refreshMedicineData();
 
     if (prescriptionModal) prescriptionModal.classList.add('hidden');
     prescriptionForm.dataset.consultationDbId = '';
-    showToast('Prescription created. Inventory and dosage schedule updated.', 'success');
+    showToast('Prescription created and inventory updated', 'success');
   });
 }
 
@@ -6206,14 +5804,8 @@ function generateReport(title, headers, rows) {
 // report buttons
 if (consultReportBtn) {
   consultReportBtn.addEventListener('click', () => {
-    const sourceRows = [...consultationQueueTickets, ...consultations.slice().reverse()];
-    const filteredRows = applyConsultationFilters(sourceRows);
-    const headers = ['ID', 'Patient', 'Diagnosis', 'Status', 'Date'];
-    const rows = filteredRows.map(c => {
-      const statusMeta = getConsultationStatusMeta(c);
-      const diagnosis = c.rowType === 'queue-serving' ? 'Awaiting consultation' : (c.diagnosis || '');
-      return [c.id, c.patientId, diagnosis, statusMeta.label, formatDateTime(c.created_at)];
-    });
+    const headers = ['ID', 'Patient', 'Diagnosis', 'Date'];
+    const rows = consultations.map(c => [c.id, c.patientId, c.diagnosis, formatDateTime(c.created_at)]);
     generateReport('Consultations Report', headers, rows);
   });
 }

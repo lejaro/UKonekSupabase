@@ -91,12 +91,10 @@ class uKonekContactStep extends StatelessWidget {
               title: 'Emergency Contact',
               children: [
                 _inputField(eName, 'Full Name',
-                  Icons.person_add_alt_1_outlined,
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z .'-]"))]),
+                    Icons.person_add_alt_1_outlined),
                 _phoneField(eContact, 'Emergency Number'),
                 _inputField(relation, 'Relationship',
-                  Icons.people_outline_rounded,
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z .'-]"))]),
+                    Icons.people_outline_rounded),
               ],
             ),
           ],
@@ -203,9 +201,9 @@ class uKonekContactStep extends StatelessWidget {
   }
 
   // ── Standard field ───────────────────────────────────────────
-    Widget _inputField(TextEditingController ctrl,
+  Widget _inputField(TextEditingController ctrl,
       String label, IconData icon,
-      {bool isEmail = false, bool enabled = true, List<TextInputFormatter>? inputFormatters}) {
+      {bool isEmail = false, bool enabled = true}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
@@ -215,7 +213,6 @@ class uKonekContactStep extends StatelessWidget {
             fontSize: 14,
             color: enabled ? _textDark : Colors.grey),
         decoration: _decoration(label, icon),
-        inputFormatters: inputFormatters,
         validator: (v) {
           if (v == null || v.trim().isEmpty) return 'Required';
           if (isEmail && (!v.contains('@') || !v.contains('.')))

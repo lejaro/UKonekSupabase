@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 class uKonekMedicineSchedulerPage extends StatefulWidget {
   const uKonekMedicineSchedulerPage({super.key});
@@ -344,9 +343,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   );
 
   Widget _buildTextInput(TextEditingController ctrl, String hint, {bool isNumber = false}) => TextField(
-    controller: ctrl,
-    keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-    inputFormatters: isNumber ? [FilteringTextInputFormatter.digitsOnly] : null,
+    controller: ctrl, keyboardType: isNumber ? TextInputType.number : TextInputType.text,
     decoration: InputDecoration(hintText: hint, filled: true, fillColor: _bg, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
   );
 

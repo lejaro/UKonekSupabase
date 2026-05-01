@@ -376,6 +376,7 @@ select:focus {
         transform: translateY(-20px) scale(0.97);
         opacity: 0;
     }
+
     to {
         transform: translateY(0) scale(1);
         opacity: 1;
@@ -627,9 +628,9 @@ select:focus {
     padding: 18px 14px;
     border-radius: 18px;
     transition: flex-basis 0.48s cubic-bezier(0.22, 1, 0.36, 1),
-                width 0.48s cubic-bezier(0.22, 1, 0.36, 1),
-                transform 0.48s cubic-bezier(0.22, 1, 0.36, 1),
-                padding 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+        width 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+        padding 0.48s cubic-bezier(0.22, 1, 0.36, 1);
     box-shadow: 8px 0 26px rgba(2, 6, 23, 0.14);
     overflow: hidden;
     will-change: width, flex-basis, transform;
@@ -663,8 +664,8 @@ select:focus {
     margin-bottom: 16px;
     padding: 0 4px;
     transition: gap 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-                margin-bottom 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-                padding 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        margin-bottom 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+        padding 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sidebar .brand-stack {
@@ -675,8 +676,8 @@ select:focus {
     max-width: 180px;
     overflow: hidden;
     transition: opacity 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-                max-width 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-                flex-basis 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+        max-width 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+        flex-basis 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sidebar .brand-subtext {
@@ -686,7 +687,7 @@ select:focus {
     text-transform: uppercase;
     color: rgba(219, 233, 255, 0.7);
     transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-section-label {
@@ -697,15 +698,15 @@ select:focus {
     color: rgba(219, 233, 255, 0.6);
     font-weight: 700;
     transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                margin 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        margin 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .hidden {
     display: none !important;
 }
 
-.logoLogIn{
+.logoLogIn {
     width: auto;
     height: 100px;
 }
@@ -721,10 +722,10 @@ select:focus {
     height: 40px;
     overflow: hidden;
     transition: opacity 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-                width 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-                height 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-                flex-basis 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-                margin 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+        width 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+        height 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+        flex-basis 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+        margin 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sidebar .brand-text {
@@ -733,7 +734,7 @@ select:focus {
     line-height: 1;
     white-space: nowrap;
     transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar .brand-row .control-btns {
@@ -758,7 +759,7 @@ select:focus {
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 10px;
     transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
 }
@@ -781,7 +782,7 @@ select:focus {
     width: 18px;
     height: 18px;
     transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .burger-menu {
@@ -837,8 +838,8 @@ select:focus {
     visibility: hidden;
     max-width: 0;
     transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar .nav {
@@ -873,35 +874,35 @@ select:focus {
     width: 100%;
     text-align: left;
     transition: background 0.2s ease,
-                transform 0.2s ease,
-                justify-content 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                padding 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                gap 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        transform 0.2s ease,
+        justify-content 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        padding 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        gap 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.sidebar .nav > a.nav-item,
-.sidebar .nav > .nav-item.dropdown > .nav-btn,
+.sidebar .nav>a.nav-item,
+.sidebar .nav>.nav-item.dropdown>.nav-btn,
 .sidebar .nav .dropdown-item,
-.sidebar .nav > a.nav-item.is-active,
-.sidebar .nav > .nav-item.dropdown > .nav-btn.is-active {
+.sidebar .nav>a.nav-item.is-active,
+.sidebar .nav>.nav-item.dropdown>.nav-btn.is-active {
     border-radius: 12px !important;
 }
 
-.sidebar .nav > a.nav-item,
-.sidebar .nav > .nav-item.dropdown > .nav-btn {
+.sidebar .nav>a.nav-item,
+.sidebar .nav>.nav-item.dropdown>.nav-btn {
     box-sizing: border-box;
     background: transparent;
     border: 1px solid transparent;
 }
 
-.sidebar .nav > a.nav-item:hover,
-.sidebar .nav > .nav-item.dropdown > .nav-btn:hover {
+.sidebar .nav>a.nav-item:hover,
+.sidebar .nav>.nav-item.dropdown>.nav-btn:hover {
     background: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.2);
 }
 
-.sidebar .nav > a.nav-item.is-active,
-.sidebar .nav > .nav-item.dropdown > .nav-btn.is-active {
+.sidebar .nav>a.nav-item.is-active,
+.sidebar .nav>.nav-item.dropdown>.nav-btn.is-active {
     background: rgba(255, 255, 255, 0.17);
     border-color: rgba(255, 255, 255, 0.18);
 }
@@ -911,8 +912,8 @@ select:focus {
     box-shadow: none;
 }
 
-.sidebar .nav > a.nav-item:focus-visible,
-.sidebar .nav > .nav-item.dropdown > .nav-btn:focus-visible,
+.sidebar .nav>a.nav-item:focus-visible,
+.sidebar .nav>.nav-item.dropdown>.nav-btn:focus-visible,
 .sidebar .nav .dropdown-item:hover,
 .sidebar .nav .dropdown-item:focus-visible,
 .sidebar .nav .dropdown-item.is-active {
@@ -951,7 +952,7 @@ select:focus {
     opacity: 0.85;
     transform: rotate(90deg);
     transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar .nav-item.dropdown.open .arrow {
@@ -970,9 +971,9 @@ select:focus {
     transform: translateY(0);
     overflow: hidden;
     transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-                transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-                margin-top 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+        margin-top 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar .nav .dropdown-menu.hidden {
@@ -1026,7 +1027,7 @@ select:focus {
     transition: margin-left 0.48s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.sidebar.collapsed ~ .mainview {
+.sidebar.collapsed~.mainview {
     margin-left: 92px;
 }
 
@@ -1047,7 +1048,9 @@ select:focus {
 .topbar::before {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0;
+    top: 0;
+    left: 0;
+    right: 0;
     height: 3px;
     background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 50%, #8b5cf6 100%);
     border-radius: 3px 3px 0 0;
@@ -1155,13 +1158,33 @@ select:focus {
     height: 24px;
 }
 
-.role-logo-admin { background: linear-gradient(145deg, #2563eb, #1d4ed8); }
-.role-logo-doctor { background: linear-gradient(145deg, #0ea5e9, #0284c7); }
-.role-logo-nurse { background: linear-gradient(145deg, #10b981, #059669); }
-.role-logo-staff { background: linear-gradient(145deg, #7c3aed, #6d28d9); }
-.role-logo-specialist { background: linear-gradient(145deg, #f59e0b, #d97706); }
-.role-logo-citizen { background: linear-gradient(145deg, #475569, #334155); }
-.role-logo-default { background: linear-gradient(145deg, #64748b, #475569); }
+.role-logo-admin {
+    background: linear-gradient(145deg, #2563eb, #1d4ed8);
+}
+
+.role-logo-doctor {
+    background: linear-gradient(145deg, #0ea5e9, #0284c7);
+}
+
+.role-logo-nurse {
+    background: linear-gradient(145deg, #10b981, #059669);
+}
+
+.role-logo-staff {
+    background: linear-gradient(145deg, #7c3aed, #6d28d9);
+}
+
+.role-logo-specialist {
+    background: linear-gradient(145deg, #f59e0b, #d97706);
+}
+
+.role-logo-citizen {
+    background: linear-gradient(145deg, #475569, #334155);
+}
+
+.role-logo-default {
+    background: linear-gradient(145deg, #64748b, #475569);
+}
 
 /* Profile edit grid */
 .profile-grid {
@@ -1170,27 +1193,45 @@ select:focus {
     gap: 18px;
     align-items: start;
 }
+
 .avatar-column {
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
 }
+
 .avatar-preview {
-    width:140px;
-    height:140px;
-    border-radius:10px;
-    background:#f3f4f6;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    overflow:hidden;
-    box-shadow: 0 1px 4px rgba(2,6,23,0.06);
+    width: 140px;
+    height: 140px;
+    border-radius: 10px;
+    background: #f3f4f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(2, 6, 23, 0.06);
 }
-.avatar-preview img{ width:100%; height:100%; object-fit:cover; }
-.file-label{ font-size:13px; color:#374151; }
-.form-column .field{ margin-bottom:10px; }
-.btn-close{ background:#e5e7eb; color:#111827; }
+
+.avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.file-label {
+    font-size: 13px;
+    color: #374151;
+}
+
+.form-column .field {
+    margin-bottom: 10px;
+}
+
+.btn-close {
+    background: #e5e7eb;
+    color: #111827;
+}
 
 /* Unified hover feedback for dashboard clickables */
 
@@ -1583,8 +1624,8 @@ select:focus {
 .sidebar .nav a .label {
     margin-left: 8px;
     transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                margin 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        margin 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar.collapsed .nav a .label,
@@ -1597,9 +1638,9 @@ select:focus {
     margin: 0;
     pointer-events: none;
     transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                margin 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        margin 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar.collapsed .nav .dropdown-menu {
@@ -1611,7 +1652,7 @@ select:focus {
     display: flex !important;
     pointer-events: none;
     transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar.collapsed .nav a,
@@ -1682,7 +1723,7 @@ body.dashboard-loading {
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar.collapsed .brand-stack {
@@ -1696,7 +1737,7 @@ body.dashboard-loading {
     padding: 0;
     overflow: hidden;
     transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar.collapsed .logo {
@@ -1709,7 +1750,7 @@ body.dashboard-loading {
     padding: 0;
     overflow: hidden;
     transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        visibility 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar.collapsed .brand-row {
@@ -1817,8 +1858,10 @@ body.dashboard-loading {
 .dashboard-hero::before {
     content: '';
     position: absolute;
-    top: -50%; right: -30%;
-    width: 300px; height: 300px;
+    top: -50%;
+    right: -30%;
+    width: 300px;
+    height: 300px;
     background: radial-gradient(circle, rgba(37, 99, 235, 0.06) 0%, transparent 70%);
     pointer-events: none;
 }
@@ -1904,8 +1947,10 @@ body.dashboard-loading {
 .stat-card::after {
     content: '';
     position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background: linear-gradient(135deg, transparent 60%, rgba(37, 99, 235, 0.03) 100%);
     pointer-events: none;
 }
@@ -2127,94 +2172,18 @@ body.dashboard-loading {
     font-size: 12px;
 }
 
-.consultation-filters-inline {
-    display: inline-flex;
+.management-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.toolbar-right {
+    display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: nowrap;
-    min-width: max-content;
-}
-
-.consultation-filters .filter-label {
-    margin-right: 4px;
-}
-
-.consultation-filters .filter-select {
-    min-height: 34px;
-}
-
-.consultation-status-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-}
-
-.consultation-status-badge.awaiting {
-    background: #dbeafe;
-    color: #1d4ed8;
-}
-
-.consultation-status-badge.done {
-    background: #dcfce7;
-    color: #166534;
-}
-
-.consultation-row .table-cell {
-    vertical-align: top;
-}
-
-.consultation-record-cell {
-    font-weight: 700;
-    color: #0f172a;
-    white-space: nowrap;
-}
-
-.consultation-patient-name {
-    font-weight: 700;
-    color: #0f172a;
-    line-height: 1.2;
-}
-
-.consultation-patient-id {
-    margin-top: 3px;
-    font-size: 12px;
-    color: #64748b;
-    font-family: Consolas, 'Courier New', monospace;
-}
-
-.consultation-summary-cell {
-    color: #334155;
-    min-width: 220px;
-    line-height: 1.35;
-}
-
-.consultation-date-cell {
-    white-space: nowrap;
-    color: #334155;
-}
-
-.consultation-actions-cell {
-    white-space: nowrap;
-}
-
-.consultation-actions-empty {
-    color: #94a3b8;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.pres-frequency-preview {
-    margin-top: 4px;
-    margin-bottom: 6px;
-    color: #475569;
-    font-size: 12px;
-    font-weight: 600;
 }
 
 .pending-row {
@@ -2334,17 +2303,20 @@ body.dashboard-loading {
     font-weight: 700;
     color: #08306b;
 }
+
 .accounts-table .table-cell {
     padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
 }
+
 .accounts-table tbody tr:hover {
     background: #f5f8ff;
 }
+
 .accounts-table tbody tr.is-active {
     background: #eef6ff;
-    box-shadow: inset 0 0 0 1px rgba(2,39,121,0.06);
+    box-shadow: inset 0 0 0 1px rgba(2, 39, 121, 0.06);
 }
 
 .chip-btn.create-btn {
@@ -2357,7 +2329,6 @@ body.dashboard-loading {
 .btn.small {
     padding: 6px 8px;
     font-size: 13px;
-    color: #fff;
 }
 
 .btn.small.outline {
@@ -2380,12 +2351,14 @@ body.dashboard-loading {
     justify-content: center;
     padding: 12px 0 0 0;
 }
+
 .pagination-controls {
-    display:flex;
-    gap:12px;
-    align-items:center;
+    display: flex;
+    gap: 12px;
+    align-items: center;
 }
+
 .pagination-info {
     color: var(--muted);
-    font-weight:600;
+    font-weight: 600;
 }

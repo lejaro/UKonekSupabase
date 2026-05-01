@@ -26,11 +26,3 @@ This folder contains production-oriented examples for isolated authentication an
 
 - `auth-middleware.js`: JWT verification + `requireRole()` helper.
 - `auth-routes.js`: sample login/logout/me and protected role-specific endpoints.
-
-## Removed family routes
-
-Family number and family-assignment example routes were removed to match the
-current schema where family features are no longer supported.
-
-If you need citizen listing/create/update samples, use `auth-routes.js` as a
-base and call family-agnostic RPCs only.

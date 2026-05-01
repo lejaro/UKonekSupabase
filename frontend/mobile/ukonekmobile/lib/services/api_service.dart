@@ -215,10 +215,6 @@ class PrescribedMedicine {
   final String medicineName;
   final int quantity;
   final String unit;
-  final String dosage;
-  final String frequency;
-  final int durationDays;
-  final String instructions;
   final String doctorName;
   final DateTime issuedAt;
 
@@ -226,10 +222,6 @@ class PrescribedMedicine {
     required this.medicineName,
     required this.quantity,
     required this.unit,
-    required this.dosage,
-    required this.frequency,
-    required this.durationDays,
-    required this.instructions,
     required this.doctorName,
     required this.issuedAt,
   });
@@ -248,52 +240,8 @@ class PrescribedMedicine {
       medicineName: (map['medicine_name'] ?? '').toString().trim(),
       quantity: (map['quantity'] as num?)?.toInt() ?? 0,
       unit: (map['unit'] ?? '').toString().trim(),
-      dosage: (map['dosage'] ?? '').toString().trim(),
-      frequency: (map['frequency'] ?? '').toString().trim(),
-      durationDays: (map['duration_days'] as num?)?.toInt() ?? 1,
-      instructions: (map['instructions'] ?? '').toString().trim(),
       doctorName: (map['doctor_name'] ?? '').toString().trim(),
       issuedAt: DateTime.tryParse(issuedAtRaw)?.toLocal() ?? DateTime.now(),
-    );
-  }
-}
-
-class DosageScheduleEntry {
-  final int id;
-  final String medicineName;
-  final String dosage;
-  final String frequency;
-  final String instructions;
-  final DateTime scheduleDate;
-  final String doseTime;
-  final String status;
-  final DateTime? takenAt;
-
-  const DosageScheduleEntry({
-    required this.id,
-    required this.medicineName,
-    required this.dosage,
-    required this.frequency,
-    required this.instructions,
-    required this.scheduleDate,
-    required this.doseTime,
-    required this.status,
-    required this.takenAt,
-  });
-
-  factory DosageScheduleEntry.fromMap(Map<String, dynamic> map) {
-    final dateRaw = (map['schedule_date'] ?? '').toString().trim();
-    final takenAtRaw = (map['taken_at'] ?? '').toString().trim();
-    return DosageScheduleEntry(
-      id: (map['id'] as num?)?.toInt() ?? 0,
-      medicineName: (map['medicine_name'] ?? '').toString().trim(),
-      dosage: (map['dosage'] ?? '').toString().trim(),
-      frequency: (map['frequency'] ?? '').toString().trim(),
-      instructions: (map['instructions'] ?? '').toString().trim(),
-      scheduleDate: DateTime.tryParse(dateRaw)?.toLocal() ?? DateTime.now(),
-      doseTime: (map['dose_time'] ?? '').toString().trim(),
-      status: (map['status'] ?? '').toString().trim(),
-      takenAt: takenAtRaw.isEmpty ? null : DateTime.tryParse(takenAtRaw)?.toLocal(),
     );
   }
 }
@@ -454,7 +402,6 @@ class ApiService {
     required Map<String, dynamic> payload,
   }) async {
     final email = (payload['email'] as String).trim().toLowerCase();
-
     final emailRedirectTo = _resolveEmailRedirectUrl();
 
     try {
@@ -467,6 +414,7 @@ class ApiService {
           'firstname': payload['firstname'],
           'surname': payload['surname'],
           'middle_initial': payload['middle_initial'] ?? '',
+          'family_number': payload['family_number'] ?? '',
           'date_of_birth': payload['date_of_birth'],
           'age': payload['age'],
           'contact_number': payload['contact_number'] ?? '',
@@ -548,6 +496,7 @@ class ApiService {
         'p_emergency_contact_contact_number':
             payload['emergency_contact_contact_number'] ?? '',
         'p_relation': payload['relation'] ?? '',
+        'p_family_number': payload['family_number'] ?? '',
         'p_username': username,
       },
     );
@@ -872,26 +821,6 @@ class ApiService {
     return rows
         .whereType<Map<String, dynamic>>()
         .map(PrescribedMedicine.fromMap)
-        .where((item) => item.medicineName.isNotEmpty)
-        .toList(growable: false);
-  }
-
-  static Future<List<DosageScheduleEntry>> getMyDosageSchedule({
-    DateTime? from,
-    DateTime? to,
-  }) async {
-    final response = await _client.rpc(
-      'get_my_dosage_schedule',
-      params: {
-        'p_from': _asDate(from ?? DateTime.now()),
-        'p_to': _asDate(to ?? DateTime.now().add(const Duration(days: 7))),
-      },
-    );
-
-    final rows = (response as List<dynamic>?) ?? const [];
-    return rows
-        .whereType<Map<String, dynamic>>()
-        .map(DosageScheduleEntry.fromMap)
         .where((item) => item.medicineName.isNotEmpty)
         .toList(growable: false);
   }

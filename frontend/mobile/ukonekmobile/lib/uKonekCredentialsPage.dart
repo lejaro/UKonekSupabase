@@ -5,7 +5,7 @@ import 'services/api_service.dart';
 import 'uKonekLoginPage.dart';
 
 class uKonekCredentialsPage extends StatefulWidget {
-  final String firstName, middleName, surname, nameExtension;
+  final String firstName, middleName, surname, familyNumber, nameExtension;
   final String dob, age, contact, sex, email, address;
   final String emergencyName, emergencyContact, relation;
   final String extractedOcrText;
@@ -17,6 +17,7 @@ class uKonekCredentialsPage extends StatefulWidget {
     required this.firstName,
     required this.middleName,
     required this.surname,
+    required this.familyNumber,
     required this.nameExtension,
     required this.dob,
     required this.age,
@@ -183,6 +184,7 @@ class _uKonekCredentialsPageState
         'firstname': widget.firstName.trim(),
         'surname': widget.surname.trim(),
         'middle_initial': widget.middleName.trim(),
+        'family_number': widget.familyNumber.trim(),
         'date_of_birth': dateOfBirth,
         'age': int.tryParse(widget.age.trim()) ?? 0,
         'contact_number': widget.contact.trim(),
