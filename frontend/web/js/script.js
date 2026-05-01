@@ -1,9 +1,20 @@
 const tabLogin = document.getElementById('tab-login');
 
-// Handle port mismatch during development (Live Server on 5500, Backend on 5000)
-const API_BASE = window.location.port === '5500'
-    ? `${window.location.protocol}//${window.location.hostname}:5000`
-    : '';
+// Determine API base URL - prioritize explicit config, fallback to port-based detection for development
+const getApiBase = () => {
+    const configBase = String(window.UKONEK_CONFIG?.API_BASE || '').trim();
+    if (configBase) return configBase;
+    
+    // Automatic fallback for local development environments
+    const port = window.location.port;
+    if (port === '5500' || port === '5501') {
+        return `${window.location.protocol}//${window.location.hostname}:5000`;
+    }
+    return '';
+};
+
+const API_BASE = getApiBase();
+const isApiMode = API_BASE.length > 0;
 
 const loginPanel = document.getElementById('login-panel');
 
@@ -286,6 +297,19 @@ function setLoginLoading(isLoading) {
     applyLoginLockStateUI();
 }
 
+function withTimeout(promise, timeoutMs, timeoutMessage) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => {
+            setTimeout(() => {
+                reject(new Error(timeoutMessage));
+            }, timeoutMs);
+        })
+    ]);
+}
+
+const LOGIN_REQUEST_TIMEOUT_MS = 15000;
+
 // Preloader helper - shows the preloader overlay for `duration` ms then hides it and calls callback
 function showPreloader(duration = 700, cb) {
     const pre = document.getElementById('preloader');
@@ -298,17 +322,30 @@ function showPreloader(duration = 700, cb) {
     pre.querySelector('.preloader-logo')?.classList.remove('animated');
     void pre.offsetWidth;
     pre.querySelector('.preloader-logo')?.classList.add('animated');
-    setTimeout(() => {
+
+    let callbackFired = false;
+    const hide = () => {
+        if (callbackFired) return;
+        callbackFired = true;
         pre.classList.add('hidden');
         if (typeof cb === 'function') cb();
-    }, duration);
+    };
+    setTimeout(hide, duration);
+    // Failsafe: ensure callback fires even if primary timeout is blocked
+    setTimeout(hide, duration + 3000);
 }
 
 // Show preloader once on page load briefly
-window.addEventListener('load', () => {
-    // show short preloader only for a moment
+if (document.readyState === 'complete') {
     showPreloader(900);
-});
+} else {
+    window.addEventListener('load', () => showPreloader(900));
+}
+// Failsafe: hide splash after 4s regardless
+setTimeout(() => {
+    const pre = document.getElementById('preloader');
+    if (pre && !pre.classList.contains('hidden')) pre.classList.add('hidden');
+}, 4000);
 
 // Login Form Handler
 const loginForm = document.getElementById('login-form');
@@ -339,9 +376,21 @@ loginForm.addEventListener('submit', async (e) => {
     setLoginLoading(true);
 
     try {
-        const authService = await loadAuthServiceModule();
-        await authService.signInStaff({ identifier: username, password });
-        const profile = await authService.getAuthenticatedStaffProfile();
+        const authService = await withTimeout(
+            loadAuthServiceModule(),
+            LOGIN_REQUEST_TIMEOUT_MS,
+            'Login service failed to load. Please check your connection and try again.'
+        );
+        await withTimeout(
+            authService.signInStaff({ identifier: username, password }),
+            LOGIN_REQUEST_TIMEOUT_MS,
+            'Login request timed out. Please check your connection and try again.'
+        );
+        const profile = await withTimeout(
+            authService.getAuthenticatedStaffProfile(),
+            LOGIN_REQUEST_TIMEOUT_MS,
+            'Profile check timed out. Please try signing in again.'
+        );
         const role = profile?.role || profile?.staff_role || profile?.user_role || '';
         const authSession = await loadAuthSessionModule();
 
@@ -353,9 +402,8 @@ loginForm.addEventListener('submit', async (e) => {
         });
 
         resetInvalidLoginAttempts();
-        showPreloader(700, () => {
-            window.location.href = resolveDashboardPath(username, role);
-        });
+        // Navigate immediately — no preloader delay needed
+        window.location.href = resolveDashboardPath(username, role);
     } catch (error) {
         const message = String(error?.message || 'Unable to sign in. Please try again.');
         const invalidCredentials = /invalid email or password|invalid credentials/i.test(message);

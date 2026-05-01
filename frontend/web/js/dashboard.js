@@ -1,7 +1,16 @@
 const sidebar = document.getElementById('sidebar');
 const burger = document.getElementById('burger');
 
-const API_BASE = String(window.UKONEK_CONFIG?.API_BASE || '').trim();
+const getApiBase = () => {
+  const configBase = String(window.UKONEK_CONFIG?.API_BASE || '').trim();
+  if (configBase) return configBase;
+  const port = window.location.port;
+  if (port === '5500' || port === '5501') {
+    return `${window.location.protocol}//${window.location.hostname}:5000`;
+  }
+  return '';
+};
+const API_BASE = getApiBase();
 const isApiMode = API_BASE.length > 0;
 const isDemoMode = Boolean(window.UKONEK_CONFIG?.FORCE_DEMO);
 let authServiceModulePromise = null;
@@ -18,6 +27,18 @@ const ADMIN_DASHBOARD_REFRESH_MS = 15000;
 let presenceHeartbeatTimer = null;
 let adminDashboardRefreshTimer = null;
 let adminDashboardRefreshInFlight = false;
+const DASHBOARD_REQUEST_TIMEOUT_MS = 15000;
+
+function withTimeout(promise, timeoutMs, timeoutMessage) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(timeoutMessage));
+      }, timeoutMs);
+    })
+  ]);
+}
 const pagePreloader = document.getElementById('page-preloader');
 let pagePreloaderDismissed = false;
 
@@ -30,11 +51,16 @@ function dismissPagePreloader() {
   document.body.classList.remove('dashboard-loading');
 }
 
-window.addEventListener('load', () => {
-  setTimeout(() => {
-    dismissPagePreloader();
-  }, 2800);
-});
+// Dismiss preloader shortly after the page finishes loading
+if (document.readyState === 'complete') {
+  setTimeout(dismissPagePreloader, 500);
+} else {
+  window.addEventListener('load', () => {
+    setTimeout(dismissPagePreloader, 500);
+  });
+}
+// Failsafe: always dismiss after 5 seconds even if window.load never fires
+setTimeout(dismissPagePreloader, 5000);
 
 function getSectionFromHash() {
   const value = String(window.location.hash || '').replace(/^#/, '').trim();
@@ -441,7 +467,11 @@ async function ensureAuthenticatedSession(force = false) {
 
   try {
     const authService = await loadAuthServiceModule();
-    const profile = await authService.getAuthenticatedStaffProfile();
+    const profile = await withTimeout(
+      authService.getAuthenticatedStaffProfile(),
+      DASHBOARD_REQUEST_TIMEOUT_MS,
+      'Session validation timed out. Please refresh the page.'
+    );
 
     if (!profile) {
       window.location.replace('./index.html');
@@ -2283,18 +2313,32 @@ if (scheduleSuccessOkBtn) {
 }
 
 async function initializeDashboard() {
-  // Master init - call all content population functions
-  initProfileAndSchedule();
-  initClinicalData();
-  await Promise.all([refreshAnnouncementsData(), refreshFeedbackData()]);
-  await initDashboardData();
+  try {
+    // Master init - call all content population functions
+    initProfileAndSchedule();
+    initClinicalData();
+    await Promise.all([
+      refreshAnnouncementsData().catch((err) => console.warn('Announcements failed:', err)),
+      refreshFeedbackData().catch((err) => console.warn('Feedback failed:', err))
+    ]);
+    await initDashboardData();
+  } catch (error) {
+    console.error('Dashboard initialization failed:', error);
+    dismissPagePreloader(); // Guarantee interaction even on partial failure
+  }
 }
 
 // Initialize on DOM ready
-document.addEventListener('DOMContentLoaded', async () => {
+const startDashboard = async () => {
   await initializeDashboard();
   navigateToSection(getSectionFromHash() || DEFAULT_SECTION_ID);
-});
+};
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startDashboard);
+} else {
+  startDashboard();
+}
 
 
 
@@ -3394,7 +3438,6 @@ async function loadPatientData() {
   });
 
     applyCitizensFinder();
-  }
 }
 
 async function listStaffFromSupabase() {
