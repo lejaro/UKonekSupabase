@@ -1,6 +1,4 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'uKonekOtpPage.dart';
 
 class uKonekPreviewPage extends StatelessWidget {
@@ -191,7 +189,6 @@ class uKonekPreviewPage extends StatelessWidget {
             Text(email,
                 style: const TextStyle(
                     fontSize: 12, color: _textMuted)),
-            ),
           ],
         )),
       ]),
@@ -303,7 +300,6 @@ class uKonekPreviewPage extends StatelessWidget {
               emergencyName:    emergencyName,
               emergencyContact: emergencyContact,
               relation:         relation,
-              idVerified:       true,
             ),
           ),
         ),

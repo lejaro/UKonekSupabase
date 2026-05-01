@@ -103,88 +103,102 @@ class _uKonekMenuPageState extends State<uKonekMenuPage>
                 position: _slideUp,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 28),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 48),
-
-                      // ── Logo / Brand ──────────────────────────
-                      _buildLogo(),
-
-                      const SizedBox(height: 20),
-
-                      // ── Tagline ───────────────────────────────
-                      const Text(
-                        "Your personal healthcare companion",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 13,
-                          letterSpacing: 0.4,
-                        ),
+                  child: SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: MediaQuery.sizeOf(context).height -
+                            MediaQuery.paddingOf(context).vertical,
                       ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const SizedBox(height: 48),
 
-                      const SizedBox(height: 56),
+                              // ── Logo / Brand ──────────────────────────
+                              _buildLogo(),
 
-                      // ── Stats row ─────────────────────────────
-                      _buildStatsRow(),
+                              const SizedBox(height: 20),
 
-                      const SizedBox(height: 52),
+                              // ── Tagline ───────────────────────────────
+                              const Text(
+                                "Your personal healthcare companion",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 13,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
 
-                      // ── Label ─────────────────────────────────
-                      const Align(
-                        alignment: Alignment.center,
-                        child: Text(
-                          "GET STARTED",
-                          style: TextStyle(
-                            color: Colors.white38,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 3,
+                              const SizedBox(height: 56),
+
+                              // ── Stats row ─────────────────────────────
+                              _buildStatsRow(),
+
+                              const SizedBox(height: 52),
+
+                              // ── Label ─────────────────────────────────
+                              const Align(
+                                alignment: Alignment.center,
+                                child: Text(
+                                  "GET STARTED",
+                                  style: TextStyle(
+                                    color: Colors.white38,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 3,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // ── Register Button ───────────────────────
+                              _buildPrimaryButton(
+                                label: "CREATE ACCOUNT",
+                                subtitle: "New to U-Konek+? Register here",
+                                icon: Icons.person_add_outlined,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  _fadeRoute(const uKonekRegisterWrapper()),
+                                ),
+                              ),
+
+                              const SizedBox(height: 14),
+
+                              // ── Login Button ──────────────────────────
+                              _buildSecondaryButton(
+                                label: "SIGN IN",
+                                subtitle: "Already have an account",
+                                icon: Icons.login_rounded,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  _fadeRoute(const uKonekLoginPage()),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
 
-                      // ── Register Button ───────────────────────
-                      _buildPrimaryButton(
-                        label: "CREATE ACCOUNT",
-                        subtitle: "New to U-Konek+? Register here",
-                        icon: Icons.person_add_outlined,
-                        onTap: () => Navigator.push(
-                          context,
-                          _fadeRoute(const uKonekRegisterWrapper()),
-                        ),
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      // ── Login Button ──────────────────────────
-                      _buildSecondaryButton(
-                        label: "SIGN IN",
-                        subtitle: "Already have an account",
-                        icon: Icons.login_rounded,
-                        onTap: () => Navigator.push(
-                          context,
-                          _fadeRoute(const uKonekLoginPage()),
-                        ),
-                      ),
-
-                      const Spacer(),
-
-                      // ── Footer ────────────────────────────────
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 28),
-                        child: Text(
-                          "© 2025 U-Konek Health Services",
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.2),
-                            fontSize: 11,
-                            letterSpacing: 0.5,
+                          // ── Footer ────────────────────────────────
+                          Padding(
+                            padding:
+                                const EdgeInsets.only(top: 24, bottom: 28),
+                            child: Text(
+                              "© 2025 U-Konek Health Services",
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.2),
+                                fontSize: 11,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

@@ -143,8 +143,6 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
             emergencyName: widget.emergencyName,
             emergencyContact: widget.emergencyContact,
             relation: widget.relation,
-            idImage: null,
-            idVerified: true,
             extractedOcrText: '',
           ),
         ),

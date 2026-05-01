@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:ukonekmobile/uKonekPreviewPage.dart';
 import 'steps/personal_info_step.dart';
 import 'steps/contact_address_step.dart';
@@ -143,8 +142,6 @@ class _uKonekRegisterWrapperState
               ? ''
               : '+63${emergencyContactController.text}',
           relation:         relationController.text,
-          idImage:          null,
-          idVerified:       true,
         ),
       ),
     );
