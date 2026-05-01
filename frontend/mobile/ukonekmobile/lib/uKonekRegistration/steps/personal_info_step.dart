@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class PersonalInfoStep extends StatelessWidget {
   final GlobalKey<FormState> formKey;
@@ -6,7 +7,6 @@ class PersonalInfoStep extends StatelessWidget {
   final TextEditingController middleName;
   final TextEditingController lastName;
   final TextEditingController nameExtension;
-  final TextEditingController familyNumber;
   final TextEditingController age;
   final DateTime? selectedDate;
   final VoidCallback onPickDate;
@@ -20,7 +20,6 @@ class PersonalInfoStep extends StatelessWidget {
     required this.middleName,
     required this.lastName,
     required this.nameExtension,
-    required this.familyNumber,
     required this.age,
     required this.onPickDate,
     this.selectedDate,
@@ -62,27 +61,28 @@ class PersonalInfoStep extends StatelessWidget {
 
             // ── Name card ───────────────────────────────────
             _card(children: [
-              _field('First Name',  firstName,
-                  Icons.person_outline_rounded, required: true),
-              _field('Middle Name', middleName,
+                _field('First Name',  firstName,
+                  Icons.person_outline_rounded, required: true,
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z .'-]"))]),
+                _field('Middle Name', middleName,
                   Icons.badge_outlined,
-                  required: false, hint: 'Optional'),
+                  required: false, hint: 'Optional',
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z .'-]"))]),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 2,
+                    Expanded(flex: 2,
                       child: _field('Last Name', lastName,
-                          Icons.family_restroom_outlined,
-                          required: true)),
+                        Icons.family_restroom_outlined,
+                        required: true,
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z .'-]"))])),
                   const SizedBox(width: 12),
-                  Expanded(child: _field('Ext.', nameExtension,
+                    Expanded(child: _field('Ext.', nameExtension,
                       Icons.more_horiz,
-                      required: false, hint: 'Jr/III')),
+                      required: false, hint: 'Jr/III',
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z .'-]"))])),
                 ],
               ),
-              _field('Family Number', familyNumber,
-                  Icons.badge_outlined,
-                  required: false, hint: 'Optional'),
             ]),
             const SizedBox(height: 16),
 
@@ -157,12 +157,13 @@ class PersonalInfoStep extends StatelessWidget {
   }
 
   // ── Input field ──────────────────────────────────────────────
-  Widget _field(String label, TextEditingController ctrl,
-      IconData icon, {bool required = true, String? hint}) {
+    Widget _field(String label, TextEditingController ctrl,
+      IconData icon, {bool required = true, bool enabled = true, String? hint, String? Function(String)? customValidator, List<TextInputFormatter>? inputFormatters}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: ctrl,
+        enabled: enabled,
         style: const TextStyle(
             fontSize: 14, color: _textDark),
         decoration: InputDecoration(
@@ -191,7 +192,12 @@ class PersonalInfoStep extends StatelessWidget {
               borderSide: const BorderSide(
                   color: Colors.redAccent)),
         ),
+        inputFormatters: inputFormatters,
         validator: (v) {
+          if (customValidator != null) {
+            final customError = customValidator(v ?? '');
+            if (customError != null) return customError;
+          }
           if (required && (v == null || v.trim().isEmpty)) {
             return 'Required';
           }

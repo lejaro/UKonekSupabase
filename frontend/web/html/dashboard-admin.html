@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>U-Konek+ — Admin Dashboard</title>
   <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/clinic-enhancements.css" />
   <style>
     .stats-chart-panel {
       margin-top: 18px;
@@ -328,19 +329,18 @@
         <div class="brand-row">
           <div class="logo"><img class="logo" src="../U-KonekLogo-transparent.png" alt="" /></div>
           <div class="brand-stack">
-            <h3 class="brand-text">U-Konek+</h3>
-            <p class="brand-subtext">Admin Workspace</p>
+            <h3 class="brand-text">U-Konek</h3>
+            <p class="brand-subtext">Health Center</p>
           </div>
           <div class="control-btns">
-            <button id="burger" class="icon-btn burger-toggle" aria-label="Toggle sidebar" aria-expanded="true">
+            <button id="burger" type="button" class="icon-btn burger-toggle" aria-label="Toggle sidebar" aria-expanded="true">
               <span class="burger-menu" aria-hidden="true">
                 <span></span>
                 <span></span>
                 <span></span>
               </span>
               <span class="burger-arrow" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                  stroke-linejoin="round">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M15 5l-7 7 7 7" />
                 </svg>
               </span>
@@ -418,6 +418,15 @@
               </svg>
             </span>
             <span class="label">Medicine Inventory</span>
+          </a>
+
+          <a href="#" class="nav-item admin-only" data-section="analytics-section" title="Analytics">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" />
+              </svg>
+            </span>
+            <span class="label">Analytics</span>
           </a>
 
           <div class="nav-item dropdown">
@@ -678,7 +687,7 @@
             <form id="profile-form" class="p-20" novalidate autocomplete="off">
               <div class="field">
                 <label class="inputLabel" for="profile-name">Display Name</label>
-                <input id="profile-name" type="text" />
+                <input id="profile-name" type="text" data-validate="name" />
               </div>
               <div class="field">
                 <label class="inputLabel" for="profile-email">Email</label>
@@ -690,7 +699,7 @@
               </div>
               <div class="field hidden" id="profile-specialization-field">
                 <label class="inputLabel" for="profile-specialization">Doctor Specialization</label>
-                <input id="profile-specialization" type="text" placeholder="e.g., Cardiology" />
+                <input id="profile-specialization" type="text" placeholder="e.g., Cardiology" data-validate="name" />
               </div>
               <div class="field">
                 <label class="inputLabel">Role Icon</label>
@@ -785,8 +794,7 @@
           </div>
           <div id="citizens-pane" class="hidden">
             <div class="management-actions" style="margin-bottom:10px;">
-              <input id="citizens-finder-input" class="search-input" type="search" placeholder="Find citizens by username, email, contact number, or family number" aria-label="Find citizens" />
-              <button id="citizens-view-toggle-btn" class="chip-btn chip-btn-outline" type="button">Grouped View</button>
+              <input id="citizens-finder-input" class="search-input" type="search" placeholder="Find citizens by username, email, or contact number" aria-label="Find citizens" />
             </div>
             <div id="citizens-table-wrap" class="table-wrap">
               <table class="accounts-table">
@@ -795,15 +803,12 @@
                     <th class="table-header-cell">Username</th>
                     <th class="table-header-cell">Email</th>
                     <th class="table-header-cell">Contact Number</th>
-                    <th class="table-header-cell">Family Number</th>
-                    <th class="table-header-cell">Family Members</th>
                     <th class="table-header-cell">Registered</th>
                   </tr>
                 </thead>
                 <tbody id="citizens-tbody"></tbody>
               </table>
             </div>
-            <div id="citizens-family-groups" class="hidden"></div>
           </div>
         </div>
         <div class="panel hidden admin-only" id="registration-pane">
@@ -817,15 +822,15 @@
           <form id="register-form" class="p-20" novalidate autocomplete="off">
             <div class="field">
               <label class="inputLabel" for="reg-first-name">First Name</label>
-              <input id="reg-first-name" required />
+              <input id="reg-first-name" type="text" data-validate="name" required />
             </div>
             <div class="field">
               <label class="inputLabel" for="reg-middle-name">Middle Name</label>
-              <input id="reg-middle-name" />
+              <input id="reg-middle-name" type="text" data-validate="name" />
             </div>
             <div class="field">
               <label class="inputLabel" for="reg-last-name">Last Name</label>
-              <input id="reg-last-name" required />
+              <input id="reg-last-name" type="text" data-validate="name" required />
             </div>
             <div class="field">
               <label class="inputLabel" for="reg-birthday">Birthday</label>
@@ -842,7 +847,7 @@
             </div>
             <div class="field">
               <label class="inputLabel" for="reg-employee-id">Employee ID</label>
-              <input id="reg-employee-id" inputmode="numeric" required />
+              <input id="reg-employee-id" inputmode="numeric" pattern="[0-9]*" data-validate="number" required readonly placeholder="Auto-generated" />
             </div>
             <div class="field">
               <label class="inputLabel" for="reg-username">Username</label>
@@ -873,7 +878,7 @@
             </div>
             <div class="field hidden" id="reg-doctor-specialization-field">
               <label class="inputLabel" for="reg-doctor-specialization">Doctor Specialization</label>
-              <input id="reg-doctor-specialization" type="text" placeholder="e.g., Pediatrics" />
+              <input id="reg-doctor-specialization" type="text" placeholder="e.g., Pediatrics" data-validate="name" />
             </div>
             <div id="register-error" class="note" style="display:none;color:#b91c1c;"></div>
             <div id="register-success" class="note" style="display:none;color:#15803d;"></div>
@@ -937,19 +942,36 @@
           <div class="panel-head">
             <h3>Consultations</h3>
             <span class="panel-hint">Record and review patient consultations.</span>
+            <span id="consultation-summary-badge" class="panel-hint" style="padding: 6px 10px; border-radius: 999px; background: #f1f5f9; color: #334155; font-weight: 700;">Awaiting: 0 | Done: 0</span>
             <div class="management-actions">
               <button id="open-consult-modal-btn" class="chip-btn">New Consultation</button>
               <button id="consult-report-btn" class="chip-btn chip-btn-outline">Generate Report</button>
+            </div>
+          </div>
+          <div class="management-toolbar consultation-filters">
+            <div class="consultation-filters-inline">
+              <label class="filter-label" for="consultation-status-filter">Status</label>
+              <select id="consultation-status-filter" class="filter-select">
+                <option value="all">All</option>
+                <option value="awaiting">Awaiting Consultation</option>
+                <option value="done">Done</option>
+              </select>
+              <label class="filter-label" for="consultation-date-from">From</label>
+              <input id="consultation-date-from" class="filter-select" type="date" />
+              <label class="filter-label" for="consultation-date-to">To</label>
+              <input id="consultation-date-to" class="filter-select" type="date" />
+              <button id="consultation-filter-clear-btn" class="chip-btn chip-btn-outline" type="button">Clear</button>
             </div>
           </div>
           <div class="table-wrap">
             <table class="accounts-table">
               <thead>
                 <tr class="table-header-row">
-                  <th class="table-header-cell">ID</th>
-                  <th class="table-header-cell">Patient</th>
-                  <th class="table-header-cell">Diagnosis</th>
-                  <th class="table-header-cell">Date</th>
+                  <th class="table-header-cell">Record</th>
+                  <th class="table-header-cell">Patient Details</th>
+                  <th class="table-header-cell">Consultation Summary</th>
+                  <th class="table-header-cell">Status</th>
+                  <th class="table-header-cell">Updated</th>
                   <th class="table-header-cell">Actions</th>
                 </tr>
               </thead>
@@ -963,12 +985,13 @@
         <div class="panel">
           <div class="panel-head">
             <h3>Medicine Inventory</h3>
-            <span class="panel-hint">Track stock levels and generate reports (view-only access).</span>
+            <span class="panel-hint">Track stock levels, expiry dates, and manage restocking.</span>
             <div class="management-actions">
               <button id="medicine-archived-toggle-btn" class="chip-btn chip-btn-outline">Show Archived</button>
               <button id="medicine-report-btn" class="chip-btn">Generate Report</button>
             </div>
           </div>
+          <div id="inventory-alerts-container" class="inventory-alerts"></div>
           <div class="table-wrap">
             <table class="accounts-table">
               <thead>
@@ -1064,11 +1087,11 @@
             </div>
             <div class="field">
               <label class="inputLabel" for="sched-start-time">Start Time</label>
-              <input id="sched-start-time" type="time" min="07:00" max="17:00" required />
+              <input id="sched-start-time" type="time" required />
             </div>
             <div class="field">
               <label class="inputLabel" for="sched-end-time">End Time</label>
-              <input id="sched-end-time" type="time" min="07:00" max="17:00" required />
+              <input id="sched-end-time" type="time" required />
             </div>
             <div class="field">
               <label class="inputLabel" for="sched-notes">Notes</label>
@@ -1122,7 +1145,15 @@
           <form id="consultation-form" class="modal-form" novalidate>
             <div class="field">
               <label class="inputLabel">Patient ID</label>
-              <input id="consult-patient-id" required />
+              <input id="consult-patient-id" required readonly />
+            </div>
+            <div class="field">
+              <label class="inputLabel">Patient Name</label>
+              <input id="consult-patient-name" readonly />
+            </div>
+            <div class="field">
+              <label class="inputLabel">Age</label>
+              <input id="consult-patient-age" readonly />
             </div>
             <div class="field">
               <label class="inputLabel">Symptoms</label>
@@ -1178,15 +1209,15 @@
           <form id="modal-edit-form" class="hidden">
             <div class="modal-group">
               <label class="modal-label" for="modal-edit-first-name">First Name</label>
-              <input id="modal-edit-first-name" class="search-input" type="text" required />
+              <input id="modal-edit-first-name" class="search-input" type="text" data-validate="name" required />
             </div>
             <div class="modal-group">
               <label class="modal-label" for="modal-edit-middle-name">Middle Name</label>
-              <input id="modal-edit-middle-name" class="search-input" type="text" />
+              <input id="modal-edit-middle-name" class="search-input" type="text" data-validate="name" />
             </div>
             <div class="modal-group">
               <label class="modal-label" for="modal-edit-last-name">Last Name</label>
-              <input id="modal-edit-last-name" class="search-input" type="text" required />
+              <input id="modal-edit-last-name" class="search-input" type="text" data-validate="name" required />
             </div>
             <div class="modal-group">
               <label class="modal-label" for="modal-edit-username">Username</label>
@@ -1198,7 +1229,7 @@
             </div>
             <div class="modal-group">
               <label class="modal-label" for="modal-edit-employee-id">Employee ID</label>
-              <input id="modal-edit-employee-id" class="search-input" type="text" />
+              <input id="modal-edit-employee-id" class="search-input" type="text" inputmode="numeric" pattern="[0-9]*" data-validate="number" />
             </div>
             <div class="modal-group">
               <label class="modal-label" for="modal-edit-role">Role</label>
@@ -1212,7 +1243,7 @@
             </div>
             <div class="modal-group hidden" id="modal-edit-specialization-group">
               <label class="modal-label" for="modal-edit-specialization">Doctor Specialization</label>
-              <input id="modal-edit-specialization" class="search-input" type="text" />
+              <input id="modal-edit-specialization" class="search-input" type="text" data-validate="name" />
             </div>
             <div class="modal-group">
               <label class="modal-label" for="modal-edit-birthday">Birthday</label>
@@ -1393,12 +1424,245 @@
         </div>
       </div>
 
+      <!-- ===== ANALYTICS SECTION ===== -->
+      <section id="analytics-section" class="section-top hidden admin-only">
+        <div class="dashboard-hero fade-in-up">
+          <div>
+            <p class="section-kicker">Reports &amp; Insights</p>
+            <h2 class="section-title">Analytics Dashboard</h2>
+            <p class="section-subtitle">Real-time statistics, inventory health, and financial overview.</p>
+          </div>
+          <div class="hero-actions">
+            <label class="filter-label" for="analytics-date-from">From</label>
+            <input id="analytics-date-from" class="filter-select" type="date" />
+            <label class="filter-label" for="analytics-date-to">To</label>
+            <input id="analytics-date-to" class="filter-select" type="date" />
+            <button id="analytics-refresh-btn" class="chip-btn">Refresh</button>
+            <button id="analytics-export-btn" class="chip-btn chip-btn-outline">Export CSV</button>
+          </div>
+        </div>
+
+        <!-- Patient Statistics -->
+        <div class="analytics-grid fade-in-up" style="animation-delay:0.04s;">
+          <article class="stat-card"><div class="stat-card-metric"><span class="stat-card-icon stat-icon-indigo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="3"/></svg></span><div><p class="stat-label">Total Consultations</p><p id="analytics-total-consultations" class="stat-value">0</p></div></div><p class="stat-foot">In selected period</p></article>
+          <article class="stat-card"><div class="stat-card-metric"><span class="stat-card-icon stat-icon-emerald" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z"/><path d="m9 12 2 2 4-4"/></svg></span><div><p class="stat-label">Unique Patients</p><p id="analytics-unique-patients" class="stat-value">0</p></div></div><p class="stat-foot">Distinct individuals</p></article>
+          <article class="stat-card"><div class="stat-card-metric"><span class="stat-card-icon stat-icon-cyan" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><div><p class="stat-label">Today</p><p id="analytics-today-consultations" class="stat-value">0</p></div></div><p class="stat-foot">Consultations today</p></article>
+        </div>
+
+        <!-- Charts Row 1: Gender + Age -->
+        <div class="analytics-charts-row fade-in-up" style="animation-delay:0.08s;">
+          <div class="panel analytics-chart-panel">
+            <div class="panel-head"><h3>Gender Distribution</h3></div>
+            <div class="chart-container"><canvas id="chart-gender"></canvas></div>
+          </div>
+          <div class="panel analytics-chart-panel">
+            <div class="panel-head"><h3>Age Groups</h3></div>
+            <div class="chart-container"><canvas id="chart-age-groups"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Charts Row 2: Diagnoses + Daily Trend -->
+        <div class="analytics-charts-row fade-in-up" style="animation-delay:0.12s;">
+          <div class="panel analytics-chart-panel">
+            <div class="panel-head"><h3>Top Diagnoses</h3></div>
+            <div class="chart-container chart-container-wide"><canvas id="chart-diagnoses"></canvas></div>
+          </div>
+          <div class="panel analytics-chart-panel">
+            <div class="panel-head"><h3>Daily Consultations</h3></div>
+            <div class="chart-container chart-container-wide"><canvas id="chart-daily-consultations"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Consultations By Doctor -->
+        <div class="panel fade-in-up" style="animation-delay:0.16s;">
+          <div class="panel-head"><h3>Consultations by Doctor</h3></div>
+          <div id="analytics-by-doctor" class="table-wrap"></div>
+        </div>
+
+        <!-- Follow-ups Due -->
+        <div class="panel fade-in-up" style="animation-delay:0.18s;">
+          <div class="panel-head"><h3>Upcoming Follow-ups</h3><span class="panel-hint">Next 14 days</span></div>
+          <div id="analytics-follow-ups" class="table-wrap"></div>
+        </div>
+
+        <!-- Inventory Stats -->
+        <div class="analytics-grid fade-in-up" style="animation-delay:0.20s;">
+          <article class="stat-card"><div class="stat-card-metric"><span class="stat-card-icon stat-icon-violet" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 9-9a3.54 3.54 0 1 0-5-5l-9 9a3.54 3.54 0 1 0 5 5Z"/></svg></span><div><p class="stat-label">Total Medicines</p><p id="analytics-total-medicines" class="stat-value">0</p></div></div></article>
+          <article class="stat-card"><div class="stat-card-metric"><span class="stat-card-icon stat-icon-emerald" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></span><div><p class="stat-label">Total Stock</p><p id="analytics-total-stock" class="stat-value">0</p></div></div></article>
+          <article class="stat-card"><div class="stat-card-metric"><span class="stat-card-icon stat-icon-rose" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><div><p class="stat-label">Low Stock</p><p id="analytics-low-stock" class="stat-value">0</p></div></div></article>
+          <article class="stat-card"><div class="stat-card-metric"><span class="stat-card-icon stat-icon-amber" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><div><p class="stat-label">Expiring Soon</p><p id="analytics-expiring" class="stat-value">0</p></div></div></article>
+          <article class="stat-card"><div class="stat-card-metric"><span class="stat-card-icon stat-icon-slate" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span><div><p class="stat-label">Expired</p><p id="analytics-expired" class="stat-value">0</p></div></div></article>
+        </div>
+
+        <div class="analytics-charts-row fade-in-up" style="animation-delay:0.22s;">
+          <div class="panel analytics-chart-panel">
+            <div class="panel-head"><h3>Inventory by Category</h3></div>
+            <div class="chart-container"><canvas id="chart-inventory-categories"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Financial Summary -->
+        <div class="panel fade-in-up" style="animation-delay:0.24s;">
+          <div class="panel-head">
+            <h3>Financial Summary</h3>
+            <div class="management-actions">
+              <button id="add-transaction-btn" class="chip-btn">Add Transaction</button>
+            </div>
+          </div>
+          <div class="analytics-grid" style="margin-bottom:16px;">
+            <article class="stat-card stat-card-income"><div class="stat-card-metric"><div><p class="stat-label">Total Income</p><p id="analytics-total-income" class="stat-value">₱0.00</p></div></div></article>
+            <article class="stat-card stat-card-expense"><div class="stat-card-metric"><div><p class="stat-label">Total Expenses</p><p id="analytics-total-expense" class="stat-value">₱0.00</p></div></div></article>
+            <article class="stat-card stat-card-net"><div class="stat-card-metric"><div><p class="stat-label">Net Income</p><p id="analytics-net-income" class="stat-value">₱0.00</p></div></div></article>
+          </div>
+          <div class="chart-container chart-container-wide"><canvas id="chart-financials"></canvas></div>
+        </div>
+      </section>
+
+      <!-- ===== ENHANCED CONSULTATION MODAL ===== -->
+      <div id="enhanced-consult-modal" class="modal-overlay hidden">
+        <div class="modal-box modal-box-wide" style="max-width:760px; text-align:left;">
+          <h3 class="modal-heading">New Consultation</h3>
+          <form id="enhanced-consult-form" class="modal-form" novalidate>
+            <div class="consult-layout">
+              <div class="consult-main">
+                <!-- Patient Info -->
+                <div class="field-row">
+                  <div class="field"><label class="inputLabel">Patient ID *</label><input id="enh-consult-patient-id" required placeholder="e.g., CIT-123" /></div>
+                  <div class="field"><label class="inputLabel">Patient Name</label><input id="enh-consult-patient-name" readonly placeholder="Auto-populated" /></div>
+                </div>
+
+                <!-- Chief Complaint -->
+                <div class="field"><label class="inputLabel">Chief Complaint *</label><textarea id="enh-consult-chief-complaint" rows="2" required placeholder="Primary reason for visit"></textarea></div>
+                <div class="field"><label class="inputLabel">History of Present Illness</label><textarea id="enh-consult-hpi" rows="2" placeholder="Onset, duration, associated symptoms..."></textarea></div>
+                <div class="field"><label class="inputLabel">Symptoms</label><textarea id="enh-consult-symptoms" rows="2" placeholder="Observed symptoms"></textarea></div>
+
+                <!-- Vitals -->
+                <div class="section-divider"><span>Vital Signs</span></div>
+                <div class="vitals-grid">
+                  <div class="vital-field"><label class="inputLabel">BP Systolic <small>mmHg</small></label><input id="vital-bp_systolic" type="number" min="60" max="300" /></div>
+                  <div class="vital-field"><label class="inputLabel">BP Diastolic <small>mmHg</small></label><input id="vital-bp_diastolic" type="number" min="30" max="200" /></div>
+                  <div class="vital-field"><label class="inputLabel">Heart Rate <small>bpm</small></label><input id="vital-heart_rate" type="number" min="30" max="250" /></div>
+                  <div class="vital-field"><label class="inputLabel">Resp. Rate <small>/min</small></label><input id="vital-respiratory_rate" type="number" min="5" max="60" /></div>
+                  <div class="vital-field"><label class="inputLabel">Temp <small>°C</small></label><input id="vital-temperature" type="number" step="0.1" min="34" max="43" /></div>
+                  <div class="vital-field"><label class="inputLabel">Weight <small>kg</small></label><input id="vital-weight" type="number" step="0.1" min="0.5" max="500" /></div>
+                  <div class="vital-field"><label class="inputLabel">Height <small>cm</small></label><input id="vital-height" type="number" step="0.1" min="20" max="300" /></div>
+                  <div class="vital-field"><label class="inputLabel">O₂ Sat <small>%</small></label><input id="vital-oxygen_sat" type="number" min="50" max="100" /></div>
+                </div>
+
+                <!-- Physical Examination -->
+                <div class="section-divider"><span>Physical Examination</span></div>
+                <div class="pe-accordion">
+                  <div><button type="button" class="pe-accordion-header">General Appearance</button><div class="pe-accordion-body hidden"><textarea id="pe-general" rows="2" placeholder="Alert, oriented, no acute distress..."></textarea></div></div>
+                  <div><button type="button" class="pe-accordion-header">HEENT</button><div class="pe-accordion-body hidden"><textarea id="pe-heent" rows="2" placeholder="Head, eyes, ears, nose, throat findings..."></textarea></div></div>
+                  <div><button type="button" class="pe-accordion-header">Chest / Lungs</button><div class="pe-accordion-body hidden"><textarea id="pe-chest" rows="2" placeholder="Breath sounds, chest expansion..."></textarea></div></div>
+                  <div><button type="button" class="pe-accordion-header">Cardiovascular</button><div class="pe-accordion-body hidden"><textarea id="pe-cardiovascular" rows="2" placeholder="Heart sounds, rhythm..."></textarea></div></div>
+                  <div><button type="button" class="pe-accordion-header">Abdomen</button><div class="pe-accordion-body hidden"><textarea id="pe-abdomen" rows="2" placeholder="Soft, non-tender, bowel sounds..."></textarea></div></div>
+                  <div><button type="button" class="pe-accordion-header">Extremities</button><div class="pe-accordion-body hidden"><textarea id="pe-extremities" rows="2" placeholder="Range of motion, edema..."></textarea></div></div>
+                  <div><button type="button" class="pe-accordion-header">Neurological</button><div class="pe-accordion-body hidden"><textarea id="pe-neurological" rows="2" placeholder="Motor, sensory, reflexes..."></textarea></div></div>
+                  <div><button type="button" class="pe-accordion-header">Skin</button><div class="pe-accordion-body hidden"><textarea id="pe-skin" rows="2" placeholder="Rashes, lesions, color..."></textarea></div></div>
+                </div>
+
+                <!-- Diagnosis & Notes -->
+                <div class="section-divider"><span>Assessment</span></div>
+                <div class="field"><label class="inputLabel">Diagnosis</label><input id="enh-consult-diagnosis" placeholder="Primary diagnosis" /></div>
+                <div class="field"><label class="inputLabel">Clinical Notes</label><textarea id="enh-consult-notes" rows="3" placeholder="Additional clinical notes..."></textarea></div>
+
+                <!-- Lab Requests -->
+                <div class="section-divider"><span>Lab Requests</span></div>
+                <div id="lab-requests-container">
+                  <div class="lab-request-row field-row">
+                    <input class="lab-test-name" type="text" placeholder="e.g., CBC, Urinalysis, X-Ray" />
+                  </div>
+                </div>
+                <button type="button" id="add-lab-request-btn" class="chip-btn chip-btn-outline" style="margin-top:6px;">+ Add Lab Request</button>
+
+                <!-- Follow-up -->
+                <div class="section-divider"><span>Follow-up</span></div>
+                <div class="field-row">
+                  <div class="field"><label class="inputLabel">Follow-up Date</label><input id="enh-consult-followup-date" type="date" /></div>
+                  <div class="field"><label class="inputLabel">Follow-up Notes</label><input id="enh-consult-followup-notes" placeholder="E.g., return in 1 week" /></div>
+                </div>
+
+                <div class="actions" style="gap:8px; margin-top:14px;">
+                  <button type="submit" class="btn">Save Consultation</button>
+                  <button type="submit" class="btn chip-btn" data-next="prescribe">Save &amp; Prescribe</button>
+                  <button type="button" id="enhanced-consult-cancel-btn" class="btn btn-close">Cancel</button>
+                </div>
+              </div>
+
+              <!-- Patient History Sidebar -->
+              <div class="consult-sidebar">
+                <h4>Patient History</h4>
+                <div id="patient-history-timeline" class="patient-history-timeline">
+                  <p class="timeline-empty">Enter a Patient ID to view history.</p>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ===== RESTOCK MODAL ===== -->
+      <div id="restock-modal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width:480px; text-align:left;">
+          <h3 class="modal-heading">Restock Medicine</h3>
+          <p style="margin-bottom:12px; color:#475569;">Restocking: <strong id="restock-medicine-name"></strong></p>
+          <form id="restock-form" novalidate>
+            <input id="restock-medicine-id" type="hidden" />
+            <div class="field"><label class="inputLabel">Quantity to Add *</label><input id="restock-qty" type="number" min="1" required /></div>
+            <div class="field-row">
+              <div class="field"><label class="inputLabel">Supplier</label><input id="restock-supplier" placeholder="Supplier name" /></div>
+              <div class="field"><label class="inputLabel">Contact</label><input id="restock-supplier-contact" placeholder="Phone / email" /></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label class="inputLabel">Batch #</label><input id="restock-batch" placeholder="Batch number" /></div>
+              <div class="field"><label class="inputLabel">Expiry Date</label><input id="restock-expiry" type="date" /></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label class="inputLabel">Unit Cost (₱)</label><input id="restock-unit-cost" type="number" step="0.01" min="0" /></div>
+              <div class="field"><label class="inputLabel">Notes</label><input id="restock-notes" placeholder="Optional notes" /></div>
+            </div>
+            <div class="actions" style="gap:8px;">
+              <button type="submit" class="btn">Restock</button>
+              <button type="button" id="restock-cancel-btn" class="btn btn-close">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ===== FINANCIAL TRANSACTION MODAL ===== -->
+      <div id="transaction-modal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width:440px; text-align:left;">
+          <h3 class="modal-heading">Add Transaction</h3>
+          <form id="transaction-form" novalidate>
+            <div class="field"><label class="inputLabel">Type *</label>
+              <select id="txn-type" required>
+                <option value="income">Income</option>
+                <option value="expense">Expense</option>
+              </select>
+            </div>
+            <div class="field"><label class="inputLabel">Category *</label><input id="txn-category" required placeholder="e.g., Consultation Fee, Medicine Purchase" /></div>
+            <div class="field"><label class="inputLabel">Amount (₱) *</label><input id="txn-amount" type="number" step="0.01" min="0" required /></div>
+            <div class="field"><label class="inputLabel">Date</label><input id="txn-date" type="date" /></div>
+            <div class="field"><label class="inputLabel">Description</label><textarea id="txn-description" rows="2" placeholder="Optional description"></textarea></div>
+            <div class="actions" style="gap:8px;">
+              <button type="submit" class="btn">Save</button>
+              <button type="button" id="transaction-cancel-btn" class="btn btn-close">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ===== PRESCRIPTION SAFETY WARNINGS ===== -->
+      <div id="prescription-safety-warnings" class="prescription-safety-panel hidden"></div>
+
     </main>
   </div>
 
   <script src="../js/runtime-config.js?v=20260403b"></script>
   <script src="../js/dashboard.js?v=20260403b"></script>
   <script src="../js/appointments.js?v=20260404e"></script>
+  <script src="../js/clinic-enhancements.js?v=20260501a"></script>
 </body>
 
 </html>

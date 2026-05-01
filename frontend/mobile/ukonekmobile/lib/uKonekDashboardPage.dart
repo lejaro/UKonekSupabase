@@ -141,6 +141,14 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     return '#${number.toString().padLeft(3, '0')}';
   }
 
+  String _queueStatusLabel(String rawStatus) {
+    final normalized = rawStatus.trim().toLowerCase();
+    if (normalized == 'serving') return 'NOW SERVING';
+    if (normalized == 'on_call') return 'ON CALL';
+    if (normalized == 'waiting') return 'WAITING';
+    return normalized.isEmpty ? 'N/A' : normalized.toUpperCase();
+  }
+
   String _formatWaitTime(int minutes) {
     final value = minutes < 0 ? 0 : minutes;
     final h = value ~/ 60;
@@ -679,6 +687,28 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                 ],
               ),
               const SizedBox(height: 20),
+              if (hasQueue) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _C.success.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'STATUS: ${_queueStatusLabel(queue.status)}',
+                      style: const TextStyle(
+                        color: _C.success,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -1004,7 +1034,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               for (var i = 0; i < medicines.length; i++) ...[
                 _medRow(
                   medicines[i].medicineName,
-                  '${medicines[i].quantityLabel} • ${_formatIssuedDate(medicines[i].issuedAt)}',
+                  '${medicines[i].quantityLabel} • ${medicines[i].dosage.isNotEmpty ? medicines[i].dosage : 'Dose not set'} • ${medicines[i].frequency.isNotEmpty ? medicines[i].frequency : 'Frequency not set'} • ${_formatIssuedDate(medicines[i].issuedAt)}',
                   'PRESCRIBED',
                   _C.primaryMid,
                 ),

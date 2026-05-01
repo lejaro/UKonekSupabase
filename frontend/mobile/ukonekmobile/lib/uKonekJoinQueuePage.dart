@@ -102,6 +102,14 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
     );
   }
 
+  String _queueStatusLabel(QueueDashboardSnapshot queue) {
+    final normalized = queue.status.trim().toLowerCase();
+    if (normalized == 'serving') return 'NOW SERVING';
+    if (normalized == 'on_call') return 'ON CALL';
+    if (normalized == 'waiting') return 'WAITING';
+    return normalized.isEmpty ? 'WAITING' : normalized.toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -191,7 +199,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
                     style: const TextStyle(fontSize: 52, fontWeight: FontWeight.w900, color: _C.textDark)),
                 Text(queue.serviceLabel.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, color: _C.textMuted, fontSize: 12)),
                 const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Divider()),
-                _detailRow("Your Status", peopleAhead <= 0 ? "NOW SERVING" : "WAITING"),
+                _detailRow("Your Status", _queueStatusLabel(queue)),
                 _detailRow("Estimated Wait", "${queue.estimatedWaitMinutes} mins"),
               ],
             ),

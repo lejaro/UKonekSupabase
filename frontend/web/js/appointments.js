@@ -6,6 +6,7 @@ const appointments = (() => {
   let supabaseClientPromise = null;
   let pendingUndo = null;
   let currentQueueTickets = [];
+  let activeQueueDate = '';
 
   const init = async () => {
     const queueSection = document.getElementById('queue-section');
@@ -113,7 +114,7 @@ const appointments = (() => {
           completed_at,
           citizen:citizens(id, firstname, surname, email)
         `)
-        .eq('queue_date', today)
+        .order('queue_date', { ascending: true })
         .order('queue_number', { ascending: true });
 
       if (response.error) {
@@ -123,6 +124,7 @@ const appointments = (() => {
       }
 
       currentQueueTickets = response.data || [];
+      activeQueueDate = resolveActiveQueueDate(currentQueueTickets, today);
       renderQueue();
       document.dispatchEvent(new CustomEvent('ukonek:queue-updated'));
     } catch (err) {
@@ -146,7 +148,33 @@ const appointments = (() => {
   };
 
   const getScopedQueueTickets = () => {
-    return currentQueueTickets;
+    if (!activeQueueDate) return currentQueueTickets;
+    return currentQueueTickets.filter((ticket) => String(ticket?.queue_date || '') === activeQueueDate);
+  };
+
+  const resolveActiveQueueDate = (tickets, fallbackDate) => {
+    const rows = Array.isArray(tickets) ? tickets : [];
+    const normalizedFallback = String(fallbackDate || '').trim();
+    const hasFallback = rows.some((ticket) => String(ticket?.queue_date || '').trim() === normalizedFallback);
+    if (hasFallback) return normalizedFallback;
+
+    const activeStatuses = new Set(['waiting', 'on_call', 'serving']);
+    const activeDates = rows
+      .filter((ticket) => activeStatuses.has(String(ticket?.status || '').trim().toLowerCase()))
+      .map((ticket) => String(ticket?.queue_date || '').trim())
+      .filter(Boolean)
+      .sort();
+
+    if (activeDates.length > 0) {
+      return activeDates[activeDates.length - 1];
+    }
+
+    const allDates = rows
+      .map((ticket) => String(ticket?.queue_date || '').trim())
+      .filter(Boolean)
+      .sort();
+
+    return allDates.length > 0 ? allDates[allDates.length - 1] : normalizedFallback;
   };
 
   const categorizeTickets = (tickets) => {
@@ -272,7 +300,8 @@ const appointments = (() => {
   const updateSummaryBadge = (waitingCount, onCallCount) => {
     const badge = document.getElementById('queue-summary-badge');
     if (!badge) return;
-    badge.textContent = `Waiting: ${waitingCount} | On Call: ${onCallCount}`;
+    const dateSuffix = activeQueueDate ? ` | Date: ${activeQueueDate}` : '';
+    badge.textContent = `Waiting: ${waitingCount} | On Call: ${onCallCount}${dateSuffix}`;
   };
 
   const moveTicketToLane = async (ticketId, targetLane) => {

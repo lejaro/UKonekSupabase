@@ -365,13 +365,13 @@ class _uKonekProfilePageState
         title: 'Personal Information',
         icon:  Icons.person_outline_rounded,
         fields: [
-          _EditField('First Name',     _firstName,     (v) => _firstName     = v),
-          _EditField('Middle Name',    _middleName,    (v) => _middleName    = v, required: false),
-          _EditField('Last Name',      _surname,       (v) => _surname       = v),
-          _EditField('Name Extension', _nameExtension, (v) => _nameExtension = v, required: false, hint: 'Jr/III'),
+          _EditField('First Name',     _firstName,     (v) => _firstName     = v, alphaOnly: true),
+          _EditField('Middle Name',    _middleName,    (v) => _middleName    = v, required: false, alphaOnly: true),
+          _EditField('Last Name',      _surname,       (v) => _surname       = v, alphaOnly: true),
+          _EditField('Name Extension', _nameExtension, (v) => _nameExtension = v, required: false, hint: 'Jr/III', alphaOnly: true),
           _EditField('Date of Birth',  _dob,           (v) => _dob           = v, hint: 'MM/DD/YYYY'),
           _EditField('Age',            _age,           (v) => _age           = v, numeric: true),
-          _EditField('Sex',            _sex,           (v) => _sex           = v),
+          _EditField('Sex',            _sex,           (v) => _sex           = v, alphaOnly: true),
         ],
       ),
       children: [
@@ -392,7 +392,7 @@ class _uKonekProfilePageState
         icon:  Icons.contact_mail_outlined,
         fields: [
           _EditField('Email',   _email,   (v) => _email   = v, hint: 'your@email.com'),
-          _EditField('Phone',   _phone,   (v) => _phone   = v, hint: '+639XXXXXXXXX'),
+          _EditField('Phone',   _phone,   (v) => _phone   = v, hint: '+639XXXXXXXXX', numeric: true),
           _EditField('Address', _address, (v) => _address = v),
         ],
       ),
@@ -412,9 +412,9 @@ class _uKonekProfilePageState
         title: 'Emergency Contact',
         icon:  Icons.emergency_outlined,
         fields: [
-          _EditField('Contact Name',   _emergencyName,    (v) => _emergencyName    = v),
-          _EditField('Contact Number', _emergencyContact, (v) => _emergencyContact = v, hint: '+639XXXXXXXXX'),
-          _EditField('Relationship',   _relation,         (v) => _relation         = v, hint: 'e.g. Mother'),
+          _EditField('Contact Name',   _emergencyName,    (v) => _emergencyName    = v, alphaOnly: true),
+          _EditField('Contact Number', _emergencyContact, (v) => _emergencyContact = v, hint: '+639XXXXXXXXX', numeric: true),
+          _EditField('Relationship',   _relation,         (v) => _relation         = v, hint: 'e.g. Mother', alphaOnly: true),
         ],
       ),
       children: [
@@ -557,9 +557,10 @@ class _uKonekProfilePageState
                             ? TextInputType.number
                             : TextInputType.text,
                         inputFormatters: f.numeric
-                            ? [FilteringTextInputFormatter
-                            .digitsOnly]
-                            : null,
+                          ? [FilteringTextInputFormatter.digitsOnly]
+                          : (f.alphaOnly
+                          ? [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z .'-]"))]
+                          : null),
                         style: const TextStyle(
                             fontSize: 14,
                             color: _C.textDark),
@@ -1145,6 +1146,7 @@ class _EditField {
   final void Function(String) setter;
   final bool required;
   final bool numeric;
+  final bool alphaOnly;
   final String? hint;
 
   const _EditField(
@@ -1153,6 +1155,7 @@ class _EditField {
       this.setter, {
         this.required = true,
         this.numeric  = false,
+        this.alphaOnly = false,
         this.hint,
       });
 }
