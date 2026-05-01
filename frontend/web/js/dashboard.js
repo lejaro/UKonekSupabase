@@ -4,10 +4,6 @@ const burger = document.getElementById('burger');
 const getApiBase = () => {
   const configBase = String(window.UKONEK_CONFIG?.API_BASE || '').trim();
   if (configBase) return configBase;
-  const port = window.location.port;
-  if (port === '5500' || port === '5501') {
-    return `${window.location.protocol}//${window.location.hostname}:5000`;
-  }
   return '';
 };
 const API_BASE = getApiBase();
@@ -120,6 +116,21 @@ const demoDelay = (ms = 500) => new Promise((resolve) => setTimeout(resolve, ms)
 const makeDemoId = () => (typeof crypto !== 'undefined' && crypto.randomUUID
   ? crypto.randomUUID()
   : `demo-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+
+const makeDemoEmployeeId = () => {
+  const existingNumbers = DEMO_REGISTERED_USERS
+    .map((user) => {
+      const match = String(user.employee_id || '').match(/(\d+)/);
+      return match ? Number(match[1]) : NaN;
+    })
+    .filter(Number.isFinite);
+
+  const nextNumber = existingNumbers.length > 0
+    ? Math.max(...existingNumbers) + 1
+    : 1001;
+
+  return `UK-${nextNumber}`;
+};
 
 
 function showToast(message, type = 'info') {
@@ -1115,9 +1126,8 @@ async function createStaffAccountDirect(payload) {
       first_name: payload.first_name,
       middle_name: payload.middle_name,
       last_name: payload.last_name,
-      employee_id: payload.employee_id,
+      employee_id: payload.employee_id || makeDemoEmployeeId(),
       role: payload.role,
-      doctor_specialization: payload.doctor_specialization || null,
       status: payload.status || 'Active',
       created_at: new Date().toISOString(),
       email: payload.email,
@@ -1130,9 +1140,6 @@ async function createStaffAccountDirect(payload) {
   if (isApiMode) {
     const apiPayload = {
       ...payload,
-      doctor_specialization: payload?.doctor_specialization ?? null,
-      doctorSpecialization: payload?.doctor_specialization ?? null,
-      specialization: payload?.doctor_specialization ?? null,
       directCreate: true,
       skipOtp: true
     };
@@ -1168,28 +1175,36 @@ async function createStaffAccountDirect(payload) {
   }
 
   const { supabase } = await loadSupabaseModule();
-  const { data, error } = await supabase.rpc('create_staff_account_admin', {
-    p_first_name: payload.first_name,
-    p_middle_name: payload.middle_name,
-    p_last_name: payload.last_name,
-    p_birthday: payload.birthday,
-    p_gender: payload.gender,
-    p_username: payload.username,
-    p_employee_id: payload.employee_id,
-    p_email: payload.email,
-    p_role: payload.role,
-    p_doctor_specialization: payload.doctor_specialization || null,
-    p_password: payload.password,
-    p_consent_given: Boolean(payload.consent_given),
-    p_status: payload.status || 'Active'
-  });
+  try {
+    const { data, error } = await supabase.rpc('create_staff_account_admin', {
+      p_first_name: payload.first_name,
+      p_middle_name: payload.middle_name,
+      p_last_name: payload.last_name,
+      p_birthday: payload.birthday,
+      p_gender: payload.gender,
+      p_username: payload.username,
+      p_email: payload.email,
+      p_role: payload.role,
+      p_password: payload.password,
+      p_consent_given: Boolean(payload.consent_given),
+      p_status: payload.status || 'Active'
+    });
 
-  if (error) {
-    throw new Error(error.message || 'Unable to create account.');
-  }
+    if (error) {
+      throw new Error(error.message || 'Unable to create account.');
+    }
 
-  if (data && data.error) {
-    throw new Error(data.error);
+    if (data && data.error) {
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    // Provide more actionable guidance for network-level failures
+    console.error('RPC create_staff_account_admin error:', err);
+    const msg = String(err?.message || '').toLowerCase();
+    if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('network request failed') || err?.name === 'TypeError') {
+      throw new Error('Network error communicating with Supabase (Failed to fetch).\n- Ensure you are serving the frontend over HTTP (not file://).\n- Confirm `SUPABASE_URL` and `SUPABASE_ANON_KEY` in frontend/web/js/runtime-config.js are correct.\n- Add your app origin to the Supabase project allowed origins (CORS).\n- Ensure the `create_staff_account_admin` function/migration is applied to the database.\nCheck the browser DevTools Network tab for the failing request for more details.');
+    }
+    throw err;
   }
 }
 
@@ -1203,15 +1218,11 @@ if (registerForm) {
     const last_name = document.getElementById('reg-last-name').value.trim();
     const birthday = document.getElementById('reg-birthday').value;
     const gender = document.getElementById('reg-gender').value;
-    const employee_id = document.getElementById('reg-employee-id').value.trim();
     const username = document.getElementById('reg-username').value.trim();
     const email = document.getElementById('reg-email').value.trim();
     const password = document.getElementById('reg-password').value;
     const confirmPassword = document.getElementById('reg-confirm-password').value;
     const role = document.getElementById('reg-role').value;
-    const doctorSpecialization = document.getElementById('reg-doctor-specialization')
-      ? document.getElementById('reg-doctor-specialization').value.trim()
-      : '';
 
     const err = document.getElementById('register-error');
     const success = document.getElementById('register-success');
@@ -1225,7 +1236,7 @@ if (registerForm) {
       success.style.display = 'none';
     }
 
-    if (!first_name || !last_name || !employee_id || !username || !email || !role) {
+    if (!first_name || !last_name || !username || !email || !role) {
       if (err) {
         err.textContent = 'Please fill in all required fields.';
         err.style.display = 'block';
@@ -1249,14 +1260,6 @@ if (registerForm) {
       return;
     }
 
-    if (role === 'doctor' && !doctorSpecialization) {
-      if (err) {
-        err.textContent = 'Doctor specialization is required for doctor accounts.';
-        err.style.display = 'block';
-      }
-      return;
-    }
-
     // Visual feedback
     if (registerSubmitBtn) {
       registerSubmitBtn.disabled = true;
@@ -1272,10 +1275,8 @@ if (registerForm) {
         birthday: birthday || null,
         gender: gender || null,
         username,
-        employee_id,
         email: email.toLowerCase(),
         role,
-        doctor_specialization: role === 'doctor' ? doctorSpecialization : null,
         password,
         consent_given: true,
         status: 'Active'
@@ -1311,23 +1312,6 @@ if (registerForm) {
 }
 
 const regRoleInput = document.getElementById('reg-role');
-const regDoctorSpecializationField = document.getElementById('reg-doctor-specialization-field');
-const regDoctorSpecializationInput = document.getElementById('reg-doctor-specialization');
-
-function updateRegistrationSpecializationVisibility() {
-  if (!regRoleInput || !regDoctorSpecializationField) return;
-  const isDoctor = String(regRoleInput.value || '').toLowerCase() === 'doctor';
-  regDoctorSpecializationField.classList.toggle('hidden', !isDoctor);
-  if (regDoctorSpecializationInput) {
-    regDoctorSpecializationInput.required = isDoctor;
-    if (!isDoctor) regDoctorSpecializationInput.value = '';
-  }
-}
-
-if (regRoleInput) {
-  regRoleInput.addEventListener('change', updateRegistrationSpecializationVisibility);
-  updateRegistrationSpecializationVisibility();
-}
 
 // Success modal buttons
 if (regSuccessDashboardBtn) {
@@ -1369,14 +1353,6 @@ if (registrationBackBtn) {
     });
   }
 });
-
-// Employee ID numeric only
-const employeeIdInput = document.getElementById('reg-employee-id');
-if (employeeIdInput) {
-  employeeIdInput.addEventListener('input', function () {
-    this.value = this.value.replace(/\D+/g, '');
-  });
-}
 
 // Email validation
 const emailInput = document.getElementById('reg-email');
@@ -1421,27 +1397,17 @@ function populateProfile(user) {
   const name = document.getElementById('profile-name');
   const email = document.getElementById('profile-email');
   const role = document.getElementById('profile-role');
-  const specializationField = document.getElementById('profile-specialization-field');
-  const specializationInput = document.getElementById('profile-specialization');
 
   if (name) name.value = user?.first_name || user?.username || '';
   if (email) email.value = user?.email || '';
   if (role) role.value = toTitleCase(user?.role || '');
-
-  const isDoctor = String(user?.role || '').toLowerCase() === 'doctor';
-  if (specializationField) specializationField.classList.toggle('hidden', !isDoctor);
-  if (specializationInput) {
-    specializationInput.value = isDoctor ? getSpecializationValue(user) : '';
-    specializationInput.required = isDoctor;
-  }
   applyRoleLogos(user?.role || 'staff');
 }
 
-async function saveMyProfileToSupabase({ displayName, role, specialization }) {
+async function saveMyProfileToSupabase({ displayName }) {
   const { supabase } = await loadSupabaseModule();
   const { data, error } = await supabase.rpc('update_my_staff_profile', {
-    p_display_name: displayName,
-    p_doctor_specialization: role === 'doctor' ? (specialization || null) : null
+    p_display_name: displayName
   });
 
   if (error) {
@@ -1461,21 +1427,12 @@ if (profileSaveBtn) {
     const name = document.getElementById('profile-name').value.trim();
     const email = document.getElementById('profile-email').value.trim();
     const role = String(document.getElementById('profile-role')?.value || '').trim().toLowerCase();
-    const specializationValue = String(document.getElementById('profile-specialization')?.value || '').trim();
 
     const form = new FormData();
     form.append('displayName', name);
     form.append('email', email);
-    if (role === 'doctor') {
-      form.append('doctorSpecialization', specializationValue);
-    }
     if (!name) {
       showToast('Display name is required.', 'error');
-      return;
-    }
-
-    if (role === 'doctor' && !specializationValue) {
-      showToast('Doctor specialization is required.', 'error');
       return;
     }
 
@@ -1501,17 +1458,14 @@ if (profileSaveBtn) {
 
       if (!saved && !isDemoMode) {
         await saveMyProfileToSupabase({
-          displayName: name,
-          role,
-          specialization: specializationValue
+          displayName: name
         });
       }
 
       cachedSessionUser = {
         ...(cachedSessionUser || {}),
         first_name: name || cachedSessionUser?.first_name,
-        email: email || cachedSessionUser?.email,
-        doctor_specialization: role === 'doctor' ? specializationValue : null
+        email: email || cachedSessionUser?.email
       };
 
       const user = await ensureAuthenticatedSession(true);
@@ -2132,22 +2086,6 @@ function renderSchedules(schedules, user, doctors = []) {
 }
 
 // Schedule editor modal logic
-const SCHEDULE_START_LIMIT = '07:00';
-const SCHEDULE_END_LIMIT = '17:00';
-
-function isWithinScheduleWindow(startTime, endTime) {
-  const startMinutes = toMinutes(startTime);
-  const endMinutes = toMinutes(endTime);
-  const windowStart = toMinutes(SCHEDULE_START_LIMIT);
-  const windowEnd = toMinutes(SCHEDULE_END_LIMIT);
-
-  if ([startMinutes, endMinutes, windowStart, windowEnd].some((value) => !Number.isFinite(value))) {
-    return false;
-  }
-
-  return startMinutes >= windowStart && endMinutes <= windowEnd;
-}
-
 function openScheduleModal(mode = 'create', schedule = null) {
   const modal = document.getElementById('schedule-editor-modal');
   const form = document.getElementById('schedule-form');
@@ -2222,11 +2160,6 @@ if (schedForm) {
 
     if (startTime >= endTime) {
       errorNode.textContent = 'End time must be after start time.';
-      return;
-    }
-
-    if (!isWithinScheduleWindow(startTime, endTime)) {
-      errorNode.textContent = 'Schedule time must be between 7:00 AM and 5:00 PM.';
       return;
     }
 
@@ -3490,7 +3423,7 @@ async function loadStaffData() {
   if (accountsTbody) {
     accountsTbody.innerHTML = '';
     if (latestStaffList.length === 0) {
-      accountsTbody.innerHTML = '<tr><td class="table-cell" colspan="5">No registered staff accounts found.</td></tr>';
+      accountsTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No registered staff accounts found.</td></tr>';
     } else {
       latestStaffList.forEach(user => {
         const identifier = user.username || user.employee_id || makeDemoId();
@@ -3498,7 +3431,6 @@ async function loadStaffData() {
 
         const roleValue = user.role ? String(user.role) : '';
         const roleLabel = roleValue ? roleValue.charAt(0).toUpperCase() + roleValue.slice(1) : '—';
-        const specializationLabel = getSpecializationValue(user) || '—';
         const statusValue = getStaffPresenceStatus(user);
         const statusClass = getStaffPresenceBadgeClass(user);
 
@@ -3510,7 +3442,6 @@ async function loadStaffData() {
           <td class="table-cell">${user.username || '—'}</td>
           <td class="table-cell">${user.employee_id || '—'}</td>
           <td class="table-cell">${roleLabel}</td>
-          <td class="table-cell">${specializationLabel}</td>
           <td class="table-cell"><span class="${statusClass}">${statusValue}</span></td>
         `;
         accountsTbody.appendChild(row);
@@ -3604,23 +3535,7 @@ const modalEditUsername = document.getElementById('modal-edit-username');
 const modalEditEmail = document.getElementById('modal-edit-email');
 const modalEditEmployeeId = document.getElementById('modal-edit-employee-id');
 const modalEditRole = document.getElementById('modal-edit-role');
-const modalEditSpecialization = document.getElementById('modal-edit-specialization');
-const modalEditSpecializationGroup = document.getElementById('modal-edit-specialization-group');
 const modalEditBirthday = document.getElementById('modal-edit-birthday');
-
-function syncModalSpecializationVisibility() {
-  if (!modalEditRole || !modalEditSpecializationGroup) return;
-  const isDoctor = String(modalEditRole.value || '').toLowerCase() === 'doctor';
-  modalEditSpecializationGroup.classList.toggle('hidden', !isDoctor);
-  if (modalEditSpecialization) {
-    modalEditSpecialization.required = isDoctor;
-    if (!isDoctor) modalEditSpecialization.value = '';
-  }
-}
-
-if (modalEditRole) {
-  modalEditRole.addEventListener('change', syncModalSpecializationVisibility);
-}
 
 function normalizeDateInput(value) {
   if (!value) return '';
@@ -3659,11 +3574,7 @@ function fillAccountEditForm(user) {
     const roleValue = String(user.role || 'staff').trim().toLowerCase();
     modalEditRole.value = roleValue || 'staff';
   }
-  if (modalEditSpecialization) {
-    modalEditSpecialization.value = getSpecializationValue(user);
-  }
   if (modalEditBirthday) modalEditBirthday.value = normalizeDateInput(user.birthday);
-  syncModalSpecializationVisibility();
 }
 
 function closeAccountModal() {
@@ -3687,13 +3598,7 @@ async function updateStaffAccountById(staffId, payload) {
   }
 
   if (isApiMode) {
-    const apiPayload = {
-      ...payload,
-      doctor_specialization: payload?.doctor_specialization ?? null,
-      doctorSpecialization: payload?.doctor_specialization ?? null,
-      specialization: payload?.doctor_specialization ?? null
-    };
-    const requestBody = JSON.stringify(apiPayload);
+    const requestBody = JSON.stringify({ ...payload });
     let response = await fetch(`${API_BASE}/api/staff/${staffId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -3719,55 +3624,6 @@ async function updateStaffAccountById(staffId, payload) {
 
   const staffService = await loadStaffServiceModule();
   return staffService.updateStaffById(staffId, payload);
-}
-
-async function persistDoctorSpecializationById(staffId, specializationValue) {
-  const normalized = String(specializationValue || '').trim() || null;
-
-  if (isApiMode) {
-    const endpoints = [
-      `${API_BASE}/api/staff/${staffId}/specialization`,
-      `${API_BASE}/api/staff/specialization`
-    ];
-
-    for (const endpoint of endpoints) {
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            staffId,
-            doctor_specialization: normalized,
-            doctorSpecialization: normalized,
-            specialization: normalized
-          })
-        });
-
-        if (response.ok) {
-          return true;
-        }
-      } catch (_) {
-        // Continue to next fallback.
-      }
-    }
-  }
-
-  const { supabase } = await loadSupabaseModule();
-  const { data, error } = await supabase.rpc('set_staff_specialization_admin', {
-    target_staff_id: staffId,
-    p_specialization: normalized
-  });
-
-  if (error) {
-    throw new Error(error.message || 'Failed to save doctor specialization.');
-  }
-
-  if (data && data.error) {
-    throw new Error(data.error);
-  }
-
-  return true;
 }
 
 async function resetStaffPasswordById(staffId, newPassword) {
@@ -3832,8 +3688,6 @@ function openAccountModal(user) {
   const modalRole = document.getElementById('modal-role');
   const modalStatus = document.getElementById('modal-status');
   const modalContact = document.getElementById('modal-contact');
-  const modalSpecialization = document.getElementById('modal-specialization');
-  const modalSpecializationGroup = document.getElementById('modal-specialization-group');
   const modalBday = document.getElementById('modal-bday');
   const confirmSection = document.getElementById('modal-confirm-section');
   const modalActions = document.getElementById('modal-actions');
@@ -3846,13 +3700,6 @@ function openAccountModal(user) {
   }
   if (modalStatus) modalStatus.textContent = getStaffPresenceStatus(user);
   if (modalContact) modalContact.textContent = user.employee_id || '—';
-  const isDoctor = String(user.role || '').toLowerCase() === 'doctor';
-  if (modalSpecializationGroup) modalSpecializationGroup.classList.toggle('hidden', !isDoctor);
-  if (modalSpecialization) {
-    modalSpecialization.textContent = isDoctor
-      ? (getSpecializationValue(user) || '—')
-      : '—';
-  }
   if (modalBday) modalBday.textContent = birthdayText;
 
   ['address'].forEach(field => {
@@ -3889,7 +3736,6 @@ function attachAccountRowListener(row) {
     const fullName = `${firstName} ${lastName}`.replace(/\s+/g, ' ').trim();
     const statusValue = getStaffPresenceStatus(user);
     const roleLabel = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '—';
-    const specializationValue = getSpecializationValue(user) || '—';
 
     const actions = document.getElementById('account-modal') ? [
       {
@@ -3910,7 +3756,6 @@ function attachAccountRowListener(row) {
         { label: 'Username', value: user.username || '—' },
         { label: 'Employee ID', value: user.employee_id || '—' },
         { label: 'Role', value: roleLabel },
-        { label: 'Specialization', value: specializationValue },
         { label: 'Status', value: statusValue },
         { label: 'Email', value: user.email || '—' },
         { label: 'Birthday', value: user.birthday ? new Date(user.birthday) : '—' }
@@ -4064,7 +3909,6 @@ if (modalSaveBtn) {
     const username = String(modalEditUsername?.value || '').trim();
     const email = String(modalEditEmail?.value || '').trim().toLowerCase();
     const role = String(modalEditRole?.value || '').trim().toLowerCase();
-    const doctorSpecialization = String(modalEditSpecialization?.value || '').trim();
     const firstName = String(modalEditFirstName?.value || '').trim();
     const lastName = String(modalEditLastName?.value || '').trim();
 
@@ -4088,11 +3932,6 @@ if (modalSaveBtn) {
       return;
     }
 
-    if (role === 'doctor' && !doctorSpecialization) {
-      setModalEditError('Doctor specialization is required for doctor accounts.');
-      return;
-    }
-
     const payload = {
       first_name: firstName,
       middle_name: String(modalEditMiddleName?.value || '').trim() || null,
@@ -4101,16 +3940,12 @@ if (modalSaveBtn) {
       email,
       employee_id: String(modalEditEmployeeId?.value || '').trim() || null,
       role,
-      doctor_specialization: role === 'doctor' ? doctorSpecialization : null,
       birthday: String(modalEditBirthday?.value || '').trim() || null
     };
 
     try {
       modalSaveBtn.disabled = true;
       await updateStaffAccountById(currentAccountData.id, payload);
-      if (role === 'doctor') {
-        await persistDoctorSpecializationById(currentAccountData.id, doctorSpecialization);
-      }
       showToast('Account updated successfully.', 'success');
       closeAccountModal();
       storedAccounts.clear();

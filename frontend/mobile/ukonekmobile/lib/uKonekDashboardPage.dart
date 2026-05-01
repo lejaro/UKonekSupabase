@@ -507,16 +507,16 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               return Column(
                 children: List.generate(schedules.length, (index) {
                   final item = schedules[index];
-                  final specialization = item.specialization.trim().isEmpty
-                      ? 'General Practice'
-                      : item.specialization.trim();
+                  final doctorName = item.doctorName.trim().isEmpty
+                      ? 'Doctor'
+                      : item.doctorName.trim();
                   final time =
                       '${_formatTime(item.startTime)} – ${_formatTime(item.endTime)}';
 
                   return Column(
                     children: [
                       _staffTile(
-                        specialization,
+                        doctorName,
                         time,
                         _C.success,
                         'Available',
@@ -539,7 +539,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   Widget _staffTile(
-    String specialization,
+    String doctorName,
     String time,
     Color statusColor,
     String statusLabel,
@@ -564,7 +564,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  specialization,
+                  doctorName,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,

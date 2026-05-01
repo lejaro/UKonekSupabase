@@ -172,9 +172,9 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
                                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                                 itemBuilder: (context, index) {
                                   final item = _visibleSchedules[index];
-                                  final specialization = item.specialization.isEmpty
-                                      ? 'General Practice'
-                                      : item.specialization;
+                                    final doctorName = item.doctorName.isEmpty
+                                        ? 'Doctor'
+                                        : item.doctorName;
 
                                   return Card(
                                     elevation: 1.5,
@@ -187,7 +187,7 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            specialization,
+                                            doctorName,
                                             style: const TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.w700,

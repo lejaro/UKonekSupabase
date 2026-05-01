@@ -697,10 +697,6 @@
                 <label class="inputLabel" for="profile-role">Role</label>
                 <input id="profile-role" type="text" readonly />
               </div>
-              <div class="field hidden" id="profile-specialization-field">
-                <label class="inputLabel" for="profile-specialization">Doctor Specialization</label>
-                <input id="profile-specialization" type="text" placeholder="e.g., Cardiology" />
-              </div>
               <div class="field">
                 <label class="inputLabel">Role Icon</label>
                 <div id="profile-role-logo" class="role-logo role-logo-admin role-logo-lg" title="Admin" aria-label="Role icon">A</div>
@@ -728,7 +724,7 @@
               <thead>
                 <tr class="table-header-row">
                   <th class="table-header-cell">Doctor</th>
-                  <th class="table-header-cell">Specialization</th>
+                  <th class="table-header-cell">Specializatio</th>
                   <th class="table-header-cell">Email</th>
                   <th class="table-header-cell">Status</th>
                   <th class="table-header-cell">Actions</th>
@@ -768,7 +764,7 @@
           <div id="registered-pane">
             <div class="management-actions" style="margin-bottom:10px;">
               <button id="staff-register-btn" class="chip-btn admin-only" type="button">Staff Registration</button>
-              <input id="staff-finder-input" class="search-input" type="search" placeholder="Find staff by name, role, specialization, or employee ID" aria-label="Find staff" />
+              <input id="staff-finder-input" class="search-input" type="search" placeholder="Find staff by name, role, or employee ID" aria-label="Find staff" />
               <select id="role-filter" class="search-input" aria-label="Filter staff by role">
                 <option value="">All roles</option>
                 <option value="admin">Admin</option>
@@ -784,7 +780,6 @@
                     <th class="table-header-cell">Username</th>
                     <th class="table-header-cell">Employee ID</th>
                     <th class="table-header-cell">Role</th>
-                    <th class="table-header-cell">Specialization</th>
                     <th class="table-header-cell">Status</th>
                   </tr>
                 </thead>
@@ -850,10 +845,6 @@
               </select>
             </div>
             <div class="field">
-              <label class="inputLabel" for="reg-employee-id">Employee ID</label>
-              <input id="reg-employee-id" inputmode="numeric" required />
-            </div>
-            <div class="field">
               <label class="inputLabel" for="reg-username">Username</label>
               <input id="reg-username" required />
             </div>
@@ -879,10 +870,6 @@
                 <option value="nurse">Nurse</option>
                 <option value="staff">Support Staff</option>
               </select>
-            </div>
-            <div class="field hidden" id="reg-doctor-specialization-field">
-              <label class="inputLabel" for="reg-doctor-specialization">Doctor Specialization</label>
-              <input id="reg-doctor-specialization" type="text" placeholder="e.g., Pediatrics" />
             </div>
             <div id="register-error" class="note" style="display:none;color:#b91c1c;"></div>
             <div id="register-success" class="note" style="display:none;color:#15803d;"></div>
@@ -1174,10 +1161,6 @@
               <label class="modal-label">Employee ID</label>
               <p class="modal-text" id="modal-contact"></p>
             </div>
-            <div class="modal-group" id="modal-specialization-group">
-              <label class="modal-label">Specialization</label>
-              <p class="modal-text" id="modal-specialization"></p>
-            </div>
             <div class="modal-group">
               <label class="modal-label">Birthday</label>
               <p class="modal-text" id="modal-bday"></p>
@@ -1218,10 +1201,6 @@
                 <option value="specialist">Specialist</option>
                 <option value="staff">Staff</option>
               </select>
-            </div>
-            <div class="modal-group hidden" id="modal-edit-specialization-group">
-              <label class="modal-label" for="modal-edit-specialization">Doctor Specialization</label>
-              <input id="modal-edit-specialization" class="search-input" type="text" />
             </div>
             <div class="modal-group">
               <label class="modal-label" for="modal-edit-birthday">Birthday</label>
