@@ -3,7 +3,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:ukonekmobile/uKonekPreviewPage.dart';
 import 'steps/personal_info_step.dart';
 import 'steps/contact_address_step.dart';
-import 'steps/id_verification_step.dart';
 
 class uKonekRegisterWrapper extends StatefulWidget {
   const uKonekRegisterWrapper({super.key});
@@ -40,8 +39,6 @@ class _uKonekRegisterWrapperState
 
   DateTime? selectedDate;
   String    selectedSex  = 'Male';
-  bool      idVerified   = false;
-  XFile?    idImage;
 
   static const _primary   = Color(0xFF0A2E6E);
   static const _primary2  = Color(0xFF1565C0);
@@ -55,7 +52,6 @@ class _uKonekRegisterWrapperState
   static const _steps = [
     {'label': 'Personal',  'icon': Icons.person_outline_rounded},
     {'label': 'Contact',   'icon': Icons.contact_mail_outlined},
-    {'label': 'Verify ID', 'icon': Icons.shield_outlined},
   ];
 
   Future<void> pickDate() async {
@@ -99,18 +95,12 @@ class _uKonekRegisterWrapperState
       }
     } else if (_currentStep == 1) {
       if (_step2Key.currentState!.validate()) {
-        canProceed = true;
+        _navigateToPreview();
       } else {
         _snackBar('Please complete all required fields');
       }
-    } else if (_currentStep == 2) {
-      if (idVerified) {
-        _navigateToPreview();
-      } else {
-        _snackBar('Please verify your ID first.');
-      }
     }
-    if (canProceed && _currentStep < 2) {
+    if (canProceed && _currentStep < 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOut,
@@ -153,8 +143,8 @@ class _uKonekRegisterWrapperState
               ? ''
               : '+63${emergencyContactController.text}',
           relation:         relationController.text,
-          idImage:          idImage,
-          idVerified:       idVerified,
+          idImage:          null,
+          idVerified:       true,
         ),
       ),
     );
@@ -198,18 +188,6 @@ class _uKonekRegisterWrapperState
                 eName:    emergencyNameController,
                 eContact: emergencyContactController,
                 relation: relationController,
-              ),
-              IdVerificationStep(
-                firstName: firstNameController.text,
-                surname:   lastNameController.text,
-                middleName:middleNameController.text,
-                dob:       selectedDate,
-                onVerified:(verified, file) {
-                  setState(() {
-                    idVerified = verified;
-                    idImage    = file;
-                  });
-                },
               ),
             ],
           ),
@@ -395,7 +373,7 @@ class _uKonekRegisterWrapperState
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                _currentStep == 2 ? 'FINISH' : 'NEXT',
+                _currentStep == 1 ? 'FINISH' : 'NEXT',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.2,
@@ -404,7 +382,7 @@ class _uKonekRegisterWrapperState
               ),
               const SizedBox(width: 8),
               Icon(
-                _currentStep == 2
+                _currentStep == 1
                     ? Icons.check_circle_outline_rounded
                     : Icons.arrow_forward_rounded,
                 size: 18,

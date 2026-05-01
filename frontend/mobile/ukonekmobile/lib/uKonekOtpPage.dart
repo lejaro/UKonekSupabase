@@ -16,7 +16,6 @@ class uKonekOtpPage extends StatefulWidget {
   final String emergencyName;
   final String emergencyContact;
   final String relation;
-  final bool idVerified;
 
   const uKonekOtpPage({
     super.key,
@@ -33,7 +32,6 @@ class uKonekOtpPage extends StatefulWidget {
     required this.emergencyName,
     required this.emergencyContact,
     required this.relation,
-    required this.idVerified,
   });
 
   @override
@@ -146,7 +144,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
             emergencyContact: widget.emergencyContact,
             relation: widget.relation,
             idImage: null,
-            idVerified: widget.idVerified,
+            idVerified: true,
             extractedOcrText: '',
           ),
         ),

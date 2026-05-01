@@ -7,8 +7,6 @@ class uKonekPreviewPage extends StatelessWidget {
   final String firstName, middleName, surname, nameExtension, familyNumber;
   final String dob, age, contact, sex, email, address;
   final String emergencyName, emergencyContact, relation;
-  final XFile? idImage;
-  final bool   idVerified;
   final String extractedOcrText;
 
   const uKonekPreviewPage({
@@ -27,8 +25,6 @@ class uKonekPreviewPage extends StatelessWidget {
     required this.emergencyName,
     required this.emergencyContact,
     required this.relation,
-    required this.idImage,
-    required this.idVerified,
     this.extractedOcrText = '',
   });
 
@@ -81,7 +77,6 @@ class uKonekPreviewPage extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
-              _idCard(),
               const SizedBox(height: 28),
               _buildSubmitBtn(context),
               const SizedBox(height: 12),
@@ -196,41 +191,6 @@ class uKonekPreviewPage extends StatelessWidget {
             Text(email,
                 style: const TextStyle(
                     fontSize: 12, color: _textMuted)),
-            const SizedBox(height: 8),
-            // ID verified badge
-            Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: idVerified
-                    ? _success.withOpacity(0.10)
-                    : Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: idVerified
-                        ? _success.withOpacity(0.3)
-                        : Colors.orange.shade200),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(
-                    idVerified
-                        ? Icons.verified_rounded
-                        : Icons.warning_amber_rounded,
-                    size: 13,
-                    color: idVerified
-                        ? _success
-                        : Colors.orange),
-                const SizedBox(width: 5),
-                Text(
-                    idVerified ? 'ID Verified' : 'ID Unverified',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: idVerified
-                          ? _success
-                          : Colors.orange.shade700,
-                    )),
-              ]),
             ),
           ],
         )),
@@ -311,81 +271,6 @@ class uKonekPreviewPage extends StatelessWidget {
     );
   }
 
-  // ── ID Card ──────────────────────────────────────────────────
-  Widget _idCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [BoxShadow(
-          color: Colors.black.withOpacity(0.05),
-          blurRadius: 14,
-          offset: const Offset(0, 4),
-        )],
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(
-                color: _primary.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.credit_card_outlined,
-                  color: _primary, size: 18),
-            ),
-            const SizedBox(width: 10),
-            const Text('National ID',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: _textDark,
-                )),
-          ]),
-          const SizedBox(height: 14),
-          const Divider(height: 1, color: _divider),
-          const SizedBox(height: 14),
-          if (idImage != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: FutureBuilder<Uint8List>(
-                future: idImage!.readAsBytes(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const SizedBox(
-                      height: 170,
-                      child: Center(
-                        child: CircularProgressIndicator(color: _primary),
-                      ),
-                    );
-                  }
-
-                  return Image.memory(
-                    snapshot.data!,
-                    width: double.infinity,
-                    height: 170,
-                    fit: BoxFit.cover,
-                  );
-                },
-              ),
-            )
-          else
-            Container(
-              height: 80,
-              decoration: BoxDecoration(
-                  color: const Color(0xFFF0F4FF),
-                  borderRadius: BorderRadius.circular(14)),
-              child: const Center(
-                  child: Text('No ID uploaded',
-                      style: TextStyle(color: _textMuted))),
-            ),
-        ],
-      ),
-    );
-  }
 
   // ── Submit button ────────────────────────────────────────────
   Widget _buildSubmitBtn(BuildContext context) {
@@ -418,7 +303,7 @@ class uKonekPreviewPage extends StatelessWidget {
               emergencyName:    emergencyName,
               emergencyContact: emergencyContact,
               relation:         relation,
-              idVerified:       idVerified,
+              idVerified:       true,
             ),
           ),
         ),

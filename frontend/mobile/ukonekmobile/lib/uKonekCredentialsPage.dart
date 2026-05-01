@@ -9,8 +9,6 @@ class uKonekCredentialsPage extends StatefulWidget {
   final String dob, age, contact, sex, email, address;
   final String emergencyName, emergencyContact, relation;
   final String extractedOcrText;
-  final XFile? idImage;
-  final bool   idVerified;
 
   const uKonekCredentialsPage({
     super.key,
@@ -28,8 +26,6 @@ class uKonekCredentialsPage extends StatefulWidget {
     required this.emergencyName,
     required this.emergencyContact,
     required this.relation,
-    required this.idImage,
-    required this.idVerified,
     required this.extractedOcrText,
   });
 
@@ -120,7 +116,7 @@ class _uKonekCredentialsPageState
                     MediaQuery.of(ctx).size.height * 0.4),
                 child: const SingleChildScrollView(
                   child: Text(
-                      '1. DATA COLLECTION: We collect your personal data and ID for verification purposes.\n\n'
+                      '1. DATA COLLECTION: We collect your personal data for registration purposes.\n\n'
                           '2. PRIVACY ACT: Your data is protected under the Data Privacy Act of 2012 (RA 10173).\n\n'
                           '3. SECURITY: You are responsible for your account security. Do not share your password.\n\n'
                           '4. CONSENT: By signing up, you consent to the processing of your data for citizen services.',
