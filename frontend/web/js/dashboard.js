@@ -2149,7 +2149,6 @@ function renderSchedules(schedules, user, doctors = []) {
 // Schedule editor modal logic
 const SCHEDULE_START_LIMIT = '07:00';
 const SCHEDULE_END_LIMIT = '17:00';
-const ENFORCE_SCHEDULE_TIME_WINDOW = false;
 
 function isWithinScheduleWindow(startTime, endTime) {
   const startMinutes = toMinutes(startTime);
@@ -2241,7 +2240,7 @@ if (schedForm) {
       return;
     }
 
-    if (ENFORCE_SCHEDULE_TIME_WINDOW && !isWithinScheduleWindow(startTime, endTime)) {
+    if (!isWithinScheduleWindow(startTime, endTime)) {
       errorNode.textContent = 'Schedule time must be between 7:00 AM and 5:00 PM.';
       return;
     }
@@ -2364,6 +2363,8 @@ const staffRegisterBtn = document.getElementById('staff-register-btn');
 const refreshAccountsBtn = document.getElementById('refresh-accounts-btn');
 const patientsTbody = document.getElementById('citizens-tbody');
 const citizensTableWrap = document.getElementById('citizens-table-wrap');
+const citizensFamilyGroups = document.getElementById('citizens-family-groups');
+const citizensViewToggleBtn = document.getElementById('citizens-view-toggle-btn');
 const staffFinderInput = document.getElementById('staff-finder-input');
 const roleFilterInput = document.getElementById('role-filter');
 const citizensFinderInput = document.getElementById('citizens-finder-input');
@@ -2383,22 +2384,43 @@ function applyStaffFinder() {
   });
 }
 
-function renderCitizensTable(filteredList) {
+function getCitizensGroupedMap(list) {
+  return list.reduce((acc, citizen) => {
+    const key = String(citizen?.family_number || '').trim() || 'Ungrouped';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(citizen);
+    return acc;
+  }, {});
+}
+
+function getCitizenFamilyMemberText(citizen, groupedMap) {
+  const familyNumber = String(citizen?.family_number || '').trim() || 'Ungrouped';
+  const familyMembers = (groupedMap[familyNumber] || [])
+    .map((member) => member.username || member.name || '')
+    .filter(Boolean);
+  return familyMembers.length > 0 ? familyMembers.join(', ') : '—';
+}
+
+function renderCitizensTable(filteredList, groupedMap) {
   if (!patientsTbody) return;
 
   patientsTbody.innerHTML = '';
   if (filteredList.length === 0) {
-    patientsTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No citizen accounts found.</td></tr>';
+    patientsTbody.innerHTML = '<tr><td class="table-cell" colspan="6">No citizen accounts found.</td></tr>';
     return;
   }
 
   filteredList.forEach(user => {
+    const familyNumber = String(user?.family_number || '').trim();
+    const familyMemberText = getCitizenFamilyMemberText(user, groupedMap);
     const row = document.createElement('tr');
     row.className = 'citizen-row';
     row.innerHTML = `
       <td class="table-cell">${user.username || user.name || '—'}</td>
       <td class="table-cell">${user.email || '—'}</td>
       <td class="table-cell">${user.contact_number || '—'}</td>
+      <td class="table-cell">${familyNumber || '—'}</td>
+      <td class="table-cell">${familyMemberText}</td>
       <td class="table-cell">${formatDateTime(user.created_at)}</td>
     `;
     patientsTbody.appendChild(row);
@@ -2410,25 +2432,74 @@ function renderCitizensTable(filteredList) {
         { label: 'Username', value: user.username || user.name || '—' },
         { label: 'Email', value: user.email || '—' },
         { label: 'Contact Number', value: user.contact_number || '—' },
+        { label: 'Family Number', value: familyNumber || '—' },
+        { label: 'Family Members', value: familyMemberText },
         { label: 'Registered', value: user.created_at ? new Date(user.created_at) : '—' }
       ]
     }));
   });
 }
 
+function renderCitizensGroupedView(filteredList, groupedMap) {
+  if (!citizensFamilyGroups) return;
+
+  citizensFamilyGroups.innerHTML = '';
+  const groupedEntries = Object.entries(groupedMap)
+    .filter(([, members]) => Array.isArray(members) && members.length > 0)
+    .sort((a, b) => {
+      if (a[0] === 'Ungrouped' && b[0] !== 'Ungrouped') return 1;
+      if (b[0] === 'Ungrouped' && a[0] !== 'Ungrouped') return -1;
+      return a[0].localeCompare(b[0]);
+    });
+
+  if (groupedEntries.length === 0) {
+    citizensFamilyGroups.innerHTML = '<p class="note" style="margin: 8px 0; color:#64748b;">No families found for this search.</p>';
+    return;
+  }
+
+  groupedEntries.forEach(([familyNumber, members]) => {
+    const isExpanded = expandedFamilyGroups.has(familyNumber);
+    const memberRows = members
+      .map((member) => `
+        <li class="citizen-family-member-item">
+          <strong>${member.username || member.name || '—'}</strong>
+          <span>${member.email || '—'} • ${member.contact_number || '—'}</span>
+        </li>
+      `)
+      .join('');
+
+    const groupCard = document.createElement('div');
+    groupCard.className = 'citizen-family-group-card';
+    groupCard.innerHTML = `
+      <button type="button" class="citizen-family-group-header" data-action="toggle-family-group" data-family-number="${familyNumber}">
+        <span>Family ${familyNumber === 'Ungrouped' ? 'Ungrouped' : familyNumber}</span>
+        <span>${members.length} member${members.length === 1 ? '' : 's'}</span>
+      </button>
+      <ul class="citizen-family-member-list ${isExpanded ? '' : 'hidden'}" data-family-members="${familyNumber}">
+        ${memberRows}
+      </ul>
+    `;
+    citizensFamilyGroups.appendChild(groupCard);
+  });
+}
+
 function applyCitizensFinder() {
   const query = String(citizensFinderInput?.value || '').trim().toLowerCase();
   const filtered = latestPatientsList.filter((citizen) => {
+    if (!query) return true;
     const username = String(citizen?.username || citizen?.name || '').toLowerCase();
     const email = String(citizen?.email || '').toLowerCase();
     const contact = String(citizen?.contact_number || '').toLowerCase();
-    if (!query) return true;
+    const familyNumber = String(citizen?.family_number || '').toLowerCase();
     return username.includes(query)
       || email.includes(query)
-      || contact.includes(query);
+      || contact.includes(query)
+      || familyNumber.includes(query);
   });
 
-  renderCitizensTable(filtered);
+  const filteredGroupedMap = getCitizensGroupedMap(filtered);
+  renderCitizensTable(filtered, filteredGroupedMap);
+  renderCitizensGroupedView(filtered, filteredGroupedMap);
 }
 
 if (staffFinderInput) {
@@ -3305,7 +3376,7 @@ async function listCitizensFromSupabase() {
 
   const modernResult = await supabase
     .from('citizens')
-    .select('id,username,firstname,surname,email,contact_number,age,date_of_birth,created_at')
+    .select('username,firstname,surname,email,contact_number,family_number,created_at')
     .order('created_at', { ascending: false });
   if (!modernResult.error) {
     return (Array.isArray(modernResult.data) ? modernResult.data : []).map(normalizeCitizenRecord);
@@ -3351,10 +3422,17 @@ async function loadPatientData() {
   latestPatientsList = Array.isArray(list) ? [...list] : [];
 
   latestPatientsList.sort((a, b) => {
+    const familyA = String(a?.family_number || '').trim();
+    const familyB = String(b?.family_number || '').trim();
+    const hasFamilyA = familyA !== '';
+    const hasFamilyB = familyB !== '';
+    if (hasFamilyA !== hasFamilyB) return hasFamilyA ? -1 : 1;
+    if (familyA !== familyB) return familyA.localeCompare(familyB);
     return String(a?.username || a?.name || '').localeCompare(String(b?.username || b?.name || ''));
   });
 
-  applyCitizensFinder();
+    applyCitizensFinder();
+  }
 }
 
 async function listStaffFromSupabase() {
@@ -6155,15 +6233,32 @@ function generateUsersReport() {
 }
 
 function generateCitizensReport() {
+  const groupedByFamily = latestPatientsList.reduce((acc, citizen) => {
+    const key = String(citizen?.family_number || '').trim();
+    if (!key) return acc;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(citizen);
+    return acc;
+  }, {});
+
   const rows = latestPatientsList.map(c => {
+    const familyNumber = String(c?.family_number || '').trim();
+    const familyMembers = familyNumber
+      ? (groupedByFamily[familyNumber] || [])
+          .map((member) => member.username || member.name || '')
+          .filter(Boolean)
+          .join(', ')
+      : '';
     return [
       c.username || c.name || '',
       c.email || '',
       c.contact_number || '',
+      familyNumber || '',
+      familyMembers || '',
       c.created_at || ''
     ];
   });
-  generateReport('Citizens Report', ['Username', 'Email', 'Contact Number', 'Registered'], rows);
+  generateReport('Citizens Report', ['Username', 'Email', 'Contact Number', 'Family Number', 'Family Members', 'Registered'], rows);
 }
 
 // wire up simple global report triggers (if buttons exist elsewhere)
