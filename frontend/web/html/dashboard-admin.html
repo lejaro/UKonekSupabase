@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>U-Konek+ — Admin Dashboard</title>
+  <title>U-Konek+ — Doctor Dashboard</title>
   <link rel="stylesheet" href="../css/style.css" />
   <style>
     .stats-chart-panel {
@@ -338,7 +338,7 @@
           <div class="logo"><img class="logo" src="../U-KonekLogo-transparent.png" alt="" /></div>
           <div class="brand-stack">
             <h3 class="brand-text">U-Konek+</h3>
-            <p class="brand-subtext">Admin Workspace</p>
+            <p class="brand-subtext">Medical Workspace</p>
           </div>
           <div class="control-btns">
             <button id="burger" class="icon-btn burger-toggle" aria-label="Toggle sidebar" aria-expanded="true">
@@ -482,9 +482,9 @@
         <div class="topbar-right">
           <div class="user-info">
             <div class="user-name">User</div>
-            <div class="user-pos">Administrator</div>
+            <div class="user-pos">Doctor</div>
           </div>
-          <div id="topbar-role-logo" class="role-logo role-logo-admin" title="Admin" aria-label="User role icon">A</div>
+          <div id="topbar-role-logo" class="role-logo role-logo-doctor" title="Doctor" aria-label="User role icon">D</div>
           <button id="logout-btn" class="icon-btn logout-btn" title="Logout">Logout</button>
         </div>
       </div>
@@ -500,7 +500,7 @@
         <div class="dashboard-hero fade-in-up">
           <div>
             <p class="section-kicker">Operations Overview</p>
-            <h2 class="section-title">Admin Command Center</h2>
+            <h2 class="section-title">Doctor Command Center</h2>
             <p class="section-subtitle">Monitor registrations, manage staff access, and keep onboarding flowing smoothly.</p>
           </div>
           <div class="hero-actions">
@@ -660,7 +660,7 @@
             <span class="panel-hint" id="non-admin-subtitle">Track your daily operations and coordinate with the admin team for account-related requests.</span>
           </div>
           <div class="table-wrap p-20">
-            <p id="non-admin-permissions" class="note" style="margin-bottom:16px;">Admin Command Center modules are restricted to admin accounts.</p>
+            <p id="non-admin-permissions" class="note" style="margin-bottom:16px;">Doctor Command Center modules are restricted to doctor accounts.</p>
             <div class="modal-group">
               <label class="modal-label">Username</label>
               <p class="modal-text" id="non-admin-username">—</p>
@@ -699,7 +699,7 @@
               </div>
               <div class="field">
                 <label class="inputLabel">Role Icon</label>
-                <div id="profile-role-logo" class="role-logo role-logo-admin role-logo-lg" title="Admin" aria-label="Role icon">A</div>
+                <div id="profile-role-logo" class="role-logo role-logo-doctor role-logo-lg" title="Doctor" aria-label="Role icon">D</div>
               </div>
               <div class="actions">
                 <button type="button" id="profile-save-btn" class="btn">Save Profile</button>
@@ -767,10 +767,9 @@
               <input id="staff-finder-input" class="search-input" type="search" placeholder="Find staff by name, role, or employee ID" aria-label="Find staff" />
               <select id="role-filter" class="search-input" aria-label="Filter staff by role">
                 <option value="">All roles</option>
-                <option value="admin">Admin</option>
                 <option value="doctor">Doctor</option>
                 <option value="nurse">Nurse</option>
-                <option value="staff">Staff</option>
+                <option value="specialist">Specialist</option>
               </select>
             </div>
             <div class="table-wrap">
@@ -865,10 +864,8 @@
               <label class="inputLabel" for="reg-role">Role</label>
               <select id="reg-role" required>
                 <option value="">Select role</option>
-                <option value="admin">Administrator</option>
                 <option value="doctor">Doctor</option>
                 <option value="nurse">Nurse</option>
-                <option value="staff">Support Staff</option>
               </select>
             </div>
             <div id="register-error" class="note" style="display:none;color:#b91c1c;"></div>
@@ -1195,11 +1192,9 @@
             <div class="modal-group">
               <label class="modal-label" for="modal-edit-role">Role</label>
               <select id="modal-edit-role" class="search-input" required>
-                <option value="admin">Admin</option>
                 <option value="doctor">Doctor</option>
                 <option value="nurse">Nurse</option>
                 <option value="specialist">Specialist</option>
-                <option value="staff">Staff</option>
               </select>
             </div>
             <div class="modal-group">

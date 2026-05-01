@@ -82,9 +82,9 @@ function detectRoleFromTitle() {
   if (storedRole) return storedRole;
 
   const title = document.title.toLowerCase();
-  if (title.includes('admin')) return 'admin';
+  if (title.includes('admin')) return 'doctor';
   if (title.includes('specialist')) return 'specialist';
-  return 'staff';
+  return 'nurse';
 }
 
 const DEMO_REGISTERED_USERS = [
@@ -104,7 +104,7 @@ const DEMO_REGISTERED_USERS = [
     first_name: 'Carla',
     last_name: 'Reyes',
     employee_id: 'UK-1015',
-    role: 'admin',
+    role: 'doctor',
     status: 'Inactive',
     created_at: '2024-12-01T08:15:00Z',
     email: 'creyes@ukonek.local',
@@ -511,17 +511,17 @@ function getSessionRole() {
 
 
 function isAdminUser(user) {
-  return String(user?.role || '').trim().toLowerCase() === 'admin';
+  return String(user?.role || '').trim().toLowerCase() === 'doctor';
 }
 
 const SECTION_ROLE_RULES = {
-  'dashboard-section': ['admin'],
-  'users-section': ['admin', 'doctor', 'nurse', 'staff'],
-  'reports-section': ['admin'],
-  'medicine-section': ['admin', 'doctor', 'nurse', 'staff'],
-  'consultation-section': ['admin', 'doctor', 'nurse', 'staff'],
-  'schedule-section': ['admin', 'doctor', 'nurse', 'staff'],
-  'profile-section': ['admin', 'doctor', 'nurse', 'staff']
+  'dashboard-section': ['doctor'],
+  'users-section': ['doctor', 'nurse', 'specialist'],
+  'reports-section': ['doctor'],
+  'medicine-section': ['doctor', 'nurse', 'specialist'],
+  'consultation-section': ['doctor', 'nurse', 'specialist'],
+  'schedule-section': ['doctor', 'nurse', 'specialist'],
+  'profile-section': ['doctor', 'nurse', 'specialist']
 };
 
 function isSectionAllowedForRole(sectionId, role) {
@@ -580,7 +580,7 @@ function getRoleLogoConfig(roleValue) {
   const key = String(roleValue || '').trim().toLowerCase();
   switch (key) {
     case 'admin':
-      return { className: 'role-logo-admin', label: 'Admin', icon: 'shield' };
+      return { className: 'role-logo-doctor', label: 'Doctor', icon: 'stethoscope' };
     case 'doctor':
       return { className: 'role-logo-doctor', label: 'Doctor', icon: 'stethoscope' };
     case 'nurse':
@@ -588,7 +588,7 @@ function getRoleLogoConfig(roleValue) {
     case 'specialist':
       return { className: 'role-logo-specialist', label: 'Specialist', icon: 'spark' };
     case 'staff':
-      return { className: 'role-logo-staff', label: 'Staff', icon: 'briefcase' };
+      return { className: 'role-logo-nurse', label: 'Nurse', icon: 'heart' };
     case 'citizen':
       return { className: 'role-logo-citizen', label: 'Citizen', icon: 'user' };
     default:
@@ -649,13 +649,13 @@ function updateNonAdminWorkspace(user) {
   const subtitleNode = document.getElementById('non-admin-subtitle');
   if (subtitleNode) {
     subtitleNode.textContent = role === 'doctor'
-      ? 'Track your daily clinical tasks and coordinate with the admin team for account-related requests.'
-      : 'Track your daily operations and coordinate with the admin team for account-related requests.';
+      ? 'Track your daily clinical tasks and coordinate with the lead doctor for account-related requests.'
+      : 'Track your daily operations and coordinate with the lead doctor for account-related requests.';
   }
 
   const permissionsNode = document.getElementById('non-admin-permissions');
   if (permissionsNode) {
-    permissionsNode.textContent = 'Admin Command Center modules are restricted to admin accounts. Your role can continue using non-admin workspace functions.';
+    permissionsNode.textContent = 'Doctor Command Center modules are restricted to doctor accounts. Your role can continue using the standard workspace.';
   }
 
   const usernameNode = document.getElementById('non-admin-username');
@@ -694,7 +694,7 @@ function applyRoleAccess(user) {
     const roleText = String(user?.role || 'Staff');
     userRoleNode.textContent = roleText.charAt(0).toUpperCase() + roleText.slice(1);
   }
-  applyRoleLogos(user?.role || 'staff');
+  applyRoleLogos(user?.role || 'nurse');
   applyConsultationAccess();
 
   const nonAdminSection = document.getElementById('non-admin-section');
@@ -718,11 +718,9 @@ function applyRoleAccess(user) {
 }
 
 const MEDICINE_PERMISSIONS = {
-  admin: { adjust: false, add: false },
   doctor: { adjust: true, add: false },
-  nurse: { adjust: true, add: false },
-  specialist: { adjust: true, add: false },
-  staff: { adjust: true, add: true }
+  nurse: { adjust: true, add: true },
+  specialist: { adjust: true, add: false }
 };
 
 const CONSULTATION_PERMISSIONS = {
@@ -1223,6 +1221,7 @@ if (registerForm) {
     const password = document.getElementById('reg-password').value;
     const confirmPassword = document.getElementById('reg-confirm-password').value;
     const role = document.getElementById('reg-role').value;
+    const allowedRegRoles = ['doctor', 'nurse'];
 
     const err = document.getElementById('register-error');
     const success = document.getElementById('register-success');
@@ -1239,6 +1238,14 @@ if (registerForm) {
     if (!first_name || !last_name || !username || !email || !role) {
       if (err) {
         err.textContent = 'Please fill in all required fields.';
+        err.style.display = 'block';
+      }
+      return;
+    }
+
+    if (!allowedRegRoles.includes(String(role).trim().toLowerCase())) {
+      if (err) {
+        err.textContent = 'Role must be doctor or nurse.';
         err.style.display = 'block';
       }
       return;
@@ -1401,7 +1408,7 @@ function populateProfile(user) {
   if (name) name.value = user?.first_name || user?.username || '';
   if (email) email.value = user?.email || '';
   if (role) role.value = toTitleCase(user?.role || '');
-  applyRoleLogos(user?.role || 'staff');
+  applyRoleLogos(user?.role || 'nurse');
 }
 
 async function saveMyProfileToSupabase({ displayName }) {
@@ -3571,8 +3578,11 @@ function fillAccountEditForm(user) {
   if (modalEditEmail) modalEditEmail.value = String(user.email || '').trim();
   if (modalEditEmployeeId) modalEditEmployeeId.value = String(user.employee_id || '').trim();
   if (modalEditRole) {
-    const roleValue = String(user.role || 'staff').trim().toLowerCase();
-    modalEditRole.value = roleValue || 'staff';
+    let roleValue = String(user.role || 'nurse').trim().toLowerCase();
+    if (roleValue === 'admin') roleValue = 'doctor';
+    if (roleValue === 'staff') roleValue = 'nurse';
+    const allowed = ['doctor', 'nurse', 'specialist'];
+    modalEditRole.value = allowed.includes(roleValue) ? roleValue : 'nurse';
   }
   if (modalEditBirthday) modalEditBirthday.value = normalizeDateInput(user.birthday);
 }

@@ -105,7 +105,7 @@ export async function requestRegistrationEmailOtp(email) {
     email: normalizedEmail,
     options: {
       shouldCreateUser: true,
-      data: { role: 'staff' }
+      data: { role: 'nurse' }
     }
   });
 
