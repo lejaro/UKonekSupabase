@@ -150,7 +150,10 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
       Navigator.pushAndRemoveUntil(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, _, _) => uKonekDashboardPage(username: displayName),
+          pageBuilder: (_, _, _) => uKonekDashboardPage(
+            username: displayName,
+            citizenId: (user?['id'] ?? '').toString(),
+          ),
           transitionDuration: const Duration(milliseconds: 500),
           transitionsBuilder: (_, animation, _, child) =>
               FadeTransition(opacity: animation, child: child),

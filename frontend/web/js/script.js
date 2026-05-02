@@ -103,8 +103,12 @@ function loadAuthSessionModule() {
 }
 
 function resolveDashboardPath(username = '', role = '') {
-    // Unified dashboard shell for all roles.
-    return './dashboard-admin.html';
+    const roleKey = String(role || '').trim().toLowerCase();
+    if (roleKey === 'nurse' || roleKey === 'staff') {
+        return './dashboard-nurse.html';
+    }
+    // Default to doctor dashboard for admin/doctor and fallbacks
+    return './dashboard-doctor.html';
 }
 
 

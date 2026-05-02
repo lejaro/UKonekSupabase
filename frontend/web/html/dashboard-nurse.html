@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>U-Konek+ — Doctor Dashboard</title>
+  <title>U-Konek+ — Nurse Dashboard</title>
   <link rel="stylesheet" href="../css/style.css" />
   <style>
     .stats-chart-panel {
@@ -399,7 +399,7 @@
             </div>
           </div>
 
-          <a href="#" class="nav-item" data-section="queue-section" title="Queue">
+          <a href="#" class="nav-item" data-section="queue-section" title="Queue">  
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10" />
@@ -407,6 +407,15 @@
               </svg>
             </span>
             <span class="label">Queue</span>
+          </a>
+
+          <a href="#" class="nav-item" data-section="vitals-section" title="Vitals Assessment">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+              </svg>
+            </span>
+            <span class="label">Vitals Assessment</span>
           </a>
 
           <a href="#" class="nav-item" data-section="consultation-section" title="Consultations">
@@ -465,7 +474,7 @@
       <div class="topbar">
         <div class="topbar-left">
           <div class="left-controls">
-            <p class="topbar-title">Systems Overview</p>
+            <p class="topbar-title">Nurse Systems Overview</p>
           </div>
           <div class="right-controls">
             <button id="notif-btn" class="icon-btn topbar-icon-btn" aria-label="Notifications">
@@ -482,9 +491,9 @@
         <div class="topbar-right">
           <div class="user-info">
             <div class="user-name">User</div>
-            <div class="user-pos">Doctor</div>
+            <div class="user-pos">Nurse</div>
           </div>
-          <div id="topbar-role-logo" class="role-logo role-logo-doctor" title="Doctor" aria-label="User role icon">D</div>
+          <div id="topbar-role-logo" class="role-logo role-logo-nurse" title="Nurse" aria-label="User role icon">N</div>
           <button id="logout-btn" class="icon-btn logout-btn" title="Logout">Logout</button>
         </div>
       </div>
@@ -500,8 +509,8 @@
         <div class="dashboard-hero fade-in-up">
           <div>
             <p class="section-kicker">Operations Overview</p>
-            <h2 class="section-title">Doctor Command Center</h2>
-            <p class="section-subtitle">Monitor registrations, manage staff access, and keep onboarding flowing smoothly.</p>
+            <h2 class="section-title">Nurse Dashboard</h2>
+            <p class="section-subtitle">Monitor patient activities and manage clinic operations.</p>
           </div>
           <div class="hero-actions">
             <button id="dash-refresh-btn" class="chip-btn">Refresh Data</button>
@@ -660,7 +669,7 @@
             <span class="panel-hint" id="non-admin-subtitle">Track your daily operations and coordinate with the admin team for account-related requests.</span>
           </div>
           <div class="table-wrap p-20">
-            <p id="non-admin-permissions" class="note" style="margin-bottom:16px;">Doctor Command Center modules are restricted to doctor accounts.</p>
+            <p id="non-admin-permissions" class="note" style="margin-bottom:16px;">Nurse Dashboard modules are restricted to nurse accounts.</p>
             <div class="modal-group">
               <label class="modal-label">Username</label>
               <p class="modal-text" id="non-admin-username">—</p>
@@ -677,7 +686,74 @@
         </div>
       </section>
 
+      <section id="vitals-section" class="section-top hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Vitals Assessment</h3>
+            <span class="panel-hint">Identify patient via QR code and record vital signs.</span>
+          </div>
+          
+          <div id="qr-scanner-container" class="p-20">
+            <div id="reader" style="width: 100%; max-width: 500px; margin: 0 auto; border-radius: 12px; overflow: hidden;"></div>
+            <div id="scanner-controls" class="actions" style="justify-content: center; margin-top: 15px;">
+              <button id="start-scanner-btn" class="btn">Start Scanner</button>
+              <button id="stop-scanner-btn" class="chip-btn hidden">Stop Scanner</button>
+            </div>
+            <p id="qr-status" class="note" style="text-align: center; margin-top: 10px;">Scanner ready.</p>
+          </div>
+
+          <div id="vitals-form-container" class="hidden">
+            <div class="p-20" style="border-top: 1px solid #e2e8f0; background: #f8fafc;">
+              <h4 style="margin: 0;">Patient Identified: <span id="identified-patient-name" style="color: #3b82f6;">—</span></h4>
+              <p class="note" style="margin: 5px 0 0 0;">Username: <span id="identified-patient-username">—</span></p>
+            </div>
+            
+            <form id="vitals-form" class="p-20" novalidate autocomplete="off">
+              <input type="hidden" id="vitals-citizen-id" />
+              
+              <div class="field">
+                <label class="inputLabel" for="vitals-complaint">Chief Complaint</label>
+                <textarea id="vitals-complaint" rows="3" placeholder="Describe the reason for visit..." required></textarea>
+              </div>
+              
+              <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                <div class="field">
+                  <label class="inputLabel" for="vitals-bp">Blood Pressure (mmHg)</label>
+                  <input id="vitals-bp" type="text" placeholder="e.g. 120/80" />
+                </div>
+                <div class="field">
+                  <label class="inputLabel" for="vitals-rr">Respiratory Rate (bpm)</label>
+                  <input id="vitals-rr" type="number" placeholder="e.g. 16" />
+                </div>
+                <div class="field">
+                  <label class="inputLabel" for="vitals-temp">Temperature (°C)</label>
+                  <input id="vitals-temp" type="number" step="0.1" placeholder="e.g. 36.5" />
+                </div>
+                <div class="field">
+                  <label class="inputLabel" for="vitals-spo2">Oxygen Saturation (SpO₂ %)</label>
+                  <input id="vitals-spo2" type="number" placeholder="e.g. 98" />
+                </div>
+              </div>
+              
+              <div class="field">
+                <label class="inputLabel" for="vitals-meds">Current Medications</label>
+                <textarea id="vitals-meds" rows="2" placeholder="List medications currently being taken..."></textarea>
+              </div>
+              
+              <div class="actions">
+                <button type="submit" id="vitals-submit-btn" class="btn">
+                  <span class="btn-spinner" aria-hidden="true"></span>
+                  <span class="btn-label">SUBMIT ASSESSMENT</span>
+                </button>
+                <button type="button" id="vitals-reset-btn" class="chip-btn">Reset</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
       <section id="profile-section" class="section-top hidden">
+
         <div class="panel">
           <div class="panel-head">
             <h3>My Profile</h3>
@@ -699,7 +775,7 @@
               </div>
               <div class="field">
                 <label class="inputLabel">Role Icon</label>
-                <div id="profile-role-logo" class="role-logo role-logo-doctor role-logo-lg" title="Doctor" aria-label="Role icon">D</div>
+                <div id="profile-role-logo" class="role-logo role-logo-nurse role-logo-lg" title="Nurse" aria-label="Role icon">N</div>
               </div>
               <div class="actions">
                 <button type="button" id="profile-save-btn" class="btn">Save Profile</button>
@@ -724,7 +800,7 @@
               <thead>
                 <tr class="table-header-row">
                   <th class="table-header-cell">Doctor</th>
-                  <th class="table-header-cell">Specializatio</th>
+                  <th class="table-header-cell">Specialization</th>
                   <th class="table-header-cell">Email</th>
                   <th class="table-header-cell">Status</th>
                   <th class="table-header-cell">Actions</th>
@@ -1379,6 +1455,7 @@
     </main>
   </div>
 
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script src="../js/runtime-config.js?v=20260501a"></script>
   <script src="../js/dashboard.js?v=20260501a"></script>
   <script src="../js/appointments.js?v=20260501a"></script>

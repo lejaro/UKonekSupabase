@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ukonekmobile/uKonekMedicineScheduler.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'services/api_service.dart';
 import 'uKonekJoinQueuePage.dart';
 import 'uKonekHealthRecordsPage.dart';
@@ -27,6 +28,7 @@ class _C {
 
 class uKonekDashboardPage extends StatefulWidget {
   final String username;
+  final String citizenId;
   final String email;
   final String phone;
   final String address;
@@ -34,6 +36,7 @@ class uKonekDashboardPage extends StatefulWidget {
   const uKonekDashboardPage({
     super.key,
     required this.username,
+    required this.citizenId,
     this.email = 'juan.delacruz@email.com',
     this.phone = '0912 345 6789',
     this.address = 'Brgy. Ugong, Valenzuela City',
@@ -181,6 +184,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildQrSection(),
+                  const SizedBox(height: 20),
                   _buildOnDutySection(),
                   const SizedBox(height: 24),
                   _buildQueueCard(),
@@ -203,6 +208,72 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildQrSection() {
+    if (widget.citizenId.isEmpty) return const SizedBox.shrink();
+
+    return Center(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: _C.shadow,
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _C.bg,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: QrImageView(
+                data: widget.citizenId,
+                version: QrVersions.auto,
+                size: 160.0,
+                eyeStyle: const QrEyeStyle(
+                  eyeShape: QrEyeShape.square,
+                  color: _C.primary,
+                ),
+                dataModuleStyle: const QrDataModuleStyle(
+                  dataModuleShape: QrDataModuleShape.square,
+                  color: _C.primary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Your Citizen QR Code',
+              style: TextStyle(
+                color: _C.textDark,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Show this to the nurse to scan for check-in',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _C.textMuted,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -521,6 +521,7 @@ const SECTION_ROLE_RULES = {
   'medicine-section': ['doctor', 'nurse', 'specialist'],
   'consultation-section': ['doctor', 'nurse', 'specialist'],
   'schedule-section': ['doctor', 'nurse', 'specialist'],
+  'vitals-section': ['doctor', 'nurse', 'specialist'],
   'profile-section': ['doctor', 'nurse', 'specialist']
 };
 
@@ -580,7 +581,7 @@ function getRoleLogoConfig(roleValue) {
   const key = String(roleValue || '').trim().toLowerCase();
   switch (key) {
     case 'admin':
-      return { className: 'role-logo-doctor', label: 'Doctor', icon: 'stethoscope' };
+      return { className: 'role-logo-doctor', label: 'Doctor Dashboard', icon: 'stethoscope' };
     case 'doctor':
       return { className: 'role-logo-doctor', label: 'Doctor', icon: 'stethoscope' };
     case 'nurse':
@@ -588,7 +589,7 @@ function getRoleLogoConfig(roleValue) {
     case 'specialist':
       return { className: 'role-logo-specialist', label: 'Specialist', icon: 'spark' };
     case 'staff':
-      return { className: 'role-logo-nurse', label: 'Nurse', icon: 'heart' };
+      return { className: 'role-logo-nurse', label: 'Nurse Dashboard', icon: 'heart' };
     case 'citizen':
       return { className: 'role-logo-citizen', label: 'Citizen', icon: 'user' };
     default:
@@ -650,12 +651,12 @@ function updateNonAdminWorkspace(user) {
   if (subtitleNode) {
     subtitleNode.textContent = role === 'doctor'
       ? 'Track your daily clinical tasks and coordinate with the lead doctor for account-related requests.'
-      : 'Track your daily operations and coordinate with the lead doctor for account-related requests.';
+      : 'Track your daily operations and coordinate with the lead nurse for account-related requests.';
   }
 
   const permissionsNode = document.getElementById('non-admin-permissions');
   if (permissionsNode) {
-    permissionsNode.textContent = 'Doctor Command Center modules are restricted to doctor accounts. Your role can continue using the standard workspace.';
+    permissionsNode.textContent = 'Doctor Dashboard modules are restricted to doctor accounts. Your role can continue using the standard workspace.';
   }
 
   const usernameNode = document.getElementById('non-admin-username');
@@ -691,7 +692,7 @@ function applyRoleAccess(user) {
 
   const userRoleNode = document.querySelector('.user-pos');
   if (userRoleNode) {
-    const roleText = String(user?.role || 'Staff');
+    const roleText = String(user?.role || 'Nurse');
     userRoleNode.textContent = roleText.charAt(0).toUpperCase() + roleText.slice(1);
   }
   applyRoleLogos(user?.role || 'nurse');
@@ -1033,6 +1034,9 @@ async function showSection(sectionId, options = {}) {
           await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData(), refreshFeedbackData()]);
         }
         renderDashboardInsights();
+        break;
+      case 'vitals-section':
+        initVitalsSection();
         break;
       // Add more as needed
     }
@@ -3378,6 +3382,189 @@ async function loadPatientData() {
   });
 
     applyCitizensFinder();
+}
+
+// --- Vitals Assessment (QR Scanning & Recording) ---
+let html5QrcodeScanner = null;
+
+function initVitalsSection() {
+  const startBtn = document.getElementById('start-scanner-btn');
+  const stopBtn = document.getElementById('stop-scanner-btn');
+  const statusText = document.getElementById('qr-status');
+  const formContainer = document.getElementById('vitals-form-container');
+  const vitalsForm = document.getElementById('vitals-form');
+
+  if (!startBtn || !stopBtn) return;
+
+  // Cleanup any previous scanner instance
+  if (html5QrcodeScanner) {
+    html5QrcodeScanner.clear().catch(console.error);
+    html5QrcodeScanner = null;
+  }
+
+  startBtn.addEventListener('click', async () => {
+    startBtn.classList.add('hidden');
+    stopBtn.classList.remove('hidden');
+    statusText.textContent = 'Scanning for QR code...';
+    formContainer.classList.add('hidden');
+
+    try {
+      html5QrcodeScanner = new Html5Qrcode('reader');
+      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+      await html5QrcodeScanner.start(
+        { facingMode: 'environment' },
+        config,
+        async (decodedText) => {
+          // Success
+          statusText.textContent = 'QR Code detected!';
+          statusText.style.color = '#15803d';
+          
+          await stopScanner();
+          handleQRDecoded(decodedText);
+        },
+        (errorMessage) => {
+          // Ignore scanning errors as they happen constantly during seek
+        }
+      );
+    } catch (err) {
+      console.error('Scanner start error:', err);
+      statusText.textContent = 'Error: Camera access denied or not found.';
+      statusText.style.color = '#b91c1c';
+      startBtn.classList.remove('hidden');
+      stopBtn.classList.add('hidden');
+    }
+  });
+
+  stopBtn.addEventListener('click', stopScanner);
+
+  async function stopScanner() {
+    if (html5QrcodeScanner) {
+      try {
+        await html5QrcodeScanner.stop();
+        await html5QrcodeScanner.clear();
+      } catch (e) {
+        console.error('Error stopping scanner:', e);
+      }
+      html5QrcodeScanner = null;
+    }
+    startBtn.classList.remove('hidden');
+    stopBtn.classList.add('hidden');
+    statusText.textContent = 'Scanner stopped.';
+    statusText.style.color = '';
+  }
+
+  vitalsForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await handleVitalsSubmission();
+  });
+
+  const resetBtn = document.getElementById('vitals-reset-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      vitalsForm.reset();
+      formContainer.classList.add('hidden');
+      statusText.textContent = 'Scanner ready.';
+    });
+  }
+}
+
+async function handleQRDecoded(decodedText) {
+  const statusText = document.getElementById('qr-status');
+  const formContainer = document.getElementById('vitals-form-container');
+  const patientNameSpan = document.getElementById('identified-patient-name');
+  const patientUserSpan = document.getElementById('identified-patient-username');
+  const citizenIdInput = document.getElementById('vitals-citizen-id');
+
+  statusText.textContent = 'Looking up patient...';
+  
+  try {
+    const { supabase } = await loadSupabaseModule();
+    // Assuming decodedText is the username or id
+    const { data, error } = await supabase
+      .from('citizens')
+      .select('id, username, firstname, surname')
+      .or(`username.eq."${decodedText}",id.eq."${decodedText}"`)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!data) {
+      statusText.textContent = 'Patient not found. Invalid QR code.';
+      statusText.style.color = '#b91c1c';
+      return;
+    }
+
+    const firstName = String(data.firstname || '').trim();
+    const surname = String(data.surname || '').trim();
+    const fullName = [firstName, surname].filter(Boolean).join(' ') || data.username;
+
+    patientNameSpan.textContent = fullName;
+    patientUserSpan.textContent = data.username;
+    citizenIdInput.value = data.id;
+
+    formContainer.classList.remove('hidden');
+    statusText.textContent = 'Patient identified successfully.';
+    statusText.style.color = '#15803d';
+    
+    // Scroll to form
+    formContainer.scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    console.error('Patient lookup error:', err);
+    statusText.textContent = 'Error identifying patient.';
+    statusText.style.color = '#b91c1c';
+  }
+}
+
+async function handleVitalsSubmission() {
+  const submitBtn = document.getElementById('vitals-submit-btn');
+  const citizenId = document.getElementById('vitals-citizen-id').value;
+  const complaint = document.getElementById('vitals-complaint').value;
+  const bp = document.getElementById('vitals-bp').value;
+  const rr = document.getElementById('vitals-rr').value;
+  const temp = document.getElementById('vitals-temp').value;
+  const spo2 = document.getElementById('vitals-spo2').value;
+  const meds = document.getElementById('vitals-meds').value;
+
+  if (!citizenId || !complaint) {
+    showToast('Patient identification and chief complaint are required.', 'error');
+    return;
+  }
+
+  setLoading(submitBtn, true);
+
+  try {
+    const user = await ensureAuthenticatedSession();
+    const { supabase } = await loadSupabaseModule();
+
+    const payload = {
+      citizen_id: citizenId,
+      nurse_id: user?.id || null,
+      chief_complaint: complaint,
+      blood_pressure: bp || null,
+      respiratory_rate: rr ? parseInt(rr) : null,
+      temperature: temp ? parseFloat(temp) : null,
+      oxygen_saturation: spo2 ? parseInt(spo2) : null,
+      current_medications: meds || null
+    };
+
+    const { error } = await supabase
+      .from('vital_signs')
+      .insert([payload]);
+
+    if (error) throw error;
+
+    showToast('Vital signs recorded successfully.', 'success');
+    document.getElementById('vitals-form').reset();
+    document.getElementById('vitals-form-container').classList.add('hidden');
+    document.getElementById('qr-status').textContent = 'Scanner ready.';
+    document.getElementById('qr-status').style.color = '';
+  } catch (err) {
+    console.error('Vitals submission error:', err);
+    showToast('Failed to record vital signs. Please check database table.', 'error');
+  } finally {
+    setLoading(submitBtn, false);
+  }
 }
 
 async function listStaffFromSupabase() {
