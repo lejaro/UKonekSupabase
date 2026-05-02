@@ -30,7 +30,7 @@ class _uKonekRegisterWrapperState
   final houseNumberController    = TextEditingController();
   final streetNameController     = TextEditingController();
   final barangayController       =
-  TextEditingController(text: 'Ugong');
+  TextEditingController();
   final emergencyNameController    = TextEditingController();
   final emergencyContactController = TextEditingController();
   final relationController         = TextEditingController();
@@ -38,13 +38,14 @@ class _uKonekRegisterWrapperState
   DateTime? selectedDate;
   String    selectedSex  = 'Male';
 
-  static const _primary   = Color(0xFF0A2E6E);
-  static const _primary2  = Color(0xFF1565C0);
-  static const _bg        = Color(0xFFF0F4FA);
+  // ── Updated Medical Green Color Palette ────────────────────────
+  static const _primary   = Color(0xFF28A745); // Health Green[cite: 1]
+  static const _primary2  = Color(0xFF1B5E20); // Forest Green[cite: 1]
+  static const _bg        = Color(0xFFF8FCF9); // Mint-tinted Background[cite: 1]
   static const _surface   = Colors.white;
-  static const _textDark  = Color(0xFF1A2740);
-  static const _textMuted = Color(0xFF8A93A0);
-  static const _divider   = Color(0xFFEEF1F6);
+  static const _textDark  = Color(0xFF1B2E1E); // Dark Forest Charcoal[cite: 1]
+  static const _textMuted = Color(0xFF637367); // Muted Sage[cite: 1]
+  static const _divider   = Color(0xFFE2E9E3); // Light Mist Divider[cite: 1]
 
   // Step labels & icons
   static const _steps = [
@@ -61,7 +62,10 @@ class _uKonekRegisterWrapperState
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
             colorScheme: const ColorScheme.light(
-                primary: _primary)),
+                primary: _primary, // Now Green[cite: 1]
+                onPrimary: Colors.white,
+                surface: _surface,
+                onSurface: _textDark)),
         child: child!,
       ),
     );
@@ -148,7 +152,7 @@ class _uKonekRegisterWrapperState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: _bg, // Updated Mint Background[cite: 1]
       body: Column(children: [
         _buildHeader(),
         _buildStepper(),
@@ -191,18 +195,14 @@ class _uKonekRegisterWrapperState
     );
   }
 
-  // ── Header ───────────────────────────────────────────────────
+  // ── Header (Green Gradient) ──────────────────────────────────
   Widget _buildHeader() {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [_primary, _primary2],
+          colors: [_primary, _primary2], // Updated to Green[cite: 1]
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft:  Radius.circular(0),
-          bottomRight: Radius.circular(0),
         ),
       ),
       child: SafeArea(
@@ -255,21 +255,19 @@ class _uKonekRegisterWrapperState
     );
   }
 
-  // ── Stepper ──────────────────────────────────────────────────
+  // ── Stepper (Green Accents) ──────────────────────────────────
   Widget _buildStepper() {
     return Container(
       color: _surface,
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
       child: Column(children: [
-        // Step nodes + connector
         Row(children: List.generate(_steps.length * 2 - 1, (i) {
           if (i.isOdd) {
-            // Connector line
             final stepIdx = i ~/ 2;
             final filled  = stepIdx < _currentStep;
             return Expanded(child: Container(
               height: 2,
-              color: filled ? _primary : const Color(0xFFE0E7FF),
+              color: filled ? _primary : const Color(0xFFE2E9E3), // Divider Grey[cite: 1]
             ));
           }
           final idx       = i ~/ 2;
@@ -312,7 +310,6 @@ class _uKonekRegisterWrapperState
           );
         })),
         const SizedBox(height: 10),
-        // Labels
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(_steps.length, (i) {
@@ -338,7 +335,7 @@ class _uKonekRegisterWrapperState
     );
   }
 
-  // ── Bottom Nav ───────────────────────────────────────────────
+  // ── Bottom Nav (Green Button) ───────────────────────────────
   Widget _buildBottomNav() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
@@ -356,7 +353,7 @@ class _uKonekRegisterWrapperState
         child: ElevatedButton(
           onPressed: _handleNext,
           style: ElevatedButton.styleFrom(
-            backgroundColor: _primary,
+            backgroundColor: _primary, // Now Green[cite: 1]
             foregroundColor: Colors.white,
             elevation:  4,
             shadowColor: _primary.withOpacity(0.3),

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'services/api_service.dart';
 import 'uKonekLoginPage.dart';
 
@@ -17,8 +19,13 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
   bool _isLoading = false;
   bool _emailSent = false;
 
-  static const _primary = Color(0xFF0D47A1);
-  static const _primaryLight = Color(0xFF1976D2);
+  // ── Updated Medical Green Design Tokens ──────────────────────
+  static const _primary      = Color(0xFF28A745); // Health Green
+  static const _primary2     = Color(0xFF1B5E20); // Forest Green
+  static const _bg           = Color(0xFFF8FCF9); // Mint Background
+  static const _textDark     = Color(0xFF1B2E1E); // Dark Forest Charcoal
+  static const _textMuted    = Color(0xFF637367); // Muted Sage
+  static const _fieldBdr     = Color(0xFFE2E9E3); // Light Mist Border
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -40,7 +47,6 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
     super.dispose();
   }
 
-  /// Send password reset email via Supabase Auth
   Future<void> _sendResetEmail() async {
     if (!_emailFormKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
@@ -62,11 +68,12 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(error.toString().replaceFirst('Exception: ', '')),
         backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ));
     }
   }
 
-  /// Mask email for display
   String _maskEmail(String email) {
     final parts = email.split('@');
     if (parts.length != 2) return email;
@@ -79,14 +86,14 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFF),
+      backgroundColor: _bg, // Updated mint background
       body: Column(
         children: [
-          // ── Header ─────────────────────────────────────────
+          // ── Header (Green Gradient) ─────────────────────────
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                  colors: [_primary, _primaryLight],
+                  colors: [_primary, _primary2], // Updated Green Gradient
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight),
               borderRadius: BorderRadius.only(
@@ -146,22 +153,19 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
     );
   }
 
-  // ────────────────────────────────────────────────────────────
-  // STEP 0 — Email entry
-  // ────────────────────────────────────────────────────────────
   Widget _buildEmailStep() {
     return Column(
       children: [
         const SizedBox(height: 16),
 
-        // Icon
+        // Medical Icon
         Container(
           width: 80, height: 80,
           decoration: BoxDecoration(
             color: _primary.withOpacity(0.08),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.email_outlined, color: _primary, size: 38),
+          child: const Icon(Icons.lock_reset_rounded, color: _primary, size: 38),
         ),
         const SizedBox(height: 20),
 
@@ -169,12 +173,12 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
             style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1A1A2E))),
+                color: _textDark)),
         const SizedBox(height: 8),
         Text(
           "Enter the email address you used during registration. We'll send you a password reset link.",
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade500, height: 1.5),
+          style: TextStyle(fontSize: 13, color: _textMuted, height: 1.5),
         ),
         const SizedBox(height: 32),
 
@@ -185,7 +189,7 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: _textDark.withOpacity(0.05),
                 blurRadius: 20,
                 offset: const Offset(0, 6))],
           ),
@@ -204,25 +208,25 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
                     return null;
                   },
                   style: const TextStyle(
-                      fontSize: 14, color: Color(0xFF1A1A2E)),
+                      fontSize: 14, color: _textDark),
                   decoration: InputDecoration(
                     labelText: "Email Address",
-                    labelStyle: TextStyle(
-                        fontSize: 13, color: Colors.grey.shade500),
+                    labelStyle: const TextStyle(
+                        fontSize: 13, color: _textMuted),
                     prefixIcon: Icon(Icons.email_outlined,
                         color: _primary.withOpacity(0.6), size: 20),
                     filled: true,
-                    fillColor: const Color(0xFFF8FAFF),
+                    fillColor: _bg,
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 14),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide:
-                        const BorderSide(color: Color(0xFFDDE3F0))),
+                        const BorderSide(color: _fieldBdr)),
                     enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide:
-                        const BorderSide(color: Color(0xFFDDE3F0))),
+                        const BorderSide(color: _fieldBdr)),
                     focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide:
@@ -274,9 +278,6 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
     );
   }
 
-  // ────────────────────────────────────────────────────────────
-  // STEP 1 — Success / Email Sent
-  // ────────────────────────────────────────────────────────────
   Widget _buildSuccessStep() {
     return Column(
       children: [
@@ -285,9 +286,9 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
         Container(
           width: 100, height: 100,
           decoration: BoxDecoration(
-              color: Colors.green.shade50, shape: BoxShape.circle),
+              color: _primary.withOpacity(0.08), shape: BoxShape.circle),
           child: const Icon(Icons.mark_email_read_outlined,
-              color: Colors.green, size: 56),
+              color: _primary, size: 56),
         ),
         const SizedBox(height: 24),
 
@@ -295,13 +296,13 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
             style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1A1A2E))),
+                color: _textDark)),
         const SizedBox(height: 10),
         RichText(
           textAlign: TextAlign.center,
           text: TextSpan(
             style: TextStyle(
-                fontSize: 13, color: Colors.grey.shade500, height: 1.6),
+                fontSize: 13, color: _textMuted, height: 1.6),
             children: [
               const TextSpan(text: "A password reset link was sent to\n"),
               TextSpan(
@@ -350,7 +351,6 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
 
         const SizedBox(height: 16),
 
-        // Resend link
         Center(
           child: GestureDetector(
             onTap: () {

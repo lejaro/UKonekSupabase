@@ -18,7 +18,10 @@ class _C {
 }
 
 class uKonekProfilePage extends StatefulWidget {
-  // ── All fields from registration ─────────────────────────────
+  // ── All fields from registration
+  // ─────────────────────────────
+  final String username;
+  final String citizenId;
   final String fullName;       // legacy — kept for compatibility
   final String email;
   final String phone;
@@ -39,6 +42,8 @@ class uKonekProfilePage extends StatefulWidget {
 
   const uKonekProfilePage({
     super.key,
+    required this.username,
+    required this.citizenId,
     // Legacy / dashboard-passed
     required this.fullName,
     this.email            = '',
