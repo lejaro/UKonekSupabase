@@ -44,6 +44,13 @@ class DoctorSchedule {
     this.availabilityStatus = 'available',
   });
 
+  String get displayName {
+    final name = doctorName.trim();
+    if (name.isEmpty) return 'Doctor';
+    if (name.toLowerCase().startsWith('dr.')) return name;
+    return 'Dr. $name';
+  }
+
   factory DoctorSchedule.fromMap(Map<String, dynamic> map) {
     return DoctorSchedule(
       id: (map['id'] as num?)?.toInt() ?? 0,
@@ -59,6 +66,38 @@ class DoctorSchedule {
           ? null
           : (map['notes'] as String?),
       availabilityStatus: (map['availability_status'] ?? '').toString().toLowerCase(),
+    );
+  }
+}
+
+class DoctorStatus {
+  final int id;
+  final String firstName;
+  final String lastName;
+  final String specialization;
+  final String availabilityStatus;
+
+  const DoctorStatus({
+    required this.id,
+    required this.firstName,
+    required this.lastName,
+    required this.specialization,
+    required this.availabilityStatus,
+  });
+
+  String get displayName {
+    final full = '$firstName $lastName'.trim();
+    if (full.toLowerCase().startsWith('dr.')) return full;
+    return 'Dr. $full';
+  }
+
+  factory DoctorStatus.fromMap(Map<String, dynamic> map) {
+    return DoctorStatus(
+      id: (map['id'] as num?)?.toInt() ?? 0,
+      firstName: (map['first_name'] as String?) ?? '',
+      lastName: (map['last_name'] as String?) ?? '',
+      specialization: (map['doctor_specialization'] as String?) ?? '',
+      availabilityStatus: (map['availability_status'] ?? 'unavailable').toString().toLowerCase(),
     );
   }
 }
@@ -417,7 +456,6 @@ class ApiService {
           'firstname': payload['firstname'],
           'surname': payload['surname'],
           'middle_initial': payload['middle_initial'] ?? '',
-          'family_number': payload['family_number'] ?? '',
           'date_of_birth': payload['date_of_birth'],
           'age': payload['age'],
           'contact_number': payload['contact_number'] ?? '',
@@ -499,7 +537,6 @@ class ApiService {
         'p_emergency_contact_contact_number':
             payload['emergency_contact_contact_number'] ?? '',
         'p_relation': payload['relation'] ?? '',
-        'p_family_number': payload['family_number'] ?? '',
         'p_username': username,
       },
     );
@@ -693,6 +730,16 @@ class ApiService {
   /// Sign out the current user.
   static Future<void> signOut() async {
     await _client.auth.signOut();
+  }
+
+  static Future<List<DoctorStatus>> listDoctorStatus() async {
+    final response = await _client.rpc('list_staff_accounts');
+    final rows = (response as List<dynamic>?) ?? const [];
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .where((row) => (row['role']?.toString().toLowerCase() ?? '') == 'doctor')
+        .map(DoctorStatus.fromMap)
+        .toList(growable: false);
   }
 
   /// Returns available doctor schedules for citizens.

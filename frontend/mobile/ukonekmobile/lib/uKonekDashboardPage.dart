@@ -49,7 +49,7 @@ class uKonekDashboardPage extends StatefulWidget {
 class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     with WidgetsBindingObserver {
   int _selectedTab = 0;
-  late Future<List<DoctorSchedule>> _onDutyTodayFuture;
+  late Future<List<DoctorStatus>> _doctorStatusFuture;
   late Future<QueueDashboardSnapshot> _queueDashboardFuture;
   late Future<List<PrescribedMedicine>> _prescribedMedicinesFuture;
   Timer? _onDutyRefreshTimer;
@@ -72,11 +72,11 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _onDutyTodayFuture = _loadOnDutyToday();
+    _doctorStatusFuture = _loadDoctorStatus();
     _queueDashboardFuture = _loadQueueDashboard();
     _prescribedMedicinesFuture = _loadPrescribedMedicines();
     _onDutyRefreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      _refreshOnDutyToday();
+      _refreshDoctorStatus();
       _refreshQueueDashboard();
       _refreshPrescribedMedicines();
     });
@@ -98,16 +98,16 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _refreshOnDutyToday();
+      _refreshDoctorStatus();
       _refreshQueueDashboard();
       _refreshPrescribedMedicines();
     }
   }
 
-  void _refreshOnDutyToday() {
+  void _refreshDoctorStatus() {
     if (!mounted) return;
     setState(() {
-      _onDutyTodayFuture = _loadOnDutyToday();
+      _doctorStatusFuture = _loadDoctorStatus();
     });
   }
 
@@ -118,10 +118,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     });
   }
 
-  Future<List<DoctorSchedule>> _loadOnDutyToday() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return ApiService.listAvailableDoctorSchedules(from: today, to: today);
+  Future<List<DoctorStatus>> _loadDoctorStatus() {
+    return ApiService.listDoctorStatus();
   }
 
   Future<QueueDashboardSnapshot> _loadQueueDashboard() {
@@ -186,7 +184,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                 children: [
                   _buildQrSection(),
                   const SizedBox(height: 20),
-                  _buildOnDutySection(),
+                  _buildDoctorStatusSection(),
                   const SizedBox(height: 24),
                   _buildQueueCard(),
                   const SizedBox(height: 28),
@@ -440,14 +438,14 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   // ── On Duty Section ──────────────────────────────────────────
-  Widget _buildOnDutySection() {
+  Widget _buildDoctorStatusSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _sectionHeader('On Duty Today'),
+            _sectionHeader('Doctor Status'),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -491,8 +489,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               ),
             ],
           ),
-          child: FutureBuilder<List<DoctorSchedule>>(
-            future: _onDutyTodayFuture,
+          child: FutureBuilder<List<DoctorStatus>>(
+            future: _doctorStatusFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Padding(
@@ -506,7 +504,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                       ),
                       SizedBox(width: 10),
                       Text(
-                        'Loading today\'s doctors...',
+                        'Loading doctor status...',
                         style: TextStyle(color: _C.textMuted),
                       ),
                     ],
@@ -533,7 +531,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Unable to load today\'s doctor schedule.',
+                              'Unable to load doctor status.',
                               style: TextStyle(
                                 color: _C.textMuted,
                                 fontSize: 12,
@@ -544,7 +542,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                       ),
                       const SizedBox(height: 10),
                       OutlinedButton.icon(
-                        onPressed: _refreshOnDutyToday,
+                        onPressed: _refreshDoctorStatus,
                         icon: const Icon(Icons.refresh_rounded, size: 16),
                         label: const Text('Retry'),
                         style: OutlinedButton.styleFrom(
@@ -560,40 +558,38 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                 );
               }
 
-              final schedules = snapshot.data ?? const <DoctorSchedule>[];
-              if (schedules.isEmpty) {
-                return SizedBox(
-                  width: double.infinity,
-                  height: MediaQuery.of(context).size.height * 0.45,
-                  child: const Center(
+              final doctors = snapshot.data ?? const <DoctorStatus>[];
+              if (doctors.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
                     child: Text(
-                      'No doctors are on duty today.',
+                      'No doctors found.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: _C.textMuted, fontSize: 16),
+                      style: TextStyle(color: _C.textMuted, fontSize: 14),
                     ),
                   ),
                 );
               }
 
               return Column(
-                children: List.generate(schedules.length, (index) {
-                  final item = schedules[index];
-                  final doctorName = item.doctorName.trim().isEmpty
-                      ? 'Doctor'
-                      : item.doctorName.trim();
-                  final time =
-                      '${_formatTime(item.startTime)} – ${_formatTime(item.endTime)}';
+                children: List.generate(doctors.length, (index) {
+                  final item = doctors[index];
+                  final doctorName = item.displayName;
+                  final subtitle = item.specialization.isNotEmpty 
+                      ? item.specialization 
+                      : 'Medical Doctor';
 
                   return Column(
                     children: [
                       _staffTile(
                         doctorName,
-                        time,
+                        subtitle,
                         _getStatusColor(item.availabilityStatus),
                         _getStatusLabel(item.availabilityStatus),
                         Icons.medical_services_rounded,
                       ),
-                      if (index < schedules.length - 1)
+                      if (index < doctors.length - 1)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: Divider(height: 1, color: _C.divider),

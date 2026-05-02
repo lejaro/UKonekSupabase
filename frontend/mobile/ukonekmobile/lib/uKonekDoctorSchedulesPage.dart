@@ -243,9 +243,7 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
                                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                                 itemBuilder: (context, index) {
                                   final item = _visibleSchedules[index];
-                                    final doctorName = item.doctorName.isEmpty
-                                        ? 'Doctor'
-                                        : item.doctorName;
+                                  final doctorName = item.displayName;
 
                                   return Card(
                                     elevation: 1.5,
