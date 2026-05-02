@@ -95,6 +95,7 @@ const DEMO_REGISTERED_USERS = [
     employee_id: 'UK-1007',
     role: 'nurse',
     status: 'Active',
+    availability_status: 'available',
     created_at: '2024-11-10T10:30:00Z',
     email: 'bcruz@ukonek.local',
     birthday: '1988-07-22'
@@ -106,6 +107,7 @@ const DEMO_REGISTERED_USERS = [
     employee_id: 'UK-1015',
     role: 'doctor',
     status: 'Inactive',
+    availability_status: 'unavailable',
     created_at: '2024-12-01T08:15:00Z',
     email: 'creyes@ukonek.local',
     birthday: '1985-01-14'
@@ -555,6 +557,11 @@ function isDoctorRole(value) {
   return String(value || '').trim().toLowerCase() === 'doctor';
 }
 
+function isScheduleRole(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return key === 'doctor' || key === 'nurse';
+}
+
 function getDoctorDisplayName(doctor) {
   if (!doctor) return 'Doctor';
   const first = String(doctor.first_name || '').trim();
@@ -575,6 +582,31 @@ function getSpecializationValue(user) {
 function getDoctorSpecializationText(doctor) {
   const value = getSpecializationValue(doctor);
   return value || '—';
+}
+
+const AVAILABILITY_LABELS = {
+  available: 'Available',
+  on_break: 'On Break',
+  unavailable: 'Unavailable'
+};
+
+function normalizeAvailabilityStatus(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'on break' || raw === 'on_break') return 'on_break';
+  if (raw === 'unavailable') return 'unavailable';
+  return 'available';
+}
+
+function getAvailabilityStatusText(user) {
+  const status = normalizeAvailabilityStatus(user?.availability_status || user?.availabilityStatus);
+  return AVAILABILITY_LABELS[status] || 'Available';
+}
+
+function getAvailabilityBadgeClass(user) {
+  const status = normalizeAvailabilityStatus(user?.availability_status || user?.availabilityStatus);
+  if (status === 'available') return 'badge-available';
+  if (status === 'on_break') return 'badge-break';
+  return 'badge-unavailable';
 }
 
 function getRoleLogoConfig(roleValue) {
@@ -1401,6 +1433,7 @@ async function initProfileAndSchedule() {
     applyRoleAccess(user);
     populateProfile(user);
     loadSchedules(user);
+    subscribeToStaffAvailability();
   }
 }
 
@@ -1519,9 +1552,11 @@ if (profileCancelBtn) {
   });
 }
 
-// --- Schedule handling (doctor-based schedules). Admins can create/update/delete; others view only ---
+// --- Schedule handling (doctor schedules + staff availability). Admins can create/update/delete; others view only ---
+let cachedScheduleStaff = [];
 let cachedScheduleDoctors = [];
 let cachedScheduleEntries = [];
+let staffAvailabilityChannel = null;
 
 function formatScheduleTime(value) {
   const normalized = normalizeTimeHHMM(value);
@@ -1688,42 +1723,195 @@ function hasScheduleConflict({ doctorStaffId, scheduleDate, startTime, endTime, 
   });
 }
 
-function renderScheduleDoctors(doctors, user) {
+function renderScheduleDoctors(staffList, user) {
   const tbody = document.getElementById('schedule-doctors-tbody');
   if (!tbody) return;
 
   tbody.innerHTML = '';
-  if (!doctors.length) {
-    tbody.innerHTML = '<tr><td class="table-cell" colspan="5">No doctor accounts found.</td></tr>';
+  if (!staffList.length) {
+    tbody.innerHTML = '<tr><td class="table-cell" colspan="4">No doctor or nurse accounts found.</td></tr>';
     return;
   }
 
-  doctors.forEach((doctor) => {
+  staffList.forEach((doctor) => {
     const tr = document.createElement('tr');
-    const statusText = getStaffPresenceStatus(doctor);
-    const statusClass = getStaffPresenceBadgeClass(doctor);
+    const roleLabel = toTitleCase(doctor?.role || 'Staff');
+    const statusText = getAvailabilityStatusText(doctor);
+    const statusClass = getAvailabilityBadgeClass(doctor);
+    const availabilityStatus = normalizeAvailabilityStatus(
+      doctor?.availability_status || doctor?.availabilityStatus
+    );
     tr.innerHTML = `
-      <td class="table-cell">${getDoctorDisplayName(doctor)}</td>
-      <td class="table-cell">${getDoctorSpecializationText(doctor)}</td>
+      <td class="table-cell">${getDoctorDisplayName(doctor)} (${roleLabel})</td>
       <td class="table-cell">${doctor.email || '—'}</td>
       <td class="table-cell"><span class="${statusClass}">${statusText}</span></td>
       <td class="table-cell"></td>
     `;
 
     const actionsCell = tr.querySelector('td:last-child');
-    if (isAdminUser(user)) {
-      const setBtn = document.createElement('button');
-      setBtn.type = 'button';
-      setBtn.className = 'chip-btn';
-      setBtn.textContent = 'Set Schedule';
-      setBtn.addEventListener('click', () => openScheduleModal('create', { doctor_staff_id: doctor.id }));
-      actionsCell.appendChild(setBtn);
-    } else {
-      actionsCell.textContent = '-';
-    }
+    if (!actionsCell) return;
+
+    const canEditAvailability = isAdminUser(user);
+    const toggleGroup = document.createElement('div');
+    toggleGroup.className = 'availability-toggle-group';
+    toggleGroup.dataset.staffId = String(doctor.id || '');
+
+    const options = [
+      { value: 'available', label: 'Available', className: 'availability-available' },
+      { value: 'on_break', label: 'On Break', className: 'availability-break' },
+      { value: 'unavailable', label: 'Unavailable', className: 'availability-unavailable' }
+    ];
+
+    options.forEach((option) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `chip-btn chip-btn-outline availability-toggle ${option.className}`;
+      btn.textContent = option.label;
+      btn.dataset.status = option.value;
+      btn.disabled = !canEditAvailability;
+      if (availabilityStatus === option.value) {
+        btn.classList.add('is-active');
+      }
+      btn.addEventListener('click', () => handleAvailabilityToggle(doctor, option.value, toggleGroup));
+      toggleGroup.appendChild(btn);
+    });
+
+    actionsCell.appendChild(toggleGroup);
 
     tbody.appendChild(tr);
   });
+}
+
+function updateAvailabilityInCaches(staffId, status, newRow = null) {
+  const normalized = normalizeAvailabilityStatus(status);
+  const updateList = (list) => {
+    const idx = list.findIndex((item) => String(item?.id || '') === String(staffId));
+    if (idx < 0) return;
+    const record = list[idx];
+    record.availability_status = normalized;
+    if (newRow) Object.assign(record, newRow);
+  };
+
+  updateList(cachedScheduleStaff);
+  updateList(cachedScheduleDoctors);
+  updateList(latestStaffList);
+}
+
+function setAvailabilityButtonsLoading(toggleGroup, isLoading) {
+  if (!toggleGroup) return;
+  toggleGroup.classList.toggle('is-loading', Boolean(isLoading));
+  toggleGroup.querySelectorAll('button').forEach((btn) => {
+    if (isLoading) {
+      if (!btn.dataset.wasDisabled) {
+        btn.dataset.wasDisabled = btn.disabled ? 'true' : 'false';
+      }
+      btn.disabled = true;
+      return;
+    }
+
+    const wasDisabled = btn.dataset.wasDisabled === 'true';
+    btn.disabled = wasDisabled;
+    delete btn.dataset.wasDisabled;
+  });
+}
+
+function applyAvailabilityToggleState(toggleGroup, status) {
+  if (!toggleGroup) return;
+  const normalized = normalizeAvailabilityStatus(status);
+  toggleGroup.querySelectorAll('button').forEach((btn) => {
+    const btnStatus = normalizeAvailabilityStatus(btn.dataset.status);
+    btn.classList.toggle('is-active', btnStatus === normalized);
+  });
+}
+
+async function updateStaffAvailabilityById(staffId, status) {
+  if (!staffId) throw new Error('Missing staff id.');
+  const normalized = normalizeAvailabilityStatus(status);
+
+  if (isDemoMode) {
+    updateAvailabilityInCaches(staffId, normalized);
+    return true;
+  }
+
+  if (isApiMode) {
+    try {
+      const resp = await fetch(`${API_BASE}/api/staff/${staffId}/availability`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: normalized })
+      });
+      if (resp.ok) {
+        return true;
+      }
+    } catch (_) {
+      // Fall back to Supabase RPC.
+    }
+  }
+
+  const { supabase } = await loadSupabaseModule();
+  const { error } = await supabase.rpc('set_staff_availability', {
+    p_target_staff_id: Number(staffId),
+    p_status: normalized
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to update availability status.');
+  }
+
+  return true;
+}
+
+async function handleAvailabilityToggle(staff, nextStatus, toggleGroup) {
+  if (!staff || !toggleGroup) return;
+  if (!isAdminUser(cachedSessionUser)) return;
+
+  const staffId = staff.id;
+  const prevStatus = normalizeAvailabilityStatus(staff?.availability_status);
+  const normalizedNext = normalizeAvailabilityStatus(nextStatus);
+  if (prevStatus === normalizedNext) return;
+
+  applyAvailabilityToggleState(toggleGroup, normalizedNext);
+  updateAvailabilityInCaches(staffId, normalizedNext);
+  setAvailabilityButtonsLoading(toggleGroup, true);
+
+  try {
+    await updateStaffAvailabilityById(staffId, normalizedNext);
+    const statusNode = toggleGroup.closest('tr')?.querySelector('td:nth-child(3) span');
+    if (statusNode) {
+      statusNode.className = getAvailabilityBadgeClass({ availability_status: normalizedNext });
+      statusNode.textContent = AVAILABILITY_LABELS[normalizedNext] || 'Available';
+    }
+  } catch (error) {
+    updateAvailabilityInCaches(staffId, prevStatus);
+    applyAvailabilityToggleState(toggleGroup, prevStatus);
+    showToast(error?.message || 'Unable to update availability.', 'error');
+  } finally {
+    setAvailabilityButtonsLoading(toggleGroup, false);
+  }
+}
+
+async function subscribeToStaffAvailability() {
+  if (staffAvailabilityChannel) return;
+  if (isDemoMode) return;
+
+  try {
+    const { supabase } = await loadSupabaseModule();
+    staffAvailabilityChannel = supabase
+      .channel('staff-availability')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, (payload) => {
+        const updated = payload?.new;
+        if (!updated || !updated.id) return;
+        if (!isScheduleRole(updated.role)) return;
+        updateAvailabilityInCaches(updated.id, updated.availability_status, updated);
+        if (!document.getElementById('schedule-section')?.classList.contains('hidden')) {
+          renderScheduleDoctors(cachedScheduleStaff, cachedSessionUser);
+        }
+      })
+      .subscribe();
+  } catch (error) {
+    console.warn('Realtime availability subscription failed:', error);
+  }
 }
 
 function populateScheduleDoctorSelect(selectedDoctorId = null) {
@@ -1746,6 +1934,7 @@ function populateScheduleDoctorSelect(selectedDoctorId = null) {
 
 async function loadSchedules(user) {
   let schedules = [];
+  let staffRoster = [];
   let doctors = [];
   let scheduleSource = 'doctor_schedules';
 
@@ -1763,7 +1952,8 @@ async function loadSchedules(user) {
 
       if (staffResp.ok) {
         const staff = await staffResp.json();
-        doctors = (Array.isArray(staff) ? staff : []).filter((item) => isDoctorRole(item?.role));
+        staffRoster = Array.isArray(staff) ? staff : [];
+        doctors = staffRoster.filter((item) => isDoctorRole(item?.role));
       }
 
       if (!schedulesResp.ok || !staffResp.ok || doctors.length === 0 || schedules.length === 0) {
@@ -1772,7 +1962,8 @@ async function loadSchedules(user) {
 
         if (doctors.length === 0) {
           const fallbackStaff = await staffService.listStaff();
-          doctors = (Array.isArray(fallbackStaff) ? fallbackStaff : []).filter((item) => isDoctorRole(item?.role));
+          staffRoster = Array.isArray(fallbackStaff) ? fallbackStaff : [];
+          doctors = staffRoster.filter((item) => isDoctorRole(item?.role));
         }
 
         if (schedules.length === 0) {
@@ -1817,7 +2008,8 @@ async function loadSchedules(user) {
       const staff = !staffRpc.error
         ? (Array.isArray(staffRpc.data) ? staffRpc.data : [])
         : await staffService.listStaff();
-      doctors = (Array.isArray(staff) ? staff : []).filter((item) => isDoctorRole(item?.role));
+      staffRoster = Array.isArray(staff) ? staff : [];
+      doctors = staffRoster.filter((item) => isDoctorRole(item?.role));
 
       const scheduleRpc = await supabase.rpc('list_doctor_schedules');
       if (!scheduleRpc.error) {
@@ -1866,9 +2058,10 @@ async function loadSchedules(user) {
   schedules = await purgePastSchedules(schedules, user, scheduleSource);
   cachedScheduleEntries = [...schedules];
 
+  cachedScheduleStaff = Array.isArray(staffRoster) ? staffRoster.filter((item) => isScheduleRole(item?.role)) : [];
   cachedScheduleDoctors = Array.isArray(doctors) ? [...doctors] : [];
   populateScheduleDoctorSelect();
-  renderScheduleDoctors(cachedScheduleDoctors, user);
+  renderScheduleDoctors(cachedScheduleStaff, user);
   renderSchedules(schedules, user, cachedScheduleDoctors);
 }
 
@@ -2020,7 +2213,7 @@ function renderSchedules(schedules, user, doctors = []) {
   calendar.appendChild(dateList);
 
   if (!schedules.length) {
-    tbody.innerHTML = '<tr><td class="table-cell" colspan="6">No schedules found.</td></tr>';
+    tbody.innerHTML = '<tr><td class="table-cell" colspan="5">No schedules found.</td></tr>';
     return;
   }
 
@@ -2028,7 +2221,6 @@ function renderSchedules(schedules, user, doctors = []) {
     const doctorId = schedule.doctor_staff_id ? String(schedule.doctor_staff_id) : '';
     const doctor = doctorId ? doctorMap.get(doctorId) : null;
     const doctorName = schedule.doctor_name || getDoctorDisplayName(doctor) || 'Doctor';
-    const doctorSpecialization = getDoctorSpecializationText(doctor);
     const scheduleDate = schedule.schedule_date || schedule.date || '—';
     const startTime = formatScheduleTime(schedule.start_time || schedule.time);
     const endTime = formatScheduleTime(schedule.end_time);
@@ -2037,7 +2229,6 @@ function renderSchedules(schedules, user, doctors = []) {
     tr.dataset.date = scheduleDate;
     tr.innerHTML = `
       <td class="table-cell">${doctorName}</td>
-      <td class="table-cell">${doctorSpecialization}</td>
       <td class="table-cell">${scheduleDate}</td>
       <td class="table-cell">${startTime}</td>
       <td class="table-cell">${endTime}</td>
@@ -2085,7 +2276,6 @@ function renderSchedules(schedules, user, doctors = []) {
       subtitle: scheduleDate,
       items: [
         { label: 'Doctor', value: doctorName },
-        { label: 'Specialization', value: doctorSpecialization },
         { label: 'Date', value: scheduleDate },
         { label: 'Start Time', value: startTime },
         { label: 'End Time', value: endTime },

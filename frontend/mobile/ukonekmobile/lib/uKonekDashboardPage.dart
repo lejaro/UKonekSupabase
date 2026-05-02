@@ -589,8 +589,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                       _staffTile(
                         doctorName,
                         time,
-                        _C.success,
-                        'Available',
+                        _getStatusColor(item.availabilityStatus),
+                        _getStatusLabel(item.availabilityStatus),
                         Icons.medical_services_rounded,
                       ),
                       if (index < schedules.length - 1)
@@ -607,6 +607,30 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         ),
       ],
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'on_break':
+        return _C.warning;
+      case 'unavailable':
+        return Colors.grey;
+      case 'available':
+      default:
+        return _C.success;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'on_break':
+        return 'On Break';
+      case 'unavailable':
+        return 'Unavailable';
+      case 'available':
+      default:
+        return 'Available';
+    }
   }
 
   Widget _staffTile(

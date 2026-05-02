@@ -30,6 +30,7 @@ class DoctorSchedule {
   final String startTime;
   final String endTime;
   final String? notes;
+  final String availabilityStatus;
 
   const DoctorSchedule({
     required this.id,
@@ -40,6 +41,7 @@ class DoctorSchedule {
     required this.startTime,
     required this.endTime,
     this.notes,
+    this.availabilityStatus = 'available',
   });
 
   factory DoctorSchedule.fromMap(Map<String, dynamic> map) {
@@ -56,6 +58,7 @@ class DoctorSchedule {
       notes: (map['notes'] as String?)?.trim().isEmpty == true
           ? null
           : (map['notes'] as String?),
+      availabilityStatus: (map['availability_status'] ?? '').toString().toLowerCase(),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/api_service.dart';
 
 class uKonekDoctorSchedulesPage extends StatefulWidget {
@@ -13,11 +14,43 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
   String? _error;
   List<DoctorSchedule> _allSchedules = const [];
   DateTime? _selectedDate;
+  RealtimeChannel? _availabilityChannel;
 
   @override
   void initState() {
     super.initState();
     _loadSchedules();
+    _subscribeAvailabilityUpdates();
+  }
+
+  @override
+  void dispose() {
+    if (_availabilityChannel != null) {
+      Supabase.instance.client.removeChannel(_availabilityChannel!);
+    }
+    super.dispose();
+  }
+
+  void _subscribeAvailabilityUpdates() {
+    final client = Supabase.instance.client;
+    _availabilityChannel = client
+        .channel('staff-availability')
+        .on(
+          RealtimeListenTypes.postgresChanges,
+          ChannelFilter(
+            event: '*',
+            schema: 'public',
+            table: 'staff',
+          ),
+          (payload, [ref]) {
+            final record = payload.newRecord;
+            if (record == null) return;
+            final role = (record['role'] ?? '').toString().toLowerCase();
+            if (role != 'doctor' && role != 'nurse') return;
+            _loadSchedules();
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _loadSchedules() async {
@@ -86,6 +119,44 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
     setState(() {
       _selectedDate = DateTime(picked.year, picked.month, picked.day);
     });
+  }
+
+  Widget _buildStatusChip(String status) {
+    Color color;
+    String label;
+
+    switch (status.toLowerCase()) {
+      case 'on_break':
+        color = Colors.orange;
+        label = 'On Break';
+        break;
+      case 'unavailable':
+        color = Colors.grey;
+        label = 'Unavailable';
+        break;
+      case 'available':
+      default:
+        color = Colors.green;
+        label = 'Available';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
   }
 
   @override
@@ -186,12 +257,18 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            doctorName,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w700,
-                                            ),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                doctorName,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              _buildStatusChip(item.availabilityStatus),
+                                            ],
                                           ),
                                           const SizedBox(height: 12),
                                           Row(

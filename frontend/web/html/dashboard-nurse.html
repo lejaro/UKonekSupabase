@@ -369,14 +369,14 @@
             </span>
             <span class="label">Dashboard</span>
           </a>
-          <a href="#" class="nav-item" data-section="schedule-section" title="Schedule">
+          <a href="#" class="nav-item" data-section="schedule-section" title="Availability">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <rect x="3" y="4" width="18" height="18" rx="2" rx="2" />
                 <path d="M16 2v4M8 2v4M3 10h18" />
               </svg>
             </span>
-            <span class="label">Schedule</span>
+            <span class="label">Availability</span>
           </a>
 
           <div class="nav-item dropdown">
@@ -789,40 +789,20 @@
       <section id="schedule-section" class="section-top hidden">
         <div class="panel">
           <div class="panel-head">
-            <h3>Working Schedule</h3>
-            <span class="panel-hint">See doctors and assign schedules by date/time.</span>
-            <div class="management-actions">
-              <button id="create-schedule-btn" class="chip-btn admin-only">Create Schedule</button>
-            </div>
+            <h3>Staff Availability</h3>
+            <span class="panel-hint">See doctor and nurse availability status.</span>
           </div>
           <div class="table-wrap" style="margin-bottom:14px;">
             <table class="accounts-table compact-table">
               <thead>
                 <tr class="table-header-row">
-                  <th class="table-header-cell">Doctor</th>
-                  <th class="table-header-cell">Specialization</th>
+                  <th class="table-header-cell">Staff</th>
                   <th class="table-header-cell">Email</th>
-                  <th class="table-header-cell">Status</th>
+                  <th class="table-header-cell">Availability</th>
                   <th class="table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody id="schedule-doctors-tbody"></tbody>
-            </table>
-          </div>
-          <div class="table-wrap">
-            <div id="calendar-container" style="margin-bottom:14px;"></div>
-            <table class="accounts-table compact-table">
-              <thead>
-                <tr class="table-header-row">
-                  <th class="table-header-cell">Doctor</th>
-                  <th class="table-header-cell">Specialization</th>
-                  <th class="table-header-cell">Date</th>
-                  <th class="table-header-cell">Start</th>
-                  <th class="table-header-cell">End</th>
-                  <th class="table-header-cell">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="schedule-tbody"></tbody>
             </table>
           </div>
         </div>
