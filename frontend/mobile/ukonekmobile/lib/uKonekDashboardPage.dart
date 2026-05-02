@@ -75,7 +75,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     _doctorStatusFuture = _loadDoctorStatus();
     _queueDashboardFuture = _loadQueueDashboard();
     _prescribedMedicinesFuture = _loadPrescribedMedicines();
-    _onDutyRefreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+    _onDutyRefreshTimer = Timer.periodic(const Duration(seconds: 9), (_) {
       _refreshDoctorStatus();
       _refreshQueueDashboard();
       _refreshPrescribedMedicines();
@@ -712,6 +712,22 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
           final queue = snapshot.data ?? QueueDashboardSnapshot.empty;
           final hasQueue = queue.hasActiveQueue;
 
+          Color statusColor = _C.primaryMid;
+          String statusLabel = 'WAITING';
+          if (hasQueue) {
+            final rawStatus = (queue.status ?? "").toLowerCase().trim();
+            final bool isOnCall = queue.isOnCall || rawStatus == 'on_call';
+            final bool isServing = !isOnCall && rawStatus == 'serving';
+
+            if (isOnCall) {
+              statusColor = _C.warning;
+              statusLabel = 'ON CALL';
+            } else if (isServing) {
+              statusColor = _C.success;
+              statusLabel = 'NOW SERVING';
+            }
+          }
+
           return Column(
             children: [
               Row(
@@ -722,7 +738,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: _C.success.withOpacity(0.10),
+                      color: (hasQueue ? statusColor : _C.success).withOpacity(0.10),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -730,16 +746,16 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                         Container(
                           width: 6,
                           height: 6,
-                          decoration: const BoxDecoration(
-                            color: _C.success,
+                          decoration: BoxDecoration(
+                            color: hasQueue ? statusColor : _C.success,
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 5),
-                        const Text(
-                          'LIVE QUEUE',
+                        Text(
+                          hasQueue ? statusLabel : 'LIVE QUEUE',
                           style: TextStyle(
-                            color: _C.success,
+                            color: hasQueue ? statusColor : _C.success,
                             fontWeight: FontWeight.w800,
                             fontSize: 10,
                             letterSpacing: 0.8,
@@ -759,8 +775,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     Text(
                       hasQueue
                           ? (queue.serviceLabel.isEmpty
-                                ? 'Active Queue'
-                                : queue.serviceLabel)
+                              ? 'Active Queue'
+                              : queue.serviceLabel)
                           : 'Not in queue',
                       style: TextStyle(
                         color: Colors.grey.shade400,
@@ -782,7 +798,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   _queueInfo(
                     'YOUR NUMBER',
                     _queueNumberText(queue.myQueueNumber),
-                    _C.primary,
+                    hasQueue ? statusColor : _C.primary,
                   ),
                 ],
               ),
@@ -791,20 +807,21 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: _C.primaryMid.withOpacity(0.06),
+                  color: (hasQueue ? statusColor : _C.primaryMid).withOpacity(0.06),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.timer_outlined, size: 16, color: _C.primaryMid),
+                    Icon(Icons.timer_outlined,
+                        size: 16, color: hasQueue ? statusColor : _C.primaryMid),
                     const SizedBox(width: 8),
                     Text(
                       hasQueue
                           ? 'Est. Wait: ${_formatWaitTime(queue.estimatedWaitMinutes)}'
                           : 'Join queue to see your waiting time',
-                      style: const TextStyle(
-                        color: _C.primaryMid,
+                      style: TextStyle(
+                        color: hasQueue ? statusColor : _C.primaryMid,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),

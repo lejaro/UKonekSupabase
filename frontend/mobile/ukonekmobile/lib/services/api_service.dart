@@ -132,6 +132,16 @@ class QueueServiceOption {
       doctorCount: (map['doctor_count'] as num?)?.toInt() ?? 0,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is QueueServiceOption &&
+          runtimeType == other.runtimeType &&
+          serviceKey == other.serviceKey;
+
+  @override
+  int get hashCode => serviceKey.hashCode;
 }
 
 class QueueJoinRequest {
@@ -873,6 +883,11 @@ class ApiService {
         .map(PrescribedMedicine.fromMap)
         .where((item) => item.medicineName.isNotEmpty)
         .toList(growable: false);
+  }
+
+  static Future<bool> cancelMyQueue() async {
+    final response = await _client.rpc('cancel_my_queue_ticket');
+    return response == true;
   }
 
   static String _asDate(DateTime value) {

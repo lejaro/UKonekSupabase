@@ -14,6 +14,26 @@ const appointments = (() => {
     setupEventListeners();
     setupTicketModalHandlers();
     await loadQueueTickets();
+    setupRealtimeListener();
+  };
+
+  const setupRealtimeListener = async () => {
+    try {
+      const supabase = await getSupabaseClient();
+      supabase
+        .channel('public:queue_tickets_changes')
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'queue_tickets' 
+        }, (payload) => {
+          console.log('Queue updated via realtime:', payload);
+          loadQueueTickets();
+        })
+        .subscribe();
+    } catch (err) {
+      console.error('Failed to setup realtime listener:', err);
+    }
   };
 
   const getSupabaseClient = async () => {
@@ -114,6 +134,8 @@ const appointments = (() => {
           citizen:citizens(id, firstname, surname, email)
         `)
         .eq('queue_date', today)
+        .neq('status', 'cancelled')
+        .neq('status', 'completed')
         .order('queue_number', { ascending: true });
 
       if (response.error) {

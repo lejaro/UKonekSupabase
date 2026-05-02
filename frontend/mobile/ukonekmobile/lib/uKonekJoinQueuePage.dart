@@ -12,6 +12,7 @@ class _C {
   static const textMuted = Color(0xFF667085);
   static const fieldBorder = Color(0xFFDDE3F0);
   static const success = Color(0xFF079455);
+  static const warning = Color(0xFFF59E0B);
 }
 
 class uKonekJoinQueuePage extends StatefulWidget {
@@ -37,7 +38,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
   void initState() {
     super.initState();
     _loadInitialData();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshDashboard());
+    _refreshTimer = Timer.periodic(const Duration(seconds: 9), (_) => _refreshDashboard());
   }
 
   void _loadInitialData() {
@@ -144,7 +145,32 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
             children: [
               _sectionLabel("Healthcare Service"),
               const SizedBox(height: 12),
-              ...services.map((s) => _serviceCard(s)),
+              DropdownButtonFormField<QueueServiceOption>(
+                value: services.contains(_selectedService) ? _selectedService : null,
+                dropdownColor: Colors.white,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _C.primary),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white,
+                  hintText: "Select Healthcare Service",
+                  hintStyle: const TextStyle(color: _C.textMuted, fontSize: 14),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _C.primary, width: 1.5)),
+                ),
+                items: services.map((s) => DropdownMenuItem(
+                  value: s,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.medical_services_outlined, size: 20, color: _C.primaryMid),
+                      const SizedBox(width: 12),
+                      Text(s.serviceLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _C.textDark)),
+                    ],
+                  ),
+                )).toList(),
+                onChanged: (val) => setState(() => _selectedService = val),
+              ),
               const SizedBox(height: 24),
               _sectionLabel("Priority Category"),
               _buildTypeSelector(),
@@ -170,11 +196,29 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
     int currentNum = queue.currentlyServingQueueNumber ?? 0;
     int peopleAhead = myNum - currentNum;
 
+    // Status color motifs
+    Color statusColor;
+    String statusLabel;
+    final rawStatus = (queue.status ?? "").toLowerCase().trim();
+    final bool isOnCall = queue.isOnCall || rawStatus == 'on_call';
+    final bool isServing = !isOnCall && rawStatus == 'serving';
+
+    if (isOnCall) {
+      statusColor = _C.warning;
+      statusLabel = "ON CALL";
+    } else if (isServing) {
+      statusColor = _C.success;
+      statusLabel = "NOW SERVING";
+    } else {
+      statusColor = _C.primaryMid;
+      statusLabel = "WAITING";
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          _buildPeopleAheadBanner(peopleAhead, currentNum),
+          _buildPeopleAheadBanner(peopleAhead, currentNum, queue),
           const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(28),
@@ -188,11 +232,27 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
                 QrImageView(data: queue.ticketCode, size: 180),
                 const SizedBox(height: 20),
                 Text('#${myNum.toString().padLeft(3, '0')}',
-                    style: const TextStyle(fontSize: 52, fontWeight: FontWeight.w900, color: _C.textDark)),
+                    style: TextStyle(fontSize: 52, fontWeight: FontWeight.w900, color: statusColor)),
                 Text(queue.serviceLabel.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, color: _C.textMuted, fontSize: 12)),
                 const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Divider()),
-                _detailRow("Your Status", peopleAhead <= 0 ? "NOW SERVING" : "WAITING"),
+                _detailRow("Your Status", statusLabel, valueColor: statusColor),
                 _detailRow("Estimated Wait", "${queue.estimatedWaitMinutes} mins"),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: _isSubmitting ? null : _handleCancel,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: const BorderSide(color: Colors.redAccent, width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      foregroundColor: Colors.redAccent,
+                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.redAccent))
+                        : const Text("CANCEL QUEUE", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                  ),
+                ),
               ],
             ),
           ),
@@ -201,29 +261,66 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
     );
   }
 
+  Future<void> _handleCancel() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Cancel Queue?"),
+        content: const Text("Are you sure you want to cancel your current queue ticket?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("NO")),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("YES, CANCEL", style: TextStyle(color: Colors.redAccent))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      final success = await ApiService.cancelMyQueue();
+      if (success) {
+        _showSnack("Queue ticket cancelled.");
+        _refreshDashboard();
+      } else {
+        _showSnack("Failed to cancel ticket.");
+      }
+    } catch (e) {
+      _showSnack(e.toString());
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
   // ── UI HELPERS ─────────────────────────────────────────────────────
 
-  Widget _buildPeopleAheadBanner(int ahead, int current) {
-    bool isTurn = ahead <= 0;
+  Widget _buildPeopleAheadBanner(int ahead, int current, QueueDashboardSnapshot queue) {
+    final rawStatus = (queue.status ?? "").toLowerCase().trim();
+    final bool isOnCall = queue.isOnCall || rawStatus == 'on_call';
+    final bool isServing = !isOnCall && rawStatus == 'serving';
+    bool isTurn = isServing || isOnCall;
+
+    Color bannerColor = isServing ? _C.success : (isOnCall ? _C.warning : _C.primaryMid);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isTurn ? _C.success.withOpacity(0.1) : _C.primaryMid.withOpacity(0.1),
+        color: bannerColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         children: [
-          Icon(isTurn ? Icons.check_circle : Icons.groups_rounded,
-              color: isTurn ? _C.success : _C.primaryMid),
+          Icon(isTurn ? (isServing ? Icons.check_circle : Icons.notifications_active) : Icons.groups_rounded,
+              color: bannerColor),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text("CURRENTLY SERVING: #$current",
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isTurn ? _C.success : _C.primaryMid)),
-                Text(isTurn ? "PLEASE PROCEED TO WINDOW" : "There are $ahead people ahead of you",
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: isTurn ? _C.success : _C.textDark)),
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: bannerColor)),
+                Text(isServing ? "PLEASE PROCEED TO WINDOW" : (isOnCall ? "YOU ARE CALLED - PLEASE PROCEED" : "There are $ahead people ahead of you"),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: isTurn ? bannerColor : _C.textDark)),
               ],
             ),
           ),
@@ -232,30 +329,6 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
     );
   }
 
-  Widget _serviceCard(QueueServiceOption s) {
-    bool isSel = _selectedService?.serviceKey == s.serviceKey;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedService = s),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSel ? _C.primary.withOpacity(0.05) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isSel ? _C.primary : Colors.transparent, width: 2),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.medical_services_outlined, color: isSel ? _C.primary : _C.textMuted),
-            const SizedBox(width: 16),
-            Text(s.serviceLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
-            const Spacer(),
-            Icon(isSel ? Icons.check_circle_rounded : Icons.radio_button_unchecked, color: isSel ? _C.primary : Colors.grey.shade300),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _submitButton() {
     return SizedBox(
@@ -330,8 +403,13 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
 
   Widget _sectionLabel(String t) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(t, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: _C.textDark)));
 
-  Widget _detailRow(String l, String v) => Padding(
+  Widget _detailRow(String l, String v, {Color? valueColor}) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
-    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(l, style: const TextStyle(color: _C.textMuted)), Text(v, style: const TextStyle(fontWeight: FontWeight.bold))]),
+    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      Text(l, style: const TextStyle(color: _C.textMuted)),
+      Text(v,
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: valueColor ?? _C.textDark))
+    ]),
   );
 }

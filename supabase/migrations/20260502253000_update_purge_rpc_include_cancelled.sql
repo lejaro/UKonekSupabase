@@ -1,5 +1,4 @@
--- Add grace period before purging completed queue tickets so UI can offer undo.
-
+-- Update purge RPC to include cancelled tickets
 create or replace function public.purge_completed_queue_tickets(
   p_queue_date date default current_date,
   p_service_key text default null,
@@ -28,9 +27,9 @@ begin
 
   delete from public.queue_tickets q
   where q.queue_date = v_target_date
-    and lower(trim(coalesce(q.status, ''))) in ('completed', 'cancelled')
-    and coalesce(q.completed_at, q.created_at) <= (now() - make_interval(secs => v_grace_seconds))
-    and (v_service_key is null or lower(trim(coalesce(q.service_key, ''))) = v_service_key);
+    and lower(trim(both from coalesce(q.status, ''))) in ('completed', 'cancelled')
+    and coalesce(q.completed_at, q.updated_at, q.created_at) <= (now() - make_interval(secs => v_grace_seconds))
+    and (v_service_key is null or lower(trim(both from coalesce(q.service_key, ''))) = v_service_key);
 
   get diagnostics v_deleted_count = row_count;
 
