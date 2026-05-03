@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'uKonekDashboardPage.dart';
 import 'uKonekJoinQueuePage.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class uKonekMedicineSchedulerPage extends StatefulWidget {
   // Session data passed from the Dashboard to maintain user identity
@@ -57,6 +58,18 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showEPrescriptionModal(
+            "Amoxicillin",
+            "500mg • 3x a day",
+            "Take after meals for 7 days.",
+            "05/10/2026"
+        ),
+        backgroundColor: _primaryMid,
+        icon: const Icon(Icons.receipt_long_rounded, color: Colors.white),
+        label: const Text("VIEW DIGITAL RX",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+      ),
       body: Column(
         children: [
           _buildStaticHeader(),
@@ -69,8 +82,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                 children: [
                   _sectionHeader("Today's Schedule"),
                   const SizedBox(height: 16),
-                  _medScheduleCard("Amoxicillin", "500mg • After Meals", "08:00 AM", _primary, true),
-                  _medScheduleCard("Amoxicillin", "500mg • After Meals", "04:00 PM", _primary, false),
+                  // ADD THE 6TH ARGUMENT (EXPIRY DATE) HERE:
+                  _medScheduleCard("Amoxicillin", "500mg • After Meals", "08:00 AM", _primary, true, "05/10/2026"),
+                  _medScheduleCard("Amoxicillin", "500mg • After Meals", "04:00 PM", _primary, false, "05/10/2026"),
                   const SizedBox(height: 32),
                   _sectionHeader("Prescription Setup"),
                   const SizedBox(height: 16),
@@ -83,6 +97,107 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  // ── NEW: E-Prescription Modal Logic ─────────────────────────
+  void _showEPrescriptionModal(String name, String dosage, String instructions, String expiry) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        builder: (_, sc) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: ListView(
+            controller: sc,
+            padding: const EdgeInsets.all(24),
+            children: [
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: _fieldBdr, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Container(width: 50, height: 50, decoration: const BoxDecoration(color: _primary, shape: BoxShape.circle), child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 30)),
+                  const SizedBox(width: 14),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('AFM ROQUERO', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: _primaryMid)),
+                      Text('Medical & Dental Clinic', style: TextStyle(fontSize: 12, color: _textMuted)),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Divider(color: _fieldBdr),
+              const SizedBox(height: 16),
+              const Text('PATIENT INFORMATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _primary, letterSpacing: 1.2)),
+              const SizedBox(height: 8),
+              // Note: Ensure your Dashboard passes the concatenated name correctly
+              Text(widget.username, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark)),
+              Text('ID: ${widget.citizenId}', style: const TextStyle(fontSize: 12, color: _textMuted)),
+              const SizedBox(height: 24),
+              const Text('℞', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: _primaryMid, height: 1)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(20), border: Border.all(color: _fieldBdr)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _textDark)),
+                    Text(dosage, style: const TextStyle(fontSize: 14, color: _primary, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+                    const Divider(color: _fieldBdr),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('EXPIRATION DATE:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _textMuted)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
+                          child: Text(expiry, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('INSTRUCTIONS:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _textMuted)),
+                    const SizedBox(height: 4),
+                    Text(instructions, style: const TextStyle(fontSize: 14, color: _textDark, height: 1.4)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              Center(
+                child: QrImageView(
+                  data: 'RX-${widget.citizenId}-$name-$expiry',
+                  version: QrVersions.auto,
+                  size: 140.0,
+                  eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: _primaryMid),
+                  dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: _primaryMid),
+                ),
+              ),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(backgroundColor: _primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                  child: const Text('DISMISS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -120,26 +235,18 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     );
   }
 
-  // ── 2. BOTTOM NAVIGATION ALGORITHM ──────────────────────────
   Widget _buildBottomNav() {
     final tabs = [
-      {'icon': Icons.dashboard_rounded, 'label': 'Home'},
-      {'icon': Icons.event_note_rounded, 'label': 'Medicine'},
-      {'icon': Icons.confirmation_number_rounded, 'label': 'Queue'},
-      {'icon': Icons.person_outline_rounded, 'label': 'Profile'},
+      {'icon': Icons.dashboard_rounded,           'label': 'Home'},
+      {'icon': Icons.event_note_rounded,           'label': 'Medicine'},
+      {'icon': Icons.confirmation_number_rounded,  'label': 'Queue'},
+      {'icon': Icons.person_outline_rounded,       'label': 'Profile'},
     ];
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: _textDark.withOpacity(0.05),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          )
-        ],
+        boxShadow: [BoxShadow(color: _textDark.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -4))],
       ),
       child: SafeArea(
         top: false,
@@ -152,31 +259,26 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
               return GestureDetector(
                 onTap: () {
                   if (i == 0) {
-                    // Returns to dashboard with correct session data
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => uKonekDashboardPage(
-                            username: widget.username,
-                            citizenId: widget.citizenId
-                        ),
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => uKonekDashboardPage(
+                        username:  widget.username,
+                        citizenId: widget.citizenId,
                       ),
-                          (route) => false,
-                    );
-                  } else if (i == 2) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => uKonekJoinQueuePage(
-                          username: widget.username,
-                          citizenId: widget.citizenId,
-                        ),
-                      ),
-                    );
-                  } else if (i == 3) {
-                    // Profile navigation logic here
-                  } else {
+                    ));
+                  } else if (i == 1) {
+                    // Already on Medicine page
                     setState(() => _selectedTab = i);
+                  } else if (i == 2) {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => uKonekJoinQueuePage(
+                        username:  widget.username,
+                        citizenId: widget.citizenId,
+                      ),
+                    ));
+                  } else if (i == 3) {
+                    // ✅ Medicine page doesn't have profile data — pop back to Dashboard
+                    // which will then navigate to Profile with full data
+                    Navigator.pop(context);
                   }
                 },
                 child: AnimatedContainer(
@@ -186,26 +288,18 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                     color: isSelected ? _primary.withOpacity(0.10) : Colors.transparent,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        tabs[i]['icon'] as IconData,
-                        color: isSelected ? _primary : _textMuted.withOpacity(0.5),
-                        size: 22,
+                  child: Row(children: [
+                    Icon(tabs[i]['icon'] as IconData,
+                      color: isSelected ? _primary : _textMuted.withOpacity(0.5),
+                      size: 22,
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(width: 6),
+                      Text(tabs[i]['label'] as String,
+                        style: const TextStyle(color: _primary, fontSize: 12, fontWeight: FontWeight.bold),
                       ),
-                      if (isSelected) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          tabs[i]['label'] as String,
-                          style: const TextStyle(
-                            color: _primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
                     ],
-                  ),
+                  ]),
                 ),
               );
             }),
@@ -316,7 +410,8 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   }
 
   // ── UI HELPERS ─────────────────────────────────────────────
-  Widget _medScheduleCard(String name, String desc, String time, Color color, bool taken) {
+  // ── UPDATED: Schedule Card with Rx Trigger ──────────────────
+  Widget _medScheduleCard(String name, String desc, String time, Color color, bool taken, String expiry) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
@@ -335,12 +430,16 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
             Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _textDark)),
             Text(desc, style: const TextStyle(fontSize: 12, color: _textMuted)),
           ])),
+          // ✅ Digital Rx View Button
+          IconButton(
+            onPressed: () => _showEPrescriptionModal(name, "500mg", desc, expiry),
+            icon: const Icon(Icons.receipt_long_rounded, color: _primaryMid, size: 22),
+          ),
           Icon(taken ? Icons.check_circle : Icons.radio_button_unchecked, color: taken ? _primary : _fieldBdr),
         ],
       ),
     );
   }
-
   Widget _buildAddMedicineCard() {
     return GestureDetector(
       onTap: _showAddMedicineSheet,
