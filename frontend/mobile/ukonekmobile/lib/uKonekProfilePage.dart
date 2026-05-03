@@ -109,6 +109,19 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
     return widget.fullName.isNotEmpty ? widget.fullName[0].toUpperCase() : 'U';
   }
 
+  // Add this getter to _uKonekProfilePageState
+  String get _formattedDob {
+    if (_dob.isEmpty) return '—';
+    // Try parsing ISO format: 2004-09-24
+    final parsed = DateTime.tryParse(_dob);
+    if (parsed != null) {
+      const months = ['Jan','Feb','Mar','Apr','May','Jun',
+        'Jul','Aug','Sep','Oct','Nov','Dec'];
+      return '${months[parsed.month - 1]} ${parsed.day}, ${parsed.year}';
+    }
+    return _dob; // return as-is if already formatted
+  }
+
   // ── QR Code Popup ────────────────────────────────────────────
   void _showQrDialog() {
     showModalBottomSheet(
@@ -392,7 +405,7 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
       children: [
         _tile(Icons.person_outline_rounded, 'Full Name',     _displayName),
         _divider(),
-        _tile(Icons.cake_outlined,          'Date of Birth', _dob.isNotEmpty ? _dob : '—'),
+        _tile(Icons.cake_outlined, 'Date of Birth', _formattedDob),
         _divider(),
         _tile(Icons.wc_rounded,             'Sex',           _sex.isNotEmpty ? _sex : '—'),
         _divider(),
