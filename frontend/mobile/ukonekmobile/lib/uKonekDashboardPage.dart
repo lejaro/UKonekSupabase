@@ -74,10 +74,11 @@ class uKonekDashboardPage extends StatefulWidget {
 class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     with WidgetsBindingObserver {
   int _selectedTab = 0;
-  late Future<List<DoctorStatus>> _doctorStatusFuture;
-  late Future<QueueDashboardSnapshot> _queueDashboardFuture;
-  late Future<List<PrescribedMedicine>> _prescribedMedicinesFuture;
-  Timer? _onDutyRefreshTimer;
+  List<DoctorStatus> _doctors = [];
+  QueueDashboardSnapshot _queueDashboard = QueueDashboardSnapshot.empty;
+  List<PrescribedMedicine> _prescribedMedicines = [];
+  bool _isInitialLoading = true;
+  Timer? _refreshTimer;
 
   // ── Navigate to profile with ALL registration fields ──────────
   void _navigateToProfile() {
@@ -111,13 +112,9 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _doctorStatusFuture        = _loadDoctorStatus();
-    _queueDashboardFuture      = _loadQueueDashboard();
-    _prescribedMedicinesFuture = _loadPrescribedMedicines();
-    _onDutyRefreshTimer = Timer.periodic(const Duration(seconds: 9), (_) {
-      _refreshDoctorStatus();
-      _refreshQueueDashboard();
-      _refreshPrescribedMedicines();
+    _loadAllData(isInitial: true);
+    _refreshTimer = Timer.periodic(const Duration(seconds: 9), (_) {
+      _loadAllData(isInitial: false);
     });
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -130,37 +127,38 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _onDutyRefreshTimer?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _refreshDoctorStatus();
-      _refreshQueueDashboard();
-      _refreshPrescribedMedicines();
+      _loadAllData(isInitial: false);
     }
   }
 
-  void _refreshDoctorStatus() {
+  Future<void> _loadAllData({bool isInitial = false}) async {
     if (!mounted) return;
-    setState(() { _doctorStatusFuture = _loadDoctorStatus(); });
+    if (isInitial) setState(() => _isInitialLoading = true);
+    try {
+      final results = await Future.wait([
+        ApiService.listDoctorStatus(),
+        ApiService.getMyQueueDashboard(),
+        ApiService.getMyPrescribedMedicines(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _doctors = results[0] as List<DoctorStatus>;
+          _queueDashboard = results[1] as QueueDashboardSnapshot;
+          _prescribedMedicines = results[2] as List<PrescribedMedicine>;
+          _isInitialLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted && isInitial) setState(() => _isInitialLoading = false);
+    }
   }
-
-  void _refreshPrescribedMedicines() {
-    if (!mounted) return;
-    setState(() { _prescribedMedicinesFuture = _loadPrescribedMedicines(); });
-  }
-
-  void _refreshQueueDashboard() {
-    if (!mounted) return;
-    setState(() { _queueDashboardFuture = _loadQueueDashboard(); });
-  }
-
-  Future<List<DoctorStatus>>      _loadDoctorStatus()        => ApiService.listDoctorStatus();
-  Future<QueueDashboardSnapshot>  _loadQueueDashboard()      => ApiService.getMyQueueDashboard();
-  Future<List<PrescribedMedicine>> _loadPrescribedMedicines() => ApiService.getMyPrescribedMedicines();
 
   void _showEPrescriptionModal(String medName, String dosage, String instructions, String expiryDate) {
     showModalBottomSheet(
@@ -515,25 +513,17 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         const SizedBox(height: 14),
         Container(
           decoration: BoxDecoration(color: _C.surface, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 16, offset: Offset(0, 6))]),
-          child: FutureBuilder<List<DoctorStatus>>(
-            future: _doctorStatusFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()));
-              }
-              final doctors = snapshot.data ?? const [];
-              if (doctors.isEmpty) {
-                return const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No doctors on duty.', style: TextStyle(color: _C.textMuted))));
-              }
-              return Column(children: List.generate(doctors.length, (i) {
-                final item = doctors[i];
-                return Column(children: [
-                  _staffTile(item.displayName, item.specialization, _getStatusColor(item.availabilityStatus), _getStatusLabel(item.availabilityStatus), Icons.medical_services_rounded),
-                  if (i < doctors.length - 1) const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Divider(height: 1, color: _C.divider)),
-                ]);
-              }));
-            },
-          ),
+          child: _isInitialLoading
+              ? const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()))
+              : (_doctors.isEmpty
+                  ? const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No doctors on duty.', style: TextStyle(color: _C.textMuted))))
+                  : Column(children: List.generate(_doctors.length, (i) {
+                      final item = _doctors[i];
+                      return Column(children: [
+                        _staffTile(item.displayName, item.specialization, _getStatusColor(item.availabilityStatus), _getStatusLabel(item.availabilityStatus), Icons.medical_services_rounded),
+                        if (i < _doctors.length - 1) const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Divider(height: 1, color: _C.divider)),
+                      ]);
+                    }))),
         ),
       ],
     );
@@ -562,52 +552,49 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   Widget _buildQueueCard() {
+    final queue = _queueDashboard;
+    final hasQueue = queue.hasActiveQueue;
+    final statusColor = hasQueue ? _C.warning : _C.success;
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(color: _C.surface, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 16, offset: Offset(0, 6))]),
-      child: FutureBuilder<QueueDashboardSnapshot>(
-        future: _queueDashboardFuture,
-        builder: (context, snapshot) {
-          final queue       = snapshot.data ?? QueueDashboardSnapshot.empty;
-          final hasQueue    = queue.hasActiveQueue;
-          final statusColor = hasQueue ? _C.warning : _C.success;
-          return Column(children: [
-            Row(children: [
+      child: _isInitialLoading
+          ? const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()))
+          : Column(children: [
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(color: statusColor.withOpacity(0.10), borderRadius: BorderRadius.circular(8)),
+                  child: Row(children: [
+                    Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+                    const SizedBox(width: 5),
+                    Text(hasQueue ? 'ACTIVE QUEUE' : 'LIVE QUEUE', style: TextStyle(color: statusColor, fontWeight: FontWeight.w800, fontSize: 10)),
+                  ]),
+                ),
+                const Spacer(),
+                Text(hasQueue ? queue.serviceLabel : 'Not in queue', style: const TextStyle(color: _C.textMuted, fontSize: 11)),
+              ]),
+              const SizedBox(height: 20),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+                _queueInfo('CURRENTLY SERVING', _queueNumberText(queue.currentlyServingQueueNumber), _C.textMuted),
+                Container(width: 1, height: 44, color: _C.divider),
+                _queueInfo('YOUR NUMBER', _queueNumberText(queue.myQueueNumber), hasQueue ? _C.primaryMid : _C.textMuted),
+              ]),
+              const SizedBox(height: 20),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(color: statusColor.withOpacity(0.10), borderRadius: BorderRadius.circular(8)),
-                child: Row(children: [
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
-                  const SizedBox(width: 5),
-                  Text(hasQueue ? 'ACTIVE QUEUE' : 'LIVE QUEUE', style: TextStyle(color: statusColor, fontWeight: FontWeight.w800, fontSize: 10)),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(color: _C.primaryMid.withOpacity(0.06), borderRadius: BorderRadius.circular(14)),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.timer_outlined, size: 16, color: _C.primaryMid),
+                  const SizedBox(width: 8),
+                  Text(
+                    hasQueue ? 'Est. Wait: ${_formatWaitTime(queue.estimatedWaitMinutes)}' : 'Join queue to view waiting time',
+                    style: const TextStyle(color: _C.primaryMid, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
                 ]),
               ),
-              const Spacer(),
-              Text(hasQueue ? queue.serviceLabel : 'Not in queue', style: const TextStyle(color: _C.textMuted, fontSize: 11)),
             ]),
-            const SizedBox(height: 20),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-              _queueInfo('CURRENTLY SERVING', _queueNumberText(queue.currentlyServingQueueNumber), _C.textMuted),
-              Container(width: 1, height: 44, color: _C.divider),
-              _queueInfo('YOUR NUMBER', _queueNumberText(queue.myQueueNumber), hasQueue ? _C.primaryMid : _C.textMuted),
-            ]),
-            const SizedBox(height: 20),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(color: _C.primaryMid.withOpacity(0.06), borderRadius: BorderRadius.circular(14)),
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Icon(Icons.timer_outlined, size: 16, color: _C.primaryMid),
-                const SizedBox(width: 8),
-                Text(
-                  hasQueue ? 'Est. Wait: ${_formatWaitTime(queue.estimatedWaitMinutes)}' : 'Join queue to view waiting time',
-                  style: const TextStyle(color: _C.primaryMid, fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-              ]),
-            ),
-          ]);
-        },
-      ),
     );
   }
 
@@ -659,7 +646,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
           final joined = await Navigator.push<bool>(context, MaterialPageRoute(
             builder: (_) => uKonekJoinQueuePage(username: widget.username, citizenId: widget.citizenId),
           ));
-          if (joined == true) _refreshQueueDashboard();
+          if (joined == true) _loadAllData(isInitial: false);
         }),
         // NEW: View E-Prescription Button
         _actionBtn('E-Prescription', Icons.receipt_long_rounded, const Color(0xFF6F42C1), () {
@@ -695,25 +682,20 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   Widget _buildMedicineCard() {
-    return FutureBuilder<List<PrescribedMedicine>>(
-      future: _prescribedMedicinesFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
-        }
-        final medicines = (snapshot.data ?? const []).take(3).toList();
-        if (medicines.isEmpty) return const Text('No recent prescriptions.', style: TextStyle(color: _C.textMuted));
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(color: _C.surface, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 14, offset: Offset(0, 5))]),
-          child: Column(children: [
-            for (var i = 0; i < medicines.length; i++) ...[
-              _medRow(medicines[i].medicineName, medicines[i].quantityLabel, 'PRESCRIBED', _C.primaryMid),
-              if (i < medicines.length - 1) const Divider(height: 28, color: _C.divider),
-            ],
-          ]),
-        );
-      },
+    final medicines = _prescribedMedicines.take(3).toList();
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: _C.surface, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 14, offset: Offset(0, 5))]),
+      child: _isInitialLoading
+          ? const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()))
+          : (medicines.isEmpty
+              ? const Text('No recent prescriptions.', style: TextStyle(color: _C.textMuted))
+              : Column(children: [
+                  for (var i = 0; i < medicines.length; i++) ...[
+                    _medRow(medicines[i].medicineName, medicines[i].quantityLabel, 'PRESCRIBED', _C.primaryMid),
+                    if (i < medicines.length - 1) const Divider(height: 28, color: _C.divider),
+                  ],
+                ])),
     );
   }
 
@@ -774,7 +756,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                         citizenId: widget.citizenId,
                       ),
                     )).then((_) {
-                      _refreshQueueDashboard();
+                      _loadAllData(isInitial: false);
                       setState(() => _selectedTab = 0);
                     });
                   } else if (i == 3) {

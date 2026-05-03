@@ -171,36 +171,59 @@ const appointments = (() => {
 
       const today = getTodayDateText();
       const supabase = await getSupabaseClient();
-      const response = await supabase
+      
+      const queryStr = `
+        id,
+        queue_date,
+        service_key,
+        reason,
+        symptoms,
+        queue_number,
+        ticket_code,
+        service_label,
+        citizen_type,
+        status,
+        created_at,
+        served_at,
+        completed_at,
+        citizen:citizens(id, firstname, surname, email, date_of_birth, sex)
+      `;
+
+      let { data, error } = await supabase
         .from('queue_tickets')
-        .select(`
-          id,
-          queue_date,
-          service_key,
-          reason,
-          symptoms,
-          queue_number,
-          ticket_code,
-          service_label,
-          citizen_type,
-          status,
-          created_at,
-          served_at,
-          completed_at,
-          citizen:citizens(id, firstname, surname, email, date_of_birth, sex)
-        `)
+        .select(queryStr)
         .eq('queue_date', today)
         .neq('status', 'cancelled')
         .neq('status', 'completed')
         .order('queue_number', { ascending: true });
 
-      if (response.error) {
-        console.error('Error loading queue tickets:', response.error);
-        showToast('Failed to load queue: ' + response.error.message, 'error');
+      // Resilience Fallback: If no tickets for "today" (local), fetch only RECENT active tickets (last 24h).
+      // This handles cases where the user's device date is slightly ahead/behind the server date
+      // while preventing stagnant tickets from days ago from "coming back" into the view.
+      if (!error && (!data || data.length === 0)) {
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        console.log('No tickets for today, attempting fallback to recent active tickets (last 24h)...');
+        const fb = await supabase
+          .from('queue_tickets')
+          .select(queryStr)
+          .neq('status', 'cancelled')
+          .neq('status', 'completed')
+          .gt('created_at', twentyFourHoursAgo)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        
+        if (!fb.error && fb.data && fb.data.length > 0) {
+          data = fb.data;
+        }
+      }
+
+      if (error) {
+        console.error('Error loading queue tickets:', error);
+        showToast('Failed to load queue: ' + error.message, 'error');
         return;
       }
 
-      currentQueueTickets = response.data || [];
+      currentQueueTickets = data || [];
       await refreshAssessedTicketIds(supabase);
       renderQueue();
       document.dispatchEvent(new CustomEvent('ukonek:queue-updated'));
@@ -629,6 +652,12 @@ const appointments = (() => {
 
     showToast('Ticket deleted successfully.', 'success');
     closeTicketDetailModal();
+    
+    // Immediate UI Update: Remove from local state and re-render
+    currentQueueTickets = currentQueueTickets.filter(t => Number(t.id) !== Number(ticketId));
+    renderQueue();
+    
+    // Background sync
     await loadQueueTickets();
   };
 
