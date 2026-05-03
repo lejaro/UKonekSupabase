@@ -790,9 +790,10 @@ function applyRoleAccess(user) {
 }
 
 const MEDICINE_PERMISSIONS = {
-  doctor: { adjust: true, add: false },
-  nurse: { adjust: true, add: true },
-  specialist: { adjust: true, add: false }
+  doctor:     { adjust: true, add: false },
+  nurse:      { adjust: true, add: true },
+  specialist: { adjust: true, add: false },
+  pharmacist: { adjust: true, add: true }
 };
 
 const CONSULTATION_PERMISSIONS = {
@@ -1305,7 +1306,7 @@ if (registerForm) {
     const password = document.getElementById('reg-password').value;
     const confirmPassword = document.getElementById('reg-confirm-password').value;
     const role = document.getElementById('reg-role').value;
-    const allowedRegRoles = ['doctor', 'nurse'];
+    const allowedRegRoles = ['doctor', 'nurse', 'pharmacist'];
 
     const err = document.getElementById('register-error');
     const success = document.getElementById('register-success');
@@ -1329,7 +1330,7 @@ if (registerForm) {
 
     if (!allowedRegRoles.includes(String(role).trim().toLowerCase())) {
       if (err) {
-        err.textContent = 'Role must be doctor or nurse.';
+        err.textContent = 'Role must be doctor, nurse, or pharmacist.';
         err.style.display = 'block';
       }
       return;
@@ -4173,6 +4174,13 @@ async function initDashboardData() {
     const sessionUser = await ensureAuthenticatedSession();
     if (!sessionUser) return;
 
+    // Pharmacists have a dedicated dashboard — redirect if they land here
+    const sessionRole = String(sessionUser?.role || '').trim().toLowerCase();
+    if (sessionRole === 'pharmacist') {
+      window.location.replace('./dashboard-pharmacist.html');
+      return;
+    }
+
     startPresenceHeartbeat();
     applyRoleAccess(sessionUser);
 
@@ -4742,14 +4750,38 @@ const medicineArchivedTbody = document.getElementById('medicine-archived-tbody')
 function openConsultationModal(prefill = {}) {
   if (!consultationModal) return;
   if (consultationForm) consultationForm.reset();
+
+  // Reset tab to History
+  consultationModal.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+  consultationModal.querySelector('.modal-tab[data-tab="tab-history"]')?.classList.add('active');
+  consultationModal.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  consultationModal.querySelector('#tab-history')?.classList.add('active');
+
   const patientInput = document.getElementById('consult-patient-id');
-  const symptomsInput = document.getElementById('consult-symptoms');
-  const diagnosisInput = document.getElementById('consult-diagnosis');
-  const notesInput = document.getElementById('consult-notes');
+  const displayId = document.getElementById('consult-display-id');
   if (patientInput && prefill.patientId) patientInput.value = prefill.patientId;
-  if (symptomsInput && prefill.symptoms) symptomsInput.value = prefill.symptoms;
-  if (diagnosisInput && prefill.diagnosis) diagnosisInput.value = prefill.diagnosis;
+
+  // Show patient name + service in modal header
+  if (displayId) {
+    const namePart = prefill.patientName ? `<strong>${prefill.patientName}</strong>` : '';
+    const idPart = prefill.patientId ? `<span style="color:#64748b">(${prefill.patientId})</span>` : '—';
+    const servicePart = prefill.serviceLabel ? ` &mdash; <em>${prefill.serviceLabel}</em>` : '';
+    displayId.innerHTML = `${namePart} ${idPart}${servicePart}`.trim();
+  }
+
+  // Store queue ticket id on form for later use
+  if (consultationForm) {
+    consultationForm.dataset.queueTicketId = prefill.queueTicketId ? String(prefill.queueTicketId) : '';
+  }
+
+  // Pre-fill HPI from symptoms/reason
+  const hpiInput = document.getElementById('consult-hpi');
+  if (hpiInput && prefill.symptoms) hpiInput.value = prefill.symptoms;
+
+  const notesInput = document.getElementById('consult-notes');
   if (notesInput && prefill.notes) notesInput.value = prefill.notes;
+
+  initConsultationTabs();
   consultationModal.classList.remove('hidden');
 }
 
@@ -4765,7 +4797,23 @@ if (openConsultModalBtn) {
       showToast('Only doctors can create consultations.', 'warning');
       return;
     }
-    openConsultationModal();
+    const servingPatients = consultationQueueTickets.filter(t => t.rowType === 'queue-serving');
+    if (servingPatients.length === 0) {
+      showToast('No patients are currently being served. Move a patient to \'Now Serving\' in the Queue first.', 'warning');
+      return;
+    }
+    if (servingPatients.length === 1) {
+      openConsultationModal({
+        patientId: servingPatients[0].patientId || '',
+        patientName: servingPatients[0].patientName || '',
+        serviceLabel: servingPatients[0].serviceLabel || '',
+        queueTicketId: servingPatients[0].queueTicketId || null,
+        symptoms: servingPatients[0].symptoms || '',
+        notes: servingPatients[0].notes || ''
+      });
+    } else {
+      showToast('Multiple patients are being served. Use the Consult button on the specific patient row.', 'info');
+    }
   });
 }
 
@@ -4800,66 +4848,78 @@ function saveToStorage(key, data) {
   try { localStorage.setItem(key, JSON.stringify(data)); } catch (err) { console.error('Storage save error', key, err); }
 }
 
+function renderServingQueue() {
+  const tbody = document.getElementById('serving-queue-tbody');
+  if (!tbody) return;
+  const allowConsult = canConsultPatients();
+  tbody.innerHTML = '';
+  if (!consultationQueueTickets.length) {
+    tbody.innerHTML = '<tr><td class="table-cell" colspan="5" style="color:#64748b;">No patients currently being served.</td></tr>';
+    return;
+  }
+  consultationQueueTickets.forEach(c => {
+    const displayName = c.patientName || c.patientId || '—';
+    const tr = document.createElement('tr');
+    tr.style.background = '#f0fdf4';
+    tr.innerHTML = `
+      <td class="table-cell"><strong>${displayName}</strong><br><span style="font-size:11px;color:#64748b">${c.patientId || ''}</span></td>
+      <td class="table-cell">${c.serviceLabel || 'General Consultation'}</td>
+      <td class="table-cell"><span style="font-weight:700;color:#0369a1">#${String(c.queueNumber || 0).padStart(3,'0')}</span></td>
+      <td class="table-cell">${formatDateTime(c.created_at)}</td>
+      <td class="table-cell">
+        ${allowConsult
+          ? `<button class="btn small" data-action="consult" data-id="${c.id}" style="background:#0369a1;color:#fff;border-color:#0369a1;">Consult</button>`
+          : '<span style="color:#94a3b8;font-size:12px">View only</span>'}
+      </td>
+    `;
+    tbody.appendChild(tr);
+    attachDetailRow(tr, () => ({
+      tag: 'Now Serving',
+      title: displayName,
+      subtitle: c.serviceLabel || 'General Consultation',
+      items: [
+        { label: 'Patient Name', value: c.patientName || '—' },
+        { label: 'Patient ID', value: c.patientId },
+        { label: 'Service', value: c.serviceLabel || '—' },
+        { label: 'Queue Number', value: c.queueNumber > 0 ? `#${String(c.queueNumber).padStart(3,'0')}` : '—' },
+        { label: 'Symptoms', value: c.symptoms || '—' },
+        { label: 'Reason', value: c.notes || '—' },
+        { label: 'Since', value: new Date(c.created_at) }
+      ]
+    }));
+  });
+}
+
 function renderConsultations() {
   if (!consultationsTbody) return;
   const allowPrescribe = canCreatePrescriptions();
-  const allowConsult = canConsultPatients();
-  const combinedRows = [...consultationQueueTickets, ...consultations];
   consultationsTbody.innerHTML = '';
-  if (!Array.isArray(combinedRows) || combinedRows.length === 0) {
-    consultationsTbody.innerHTML = '<tr><td class="table-cell" colspan="5">No consultations or now serving patients yet.</td></tr>';
+  const rows = consultations.slice().reverse();
+  if (!rows.length) {
+    consultationsTbody.innerHTML = '<tr><td class="table-cell" colspan="5" style="color:#64748b;">No consultation records yet.</td></tr>';
     return;
   }
-  const consultationRows = consultations.slice().reverse();
-  const orderedRows = [...consultationQueueTickets, ...consultationRows];
-
-  orderedRows.forEach(c => {
-    const isQueueServing = c.rowType === 'queue-serving';
-    const diagnosisText = isQueueServing ? 'Awaiting consultation' : (c.diagnosis || '').substring(0, 60);
-    const actionButtons = isQueueServing
-      ? `${allowConsult ? `<button class="btn small" data-action="consult" data-id="${c.id}">Consult</button>` : ''}`
-      : `
-        <button class="btn small" data-action="view" data-id="${c.id}">View</button>
-        ${allowPrescribe ? `<button class="btn small outline" data-action="prescribe" data-id="${c.id}">Prescribe</button>` : ''}
-      `;
-
+  rows.forEach(c => {
+    const displayName = c.patientName || c.patientId || '—';
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="table-cell">${c.id}</td>
-      <td class="table-cell">${c.patientId}</td>
-      <td class="table-cell">${diagnosisText}</td>
+      <td class="table-cell"><strong>${displayName}</strong></td>
+      <td class="table-cell" style="color:#64748b;font-size:13px;">${c.patientId || '—'}</td>
+      <td class="table-cell">${(c.diagnosis || '').substring(0, 60)}</td>
       <td class="table-cell">${formatDateTime(c.created_at)}</td>
-      <td class="table-cell">
-        ${actionButtons}
+      <td class="table-cell" style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn small" data-action="view" data-id="${c.id}" style="background:#64748b;color:#fff;border-color:#64748b;">View</button>
+        ${allowPrescribe ? `<button class="btn small" data-action="prescribe" data-id="${c.id}" style="background:#16a34a;color:#fff;border-color:#16a34a;">Prescribe</button>` : ''}
       </td>
     `;
     consultationsTbody.appendChild(tr);
-
-    if (isQueueServing) {
-      attachDetailRow(tr, () => ({
-        tag: 'Now Serving',
-        title: c.patientId || 'Queue Patient',
-        subtitle: c.id,
-        items: [
-          { label: 'Queue Ticket', value: c.id },
-          { label: 'Patient ID', value: c.patientId },
-          { label: 'Queue Number', value: c.queueNumber > 0 ? `#${String(c.queueNumber).padStart(3, '0')}` : '—' },
-          { label: 'Service', value: c.serviceLabel || '—' },
-          { label: 'Symptoms', value: c.symptoms || '—' },
-          { label: 'Reason', value: c.notes || '—' },
-          { label: 'Status', value: c.queueStatus || 'serving' },
-          { label: 'Since', value: new Date(c.created_at) }
-        ]
-      }));
-      return;
-    }
-
     attachDetailRow(tr, () => ({
       tag: 'Consultation',
-      title: c.patientId || 'Consultation Record',
+      title: displayName,
       subtitle: c.id,
       items: [
         { label: 'Consultation ID', value: c.id },
+        { label: 'Patient Name', value: c.patientName || '—' },
         { label: 'Patient ID', value: c.patientId },
         { label: 'Symptoms', value: c.symptoms || '—' },
         { label: 'Diagnosis', value: c.diagnosis || '—' },
@@ -4880,6 +4940,7 @@ function mapConsultationRow(item) {
     symptoms: String(item?.symptoms || '').trim(),
     diagnosis: String(item?.diagnosis || '').trim(),
     notes: String(item?.notes || '').trim(),
+    patientName: item?.citizen ? `${item.citizen.firstname} ${item.citizen.surname}`.trim() : (item?.patientName || ''),
     created_at: item?.consulted_at || item?.created_at || new Date().toISOString(),
     doctor_staff_id: Number(item?.doctor_staff_id) || null
   };
@@ -4888,6 +4949,11 @@ function mapConsultationRow(item) {
 function mapNowServingQueueRow(item) {
   const ticketId = Number(item?.id) || 0;
   const citizenId = Number(item?.citizen?.id || 0);
+  const citizenFirstName = String(item?.citizen?.firstname || '').trim();
+  const citizenSurname = String(item?.citizen?.surname || '').trim();
+  const patientName = (citizenFirstName || citizenSurname)
+    ? `${citizenFirstName} ${citizenSurname}`.trim()
+    : '';
   const patientId = citizenId > 0
     ? `CIT-${citizenId}`
     : (String(item?.ticket_code || '').trim() || `QUEUE-${ticketId || Date.now()}`);
@@ -4901,6 +4967,7 @@ function mapNowServingQueueRow(item) {
     rowType: 'queue-serving',
     queueTicketId: ticketId > 0 ? ticketId : null,
     patientId,
+    patientName,
     symptoms: String(item?.symptoms || '').trim(),
     diagnosis: '',
     notes: String(item?.reason || '').trim(),
@@ -4935,7 +5002,7 @@ async function listConsultationData() {
   const { supabase } = await loadSupabaseModule();
   const { data, error } = await supabase
     .from('consultations')
-    .select('id,patient_identifier,symptoms,diagnosis,notes,consulted_at,created_at,doctor_staff_id')
+    .select('id,patient_identifier,symptoms,diagnosis,notes,consulted_at,created_at,doctor_staff_id, citizen:citizens(firstname, surname)')
     .order('consulted_at', { ascending: false });
 
   if (error) {
@@ -4971,7 +5038,7 @@ async function listNowServingQueueForConsultation() {
 async function refreshConsultationData() {
   try {
     const [consultationRows, queueRows] = await Promise.all([
-      listConsultationData(),
+      listConsultationData().catch(() => []),
       listNowServingQueueForConsultation()
     ]);
     consultations = consultationRows;
@@ -4981,6 +5048,7 @@ async function refreshConsultationData() {
     consultations = [];
     consultationQueueTickets = [];
   }
+  renderServingQueue();
   renderConsultations();
 }
 
@@ -5747,6 +5815,8 @@ async function initClinicalData() {
   await ensureAuthenticatedSession().catch(() => null);
   await migrateLegacyClinicalStorageIfNeeded();
   await refreshConsultationData();
+  renderServingQueue();
+  renderConsultations();
 
   await Promise.all([refreshMedicineData(), refreshArchivedMedicineData()]);
 
@@ -5755,759 +5825,12 @@ async function initClinicalData() {
   } else {
     prescriptions = [];
   }
+  renderServingQueue();
   renderConsultations();
 }
 
-document.addEventListener('ukonek:queue-updated', async () => {
-  if (!consultationSection || consultationSection.classList.contains('hidden')) return;
-  await refreshConsultationData();
-});
+// ...
 
-function mapAnnouncementRow(item) {
-  const content = String(item?.content || item?.body || item?.preview || '').trim();
-  return {
-    id: item?.id,
-    title: String(item?.title || '').trim(),
-    content,
-    preview: content,
-    date: item?.created_at
-      ? new Date(item.created_at).toISOString().slice(0, 10)
-      : String(item?.date || '').trim(),
-    created_at: item?.created_at || null,
-    updated_at: item?.updated_at || null
-  };
-}
-
-function mapFeedbackRow(item) {
-  const message = String(item?.message || item?.content || '').trim();
-  return {
-    id: item?.id,
-    from: String(item?.from_email || item?.from || 'Anonymous').trim() || 'Anonymous',
-    subject: String(item?.subject || '').trim() || 'Feedback',
-    message,
-    date: item?.created_at
-      ? new Date(item.created_at).toISOString().slice(0, 10)
-      : String(item?.date || '').trim(),
-    rating: Number.isFinite(Number(item?.rating)) ? Number(item.rating) : null,
-    created_at: item?.created_at || null,
-    updated_at: item?.updated_at || null
-  };
-}
-
-function loadAnnouncementsFromLocalStorage() {
-  try {
-    const raw = localStorage.getItem('ukonek_announcements');
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.map(mapAnnouncementRow) : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-async function listAnnouncementsData() {
-  if (isDemoMode) {
-    return loadAnnouncementsFromLocalStorage();
-  }
-
-  if (isApiMode) {
-    const response = await fetch(`${API_BASE}/api/announcements`, {
-      method: 'GET',
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      throw new Error('Unable to load announcements.');
-    }
-
-    const data = await response.json().catch(() => ([]));
-    return (Array.isArray(data) ? data : []).map(mapAnnouncementRow);
-  }
-
-  const { supabase } = await loadSupabaseModule();
-  const { data, error } = await supabase
-    .from('announcements')
-    .select('id,title,content,created_at,updated_at')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    throw new Error(error.message || 'Unable to load announcements.');
-  }
-
-  return (data || []).map(mapAnnouncementRow);
-}
-
-async function createAnnouncementEntry({ title, content, visibility }) {
-  const cleanTitle = String(title || '').trim();
-  const cleanContent = String(content || '').trim();
-  const cleanVisibility = String(visibility || 'all').trim();
-
-  if (isDemoMode) {
-    const next = [...loadAnnouncementsFromLocalStorage()];
-    next.unshift({
-      id: (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
-        ? crypto.randomUUID()
-        : `ann-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      title: cleanTitle,
-      content: cleanContent,
-      preview: cleanContent,
-      visibility: cleanVisibility,
-      date: new Date().toISOString().slice(0, 10),
-      created_at: new Date().toISOString()
-    });
-    saveToStorage('ukonek_announcements', next);
-    return true;
-  }
-
-  if (isApiMode) {
-    const response = await fetch(`${API_BASE}/api/announcements`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: cleanTitle, content: cleanContent, visibility: cleanVisibility })
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data.message || 'Unable to create announcement.');
-    }
-
-    return true;
-  }
-
-  const { supabase } = await loadSupabaseModule();
-  const payload = {
-    title: cleanTitle,
-    content: cleanContent,
-    visibility: cleanVisibility,
-    created_by_staff_id: Number(cachedSessionUser?.id) || null
-  };
-
-  const { error } = await supabase.from('announcements').insert(payload);
-  if (error) {
-    throw new Error(error.message || 'Unable to create announcement.');
-  }
-
-  return true;
-}
-
-async function updateAnnouncementEntry(announcementId, { title, content, visibility }) {
-  const cleanTitle = String(title || '').trim();
-  const cleanContent = String(content || '').trim();
-  const cleanVisibility = String(visibility || 'all').trim();
-
-  if (isDemoMode) {
-    const all = loadAnnouncementsFromLocalStorage();
-    const next = all.map((item) => {
-      if (String(item.id) !== String(announcementId)) return item;
-      return {
-        ...item,
-        title: cleanTitle,
-        content: cleanContent,
-        preview: cleanContent,
-        visibility: cleanVisibility
-      };
-    });
-    saveToStorage('ukonek_announcements', next);
-    return true;
-  }
-
-  if (isApiMode) {
-    let response = await fetch(`${API_BASE}/api/announcements/${announcementId}`, {
-      method: 'PATCH',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: cleanTitle, content: cleanContent, visibility: cleanVisibility })
-    });
-
-    if (response.status === 404 || response.status === 405) {
-      response = await fetch(`${API_BASE}/api/announcements/${announcementId}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: cleanTitle, content: cleanContent, visibility: cleanVisibility })
-      });
-    }
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data.message || 'Unable to update announcement.');
-    }
-
-    return true;
-  }
-
-  const { supabase } = await loadSupabaseModule();
-  const { error } = await supabase
-    .from('announcements')
-    .update({ title: cleanTitle, content: cleanContent, visibility: cleanVisibility })
-    .eq('id', Number(announcementId));
-
-  if (error) {
-    throw new Error(error.message || 'Unable to update announcement.');
-  }
-
-  return true;
-}
-
-async function deleteAnnouncementEntry(announcementId) {
-  const targetId = String(announcementId || '').trim();
-  if (!targetId) {
-    throw new Error('Announcement ID is required.');
-  }
-
-  if (isDemoMode) {
-    const next = loadAnnouncementsFromLocalStorage().filter((item) => String(item.id) !== targetId);
-    saveToStorage('ukonek_announcements', next);
-    return true;
-  }
-
-  if (isApiMode) {
-    const response = await fetch(`${API_BASE}/api/announcements/${targetId}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data.message || 'Unable to delete announcement.');
-    }
-
-    return true;
-  }
-
-  const { supabase } = await loadSupabaseModule();
-  const { error } = await supabase
-    .from('announcements')
-    .delete()
-    .eq('id', Number(targetId));
-
-  if (error) {
-    throw new Error(error.message || 'Unable to delete announcement.');
-  }
-
-  return true;
-}
-
-async function refreshAnnouncementsData() {
-  try {
-    latestAnnouncementsList = await listAnnouncementsData();
-  } catch (error) {
-    console.error('Failed to refresh announcements:', error);
-    latestAnnouncementsList = [];
-  }
-  renderAnnouncements();
-}
-
-async function listFeedbackData() {
-  if (isDemoMode) {
-    return [];
-  }
-
-  if (isApiMode) {
-    const response = await fetch(`${API_BASE}/api/feedbacks`, {
-      method: 'GET',
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      throw new Error('Unable to load feedbacks.');
-    }
-
-    const data = await response.json().catch(() => ([]));
-    return (Array.isArray(data) ? data : []).map(mapFeedbackRow);
-  }
-
-  const { supabase } = await loadSupabaseModule();
-  const { data, error } = await supabase
-    .from('feedbacks')
-    .select('id,from_email,subject,message,rating,created_at,updated_at')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    throw new Error(error.message || 'Unable to load feedbacks.');
-  }
-
-  return (data || []).map(mapFeedbackRow);
-}
-
-async function refreshFeedbackData() {
-  try {
-    latestFeedbackList = await listFeedbackData();
-  } catch (error) {
-    console.error('Failed to refresh feedbacks:', error);
-    latestFeedbackList = [];
-  }
-  renderFeedbacks();
-}
-
-function renderAnnouncements() {
-  const tbody = document.getElementById('announcements-tbody');
-  if (!tbody) return;
-  const canManageAnnouncements = isAdminUser(cachedSessionUser);
-
-  tbody.innerHTML = '';
-  if (!latestAnnouncementsList.length) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = '<td colspan="1" class="table-cell">No announcements yet.</td>';
-    tbody.appendChild(tr);
-  }
-  latestAnnouncementsList.forEach(a => {
-    const tr = document.createElement('tr');
-    tr.className = 'announcement-row';
-    const deleteButton = canManageAnnouncements
-      ? '<button class="btn-delete-announcement" title="Delete announcement" style="background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px; color: #e53935;">×</button>'
-      : '';
-    tr.innerHTML = `
-      <td class="table-cell" style="padding-right:12px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <span style="font-weight:600;">${a.title}</span>
-          ${deleteButton}
-        </div>
-      </td>
-    `;
-    tbody.appendChild(tr);
-    attachAnnouncementRow(tr, a);
-  });
-  // Update stats
-  if (document.getElementById('stat-announcements')) {
-    document.getElementById('stat-announcements').textContent = String(latestAnnouncementsList.length);
-  }
-}
-
-function openAnnouncementDetailLegacy(announcement) {
-  if (!announcementDetailModal) return;
-  currentAnnouncementDetail = announcement || null;
-  if (announcementDetailTitle) announcementDetailTitle.textContent = announcement.title || 'Announcement';
-  if (announcementDetailBody) announcementDetailBody.textContent = announcement.content || announcement.body || announcement.preview || '—';
-  if (announcementDetailDate) announcementDetailDate.textContent = announcement.date || '';
-  const visibilityNode = document.getElementById('announcement-detail-visibility');
-  if (visibilityNode) {
-    const rawVisibility = String(announcement?.visibility || 'all').trim().toLowerCase();
-    const visibilityLabel = rawVisibility === 'staff'
-      ? 'Staff Only'
-      : rawVisibility === 'citizen'
-        ? 'Citizens Only'
-        : 'Staff and Citizens';
-    visibilityNode.textContent = `Visible To: ${visibilityLabel}`;
-  }
-  const detailDeleteBtn = document.getElementById('announcement-detail-delete');
-  if (detailDeleteBtn) {
-    detailDeleteBtn.style.display = isAdminUser(cachedSessionUser) ? '' : 'none';
-  }
-  announcementDetailModal.classList.remove('hidden');
-}
-
-function attachAnnouncementRow(row, announcement) {
-  if (!row) return;
-
-  // Add delete button handler
-  const deleteBtn = row.querySelector('.btn-delete-announcement');
-  if (deleteBtn && isAdminUser(cachedSessionUser)) {
-    deleteBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const confirmation = await openDialogModal({
-        title: 'Delete Announcement',
-        message: 'Delete this announcement?',
-        confirmText: 'Delete',
-        cancelText: 'Cancel'
-      });
-      if (!confirmation.confirmed) return;
-      
-      try {
-        await deleteAnnouncementEntry(announcement.id);
-        await refreshAnnouncementsData();
-        renderDashboardInsights();
-        showToast('Announcement deleted successfully.', 'success');
-      } catch (error) {
-        console.error('Error deleting announcement:', error);
-        showToast(error.message || 'Failed to delete announcement.', 'error');
-      }
-    });
-  }
-
-  // Click row to view full content.
-  row.style.cursor = 'pointer';
-  row.addEventListener('click', (e) => {
-    if (deleteBtn && (e.target === deleteBtn || deleteBtn.contains(e.target))) return;
-    openAnnouncementDetailLegacy(announcement);
-  });
-}
-
-function renderFeedbacks() {
-  const tbody = document.getElementById('feedback-tbody');
-  if (!tbody) return;
-  const feedbacks = Array.isArray(latestFeedbackList) ? [...latestFeedbackList] : [];
-  tbody.innerHTML = '';
-  if (!feedbacks.length) {
-    tbody.innerHTML = '<tr><td class="table-cell" colspan="3">No feedback yet.</td></tr>';
-  }
-  feedbacks.forEach(f => {
-    const tr = document.createElement('tr');
-    tr.className = 'feedback-row';
-    tr.innerHTML = `
-      <td class="table-cell">${f.from}</td>
-      <td class="table-cell">${f.subject}</td>
-      <td class="table-cell">${f.date}</td>
-    `;
-    tbody.appendChild(tr);
-    attachDetailRow(tr, () => ({
-      tag: 'Feedback',
-      title: f.subject || 'Feedback Detail',
-      subtitle: f.from || '',
-      items: [
-        { label: 'From', value: f.from },
-        { label: 'Subject', value: f.subject },
-        { label: 'Date', value: f.date },
-        { label: 'Message', value: f.message || '—' },
-        { label: 'Rating', value: typeof f.rating !== 'undefined' ? `${f.rating} / 5` : '—' }
-      ]
-    }));
-  });
-  // Update stats
-  if (document.getElementById('stat-reports')) {
-    document.getElementById('stat-reports').textContent = String(feedbacks.length);
-  }
-}
-
-
-initClinicalData();
-
-// Consultation form submit
-if (consultationForm) {
-  consultationForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!canConsultPatients()) {
-      showToast('Only doctors can create consultations.', 'warning');
-      return;
-    }
-    const payload = {
-      patientId: document.getElementById('consult-patient-id').value.trim(),
-      diagnosis: document.getElementById('consult-diagnosis').value.trim(),
-      notes: document.getElementById('consult-notes').value.trim(),
-      hpi: document.getElementById('consult-hpi')?.value.trim(),
-      pmh: document.getElementById('consult-pmh')?.value.trim(),
-      allergies: document.getElementById('consult-allergies')?.value.trim(),
-      immunization: document.getElementById('consult-immunization')?.value.trim(),
-      social: document.getElementById('consult-social')?.value.trim(),
-      physical_exam: {
-        heent: document.getElementById('exam-heent')?.value.trim(),
-        chest: document.getElementById('exam-chest')?.value.trim(),
-        abdomen: document.getElementById('exam-abdomen')?.value.trim(),
-        extremities: document.getElementById('exam-extremities')?.value.trim(),
-        others: document.getElementById('exam-others')?.value.trim()
-      },
-      differential: document.getElementById('consult-differential')?.value.trim(),
-      lab_orders: document.getElementById('consult-lab-orders')?.value.trim(),
-      followup: document.getElementById('consult-followup')?.value || null
-    };
-
-    if (!payload.patientId || !payload.diagnosis) { 
-      showToast('Patient ID and diagnosis required', 'warning'); 
-      return; 
-    }
-
-    try {
-      setLoading(e.submitter, true);
-      const result = await createConsultationEntry(payload);
-      await refreshConsultationData();
-      
-      const isPrescribe = e.submitter.id === 'consult-prescribe-btn';
-      
-      if (consultationModal) {
-        closeConsultationModal();
-      } else {
-        consultationForm.reset();
-      }
-      
-      showToast('Consultation finalized', 'success');
-
-      if (isPrescribe && result.id) {
-        openPrescriptionModalForPatient(payload.patientId, result.id);
-      }
-    } catch (error) {
-      console.error('Failed to save consultation:', error);
-      showToast(error.message || 'Unable to save consultation.', 'error');
-    } finally {
-      setLoading(e.submitter, false);
-    }
-  });
-}
-
-// Open prescription modal
-const consultAddPrescBtn = document.getElementById('consult-add-prescription');
-if (consultAddPrescBtn && prescriptionModal) {
-  consultAddPrescBtn.addEventListener('click', () => {
-    if (!canCreatePrescriptions()) {
-      showToast('Only doctors can create prescriptions.', 'warning');
-      return;
-    }
-    const pid = document.getElementById('consult-patient-id')?.value || '';
-    openPrescriptionModalForPatient(pid, null);
-  });
-}
-
-function openPrescriptionModalForPatient(patientId = '', consultationDbId = null) {
-  if (!prescriptionModal) return;
-  prescriptionModal.classList.remove('hidden');
-  if (prescriptionPatient) prescriptionPatient.value = patientId || '';
-  if (prescriptionForm) {
-    prescriptionForm.dataset.consultationDbId = consultationDbId ? String(consultationDbId) : '';
-  }
-  prescriptionLines.innerHTML = '';
-  addPrescriptionLine();
-}
-
-function addPrescriptionLine() {
-  const line = document.createElement('div');
-  line.className = 'field prescription-line-item';
-  line.style.padding = '12px';
-  line.style.background = '#f8fafc';
-  line.style.borderRadius = '8px';
-  line.style.marginBottom = '12px';
-  line.style.border = '1px solid #e2e8f0';
-
-  line.innerHTML = `
-    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; align-items: end;">
-      <div class="field" style="margin: 0;">
-        <label class="inputLabel">Medicine</label>
-        <select class="pres-med" style="width: 100%;" required>
-          ${medicines.map(m => `<option value="${m.name}">${m.name} (${m.unit||''})</option>`).join('')}
-        </select>
-      </div>
-      <div class="field" style="margin: 0;">
-        <label class="inputLabel">Qty</label>
-        <input type="number" class="pres-qty" value="1" min="1" style="width: 100%;" required />
-      </div>
-      <div class="field" style="margin: 0;">
-        <label class="inputLabel">Dosage</label>
-        <input type="text" class="pres-dosage" placeholder="500mg" style="width: 100%;" />
-      </div>
-      <div class="field" style="margin: 0;">
-        <label class="inputLabel">Freq.</label>
-        <input type="text" class="pres-freq" placeholder="3x a day" style="width: 100%;" />
-      </div>
-      <button type="button" class="btn small btn-delete" data-action="remove-line" style="padding: 8px; margin-bottom: 2px;">×</button>
-    </div>
-  `;
-  prescriptionLines.appendChild(line);
-  line.querySelector('[data-action="remove-line"]').addEventListener('click', () => line.remove());
-}
-
-if (addPrescriptionLineBtn) addPrescriptionLineBtn.addEventListener('click', addPrescriptionLine);
-
-if (cancelPrescriptionBtn) cancelPrescriptionBtn.addEventListener('click', () => {
-  if (prescriptionModal) prescriptionModal.classList.add('hidden');
-  if (prescriptionForm) prescriptionForm.dataset.consultationDbId = '';
-});
-
-if (prescriptionForm) {
-  prescriptionForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!canCreatePrescriptions()) {
-      showToast('Only doctors can create prescriptions.', 'warning');
-      return;
-    }
-    const patient = prescriptionPatient.value.trim();
-    if (!patient) { showToast('Patient ID required', 'warning'); return; }
-    const items = [];
-    const selects = prescriptionForm.querySelectorAll('.pres-med');
-    const qtys = prescriptionForm.querySelectorAll('.pres-qty');
-    const dosages = prescriptionForm.querySelectorAll('.pres-dosage');
-    const freqs = prescriptionForm.querySelectorAll('.pres-freq');
-    for (let i = 0; i < selects.length; i++) {
-      const name = selects[i].value;
-      const qty = Number(qtys[i].value) || 0;
-      const dosage = dosages[i]?.value || '';
-      const frequency = freqs[i]?.value || '';
-      if (name && qty > 0) items.push({ name, qty, dosage, frequency });
-    }
-    if (items.length === 0) { showToast('Add at least one medicine', 'warning'); return; }
-
-    try {
-      await createPrescriptionEntry({
-        patientId: patient,
-        consultationDbId: Number(prescriptionForm.dataset.consultationDbId || '0') || null,
-        items: items.map((it) => {
-          const med = medicines.find((m) => String(m.name || '') === String(it.name || ''));
-          return { name: it.name, qty: it.qty, unit: med?.unit || '' };
-        })
-      });
-    } catch (error) {
-      console.error('Failed to save prescription:', error);
-      showToast(error.message || 'Unable to create prescription.', 'error');
-      return;
-    }
-
-    // decrement inventory where possible
-    try {
-      for (const it of items) {
-        await reduceMedicineStockByName(it.name, Number(it.qty));
-      }
-      await refreshMedicineData();
-    } catch (error) {
-      console.error('Failed to update medicine inventory after prescription:', error);
-      showToast(error.message || 'Prescription saved, but inventory update failed.', 'warning');
-    }
-
-    if (prescriptionModal) prescriptionModal.classList.add('hidden');
-    prescriptionForm.dataset.consultationDbId = '';
-    showToast('Prescription created and inventory updated', 'success');
-  });
-}
-
-// Medicine form submit
-if (medicineForm) {
-  medicineForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!canAddNewMedicine()) {
-      showToast('You only have view access to the inventory.', 'warning');
-      return;
-    }
-    const name = document.getElementById('med-name').value.trim();
-    const qty = Number(document.getElementById('med-qty').value) || 0;
-    const unit = document.getElementById('med-unit').value.trim();
-    if (!name) { showToast('Medicine name required', 'warning'); return; }
-    try {
-      await upsertMedicineEntry({ name, qty, unit });
-      await refreshMedicineData();
-      medicineForm.reset();
-      showToast('Medicine added/updated', 'success');
-    } catch (error) {
-      console.error('Failed to save medicine:', error);
-      showToast(error.message || 'Unable to save medicine.', 'error');
-    }
-  });
-}
-
-// medicine +/- actions
-if (medicineTbody) {
-  medicineTbody.addEventListener('click', async (e) => {
-    const btn = e.target.closest('button');
-    if (!btn) return;
-    const action = btn.getAttribute('data-action');
-    const name = btn.getAttribute('data-name');
-    if (!action || !name) return;
-    if (!canAdjustMedicineInventory()) {
-      showToast('You only have view access to the inventory.', 'warning');
-      return;
-    }
-    const target = medicines.find(m => m.name === name);
-    if (!target) return;
-    try {
-      if (action === 'add') {
-        const addDialog = await openDialogModal({
-          title: 'Add Quantity',
-          message: 'Enter quantity to add.',
-          confirmText: 'Apply',
-          cancelText: 'Cancel',
-          inputs: [
-            {
-              label: 'Quantity',
-              type: 'number',
-              initialValue: '1',
-              placeholder: 'Enter amount'
-            }
-          ]
-        });
-        if (!addDialog.confirmed) return;
-        const add = Number(addDialog.values?.[0] || '0') || 0;
-        await addMedicineStockByName(target.name, add);
-        showToast('Medicine quantity increased.', 'success');
-      } else if (action === 'sub') {
-        const subDialog = await openDialogModal({
-          title: 'Subtract Quantity',
-          message: 'Enter quantity to subtract.',
-          confirmText: 'Apply',
-          cancelText: 'Cancel',
-          inputs: [
-            {
-              label: 'Quantity',
-              type: 'number',
-              initialValue: '1',
-              placeholder: 'Enter amount'
-            }
-          ]
-        });
-        if (!subDialog.confirmed) return;
-        const sub = Number(subDialog.values?.[0] || '0') || 0;
-        await reduceMedicineStockByName(target.name, sub);
-        showToast('Medicine quantity reduced.', 'success');
-      } else if (action === 'remove') {
-        if (!canAddNewMedicine()) {
-          showToast('Only users with inventory management access can remove medicines.', 'warning');
-          return;
-        }
-        const removeDialog = await openDialogModal({
-          title: 'Remove Medicine',
-          message: `Remove ${target.name} from inventory?`,
-          confirmText: 'Remove',
-          cancelText: 'Cancel'
-        });
-        if (!removeDialog.confirmed) return;
-        await removeMedicineEntryByName(target.name);
-        showToast('Medicine removed.', 'success');
-      }
-      await Promise.all([refreshMedicineData(), refreshArchivedMedicineData()]);
-    } catch (error) {
-      console.error('Medicine action failed:', error);
-      showToast(error.message || 'Unable to update inventory.', 'error');
-    }
-  });
-}
-
-if (medicineArchivedToggleBtn) {
-  medicineArchivedToggleBtn.addEventListener('click', async () => {
-    isArchivedMedicinesVisible = !isArchivedMedicinesVisible;
-    if (isArchivedMedicinesVisible) {
-      await refreshArchivedMedicineData();
-    } else {
-      renderArchivedMedicines();
-    }
-  });
-}
-
-if (medicineArchivedTbody) {
-  medicineArchivedTbody.addEventListener('click', async (event) => {
-    const btn = event.target.closest('button');
-    if (!btn) return;
-    const action = btn.getAttribute('data-action');
-    const id = Number(btn.getAttribute('data-id') || '0');
-    if (!id) return;
-
-    try {
-      if (action === 'restore') {
-        if (!canAddNewMedicine()) {
-          showToast('Only users with inventory management access can restore medicines.', 'warning');
-          return;
-        }
-        await restoreMedicineEntryById(id);
-        await Promise.all([refreshMedicineData(), refreshArchivedMedicineData()]);
-        showToast('Medicine restored.', 'success');
-      } else if (action === 'hard-delete') {
-        if (!isAdminUser(cachedSessionUser)) {
-          showToast('Only admins can permanently delete medicines.', 'warning');
-          return;
-        }
-        const confirmation = await openDialogModal({
-          title: 'Delete Permanently',
-          message: 'This will permanently delete the archived medicine record. Continue?',
-          confirmText: 'Delete',
-          cancelText: 'Cancel'
-        });
-        if (!confirmation.confirmed) return;
-
-        await permanentlyDeleteArchivedMedicineById(id);
-        await Promise.all([refreshMedicineData(), refreshArchivedMedicineData()]);
-        showToast('Archived medicine permanently deleted.', 'success');
-      }
-    } catch (error) {
-      console.error('Failed to restore medicine:', error);
-      showToast(error.message || 'Unable to update archived medicine.', 'error');
-    }
-  });
-}
-
-// Consultations table actions (view/prescribe)
 if (consultationsTbody) {
   consultationsTbody.addEventListener('click', (e) => {
     const btn = e.target.closest('button');
@@ -6523,13 +5846,16 @@ if (consultationsTbody) {
       }
       openConsultationModal({
         patientId: entry.patientId || '',
+        patientName: entry.patientName || '',
+        serviceLabel: entry.serviceLabel || '',
+        queueTicketId: entry.queueTicketId || null,
         symptoms: entry.symptoms || '',
         notes: entry.notes || ''
       });
     } else if (action === 'view') {
       openDataDetail({
         tag: 'Consultation',
-        title: entry.patientId || 'Consultation Detail',
+        title: entry.patientName || entry.patientId || 'Consultation Detail',
         subtitle: entry.id,
         items: [
           { label: 'Consultation ID', value: entry.id },
@@ -6545,13 +5871,34 @@ if (consultationsTbody) {
         showToast('Only doctors can create prescriptions.', 'warning');
         return;
       }
-      if (prescriptionModal) prescriptionModal.classList.remove('hidden');
-      if (prescriptionPatient) prescriptionPatient.value = entry.patientId || '';
-      if (prescriptionForm) {
-        prescriptionForm.dataset.consultationDbId = Number(entry.dbId) ? String(entry.dbId) : '';
+      openPrescriptionModalForPatient(entry.patientId || '', entry.dbId || null, entry.patientName || '');
+    }
+  });
+}
+
+// Serving queue table click handler (consult button)
+const servingQueueTbody = document.getElementById('serving-queue-tbody');
+if (servingQueueTbody) {
+  servingQueueTbody.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const action = btn.getAttribute('data-action');
+    const id = btn.getAttribute('data-id');
+    const entry = consultationQueueTickets.find(c => c.id === id);
+    if (!action || !entry) return;
+    if (action === 'consult') {
+      if (!canConsultPatients()) {
+        showToast('Only doctors can create consultations.', 'warning');
+        return;
       }
-      prescriptionLines.innerHTML = '';
-      addPrescriptionLine();
+      openConsultationModal({
+        patientId: entry.patientId || '',
+        patientName: entry.patientName || '',
+        serviceLabel: entry.serviceLabel || '',
+        queueTicketId: entry.queueTicketId || null,
+        symptoms: entry.symptoms || '',
+        notes: entry.notes || ''
+      });
     }
   });
 }
@@ -6581,8 +5928,8 @@ function generateReport(title, headers, rows) {
 // report buttons
 if (consultReportBtn) {
   consultReportBtn.addEventListener('click', () => {
-    const headers = ['ID', 'Patient', 'Diagnosis', 'Date'];
-    const rows = consultations.map(c => [c.id, c.patientId, c.diagnosis, formatDateTime(c.created_at)]);
+    const headers = ['Patient Name', 'Patient ID', 'Diagnosis', 'Date'];
+    const rows = consultations.map(c => [c.patientName || c.patientId || '—', c.patientId || '—', c.diagnosis || '—', formatDateTime(c.created_at)]);
     generateReport('Consultations Report', headers, rows);
   });
 }
@@ -6617,3 +5964,152 @@ if (usersReportBtn) usersReportBtn.addEventListener('click', generateUsersReport
 
 const citizensReportBtn = document.getElementById('citizens-report-btn');
 if (citizensReportBtn) citizensReportBtn.addEventListener('click', generateCitizensReport);
+
+// --- Prescription modal ---
+
+function openPrescriptionModalForPatient(patientId = '', consultationDbId = null, patientName = '') {
+  if (!prescriptionModal) return;
+  prescriptionModal.classList.remove('hidden');
+  if (prescriptionPatient) prescriptionPatient.value = patientId || '';
+  const displayEl = document.getElementById('prescription-patient-display');
+  if (displayEl) {
+    displayEl.textContent = patientName || patientId || '—';
+  }
+  if (prescriptionForm) {
+    prescriptionForm.dataset.consultationDbId = consultationDbId ? String(consultationDbId) : '';
+    prescriptionForm.dataset.patientName = patientName || '';
+  }
+  if (prescriptionLines) {
+    prescriptionLines.innerHTML = '';
+    addPrescriptionLine();
+  }
+}
+
+function addPrescriptionLine() {
+  if (!prescriptionLines) return;
+  const line = document.createElement('div');
+  line.className = 'field prescription-line-item';
+  line.style.padding = '12px';
+  line.style.background = '#f8fafc';
+  line.style.borderRadius = '8px';
+  line.style.marginBottom = '12px';
+  line.style.border = '1px solid #e2e8f0';
+  line.innerHTML = `
+    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; align-items: end;">
+      <div class="field" style="margin: 0;">
+        <label class="inputLabel">Medicine</label>
+        <select class="pres-med" style="width: 100%;" required>
+          ${medicines.map(m => `<option value="${m.name}">${m.name} (${m.unit || ''})</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="margin: 0;">
+        <label class="inputLabel">Qty</label>
+        <input type="number" class="pres-qty" value="1" min="1" style="width: 100%;" required />
+      </div>
+      <div class="field" style="margin: 0;">
+        <label class="inputLabel">Dosage</label>
+        <input type="text" class="pres-dosage" placeholder="500mg" style="width: 100%;" />
+      </div>
+      <div class="field" style="margin: 0;">
+        <label class="inputLabel">Freq.</label>
+        <input type="text" class="pres-freq" placeholder="3x a day" style="width: 100%;" />
+      </div>
+      <button type="button" class="btn small btn-delete" data-action="remove-line" style="padding: 8px; margin-bottom: 2px;">×</button>
+    </div>
+  `;
+  prescriptionLines.appendChild(line);
+  line.querySelector('[data-action="remove-line"]').addEventListener('click', () => line.remove());
+}
+
+if (addPrescriptionLineBtn) {
+  addPrescriptionLineBtn.addEventListener('click', addPrescriptionLine);
+}
+
+if (cancelPrescriptionBtn) {
+  cancelPrescriptionBtn.addEventListener('click', () => {
+    if (prescriptionModal) prescriptionModal.classList.add('hidden');
+    if (prescriptionForm) prescriptionForm.dataset.consultationDbId = '';
+  });
+}
+
+if (prescriptionModal) {
+  prescriptionModal.addEventListener('click', (e) => {
+    if (e.target === prescriptionModal) {
+      prescriptionModal.classList.add('hidden');
+      if (prescriptionForm) prescriptionForm.dataset.consultationDbId = '';
+    }
+  });
+}
+
+if (prescriptionForm) {
+  prescriptionForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!canCreatePrescriptions()) {
+      showToast('Only doctors can create prescriptions.', 'warning');
+      return;
+    }
+    const patient = prescriptionPatient ? prescriptionPatient.value.trim() : '';
+    if (!patient) { showToast('Patient ID required.', 'warning'); return; }
+
+    const selects  = prescriptionForm.querySelectorAll('.pres-med');
+    const qtys     = prescriptionForm.querySelectorAll('.pres-qty');
+    const dosages  = prescriptionForm.querySelectorAll('.pres-dosage');
+    const freqs    = prescriptionForm.querySelectorAll('.pres-freq');
+    const items = [];
+    for (let i = 0; i < selects.length; i++) {
+      const name = selects[i].value;
+      const qty  = Number(qtys[i].value) || 0;
+      if (name && qty > 0) {
+        items.push({ name, qty, dosage: dosages[i]?.value || '', frequency: freqs[i]?.value || '' });
+      }
+    }
+    if (!items.length) { showToast('Add at least one medicine.', 'warning'); return; }
+
+    const submitBtn = prescriptionForm.querySelector('button[type="submit"]');
+    try {
+      setLoading(submitBtn, true);
+      await createPrescriptionEntry({
+        patientId: patient,
+        consultationDbId: Number(prescriptionForm.dataset.consultationDbId || '0') || null,
+        items: items.map((it) => {
+          const med = medicines.find((m) => String(m.name || '') === String(it.name || ''));
+          return { name: it.name, qty: it.qty, unit: med?.unit || '', dosage: it.dosage, frequency: it.frequency };
+        })
+      });
+
+      // Decrement inventory
+      try {
+        for (const it of items) {
+          await reduceMedicineStockByName(it.name, Number(it.qty));
+        }
+        await refreshMedicineData();
+      } catch (invErr) {
+        console.error('Inventory update failed after prescription:', invErr);
+        showToast('Prescription saved, but inventory update failed.', 'warning');
+      }
+
+      if (prescriptionModal) prescriptionModal.classList.add('hidden');
+      if (prescriptionForm) prescriptionForm.dataset.consultationDbId = '';
+      showToast('Prescription created and inventory updated.', 'success');
+    } catch (error) {
+      console.error('Failed to save prescription:', error);
+      showToast(error.message || 'Unable to create prescription.', 'error');
+    } finally {
+      setLoading(submitBtn, false);
+    }
+  });
+}
+
+// Open prescription from inside consultation modal (consult-add-prescription)
+const consultAddPrescBtn = document.getElementById('consult-add-prescription');
+if (consultAddPrescBtn && prescriptionModal) {
+  consultAddPrescBtn.addEventListener('click', () => {
+    if (!canCreatePrescriptions()) {
+      showToast('Only doctors can create prescriptions.', 'warning');
+      return;
+    }
+    const pid  = document.getElementById('consult-patient-id')?.value || '';
+    const name = consultationForm?.dataset?.patientName || '';
+    openPrescriptionModalForPatient(pid, null, name);
+  });
+}

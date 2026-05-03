@@ -70,6 +70,11 @@ const appointments = (() => {
       }
     });
 
+    const tvViewBtn = document.getElementById('open-tv-view-btn');
+    tvViewBtn?.addEventListener('click', () => {
+      window.open('tv-view.html', '_blank');
+    });
+
     document.addEventListener('click', async (event) => {
       const infoBtn = event.target.closest('[data-action="ticket-info"]');
       if (infoBtn) {

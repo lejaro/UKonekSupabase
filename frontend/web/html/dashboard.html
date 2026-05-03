@@ -986,6 +986,7 @@
                 <option value="">Select role</option>
                 <option value="doctor">Doctor</option>
                 <option value="nurse">Nurse</option>
+                <option value="pharmacist">Pharmacist</option>
               </select>
             </div>
             <div id="register-error" class="note" style="display:none;color:#b91c1c;"></div>
@@ -1073,12 +1074,40 @@
       </section>
 
       <section id="consultation-section" class="section-top hidden">
+
+        <div class="panel" style="margin-bottom: 18px;">
+          <div class="panel-head">
+            <div>
+              <h3 style="margin:0">Now Serving — Patients to Consult</h3>
+              <span class="panel-hint">Citizens currently being served in the queue.</span>
+            </div>
+            <div class="management-actions">
+              <button id="open-consult-modal-btn" class="chip-btn">Consult Serving Patient</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="accounts-table">
+              <thead>
+                <tr class="table-header-row">
+                  <th class="table-header-cell">Patient Name</th>
+                  <th class="table-header-cell">Service</th>
+                  <th class="table-header-cell">Queue #</th>
+                  <th class="table-header-cell">Since</th>
+                  <th class="table-header-cell">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="serving-queue-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel-head">
-            <h3>Consultations</h3>
-            <span class="panel-hint">Record and review patient consultations.</span>
+            <div>
+              <h3 style="margin:0">Consultation Records</h3>
+              <span class="panel-hint">Past consultations — view history and issue prescriptions.</span>
+            </div>
             <div class="management-actions">
-              <button id="open-consult-modal-btn" class="chip-btn">New Consultation</button>
               <button id="consult-report-btn" class="chip-btn chip-btn-outline">Generate Report</button>
             </div>
           </div>
@@ -1086,8 +1115,8 @@
             <table class="accounts-table">
               <thead>
                 <tr class="table-header-row">
-                  <th class="table-header-cell">ID</th>
-                  <th class="table-header-cell">Patient</th>
+                  <th class="table-header-cell">Patient Name</th>
+                  <th class="table-header-cell">Patient ID</th>
                   <th class="table-header-cell">Diagnosis</th>
                   <th class="table-header-cell">Date</th>
                   <th class="table-header-cell">Actions</th>
@@ -1097,6 +1126,7 @@
             </table>
           </div>
         </div>
+
       </section>
 
       <section id="medicine-section" class="section-top hidden">
@@ -1148,6 +1178,7 @@
             <span id="queue-summary-badge" class="panel-hint" style="padding: 6px 10px; border-radius: 999px; background: #f1f5f9; color: #475569; font-weight: 700;">Waiting: 0 | On Call: 0</span>
             <div class="management-actions">
               <button id="queue-refresh-btn" class="chip-btn">Refresh</button>
+              <button id="open-tv-view-btn" class="chip-btn chip-btn-outline" type="button">TV View Mode</button>
             </div>
           </div>
           <div class="queue-board">
@@ -1562,11 +1593,12 @@
       <div id="prescription-modal" class="modal-overlay hidden">
         <div class="modal-box">
           <h3>New Prescription</h3>
+          <div class="field" style="margin-bottom:16px; padding:12px 16px; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
+            <span style="font-size:12px; color:#64748b; display:block; margin-bottom:2px;">Prescribing for</span>
+            <strong id="prescription-patient-display" style="font-size:15px; color:#166534;">—</strong>
+          </div>
           <form id="prescription-form">
-            <div class="field">
-              <label class="inputLabel">Patient ID</label>
-              <input id="prescription-patient" required />
-            </div>
+            <input type="hidden" id="prescription-patient" />
             <div id="prescription-lines"></div>
             <div class="field">
               <button type="button" id="add-prescription-line" class="chip-btn">Add Medicine</button>
@@ -1644,7 +1676,7 @@
 
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script src="../js/runtime-config.js?v=20260502b"></script>
-  <script src="../js/dashboard.js?v=20260503d"></script>
+  <script src="../js/dashboard.js?v=20260503h"></script>
   <script src="../js/appointments.js?v=20260502b"></script>
 </body>
 

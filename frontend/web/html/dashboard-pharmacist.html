@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>U-Konek+ — Pharmacist Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ── Pharmacist-specific overrides ── */
+    :root {
+      --ph-green: #16a34a;
+      --ph-green-light: #dcfce7;
+      --ph-amber: #d97706;
+      --ph-amber-light: #fef3c7;
+      --ph-red: #dc2626;
+      --ph-red-light: #fee2e2;
+      --ph-blue: #0369a1;
+      --ph-blue-light: #e0f2fe;
+      --ph-gray: #64748b;
+    }
+
+    .ph-header {
+      background: linear-gradient(135deg, #166534 0%, #15803d 100%);
+      color: #fff;
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .ph-header-brand { display: flex; align-items: center; gap: 12px; }
+    .ph-header-brand img { height: 40px; width: 40px; object-fit: contain; }
+    .ph-header-brand h1 { font-size: 18px; font-weight: 700; margin: 0; color: #fff; }
+    .ph-header-brand span { font-size: 12px; opacity: 0.8; display: block; }
+    .ph-header-user { display: flex; align-items: center; gap: 12px; }
+    .ph-header-user .user-badge { font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 4px 14px; }
+    .ph-logout-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: background 0.2s; }
+    .ph-logout-btn:hover { background: rgba(255,255,255,0.25); }
+
+    .ph-main { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
+
+    /* Summary Cards */
+    .ph-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    @media (max-width: 900px) { .ph-stats { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .ph-stats { grid-template-columns: 1fr; } }
+    .ph-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .ph-card-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .ph-card-icon.green  { background: var(--ph-green-light); }
+    .ph-card-icon.amber  { background: var(--ph-amber-light); }
+    .ph-card-icon.red    { background: var(--ph-red-light); }
+    .ph-card-icon.blue   { background: var(--ph-blue-light); }
+    .ph-card-label { font-size: 12px; color: var(--ph-gray); font-weight: 500; }
+    .ph-card-value { font-size: 28px; font-weight: 800; margin: 0; line-height: 1; }
+    .ph-card-value.green { color: var(--ph-green); }
+    .ph-card-value.amber { color: var(--ph-amber); }
+    .ph-card-value.red   { color: var(--ph-red); }
+    .ph-card-value.blue  { color: var(--ph-blue); }
+
+    /* Panel */
+    .ph-panel {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .ph-panel-head {
+      padding: 18px 24px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .ph-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; color: #1e293b; }
+    .ph-panel-head span { font-size: 13px; color: var(--ph-gray); display: block; }
+    .ph-panel-body { padding: 20px 24px; }
+
+    /* Toolbar */
+    .ph-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .ph-search { flex: 1; min-width: 180px; padding: 8px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; outline: none; }
+    .ph-search:focus { border-color: var(--ph-green); }
+    .ph-filter-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .ph-filter-btn {
+      padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer;
+      border: 1px solid #e2e8f0; background: #f8fafc; color: #475569; transition: all 0.15s;
+    }
+    .ph-filter-btn:hover { background: #f1f5f9; }
+    .ph-filter-btn.active { background: var(--ph-green); color: #fff; border-color: var(--ph-green); }
+    .ph-filter-btn.amber.active { background: var(--ph-amber); border-color: var(--ph-amber); }
+    .ph-filter-btn.red.active   { background: var(--ph-red);   border-color: var(--ph-red); }
+
+    /* Table */
+    .ph-table-wrap { overflow-x: auto; }
+    .ph-table { width: 100%; border-collapse: collapse; }
+    .ph-table th { background: #f8fafc; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 10px 14px; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    .ph-table td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; font-size: 14px; color: #1e293b; vertical-align: middle; }
+    .ph-table tr:last-child td { border-bottom: none; }
+    .ph-table tr:hover td { background: #f8fafc; }
+    .ph-table .empty-row td { text-align: center; color: #94a3b8; padding: 32px; }
+
+    /* Status badges */
+    .badge {
+      display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap;
+    }
+    .badge-green   { background: var(--ph-green-light);  color: #166534; }
+    .badge-amber   { background: var(--ph-amber-light);  color: #92400e; }
+    .badge-red     { background: var(--ph-red-light);    color: #991b1b; }
+    .badge-gray    { background: #f1f5f9; color: #475569; }
+    .badge-blue    { background: var(--ph-blue-light);   color: #0c4a6e; }
+
+    /* Action buttons */
+    .ph-btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px;
+      border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+      border: none; transition: opacity 0.15s;
+    }
+    .ph-btn:hover { opacity: 0.87; }
+    .ph-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ph-btn-primary { background: var(--ph-green); color: #fff; }
+    .ph-btn-outline { background: transparent; border: 1px solid var(--ph-green); color: var(--ph-green); }
+    .ph-btn-sm { padding: 5px 11px; font-size: 12px; border-radius: 6px; }
+    .ph-btn-edit   { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .ph-btn-delete { background: var(--ph-red-light); color: #991b1b; border: 1px solid #fecaca; }
+
+    /* Add form inline panel */
+    .ph-add-form { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 12px; align-items: end; }
+    @media (max-width: 800px) { .ph-add-form { grid-template-columns: 1fr 1fr; } }
+    .ph-field label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+    .ph-field input, .ph-field textarea, .ph-field select {
+      width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+      font-size: 14px; outline: none; box-sizing: border-box;
+    }
+    .ph-field input:focus, .ph-field textarea:focus { border-color: var(--ph-green); }
+    .ph-field input[type="date"] { color: #475569; }
+
+    /* Edit modal */
+    .ph-modal-overlay {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.5);
+      display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+    }
+    .ph-modal-overlay.hidden { display: none; }
+    .ph-modal-box {
+      background: #fff; border-radius: 16px; padding: 28px; width: 100%; max-width: 500px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .ph-modal-box h3 { margin: 0 0 20px; font-size: 18px; font-weight: 700; color: #1e293b; }
+    .ph-modal-fields { display: grid; gap: 14px; }
+    .ph-modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+    /* Toast */
+    #ph-toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+      display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+    }
+    .ph-toast-item {
+      padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600;
+      color: #fff; opacity: 0; transform: translateY(12px);
+      transition: all 0.3s; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      max-width: 320px;
+    }
+    .ph-toast-item.show { opacity: 1; transform: translateY(0); }
+    .ph-toast-item.success { background: var(--ph-green); }
+    .ph-toast-item.error   { background: var(--ph-red); }
+    .ph-toast-item.warning { background: var(--ph-amber); }
+    .ph-toast-item.info    { background: var(--ph-blue); }
+
+    /* Spinner */
+    .ph-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: ph-spin 0.6s linear infinite; }
+    @keyframes ph-spin { to { transform: rotate(360deg); } }
+
+    .ph-divider { height: 1px; background: #f1f5f9; margin: 0 0 20px; }
+
+    /* Confirm delete inline */
+    .ph-confirm-row td { background: #fff5f5 !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="ph-header">
+    <div class="ph-header-brand">
+      <img src="../U-KonekLogo-transparent.png" alt="U-Konek">
+      <div>
+        <h1>U-Konek+ Pharmacy</h1>
+        <span>Medicine Management</span>
+      </div>
+    </div>
+    <div class="ph-header-user">
+      <span class="user-badge" id="ph-user-name">Loading...</span>
+      <button class="ph-logout-btn" id="ph-logout-btn">Sign Out</button>
+    </div>
+  </header>
+
+  <main class="ph-main">
+
+    <!-- Summary Cards -->
+    <div class="ph-stats">
+      <div class="ph-card">
+        <div class="ph-card-icon blue">💊</div>
+        <div>
+          <div class="ph-card-label">Total Medicines</div>
+          <div class="ph-card-value blue" id="stat-total">—</div>
+        </div>
+      </div>
+      <div class="ph-card">
+        <div class="ph-card-icon green">✅</div>
+        <div>
+          <div class="ph-card-label">In Stock</div>
+          <div class="ph-card-value green" id="stat-in-stock">—</div>
+        </div>
+      </div>
+      <div class="ph-card">
+        <div class="ph-card-icon amber">⚠️</div>
+        <div>
+          <div class="ph-card-label">Low / Out of Stock</div>
+          <div class="ph-card-value amber" id="stat-low">—</div>
+        </div>
+      </div>
+      <div class="ph-card">
+        <div class="ph-card-icon red">🗓️</div>
+        <div>
+          <div class="ph-card-label">Expired / Expiring Soon</div>
+          <div class="ph-card-value red" id="stat-expiry">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Medicine Panel -->
+    <div class="ph-panel">
+      <div class="ph-panel-head">
+        <div>
+          <h2>Add New Medicine</h2>
+          <span>Register a new medicine to the inventory</span>
+        </div>
+      </div>
+      <div class="ph-panel-body">
+        <form id="ph-add-form">
+          <div class="ph-add-form">
+            <div class="ph-field">
+              <label for="add-name">Medicine Name *</label>
+              <input id="add-name" type="text" placeholder="e.g., Amoxicillin" required />
+            </div>
+            <div class="ph-field">
+              <label for="add-qty">Stock Qty *</label>
+              <input id="add-qty" type="number" min="0" value="0" required />
+            </div>
+            <div class="ph-field">
+              <label for="add-unit">Unit</label>
+              <input id="add-unit" type="text" placeholder="e.g., tablet" />
+            </div>
+            <div class="ph-field">
+              <label for="add-expiry">Expiration Date</label>
+              <input id="add-expiry" type="date" />
+            </div>
+            <div class="ph-field">
+              <label>&nbsp;</label>
+              <button type="submit" class="ph-btn ph-btn-primary" id="add-submit-btn">
+                <span id="add-btn-label">+ Add Medicine</span>
+              </button>
+            </div>
+          </div>
+          <div class="ph-field" style="margin-top:12px; max-width:600px;">
+            <label for="add-desc">Description (optional)</label>
+            <input id="add-desc" type="text" placeholder="Brief notes about this medicine" />
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Medicine List Panel -->
+    <div class="ph-panel">
+      <div class="ph-panel-head">
+        <div>
+          <h2>Medicine Inventory</h2>
+          <span id="ph-list-subtitle">All medicines</span>
+        </div>
+        <button class="ph-btn ph-btn-outline ph-btn-sm" id="ph-refresh-btn">↻ Refresh</button>
+      </div>
+      <div class="ph-panel-body" style="padding-bottom:10px;">
+        <div class="ph-toolbar" style="margin-bottom:16px;">
+          <input class="ph-search" type="search" id="ph-search" placeholder="Search medicine name…" />
+          <div class="ph-filter-group">
+            <button class="ph-filter-btn active" data-filter="all">All</button>
+            <button class="ph-filter-btn amber" data-filter="low">Low Stock</button>
+            <button class="ph-filter-btn red" data-filter="expired">Expired</button>
+            <button class="ph-filter-btn amber" data-filter="expiring">Expiring Soon</button>
+          </div>
+        </div>
+      </div>
+      <div class="ph-divider"></div>
+      <div class="ph-table-wrap">
+        <table class="ph-table">
+          <thead>
+            <tr>
+              <th>Medicine Name</th>
+              <th>Description</th>
+              <th>Stock Qty</th>
+              <th>Unit</th>
+              <th>Expiration Date</th>
+              <th>Stock Status</th>
+              <th>Expiry Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ph-medicines-tbody">
+            <tr class="empty-row"><td colspan="8">Loading medicines…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Edit Modal -->
+  <div id="ph-edit-modal" class="ph-modal-overlay hidden">
+    <div class="ph-modal-box">
+      <h3>Edit Medicine</h3>
+      <input type="hidden" id="edit-id" />
+      <div class="ph-modal-fields">
+        <div class="ph-field">
+          <label>Medicine Name</label>
+          <input id="edit-name-display" type="text" disabled style="background:#f8fafc;color:#64748b;" />
+        </div>
+        <div class="ph-field">
+          <label for="edit-desc">Description</label>
+          <input id="edit-desc" type="text" placeholder="Brief notes" />
+        </div>
+        <div class="ph-field">
+          <label for="edit-qty">Stock Quantity *</label>
+          <input id="edit-qty" type="number" min="0" required />
+        </div>
+        <div class="ph-field">
+          <label for="edit-expiry">Expiration Date</label>
+          <input id="edit-expiry" type="date" />
+        </div>
+      </div>
+      <div class="ph-modal-actions">
+        <button type="button" class="ph-btn ph-btn-outline" id="edit-cancel-btn">Cancel</button>
+        <button type="button" class="ph-btn ph-btn-primary" id="edit-save-btn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="ph-toast"></div>
+
+  <script src="../js/runtime-config.js"></script>
+  <script src="../js/dashboard-pharmacist.js?v=20260503f"></script>
+</body>
+</html>
