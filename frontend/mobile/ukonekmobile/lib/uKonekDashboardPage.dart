@@ -9,6 +9,7 @@ import 'uKonekFeedbackPage.dart';
 import 'uKonekMedicineScheduler.dart';
 import 'uKonekNotificationPage.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'uKonekPrescriptionPage.dart';
 
 
 class _C {
@@ -76,7 +77,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   int _selectedTab = 0;
   List<DoctorStatus> _doctors = [];
   QueueDashboardSnapshot _queueDashboard = QueueDashboardSnapshot.empty;
-  List<PrescribedMedicine> _prescribedMedicines = [];
+  List<PrescriptionRecord> _prescribedMedicines = [];
   bool _isInitialLoading = true;
   Timer? _refreshTimer;
 
@@ -145,13 +146,13 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
       final results = await Future.wait([
         ApiService.listDoctorStatus(),
         ApiService.getMyQueueDashboard(),
-        ApiService.getMyPrescribedMedicines(),
+        ApiService.fetchPrescriptions(limit: 10),
       ]);
       if (mounted) {
         setState(() {
           _doctors = results[0] as List<DoctorStatus>;
           _queueDashboard = results[1] as QueueDashboardSnapshot;
-          _prescribedMedicines = results[2] as List<PrescribedMedicine>;
+          _prescribedMedicines = results[2] as List<PrescriptionRecord>;
           _isInitialLoading = false;
         });
       }
@@ -160,7 +161,12 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     }
   }
 
-  void _showEPrescriptionModal(String medName, String dosage, String instructions, String expiryDate) {
+  void _showEPrescriptionModal(PrescriptionRecord record) {
+    final medName = record.medicineName;
+    final dosage = record.dosage.isNotEmpty ? record.dosage : 'As prescribed';
+    final instructions = record.instructions.isNotEmpty ? record.instructions : 'Follow doctor\'s verbal instructions.';
+    final expiryDate = DateFormat('MM/dd/yyyy').format(record.issuedAt.add(const Duration(days: 30)));
+    final doctorName = record.displayDoctorName;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -215,6 +221,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B2E1E))),
                     const SizedBox(height: 4),
                     Text('ID: ${widget.citizenId}', style: const TextStyle(fontSize: 12, color: Color(0xFF637367))),
+                    const SizedBox(height: 4),
+                    Text('Doctor: $doctorName', style: const TextStyle(fontSize: 12, color: Color(0xFF637367), fontWeight: FontWeight.w600)),
 
                     const SizedBox(height: 24),
 
@@ -335,6 +343,16 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   _sectionHeader('Recent Prescriptions'),
                   const SizedBox(height: 14),
                   _buildMedicineCard(),
+                  if (_prescribedMedicines.length > 3)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Center(
+                        child: TextButton(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrescriptionPage())),
+                          child: const Text('View All Prescriptions', style: TextStyle(color: _C.primaryMid, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -648,14 +666,13 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
           ));
           if (joined == true) _loadAllData(isInitial: false);
         }),
-        // NEW: View E-Prescription Button
+        // NEW: View E-Prescription Button (Dynamic)
         _actionBtn('E-Prescription', Icons.receipt_long_rounded, const Color(0xFF6F42C1), () {
-          _showEPrescriptionModal(
-              'Amoxicillin',
-              '500mg - 3x a day',
-              'Take after meals for 7 days. Finish the entire course as prescribed by the dentist.',
-              '05/10/2026' // Expiration Date
-          );
+          if (_prescribedMedicines.isNotEmpty) {
+            _showEPrescriptionModal(_prescribedMedicines.first);
+          } else {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const PrescriptionPage()));
+          }
         }),
         _actionBtn('Records', Icons.assignment_outlined, const Color(0xFF17A2B8), () =>
             Navigator.push(context, MaterialPageRoute(builder: (_) => const uKonekHealthRecordsPage()))),

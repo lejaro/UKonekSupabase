@@ -144,6 +144,14 @@ class PrescriptionRecord {
   bool get isCancelled  => dispensingStatus == 'cancelled';
   bool get isPending    => dispensingStatus == 'pending';
 
+  String get quantityLabel {
+    final normalizedUnit = unit.trim();
+    if (normalizedUnit.isEmpty) {
+      return quantity.toString();
+    }
+    return '$quantity $normalizedUnit';
+  }
+
   factory PrescriptionRecord.fromMap(Map<String, dynamic> m) {
     return PrescriptionRecord(
       prescriptionId:   (m['prescription_id']   as num?)?.toInt() ?? 0,

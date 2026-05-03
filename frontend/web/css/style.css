@@ -2324,7 +2324,7 @@ body.dashboard-loading {
 .panel-head {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     gap: 10px;
     margin-bottom: 10px;
 }
@@ -2370,6 +2370,7 @@ body.dashboard-loading {
 
 .management-actions {
     display: flex;
+    align-items: center;
     gap: 10px;
 }
 

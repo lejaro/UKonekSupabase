@@ -4915,11 +4915,18 @@ function renderServingQueue() {
   if (!tbody) return;
   const allowConsult = canConsultPatients();
   tbody.innerHTML = '';
-  if (!consultationQueueTickets.length) {
+  
+  // Hard filter to ensure no completed/cancelled tickets ever show up in this active list
+  const activeTickets = consultationQueueTickets.filter(c => {
+    const status = String(c?.queueStatus || '').trim().toLowerCase();
+    return status === 'serving' || status === 'on_call';
+  });
+
+  if (!activeTickets.length) {
     tbody.innerHTML = '<tr><td class="table-cell" colspan="5" style="color:#64748b;">No patients currently being served.</td></tr>';
     return;
   }
-  consultationQueueTickets.forEach(c => {
+  activeTickets.forEach(c => {
     const displayName = c.patientName || c.patientId || '—';
     const tr = document.createElement('tr');
     tr.style.background = '#f0fdf4';
@@ -4954,11 +4961,40 @@ function renderServingQueue() {
 
 function renderConsultations() {
   if (!consultationsTbody) return;
+  const sortSelect = document.getElementById('consult-sort-select');
+  const sortBy = sortSelect ? sortSelect.value : 'date-desc';
+
+  const dateFromInput = document.getElementById('consult-date-from');
+  const dateToInput = document.getElementById('consult-date-to');
+  const dateFrom = dateFromInput?.value ? new Date(dateFromInput.value + 'T00:00:00') : null;
+  const dateTo = dateToInput?.value ? new Date(dateToInput.value + 'T23:59:59') : null;
+
   const allowPrescribe = canCreatePrescriptions();
   consultationsTbody.innerHTML = '';
-  const rows = consultations.slice().reverse();
+  
+  let rows = consultations.slice();
+
+  // Apply date range filter
+  if (dateFrom || dateTo) {
+    rows = rows.filter(c => {
+      const d = new Date(c.created_at);
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo && d > dateTo) return false;
+      return true;
+    });
+  }
+
+  if (sortBy === 'date-desc') {
+    rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  } else if (sortBy === 'date-asc') {
+    rows.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  } else if (sortBy === 'name-asc') {
+    rows.sort((a, b) => (a.patientName || '').localeCompare(b.patientName || ''));
+  }
+
   if (!rows.length) {
-    consultationsTbody.innerHTML = '<tr><td class="table-cell" colspan="5" style="color:#64748b;">No consultation records yet.</td></tr>';
+    const msg = (dateFrom || dateTo) ? 'No consultations found for the selected date range.' : 'No consultation records yet.';
+    consultationsTbody.innerHTML = `<tr><td class="table-cell" colspan="5" style="color:#64748b;">${msg}</td></tr>`;
     return;
   }
   rows.forEach(c => {
@@ -5083,12 +5119,31 @@ async function listNowServingQueueForConsultation() {
   const queueDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const { supabase } = await loadSupabaseModule();
-  const { data, error } = await supabase
+  
+  const query = supabase
     .from('queue_tickets')
     .select('id,queue_number,ticket_code,service_label,status,reason,symptoms,created_at,served_at,citizen:citizens(id,firstname,surname,email)')
-    .eq('queue_date', queueDate)
     .eq('status', 'serving')
     .order('queue_number', { ascending: true });
+
+  let { data, error } = await query.eq('queue_date', queueDate);
+
+  // Resilience Fallback: If no "serving" tickets for "today" (local), fetch only RECENT active serving tickets (last 24h).
+  if (!error && (!data || data.length === 0)) {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    console.log('No serving tickets for today, attempting fallback to recent serving tickets (last 24h)...');
+    const fb = await supabase
+      .from('queue_tickets')
+      .select('id,queue_number,ticket_code,service_label,status,reason,symptoms,created_at,served_at,citizen:citizens(id,firstname,surname,email)')
+      .eq('status', 'serving')
+      .gt('created_at', twentyFourHoursAgo)
+      .order('served_at', { ascending: false })
+      .limit(50);
+    
+    if (!fb.error && fb.data && fb.data.length > 0) {
+      data = fb.data;
+    }
+  }
 
   if (error) {
     throw new Error(error.message || 'Unable to load now serving queue tickets.');
@@ -5116,22 +5171,69 @@ async function refreshConsultationData() {
 
 function initConsultationTabs() {
   const tabs = document.querySelectorAll('.modal-tab');
+  const nextBtn = document.getElementById('consult-next-btn');
+  const prevBtn = document.getElementById('consult-prev-btn');
+  const submitBtn = document.getElementById('consult-submit-btn');
+  
+  const updateButtons = (activeTabId) => {
+    if (!nextBtn || !prevBtn || !submitBtn) return;
+    
+    if (activeTabId === 'tab-history') {
+      prevBtn.classList.add('hidden');
+      nextBtn.classList.remove('hidden');
+      submitBtn.classList.add('hidden');
+    } else if (activeTabId === 'tab-exam') {
+      prevBtn.classList.remove('hidden');
+      nextBtn.classList.remove('hidden');
+      submitBtn.classList.add('hidden');
+    } else if (activeTabId === 'tab-diagnosis') {
+      prevBtn.classList.remove('hidden');
+      nextBtn.classList.add('hidden');
+      submitBtn.classList.remove('hidden');
+    }
+  };
+
   tabs.forEach(tab => {
     tab.addEventListener('click', (e) => {
       e.preventDefault();
       const targetId = tab.dataset.tab;
       
-      // Update tabs
       tabs.forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       
-      // Update content
       document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.remove('active');
       });
       document.getElementById(targetId)?.classList.add('active');
+      
+      updateButtons(targetId);
     });
   });
+
+  if (nextBtn) {
+    nextBtn.onclick = () => {
+      const activeTab = document.querySelector('.modal-tab.active');
+      if (activeTab?.dataset.tab === 'tab-history') {
+        document.querySelector('[data-tab="tab-exam"]')?.click();
+      } else if (activeTab?.dataset.tab === 'tab-exam') {
+        document.querySelector('[data-tab="tab-diagnosis"]')?.click();
+      }
+    };
+  }
+
+  if (prevBtn) {
+    prevBtn.onclick = () => {
+      const activeTab = document.querySelector('.modal-tab.active');
+      if (activeTab?.dataset.tab === 'tab-exam') {
+        document.querySelector('[data-tab="tab-history"]')?.click();
+      } else if (activeTab?.dataset.tab === 'tab-diagnosis') {
+        document.querySelector('[data-tab="tab-exam"]')?.click();
+      }
+    };
+  }
+  
+  // Initial button state
+  updateButtons('tab-history');
 
   const allergyInput = document.getElementById('consult-allergies');
   const allergyBanner = document.getElementById('allergy-alert-banner');
@@ -5153,6 +5255,70 @@ function initConsultationTabs() {
       }
     });
   }
+}
+
+// Global consultation form handler (saves and then opens prescription)
+if (consultationForm) {
+  consultationForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!canConsultPatients()) {
+      showToast('Only doctors can create consultations.', 'warning');
+      return;
+    }
+    
+    const submitBtn = document.getElementById('consult-submit-btn');
+    const patientId = document.getElementById('consult-patient-id')?.value || '';
+    const diagnosis = document.getElementById('consult-diagnosis')?.value || '';
+    
+    if (!diagnosis) {
+      showToast('Diagnosis is required.', 'warning');
+      // Jump to diagnosis tab if not there
+      document.querySelector('[data-tab="tab-diagnosis"]')?.click();
+      return;
+    }
+
+    try {
+      setLoading(submitBtn, true);
+      const payload = {
+        patientId,
+        queueTicketId: consultationForm.dataset.queueTicketId || null,
+        symptoms: document.getElementById('consult-hpi')?.value || '',
+        diagnosis,
+        notes: document.getElementById('consult-notes')?.value || '',
+        hpi: document.getElementById('consult-hpi')?.value || '',
+        pmh: document.getElementById('consult-pmh')?.value || '',
+        allergies: document.getElementById('consult-allergies')?.value || '',
+        immunization: document.getElementById('consult-immunization')?.value || '',
+        social: document.getElementById('consult-social')?.value || '',
+        physical_exam: {
+          heent: document.getElementById('consult-heent')?.value || '',
+          chest: document.getElementById('consult-chest')?.value || '',
+          heart: document.getElementById('consult-heart')?.value || '',
+          abdomen: document.getElementById('consult-abdomen')?.value || '',
+          extremities: document.getElementById('consult-extremities')?.value || '',
+          neurological: document.getElementById('consult-neurological')?.value || ''
+        },
+        differential: document.getElementById('consult-differential')?.value || '',
+        lab_orders: document.getElementById('consult-lab-orders')?.value || '',
+        followup: document.getElementById('consult-followup')?.value || null
+      };
+
+      const result = await createConsultationEntry(payload);
+      
+      showToast('Consultation saved successfully.', 'success');
+      closeConsultationModal();
+      await refreshConsultationData();
+      
+      // Auto-open prescription modal for the next step, pass queueTicketId
+      openPrescriptionModalForPatient(result.patientId, result.dbId, result.patientName, payload.queueTicketId);
+      
+    } catch (error) {
+      console.error('Failed to save consultation:', error);
+      showToast(error.message || 'Unable to save consultation.', 'error');
+    } finally {
+      setLoading(submitBtn, false);
+    }
+  });
 }
 
 async function createConsultationEntry(payload) {
@@ -5379,10 +5545,28 @@ function renderMedicines() {
   if (!medicineTbody) return;
 
   const searchQuery = (medicineSearchInput?.value || '').toLowerCase().trim();
-  const filtered = medicines.filter(m => 
+  const sortSelect = document.getElementById('medicine-sort-select');
+  const sortBy = sortSelect ? sortSelect.value : 'name-asc';
+
+  let filtered = medicines.filter(m => 
     m.name.toLowerCase().includes(searchQuery) || 
     (m.description || '').toLowerCase().includes(searchQuery)
   );
+
+  // Apply Sorting
+  if (sortBy === 'name-asc') {
+    filtered.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (sortBy === 'expiry-asc') {
+    filtered.sort((a, b) => {
+      const dateA = a.expiry_date ? new Date(a.expiry_date).getTime() : Infinity;
+      const dateB = b.expiry_date ? new Date(b.expiry_date).getTime() : Infinity;
+      return dateA - dateB;
+    });
+  } else if (sortBy === 'stock-desc') {
+    filtered.sort((a, b) => (b.qty || 0) - (a.qty || 0));
+  } else if (sortBy === 'stock-asc') {
+    filtered.sort((a, b) => (a.qty || 0) - (b.qty || 0));
+  }
 
   const role = getSessionRole();
   const allowAdjust = canAdjustMedicineInventory(role);
@@ -5917,6 +6101,36 @@ async function initClinicalData() {
 
 // ...
 
+// Consultation table sort handler
+const consultSortSelect = document.getElementById('consult-sort-select');
+if (consultSortSelect) {
+  consultSortSelect.addEventListener('change', () => {
+    renderConsultations();
+  });
+}
+
+// Consultation date range filter handlers
+const consultDateFrom = document.getElementById('consult-date-from');
+const consultDateTo = document.getElementById('consult-date-to');
+const consultDateClear = document.getElementById('consult-date-clear');
+
+if (consultDateFrom) consultDateFrom.addEventListener('change', () => renderConsultations());
+if (consultDateTo) consultDateTo.addEventListener('change', () => renderConsultations());
+if (consultDateClear) {
+  consultDateClear.addEventListener('click', () => {
+    if (consultDateFrom) consultDateFrom.value = '';
+    if (consultDateTo) consultDateTo.value = '';
+    renderConsultations();
+  });
+}
+
+const medicineSortSelect = document.getElementById('medicine-sort-select');
+if (medicineSortSelect) {
+  medicineSortSelect.addEventListener('change', () => {
+    renderMedicines();
+  });
+}
+
 if (consultationsTbody) {
   consultationsTbody.addEventListener('click', (e) => {
     const btn = e.target.closest('button');
@@ -6053,7 +6267,7 @@ if (citizensReportBtn) citizensReportBtn.addEventListener('click', generateCitiz
 
 // --- Prescription modal ---
 
-function openPrescriptionModalForPatient(patientId = '', consultationDbId = null, patientName = '') {
+function openPrescriptionModalForPatient(patientId = '', consultationDbId = null, patientName = '', queueTicketId = null) {
   if (!prescriptionModal) return;
   prescriptionModal.classList.remove('hidden');
   if (prescriptionPatient) prescriptionPatient.value = patientId || '';
@@ -6064,6 +6278,7 @@ function openPrescriptionModalForPatient(patientId = '', consultationDbId = null
   if (prescriptionForm) {
     prescriptionForm.dataset.consultationDbId = consultationDbId ? String(consultationDbId) : '';
     prescriptionForm.dataset.patientName = patientName || '';
+    prescriptionForm.dataset.queueTicketId = queueTicketId ? String(queueTicketId) : '';
   }
   if (prescriptionLines) {
     prescriptionLines.innerHTML = '';
@@ -6177,8 +6392,37 @@ if (prescriptionForm) {
       });
 
       if (prescriptionModal) prescriptionModal.classList.add('hidden');
-      if (prescriptionForm) prescriptionForm.dataset.consultationDbId = '';
-      showToast('Prescription created. Patient can present it to the pharmacist for dispensing.', 'success');
+      
+      // Automatically complete queue ticket if applicable
+      const qId = prescriptionForm.dataset.queueTicketId;
+      if (qId && !isDemoMode && !isApiMode) {
+        const { supabase } = await loadSupabaseModule();
+        const { error: completeErr } = await supabase
+          .from('queue_tickets')
+          .update({ status: 'completed', completed_at: new Date().toISOString() })
+          .eq('id', Number(qId));
+        
+        if (completeErr) {
+          console.warn('Silent failure completing queue ticket:', completeErr);
+        }
+        
+        // Remove locally immediately for better responsiveness
+        consultationQueueTickets = consultationQueueTickets.filter(t => 
+          Number(t.queueTicketId || t.id?.replace('Q-','')) !== Number(qId)
+        );
+        renderServingQueue();
+
+        // Refresh queue and consultations to reflect completion in other areas
+        await refreshConsultationData();
+        if (typeof appointments !== 'undefined' && appointments.loadQueueTickets) {
+          appointments.loadQueueTickets();
+        }
+      }
+
+      if (prescriptionForm) {
+        prescriptionForm.dataset.consultationDbId = '';
+        prescriptionForm.dataset.queueTicketId = '';
+      }
     } catch (error) {
       console.error('Failed to save prescription:', error);
       showToast(error.message || 'Unable to create prescription.', 'error');

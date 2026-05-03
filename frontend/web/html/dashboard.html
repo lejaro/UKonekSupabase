@@ -1131,13 +1131,36 @@
         </div>
 
         <div class="panel">
-          <div class="panel-head">
+          <div class="panel-head" style="flex-wrap:wrap;gap:10px;">
             <div>
               <h3 style="margin:0">Consultation Records</h3>
               <span class="panel-hint">Past consultations — view history and issue prescriptions.</span>
             </div>
-            <div class="management-actions">
-              <button id="consult-report-btn" class="chip-btn chip-btn-outline">Generate Report</button>
+            <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <label style="font-size:11px;color:#64748b;font-weight:500;">From</label>
+                <input type="date" id="consult-date-from" class="chip-btn chip-btn-outline" style="width:140px;cursor:pointer;padding:5px 10px;box-sizing:border-box;" />
+              </div>
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <label style="font-size:11px;color:#64748b;font-weight:500;">To</label>
+                <input type="date" id="consult-date-to" class="chip-btn chip-btn-outline" style="width:140px;cursor:pointer;padding:5px 10px;box-sizing:border-box;" />
+              </div>
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <label style="font-size:11px;color:#64748b;font-weight:500;">Sort</label>
+                <select id="consult-sort-select" class="chip-btn chip-btn-outline" style="width:140px;cursor:pointer;padding:5px 10px;box-sizing:border-box;">
+                  <option value="date-desc">Newest First</option>
+                  <option value="date-asc">Oldest First</option>
+                  <option value="name-asc">Name (A–Z)</option>
+                </select>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <label style="font-size:11px;color:transparent;">.</label>
+                <button id="consult-date-clear" class="chip-btn chip-btn-outline" style="width:140px;padding:5px 10px;font-size:12px;box-sizing:border-box;" title="Clear date filter">✕ Clear</button>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <label style="font-size:11px;color:transparent;">.</label>
+                <button id="consult-report-btn" class="chip-btn chip-btn-outline" style="width:140px;padding:5px 10px;box-sizing:border-box;">Generate Report</button>
+              </div>
             </div>
           </div>
           <div class="table-wrap">
@@ -1165,8 +1188,13 @@
             <span class="panel-hint">Track stock levels and generate reports (view-only access).</span>
             <div class="management-actions">
               <input type="text" id="medicine-search-input" class="search-input" placeholder="Search medicine name..." style="min-width: 200px;">
+              <select id="medicine-sort-select" class="chip-btn chip-btn-outline" style="min-width: 150px; cursor: pointer;">
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="expiry-asc">Expiry (Nearest)</option>
+                <option value="stock-desc">Highest Stock</option>
+                <option value="stock-asc">Lowest Stock</option>
+              </select>
               <button id="medicine-csv-import-btn" class="chip-btn chip-btn-outline">Import CSV</button>
-              <button id="medicine-archived-toggle-btn" class="chip-btn chip-btn-outline">Show Archived</button>
               <button id="medicine-report-btn" class="chip-btn">Generate Report</button>
             </div>
           </div>
@@ -1395,7 +1423,7 @@
       </div>
 
       <div id="consultation-modal" class="modal-overlay hidden">
-        <div class="modal-box" style="max-width:850px; text-align:left; width: 95%;">
+        <div class="modal-box" style="max-width:850px; text-align:left; width: 95%; max-height: 92vh; overflow-y: auto;">
           <div class="panel-head" style="margin-bottom: 20px; padding: 0;">
             <h3 class="modal-heading" style="margin: 0;">Clinical Consultation Proper</h3>
             <span class="panel-hint">Patient ID: <span id="consult-display-id">—</span></span>
@@ -1518,14 +1546,13 @@
             </div>
 
             <div class="actions" style="gap:12px; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-              <button type="submit" class="btn" style="flex: 2;">
+              <button type="button" id="consultation-cancel-btn" class="btn outline" style="flex: 1;">Cancel</button>
+              <button type="button" id="consult-prev-btn" class="btn outline hidden" style="flex: 1;">Back</button>
+              <button type="button" id="consult-next-btn" class="btn" style="flex: 2;">Next</button>
+              <button type="submit" id="consult-submit-btn" class="btn hidden" style="flex: 2; background: #16a34a; color: white;">
                 <span class="btn-spinner" aria-hidden="true"></span>
-                <span class="btn-label">FINALIZE CONSULTATION</span>
+                <span class="btn-label">SAVE AND PRESCRIBE</span>
               </button>
-              <button type="button" id="consult-prescribe-btn" class="btn chip-btn" style="flex: 1; background: #f0fdf4; border-color: #bbf7d0; color: #166534;">
-                Save & Prescribe
-              </button>
-              <button type="button" id="consultation-cancel-btn" class="btn btn-close" style="width: auto;">Cancel</button>
             </div>
           </form>
         </div>

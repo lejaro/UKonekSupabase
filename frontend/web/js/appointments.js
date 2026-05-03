@@ -193,21 +193,16 @@ const appointments = (() => {
         .from('queue_tickets')
         .select(queryStr)
         .eq('queue_date', today)
-        .neq('status', 'cancelled')
-        .neq('status', 'completed')
+        .not('status', 'in', '("cancelled","completed")')
         .order('queue_number', { ascending: true });
 
-      // Resilience Fallback: If no tickets for "today" (local), fetch only RECENT active tickets (last 24h).
-      // This handles cases where the user's device date is slightly ahead/behind the server date
-      // while preventing stagnant tickets from days ago from "coming back" into the view.
       if (!error && (!data || data.length === 0)) {
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         console.log('No tickets for today, attempting fallback to recent active tickets (last 24h)...');
         const fb = await supabase
           .from('queue_tickets')
           .select(queryStr)
-          .neq('status', 'cancelled')
-          .neq('status', 'completed')
+          .not('status', 'in', '("cancelled","completed")')
           .gt('created_at', twentyFourHoursAgo)
           .order('created_at', { ascending: false })
           .limit(100);
