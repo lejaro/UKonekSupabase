@@ -139,22 +139,18 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
     );
   }
 
-  // ── BOTTOM NAVIGATION (FIXED ALGORITHM) ──────────────────────
   Widget _buildBottomNav() {
     final tabs = [
-      {'icon': Icons.dashboard_rounded, 'label': 'Home'},
-      {'icon': Icons.event_note_rounded, 'label': 'Medicine'},
-      {'icon': Icons.confirmation_number_rounded, 'label': 'Queue'},
-      {'icon': Icons.person_outline_rounded, 'label': 'Profile'},
+      {'icon': Icons.dashboard_rounded,           'label': 'Home'},
+      {'icon': Icons.event_note_rounded,           'label': 'Medicine'},
+      {'icon': Icons.confirmation_number_rounded,  'label': 'Queue'},
+      {'icon': Icons.person_outline_rounded,       'label': 'Profile'},
     ];
-
     return Container(
       decoration: BoxDecoration(
         color: _C.surface,
         borderRadius: const BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(color: _C.textDark.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -4))
-        ],
+        boxShadow: [BoxShadow(color: _C.textDark.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -4))],
       ),
       child: SafeArea(
         top: false,
@@ -167,21 +163,26 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
               return GestureDetector(
                 onTap: () {
                   if (i == 0) {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (context) => uKonekDashboardPage(
-                          username: widget.username,
-                          citizenId: widget.citizenId
-                      )),
-                          (route) => false,
-                    );
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => uKonekDashboardPage(
+                        username:  widget.username,
+                        citizenId: widget.citizenId,
+                      ),
+                    ));
                   } else if (i == 1) {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => uKonekMedicineSchedulerPage(
-                        username: widget.username,
-                        citizenId: widget.citizenId
-                    )));
-                  } else {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => uKonekMedicineSchedulerPage(
+                        username:  widget.username,
+                        citizenId: widget.citizenId,
+                      ),
+                    ));
+                  } else if (i == 2) {
+                    // Already on Queue page
                     setState(() => _selectedTab = i);
+                  } else if (i == 3) {
+                    // ✅ Queue page doesn't have profile data — just pop back to Dashboard
+                    // which will then navigate to Profile with full data
+                    Navigator.pop(context);
                   }
                 },
                 child: AnimatedContainer(
@@ -191,22 +192,18 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
                     color: isSelected ? _C.primaryMid.withOpacity(0.10) : Colors.transparent,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        tabs[i]['icon'] as IconData,
-                        color: isSelected ? _C.primaryMid : Colors.grey.shade400,
-                        size: 22,
+                  child: Row(children: [
+                    Icon(tabs[i]['icon'] as IconData,
+                      color: isSelected ? _C.primaryMid : Colors.grey.shade400,
+                      size: 22,
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(width: 6),
+                      Text(tabs[i]['label'] as String,
+                        style: const TextStyle(color: _C.primaryMid, fontSize: 12, fontWeight: FontWeight.bold),
                       ),
-                      if (isSelected) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          tabs[i]['label'] as String,
-                          style: const TextStyle(color: _C.primaryMid, fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                      ],
                     ],
-                  ),
+                  ]),
                 ),
               );
             }),

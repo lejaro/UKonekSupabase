@@ -7,38 +7,64 @@ import 'uKonekHealthRecordsPage.dart';
 import 'uKonekProfilePage.dart';
 import 'uKonekFeedbackPage.dart';
 import 'uKonekMedicineScheduler.dart';
+import 'uKonekNotificationPage.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
-// ── Medical Green Design tokens ────────────────────────────────
+
 class _C {
-  static const primary = Color(0xFF28A745);      // Health Green
-  static const primaryMid = Color(0xFF1B5E20);   // Forest Green
-  static const accent = Color(0xFF20C997);       // Mint Accent
-  static const bg = Color(0xFFF8FCF9);           // Mint-tinted Background
-  static const surface = Colors.white;
-  static const textDark = Color(0xFF1B2E1E);     // Dark Forest Charcoal
-  static const textMuted = Color(0xFF637367);    // Muted Sage
-  static const divider = Color(0xFFE2E9E3);      // Light Mist Divider
-  static const success = Color(0xFF28A745);
-  static const warning = Color(0xFFF59E0B);
-  static const shadow = Color(0x0A000000);
+  static const primary    = Color(0xFF28A745);
+  static const primaryMid = Color(0xFF1B5E20);
+  static const accent     = Color(0xFF20C997);
+  static const bg         = Color(0xFFF8FCF9);
+  static const surface    = Colors.white;
+  static const textDark   = Color(0xFF1B2E1E);
+  static const textMuted  = Color(0xFF637367);
+  static const divider    = Color(0xFFE2E9E3);
+  static const success    = Color(0xFF28A745);
+  static const warning    = Color(0xFFF59E0B);
+  static const shadow     = Color(0x0A000000);
 }
 
 class uKonekDashboardPage extends StatefulWidget {
+  // ── Core fields ───────────────────────────────────────────────
   final String username;
-  final String fullname;
   final String citizenId;
+  final String fullname;
+
+  // ── Registration fields (passed from OTP page after register) ─
+  final String firstName;
+  final String middleName;
+  final String surname;
+  final String nameExtension;
+  final String dob;
+  final String age;
+  final String sex;
   final String email;
   final String phone;
   final String address;
+  final String emergencyName;
+  final String emergencyContact;
+  final String relation;
 
   const uKonekDashboardPage({
     super.key,
     required this.username,
     required this.citizenId,
-    this.fullname = '',       // ← optional with default, fixes all 3 errors
-    this.email = 'juan.delacruz@email.com',
-    this.phone = '0912 345 6789',
-    this.address = 'Brgy. Ugong, Valenzuela City',
+    this.fullname         = '',
+    // Registration fields — all optional so login path still works
+    this.firstName        = '',
+    this.middleName       = '',
+    this.surname          = '',
+    this.nameExtension    = '',
+    this.dob              = '',
+    this.age              = '',
+    this.sex              = '',
+    this.email            = '',
+    this.phone            = '',
+    this.address          = '',
+    this.emergencyName    = '',
+    this.emergencyContact = '',
+    this.relation         = '',
   });
 
   @override
@@ -53,17 +79,25 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   late Future<List<PrescribedMedicine>> _prescribedMedicinesFuture;
   Timer? _onDutyRefreshTimer;
 
+  // ── Navigate to profile with ALL registration fields ──────────
   void _navigateToProfile() {
+    final String fullNameString = "${widget.firstName} ${widget.middleName} ${widget.surname} ${widget.nameExtension}";
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => uKonekProfilePage(
-          username: widget.username,
-          citizenId: widget.citizenId,
-          fullName: widget.fullname,
-          email: widget.email,
-          phone: widget.phone,
-          address: widget.address,
+          username:         widget.username,
+          citizenId:        widget.citizenId,
+          fullName: fullNameString,
+          dob:              widget.dob,
+          age:              widget.age,
+          sex:              widget.sex,
+          email:            widget.email,
+          phone:            widget.phone,
+          address:          widget.address,
+          emergencyName:    widget.emergencyName,
+          emergencyContact: widget.emergencyContact,
+          relation:         widget.relation,
         ),
       ),
     );
@@ -73,8 +107,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _doctorStatusFuture = _loadDoctorStatus();
-    _queueDashboardFuture = _loadQueueDashboard();
+    _doctorStatusFuture        = _loadDoctorStatus();
+    _queueDashboardFuture      = _loadQueueDashboard();
     _prescribedMedicinesFuture = _loadPrescribedMedicines();
     _onDutyRefreshTimer = Timer.periodic(const Duration(seconds: 9), (_) {
       _refreshDoctorStatus();
@@ -120,9 +154,151 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     setState(() { _queueDashboardFuture = _loadQueueDashboard(); });
   }
 
-  Future<List<DoctorStatus>> _loadDoctorStatus() => ApiService.listDoctorStatus();
-  Future<QueueDashboardSnapshot> _loadQueueDashboard() => ApiService.getMyQueueDashboard();
+  Future<List<DoctorStatus>>      _loadDoctorStatus()        => ApiService.listDoctorStatus();
+  Future<QueueDashboardSnapshot>  _loadQueueDashboard()      => ApiService.getMyQueueDashboard();
   Future<List<PrescribedMedicine>> _loadPrescribedMedicines() => ApiService.getMyPrescribedMedicines();
+
+  void _showEPrescriptionModal(String medName, String dosage, String instructions, String expiryDate) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        builder: (_, sc) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFE2E9E3), borderRadius: BorderRadius.circular(2))),
+              ),
+              Expanded(
+                child: ListView(
+                  controller: sc,
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    // ── Clinic Header ──────────────────────────────────
+                    Row(
+                      children: [
+                        Container(
+                          width: 50, height: 50,
+                          decoration: const BoxDecoration(color: Color(0xFF28A745), shape: BoxShape.circle),
+                          child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 30),
+                        ),
+                        const SizedBox(width: 14),
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('AFM ROQUERO', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF1B5E20))),
+                            Text('Medical & Dental Clinic', style: TextStyle(fontSize: 12, color: Color(0xFF637367))),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    const Divider(color: Color(0xFFE2E9E3)),
+                    const SizedBox(height: 16),
+
+                    // ── Patient Info ───────────────────────────────────
+                    const Text('PATIENT INFORMATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF28A745), letterSpacing: 1.2)),
+                    const SizedBox(height: 8),
+                    // Concatenated name integration
+                    Text("${widget.firstName} ${widget.middleName} ${widget.surname} ${widget.nameExtension}".trim(),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B2E1E))),
+                    const SizedBox(height: 4),
+                    Text('ID: ${widget.citizenId}', style: const TextStyle(fontSize: 12, color: Color(0xFF637367))),
+
+                    const SizedBox(height: 24),
+
+                    // ── Rx Symbol & Medication ──────────────────────────
+                    const Text('℞', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20), height: 1)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFF8FCF9),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFD6E8DA))
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(medName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B2E1E))),
+                          const SizedBox(height: 4),
+                          Text(dosage, style: const TextStyle(fontSize: 14, color: Color(0xFF28A745), fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 12),
+                          const Divider(color: Color(0xFFD6E8DA)),
+                          const SizedBox(height: 12),
+
+                          // NEW: Expiration Date Row
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('EXPIRATION DATE:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF637367))),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
+                                child: Text(expiryDate, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 16),
+                          const Text('INSTRUCTIONS:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF637367))),
+                          const SizedBox(height: 4),
+                          Text(instructions, style: const TextStyle(fontSize: 14, color: Color(0xFF1B2E1E), height: 1.4)),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // ── Verification QR ────────────────────────────────
+                    Center(
+                      child: Column(
+                        children: [
+                          const Text('PHARMACY VERIFICATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF637367), letterSpacing: 1)),
+                          const SizedBox(height: 12),
+                          QrImageView(
+                            data: 'RX-${widget.citizenId}-$medName-$expiryDate',
+                            version: QrVersions.auto,
+                            size: 140.0,
+                            eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF1B5E20)),
+                            dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Color(0xFF1B5E20)),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text('Digital Signature Verified', style: TextStyle(color: Color(0xFF28A745), fontWeight: FontWeight.bold, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 40),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.check_circle_outline_rounded, color: Colors.white),
+                        label: const Text('DISMISS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28A745), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -138,8 +314,10 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildAnnouncements(), // Horizontal Announcement Section
-                  const SizedBox(height: 24),
+                  _buildAnnouncements(),
+                  /*const SizedBox(height: 24),
+                  _buildQrSection(),*/
+                  const SizedBox(height: 20),
                   _buildDoctorStatusSection(),
                   const SizedBox(height: 24),
                   _buildQueueCard(),
@@ -165,23 +343,11 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
-  // ── Announcement Section ─────────────────────────────────────
   Widget _buildAnnouncements() {
     final announcements = [
-      {
-        'title': 'Free Dental Checkup',
-        'desc': 'Available for Brgy. Ugong residents this Friday.',
-        'tag': 'HEALTH ADVISORY',
-        'color': _C.primary,
-      },
-      {
-        'title': 'System Maintenance',
-        'desc': 'U-Konek+ will be offline on Sunday, 2AM-4AM.',
-        'tag': 'MAINTENANCE',
-        'color': _C.warning,
-      },
+      {'title': 'Free Dental Checkup', 'desc': 'Available for Brgy. Ugong residents this Friday.', 'tag': 'HEALTH ADVISORY', 'color': _C.primary},
+      {'title': 'System Maintenance',  'desc': 'U-Konek+ will be offline on Sunday, 2AM-4AM.',     'tag': 'MAINTENANCE',      'color': _C.warning},
     ];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -194,9 +360,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
             physics: const BouncingScrollPhysics(),
             itemCount: announcements.length,
             itemBuilder: (context, index) {
-              final item = announcements[index];
-              final Color accentColor = item['color'] as Color;
-
+              final item        = announcements[index];
+              final accentColor = item['color'] as Color;
               return Container(
                 width: 280,
                 margin: const EdgeInsets.only(right: 16),
@@ -218,7 +383,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     const SizedBox(height: 12),
                     Text(item['title'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _C.textDark)),
                     const SizedBox(height: 4),
-                    Text(item['desc'] as String, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: _C.textMuted, height: 1.3)),
+                    Text(item['desc']  as String, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: _C.textMuted, height: 1.3)),
                   ],
                 ),
               );
@@ -229,65 +394,52 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
-  // ── Header Component ────────────────────────────────────────
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_C.primary, _C.primaryMid], //
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: LinearGradient(colors: [_C.primary, _C.primaryMid], begin: Alignment.topLeft, end: Alignment.bottomRight),
         borderRadius: BorderRadius.only(bottomLeft: Radius.circular(32), bottomRight: Radius.circular(32)),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-          child: Column(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  GestureDetector(
-                    onTap: _navigateToProfile,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44, height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withOpacity(0.4)),
-                          ),
-                          child: Center(
-                            child: Text(
-                              widget.username.isNotEmpty ? widget.username[0].toUpperCase() : 'U',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(_getGreeting(), style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                            Row(
-                              children: [
-                                Text(widget.username, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                                const SizedBox(width: 4),
-                                const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 11),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
+              GestureDetector(
+                onTap: _navigateToProfile,
+                child: Row(children: [
+                  Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withOpacity(0.4)),
+                    ),
+                    child: Center(
+                      child: Text(
+                        widget.username.isNotEmpty ? widget.username[0].toUpperCase() : 'U',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
                     ),
                   ),
-                  _buildNotificationBell(),
-                ],
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_getGreeting(), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      Row(children: [
+                        Text(widget.username, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 11),
+                      ]),
+                    ],
+                  ),
+                ]),
               ),
+              _buildNotificationBell(),
             ],
           ),
         ),
@@ -296,32 +448,47 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   Widget _buildNotificationBell() {
-    return Stack(
-      children: [
-        Container(
-          width: 44, height: 44,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.18),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.25)),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => uKonekNotificationPage(
+              username: widget.username,
+              fullname: widget.fullname,
+            ),
           ),
-          child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 22),
-        ),
-        Positioned(
-          top: 9, right: 9,
-          child: Container(
-            width: 8, height: 8,
-            decoration: BoxDecoration(color: const Color(0xFFFF5252), shape: BoxShape.circle, border: Border.all(color: _C.primaryMid, width: 1.5)),
+        );
+      },
+      child: Stack(
+        children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withOpacity(0.25)),
+            ),
+            child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 22),
           ),
-        ),
-      ],
+          Positioned(
+            top: 9, right: 9,
+            child: Container(
+              width: 8, height: 8,
+              decoration: BoxDecoration(
+                  color: const Color(0xFFFF5252),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF1B5E20), width: 1.5)
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
 
 
-
-  // ── Doctor Status ───────────────────────────────────────────
   Widget _buildDoctorStatusSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,8 +501,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(color: _C.success.withOpacity(0.10), borderRadius: BorderRadius.circular(8)),
               child: Row(children: [
-                // Error fix: removed 'const'
-                Container(width: 6, height: 6, decoration: BoxDecoration(color: _C.success, shape: BoxShape.circle)),
+                Container(width: 6, height: 6, decoration: const BoxDecoration(color: _C.success, shape: BoxShape.circle)),
                 const SizedBox(width: 5),
                 const Text('Live', style: TextStyle(fontSize: 11, color: _C.success, fontWeight: FontWeight.w700)),
               ]),
@@ -348,10 +514,13 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
           child: FutureBuilder<List<DoctorStatus>>(
             future: _doctorStatusFuture,
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()));
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()));
+              }
               final doctors = snapshot.data ?? const [];
-              if (doctors.isEmpty) return const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No doctors on duty.', style: TextStyle(color: _C.textMuted))));
-
+              if (doctors.isEmpty) {
+                return const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No doctors on duty.', style: TextStyle(color: _C.textMuted))));
+              }
               return Column(children: List.generate(doctors.length, (i) {
                 final item = doctors[i];
                 return Column(children: [
@@ -366,7 +535,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
-  Color _getStatusColor(String s) => s.toLowerCase() == 'on_break' ? _C.warning : (s.toLowerCase() == 'unavailable' ? Colors.grey : _C.success);
+  Color  _getStatusColor(String s) => s.toLowerCase() == 'on_break' ? _C.warning : (s.toLowerCase() == 'unavailable' ? Colors.grey : _C.success);
   String _getStatusLabel(String s) => s.toLowerCase() == 'on_break' ? 'On Break' : (s.toLowerCase() == 'unavailable' ? 'Offline' : 'Online');
 
   Widget _staffTile(String name, String sub, Color color, String label, IconData icon) {
@@ -379,12 +548,15 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
           Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _C.textDark)),
           Text(sub.isEmpty ? 'General Physician' : sub, style: const TextStyle(color: _C.textMuted, fontSize: 11)),
         ])),
-        Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(10)), child: Text(label.toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w800))),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(10)),
+          child: Text(label.toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w800)),
+        ),
       ]),
     );
   }
 
-  // ── Queue Component ──────────────────────────────────────────
   Widget _buildQueueCard() {
     return Container(
       padding: const EdgeInsets.all(22),
@@ -392,18 +564,20 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
       child: FutureBuilder<QueueDashboardSnapshot>(
         future: _queueDashboardFuture,
         builder: (context, snapshot) {
-          final queue = snapshot.data ?? QueueDashboardSnapshot.empty;
-          final hasQueue = queue.hasActiveQueue;
-          Color statusColor = hasQueue ? _C.warning : _C.success;
-
+          final queue       = snapshot.data ?? QueueDashboardSnapshot.empty;
+          final hasQueue    = queue.hasActiveQueue;
+          final statusColor = hasQueue ? _C.warning : _C.success;
           return Column(children: [
             Row(children: [
-              Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: statusColor.withOpacity(0.10), borderRadius: BorderRadius.circular(8)), child: Row(children: [
-                // Error fix: removed 'const'
-                Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
-                const SizedBox(width: 5),
-                Text(hasQueue ? 'ACTIVE QUEUE' : 'LIVE QUEUE', style: TextStyle(color: statusColor, fontWeight: FontWeight.w800, fontSize: 10)),
-              ])),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(color: statusColor.withOpacity(0.10), borderRadius: BorderRadius.circular(8)),
+                child: Row(children: [
+                  Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+                  const SizedBox(width: 5),
+                  Text(hasQueue ? 'ACTIVE QUEUE' : 'LIVE QUEUE', style: TextStyle(color: statusColor, fontWeight: FontWeight.w800, fontSize: 10)),
+                ]),
+              ),
               const Spacer(),
               Text(hasQueue ? queue.serviceLabel : 'Not in queue', style: const TextStyle(color: _C.textMuted, fontSize: 11)),
             ]),
@@ -415,12 +589,16 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
             ]),
             const SizedBox(height: 20),
             Container(
-              width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 12),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(color: _C.primaryMid.withOpacity(0.06), borderRadius: BorderRadius.circular(14)),
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 const Icon(Icons.timer_outlined, size: 16, color: _C.primaryMid),
                 const SizedBox(width: 8),
-                Text(hasQueue ? 'Est. Wait: ${_formatWaitTime(queue.estimatedWaitMinutes)}' : 'Join queue to view waiting time', style: const TextStyle(color: _C.primaryMid, fontWeight: FontWeight.bold, fontSize: 12)),
+                Text(
+                  hasQueue ? 'Est. Wait: ${_formatWaitTime(queue.estimatedWaitMinutes)}' : 'Join queue to view waiting time',
+                  style: const TextStyle(color: _C.primaryMid, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
               ]),
             ),
           ]);
@@ -437,42 +615,63 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     ]);
   }
 
-  // ── Services ─────────────────────────────────────────────────
   Widget _buildServiceIcons() {
     final services = [
-      {'icon': Icons.medical_services_outlined, 'label': 'Consult', 'color': const Color(0xFF28A745)},
-      {'icon': Icons.vaccines_outlined, 'label': 'Vaccine', 'color': const Color(0xFF17A2B8)},
-      {'icon': Icons.monitor_heart_outlined, 'label': 'Check-up', 'color': const Color(0xFFDC3545)},
-      {'icon': Icons.child_care_outlined, 'label': 'Maternal', 'color': const Color(0xFF6F42C1)},
+      {'icon': Icons.medical_services_outlined, 'label': 'Consult',  'color': const Color(0xFF28A745)},
+      {'icon': Icons.vaccines_outlined,         'label': 'Vaccine',  'color': const Color(0xFF17A2B8)},
+      {'icon': Icons.monitor_heart_outlined,    'label': 'Check-up', 'color': const Color(0xFFDC3545)},
+      {'icon': Icons.child_care_outlined,       'label': 'Maternal', 'color': const Color(0xFF6F42C1)},
     ];
-    return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: services.map((s) {
-      final color = s['color'] as Color;
-      return Column(children: [
-        Container(width: 62, height: 62, decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withOpacity(0.15))), child: Icon(s['icon'] as IconData, color: color, size: 28)),
-        const SizedBox(height: 8),
-        Text(s['label'] as String, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.textDark)),
-      ]);
-    }).toList());
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: services.map((s) {
+        final color = s['color'] as Color;
+        return Column(children: [
+          Container(
+            width: 62, height: 62,
+            decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withOpacity(0.15))),
+            child: Icon(s['icon'] as IconData, color: color, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(s['label'] as String, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.textDark)),
+        ]);
+      }).toList(),
+    );
   }
 
-  // ── Quick Actions ────────────────────────────────────────────
   Widget _buildQuickActionGrid() {
     return GridView.count(
-      shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, crossAxisSpacing: 14, mainAxisSpacing: 14, childAspectRatio: 2.3,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: 14,
+      mainAxisSpacing: 14,
+      childAspectRatio: 2.3,
       children: [
+        _actionBtn('My Patient ID', Icons.qr_code_scanner_rounded, _C.primaryMid, () {
+          _navigateToProfile(); // Navigates to profile where QR is now located
+        }),
         _actionBtn('Join Queue', Icons.add_circle_outline_rounded, _C.primary, () async {
-          final joined = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) =>  uKonekJoinQueuePage(
-              username: widget.username, // Provide the required parameter
-              citizenId: widget.citizenId
-          )));
+          final joined = await Navigator.push<bool>(context, MaterialPageRoute(
+            builder: (_) => uKonekJoinQueuePage(username: widget.username, citizenId: widget.citizenId),
+          ));
           if (joined == true) _refreshQueueDashboard();
         }),
-        _actionBtn('Records', Icons.assignment_outlined, const Color(0xFF17A2B8), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const uKonekHealthRecordsPage()))),
-        _actionBtn('Scheduler', Icons.alarm_on_outlined, const Color(0xFF6F42C1), () => Navigator.push(context, MaterialPageRoute(builder: (_) =>  uKonekMedicineSchedulerPage(
-            username: widget.username, // Provide the required parameter
-            citizenId: widget.citizenId
-        )))),
-        _actionBtn('Feedback', Icons.feedback_outlined, const Color(0xFFF59E0B), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const uKonekFeedbackPage()))),
+        // NEW: View E-Prescription Button
+        _actionBtn('E-Prescription', Icons.receipt_long_rounded, const Color(0xFF6F42C1), () {
+          _showEPrescriptionModal(
+              'Amoxicillin',
+              '500mg - 3x a day',
+              'Take after meals for 7 days. Finish the entire course as prescribed by the dentist.',
+              '05/10/2026' // Expiration Date
+          );
+        }),
+        _actionBtn('Records', Icons.assignment_outlined, const Color(0xFF17A2B8), () =>
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const uKonekHealthRecordsPage()))),
+        _actionBtn('Scheduler', Icons.alarm_on_outlined, const Color(0xFF6F42C1), () =>
+            Navigator.push(context, MaterialPageRoute(builder: (_) => uKonekMedicineSchedulerPage(username: widget.username, citizenId: widget.citizenId)))),
+        _actionBtn('Feedback', Icons.feedback_outlined, const Color(0xFFF59E0B), () =>
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const uKonekFeedbackPage()))),
       ],
     );
   }
@@ -491,15 +690,15 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
-  // ── Medicine Section ─────────────────────────────────────────
   Widget _buildMedicineCard() {
     return FutureBuilder<List<PrescribedMedicine>>(
       future: _prescribedMedicinesFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
+        }
         final medicines = (snapshot.data ?? const []).take(3).toList();
         if (medicines.isEmpty) return const Text('No recent prescriptions.', style: TextStyle(color: _C.textMuted));
-
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(color: _C.surface, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 14, offset: Offset(0, 5))]),
@@ -520,19 +719,22 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _C.textDark)),
-        Text(sub, style: const TextStyle(color: _C.textMuted, fontSize: 11)),
+        Text(sub,  style: const TextStyle(color: _C.textMuted, fontSize: 11)),
       ])),
-      Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(8)), child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 10))),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(8)),
+        child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 10)),
+      ),
     ]);
   }
 
-  // ── Navigation and Helpers ────────────────────────────────────
   Widget _buildBottomNav() {
     final tabs = [
-      {'icon': Icons.dashboard_rounded, 'label': 'Home'},
-      {'icon': Icons.event_note_rounded, 'label': 'Medicine'},
-      {'icon': Icons.confirmation_number_rounded, 'label': 'Queue'},
-      {'icon': Icons.person_outline_rounded, 'label': 'Profile'},
+      {'icon': Icons.dashboard_rounded,          'label': 'Home'},
+      {'icon': Icons.event_note_rounded,         'label': 'Medicine'},
+      {'icon': Icons.confirmation_number_rounded,'label': 'Queue'},
+      {'icon': Icons.person_outline_rounded,     'label': 'Profile'},
     ];
     return Container(
       decoration: const BoxDecoration(
@@ -550,40 +752,33 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               final isSelected = _selectedTab == i;
               return GestureDetector(
                 onTap: () {
-                  setState(() => _selectedTab = i); // ✅ Fix: update selected tab
-                  if (i == 1) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => uKonekMedicineSchedulerPage(
-                          username: widget.username,
-                          citizenId: widget.citizenId,
-                        ),
+                  setState(() => _selectedTab = i);
+                  if (i == 0) {
+                    // Already on Home — nothing to do
+                  } else if (i == 1) {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => uKonekMedicineSchedulerPage(
+                        username:  widget.username,
+                        citizenId: widget.citizenId,
+                        // ✅ removed fullname — MedicineSchedulerPage only takes username + citizenId
                       ),
-                    );
-                  } else if (i == 2) { // ✅ Fix: was missing 'else', causing fall-through to i==3
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => uKonekJoinQueuePage(
-                          username: widget.username,
-                          citizenId: widget.citizenId,
-                        ),
+                    )).then((_) => setState(() => _selectedTab = 0));
+                  } else if (i == 2) {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => uKonekJoinQueuePage(
+                        username:  widget.username,
+                        citizenId: widget.citizenId,
                       ),
-                    ).then((_) => _refreshQueueDashboard());
+                    )).then((_) {
+                      _refreshQueueDashboard();
+                      setState(() => _selectedTab = 0);
+                    });
                   } else if (i == 3) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => uKonekProfilePage(
-                          username: widget.username,
-                          citizenId: widget.citizenId,
-                          fullName: widget.fullname,
-                        ),
-                      ),
-                    );
+                    _navigateToProfile();
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (mounted) setState(() => _selectedTab = 0);
+                    });
                   }
-                  // i == 0 (Home): no navigation needed, setState above is enough
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
@@ -593,10 +788,15 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Row(children: [
-                    Icon(tabs[i]['icon'] as IconData, color: isSelected ? _C.primaryMid : Colors.grey.shade400, size: 22),
+                    Icon(tabs[i]['icon'] as IconData,
+                      color: isSelected ? _C.primaryMid : Colors.grey.shade400,
+                      size: 22,
+                    ),
                     if (isSelected) ...[
                       const SizedBox(width: 6),
-                      Text(tabs[i]['label'] as String, style: const TextStyle(color: _C.primaryMid, fontSize: 12, fontWeight: FontWeight.bold)),
+                      Text(tabs[i]['label'] as String,
+                        style: const TextStyle(color: _C.primaryMid, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
                     ],
                   ]),
                 ),
@@ -610,7 +810,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
   Widget _sectionHeader(String title) => Text(
     title,
-    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _C.textDark, letterSpacing: -0.3),
+    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _C.textDark, letterSpacing: -0.3),
   );
 
   String _getGreeting() {
@@ -621,5 +821,5 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   String _queueNumberText(int? n) => (n == null || n <= 0) ? '--' : '#${n.toString().padLeft(3, '0')}';
-  String _formatWaitTime(int m) => (m ~/ 60) <= 0 ? '$m mins' : '${m ~/ 60} hr ${m % 60} mins';
+  String _formatWaitTime(int m)   => (m ~/ 60) <= 0 ? '$m mins' : '${m ~/ 60} hr ${m % 60} mins';
 }
