@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'services/api_service.dart';
 import 'uKonekJoinQueuePage.dart';
 import 'uKonekHealthRecordsPage.dart';
@@ -78,6 +79,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   List<DoctorStatus> _doctors = [];
   QueueDashboardSnapshot _queueDashboard = QueueDashboardSnapshot.empty;
   List<PrescriptionRecord> _prescribedMedicines = [];
+  List<Announcement> _announcements = [];
   bool _isInitialLoading = true;
   Timer? _refreshTimer;
 
@@ -147,12 +149,14 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         ApiService.listDoctorStatus(),
         ApiService.getMyQueueDashboard(),
         ApiService.fetchPrescriptions(limit: 10),
+        ApiService.fetchAnnouncements(),
       ]);
       if (mounted) {
         setState(() {
           _doctors = results[0] as List<DoctorStatus>;
           _queueDashboard = results[1] as QueueDashboardSnapshot;
           _prescribedMedicines = results[2] as List<PrescriptionRecord>;
+          _announcements = results[3] as List<Announcement>;
           _isInitialLoading = false;
         });
       }
@@ -339,20 +343,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   _sectionHeader('Quick Actions'),
                   const SizedBox(height: 14),
                   _buildQuickActionGrid(),
-                  const SizedBox(height: 28),
-                  _sectionHeader('Recent Prescriptions'),
-                  const SizedBox(height: 14),
-                  _buildMedicineCard(),
-                  if (_prescribedMedicines.length > 3)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Center(
-                        child: TextButton(
-                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrescriptionPage())),
-                          child: const Text('View All Prescriptions', style: TextStyle(color: _C.primaryMid, fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -364,52 +354,52 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   Widget _buildAnnouncements() {
-    final announcements = [
-      {'title': 'Free Dental Checkup', 'desc': 'Available for Brgy. Ugong residents this Friday.', 'tag': 'HEALTH ADVISORY', 'color': _C.primary},
-      {'title': 'System Maintenance',  'desc': 'U-Konek+ will be offline on Sunday, 2AM-4AM.',     'tag': 'MAINTENANCE',      'color': _C.warning},
-    ];
+    if (_announcements.isEmpty && !_isInitialLoading) return const SizedBox.shrink();
+    final tagColors = [_C.primary, _C.warning, const Color(0xFF17A2B8), const Color(0xFF6F42C1)];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionHeader('Announcements'),
         const SizedBox(height: 14),
-        SizedBox(
-          height: 140,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: announcements.length,
-            itemBuilder: (context, index) {
-              final item        = announcements[index];
-              final accentColor = item['color'] as Color;
-              return Container(
-                width: 280,
-                margin: const EdgeInsets.only(right: 16),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: _C.surface,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: _C.divider),
-                  boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 10, offset: Offset(0, 4))],
+        _isInitialLoading
+            ? const SizedBox(height: 140, child: Center(child: CircularProgressIndicator()))
+            : SizedBox(
+                height: 140,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _announcements.length,
+                  itemBuilder: (context, index) {
+                    final item = _announcements[index];
+                    final accentColor = tagColors[index % tagColors.length];
+                    return Container(
+                      width: 280,
+                      margin: const EdgeInsets.only(right: 16),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: _C.surface,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: _C.divider),
+                        boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 10, offset: Offset(0, 4))],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(color: accentColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                            child: Text('ANNOUNCEMENT', style: TextStyle(color: accentColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _C.textDark)),
+                          const SizedBox(height: 4),
+                          Text(item.content, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: _C.textMuted, height: 1.3)),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(color: accentColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                      child: Text(item['tag'] as String, style: TextStyle(color: accentColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(item['title'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _C.textDark)),
-                    const SizedBox(height: 4),
-                    Text(item['desc']  as String, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: _C.textMuted, height: 1.3)),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
+              ),
       ],
     );
   }
@@ -626,24 +616,43 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
   Widget _buildServiceIcons() {
     final services = [
-      {'icon': Icons.medical_services_outlined, 'label': 'Consult',  'color': const Color(0xFF28A745)},
-      {'icon': Icons.vaccines_outlined,         'label': 'Vaccine',  'color': const Color(0xFF17A2B8)},
-      {'icon': Icons.monitor_heart_outlined,    'label': 'Check-up', 'color': const Color(0xFFDC3545)},
-      {'icon': Icons.child_care_outlined,       'label': 'Maternal', 'color': const Color(0xFF6F42C1)},
+      {'icon': Icons.medical_services_outlined, 'label': 'Consult',  'color': const Color(0xFF28A745), 'key': 'consult'},
+      {'icon': Icons.vaccines_outlined,         'label': 'Vaccine',  'color': const Color(0xFF17A2B8), 'key': 'vaccine'},
+      {'icon': Icons.monitor_heart_outlined,    'label': 'Check-up', 'color': const Color(0xFFDC3545), 'key': 'checkup'},
+      {'icon': Icons.child_care_outlined,       'label': 'Maternal', 'color': const Color(0xFF6F42C1), 'key': 'maternal'},
     ];
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: services.map((s) {
         final color = s['color'] as Color;
-        return Column(children: [
-          Container(
-            width: 62, height: 62,
-            decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withOpacity(0.15))),
-            child: Icon(s['icon'] as IconData, color: color, size: 28),
-          ),
-          const SizedBox(height: 8),
-          Text(s['label'] as String, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.textDark)),
-        ]);
+        return GestureDetector(
+          onTap: () async {
+            final joined = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => uKonekJoinQueuePage(
+                  username: widget.username,
+                  citizenId: widget.citizenId,
+                  initialServiceKey: s['key'] as String,
+                ),
+              ),
+            );
+            if (joined == true) _loadAllData(isInitial: false);
+          },
+          child: Column(children: [
+            Container(
+              width: 62, height: 62,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: color.withOpacity(0.25)),
+              ),
+              child: Icon(s['icon'] as IconData, color: color, size: 28),
+            ),
+            const SizedBox(height: 8),
+            Text(s['label'] as String, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.textDark)),
+          ]),
+        );
       }).toList(),
     );
   }

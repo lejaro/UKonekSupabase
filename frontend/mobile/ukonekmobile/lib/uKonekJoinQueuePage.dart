@@ -25,11 +25,13 @@ class _C {
 class uKonekJoinQueuePage extends StatefulWidget {
   final String username;
   final String citizenId;
+  final String? initialServiceKey;
 
   const uKonekJoinQueuePage({
     super.key,
     required this.username,
     required this.citizenId,
+    this.initialServiceKey,
   });
 
   @override
@@ -61,17 +63,61 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _loadInitialData();
     _animController.forward();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 9), (_) => _refreshDashboard());
+    // Timer will be started only when citizen has active queue ticket
   }
 
   void _loadInitialData() {
     _dashboardFuture = ApiService.getMyQueueDashboard();
     _servicesFuture  = ApiService.listAvailableQueueServices();
+    
+    // Check if citizen has active queue and start timer accordingly
+    _dashboardFuture.then((snapshot) {
+      if (!mounted) return;
+      if (snapshot.hasActiveQueue) {
+        _startRefreshTimer();
+      } else {
+        _stopRefreshTimer();
+      }
+    });
+    
+    // Pre-select service if launched from a health service card
+    if (widget.initialServiceKey != null && widget.initialServiceKey!.isNotEmpty) {
+      _servicesFuture.then((services) {
+        if (!mounted) return;
+        final match = services.where(
+          (s) => s.serviceKey.toLowerCase().contains(widget.initialServiceKey!.toLowerCase()) ||
+                 s.serviceLabel.toLowerCase().contains(widget.initialServiceKey!.toLowerCase()),
+        ).firstOrNull;
+        if (match != null) setState(() => _selectedService = match);
+      });
+    }
+  }
+
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 9), (_) => _refreshDashboard());
+  }
+
+  void _stopRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
   }
 
   void _refreshDashboard() {
     if (!mounted) return;
-    setState(() { _dashboardFuture = ApiService.getMyQueueDashboard(); });
+    setState(() { 
+      _dashboardFuture = ApiService.getMyQueueDashboard();
+    });
+    
+    // Re-check if we should continue refreshing
+    _dashboardFuture.then((snapshot) {
+      if (!mounted) return;
+      if (snapshot.hasActiveQueue) {
+        if (_refreshTimer == null) _startRefreshTimer();
+      } else {
+        _stopRefreshTimer();
+      }
+    });
   }
 
   @override
@@ -95,7 +141,11 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
         reason:       _reasonController.text.trim(),
         symptoms:     _symptomsController.text.trim(),
       ));
-      if (mounted) { _refreshDashboard(); setState(() => _isSubmitting = false); }
+      if (mounted) { 
+        _refreshDashboard();
+        _startRefreshTimer(); // Start auto-refresh after joining queue
+        setState(() => _isSubmitting = false); 
+      }
     } catch (e) {
       if (mounted) { setState(() => _isSubmitting = false); _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true); }
     }
@@ -104,7 +154,6 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
   Future<void> _handleCancel() async {
     final confirm = await showDialog<bool>(
       context: context,
-      // AFTER (fixed) — name the parameter 'ctx' so it can be referenced
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: const EdgeInsets.all(28),
@@ -121,7 +170,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
           const SizedBox(height: 24),
           Row(children: [
             Expanded(child: OutlinedButton(
-              onPressed: () => Navigator.pop(ctx, false),  // ✅ ctx instead of _
+              onPressed: () => Navigator.pop(ctx, false),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 side: const BorderSide(color: _C.fieldBorder),
@@ -131,7 +180,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
             )),
             const SizedBox(width: 12),
             Expanded(child: ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),   // ✅ ctx instead of _
+              onPressed: () => Navigator.pop(ctx, true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _C.danger,
                 elevation: 0,
@@ -147,7 +196,10 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
     if (confirm != true) return;
     setState(() => _isSubmitting = true);
     try {
-      if (await ApiService.cancelMyQueue()) _refreshDashboard();
+      if (await ApiService.cancelMyQueue()) {
+        _stopRefreshTimer(); // Stop auto-refresh after leaving queue
+        _refreshDashboard();
+      }
     } catch (e) { _showSnack(e.toString()); }
     finally { if (mounted) setState(() => _isSubmitting = false); }
   }

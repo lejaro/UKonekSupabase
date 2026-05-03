@@ -384,6 +384,32 @@ class FeedbackSubmission {
   });
 }
 
+class Announcement {
+  final int id;
+  final String title;
+  final String content;
+  final String visibility;
+  final DateTime createdAt;
+
+  const Announcement({
+    required this.id,
+    required this.title,
+    required this.content,
+    required this.visibility,
+    required this.createdAt,
+  });
+
+  factory Announcement.fromMap(Map<String, dynamic> map) {
+    return Announcement(
+      id: (map['id'] as num?)?.toInt() ?? 0,
+      title: (map['title'] as String?)?.trim() ?? '',
+      content: (map['content'] as String?)?.trim() ?? '',
+      visibility: (map['visibility'] as String?)?.trim() ?? 'all',
+      createdAt: DateTime.tryParse(map['created_at'] ?? '') ?? DateTime.now(),
+    );
+  }
+}
+
 class QueueServiceOption {
   final String serviceKey;
   final String serviceLabel;
@@ -1280,6 +1306,28 @@ class ApiService {
           .toList();
     } catch (e) {
       debugPrint('Error fetching consultations: $e');
+      return [];
+    }
+  }
+
+  // ── Announcements ─────────────────────────────────────────────────────────────
+
+  static Future<List<Announcement>> fetchAnnouncements() async {
+    try {
+      final response = await _client
+          .from('announcements')
+          .select('id,title,content,visibility,created_at')
+          .inFilter('visibility', ['all', 'citizen'])
+          .order('created_at', ascending: false)
+          .limit(10);
+
+      final rows = (response as List<dynamic>?) ?? const [];
+      return rows
+          .whereType<Map<String, dynamic>>()
+          .map(Announcement.fromMap)
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching announcements: $e');
       return [];
     }
   }

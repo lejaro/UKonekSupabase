@@ -29,8 +29,8 @@ const tvView = (() => {
             setInterval(loadQueueData, 5000);
         } catch (err) {
             console.error('TV View init error:', err);
-            const lbl = document.getElementById('serving-label');
-            if (lbl) lbl.textContent = 'Error connecting. Check runtime-config.js.';
+            const status = document.getElementById('serving-status');
+            if (status) status.textContent = 'Error connecting. Check runtime-config.js.';
         }
     };
 
@@ -68,8 +68,8 @@ const tvView = (() => {
             renderView(result);
         } catch (err) {
             console.error('TV load error:', err);
-            const lbl = document.getElementById('serving-label');
-            if (lbl) lbl.textContent = 'Connectivity error. Retrying...';
+            const status = document.getElementById('serving-status');
+            if (status) status.textContent = 'Connectivity error. Retrying...';
         }
     };
 
@@ -85,21 +85,21 @@ const tvView = (() => {
         updateWaitingDisplay(waiting);
     };
 
-    const fmt = (n) => `${String(n).padStart(3, '0')}`;
+    const fmt = (n) => `#${String(n).padStart(3, '0')}`;
 
     const updateServingDisplay = (tickets) => {
         const numberEl = document.getElementById('serving-number');
-        const labelEl  = document.getElementById('serving-label');
+        const statusEl = document.getElementById('serving-status');
         const sound    = document.getElementById('call-sound');
 
         if (!tickets.length) {
             if (numberEl) numberEl.textContent = '---';
-            if (labelEl)  labelEl.textContent  = 'Waiting for patients...';
+            if (statusEl) statusEl.textContent = 'Waiting for patients...';
             lastServingIds = new Set();
             return;
         }
 
-        // Show the first (lowest queue number) serving ticket in the main display
+        // Show the first (lowest queue number) serving ticket
         const primary = tickets[0];
         const newNum  = fmt(primary.queue_number);
 
@@ -112,42 +112,45 @@ const tvView = (() => {
         lastServingIds = newIds;
 
         if (numberEl) numberEl.textContent = newNum;
-        if (labelEl)  labelEl.textContent  = ''; // Hide service label as requested
-
-        // If multiple serving, show them all stacked under the label
-        const extra = tickets.slice(1);
-        const extraEl = document.getElementById('serving-extra');
-        if (extraEl) {
-            extraEl.innerHTML = extra.map(t =>
-                `<div style="font-size:1.4rem;opacity:0.7;">${fmt(t.queue_number)}</div>`
-            ).join('');
+        if (statusEl) {
+            if (tickets.length > 1) {
+                statusEl.textContent = `+ ${tickets.length - 1} more being served`;
+            } else {
+                statusEl.textContent = 'Please proceed to the clinic';
+            }
         }
     };
 
     const updateOnCallDisplay = (tickets) => {
         const list = document.getElementById('oncall-list');
         if (!list) return;
+        
         if (!tickets.length) {
-            list.innerHTML = '<div class="upcoming-placeholder">—</div>';
+            list.innerHTML = '<div class="queue-empty">—</div>';
             return;
         }
-        list.innerHTML = tickets.map(t => `
-            <div class="upcoming-card" style="border-left:3px solid #f59e0b;">
-                <span class="upcoming-number">${fmt(t.queue_number)}</span>
+        
+        // Show up to 8 on-call tickets
+        list.innerHTML = tickets.slice(0, 8).map(t => `
+            <div class="queue-number-card">
+                <span class="queue-number">${fmt(t.queue_number)}</span>
             </div>
         `).join('');
     };
 
     const updateWaitingDisplay = (tickets) => {
-        const list = document.getElementById('upcoming-list');
+        const list = document.getElementById('waiting-list');
         if (!list) return;
+        
         if (!tickets.length) {
-            list.innerHTML = '<div class="upcoming-placeholder">No waiting tickets</div>';
+            list.innerHTML = '<div class="queue-empty">No waiting tickets</div>';
             return;
         }
-        list.innerHTML = tickets.slice(0, 10).map(t => `
-            <div class="upcoming-card">
-                <span class="upcoming-number">${fmt(t.queue_number)}</span>
+        
+        // Show up to 8 waiting tickets
+        list.innerHTML = tickets.slice(0, 8).map(t => `
+            <div class="queue-number-card">
+                <span class="queue-number">${fmt(t.queue_number)}</span>
             </div>
         `).join('');
     };
