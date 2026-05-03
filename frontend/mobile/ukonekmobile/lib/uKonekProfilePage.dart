@@ -363,8 +363,8 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
               ),
               Container(
                 width: 22, height: 22,
-                decoration: BoxDecoration(color: widget.idVerified ? _C.success : Colors.orange, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
-                child: Icon(widget.idVerified ? Icons.check_rounded : Icons.warning_rounded, color: Colors.white, size: 12),
+                decoration: BoxDecoration(color: _C.success, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
+                child: const Icon(Icons.check_rounded, color: Colors.white, size: 12),
               ),
             ],
           ),

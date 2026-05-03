@@ -519,7 +519,389 @@ select:focus {
     gap: 10px;
 }
 
-/* Vital Assessment & Queue Modal Enhancements */
+/* ═══════════════════════════════════════════════════════════════════════════
+   VITAL SIGNS ASSESSMENT MODAL - MODERN UI
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.vital-assessment-modal {
+    max-width: 720px;
+    max-height: 90vh;
+    overflow-y: auto;
+    text-align: left;
+    padding: 0;
+}
+
+/* Modal Header */
+.vital-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 32px;
+    border-bottom: 2px solid #E8F5E9;
+    background: linear-gradient(135deg, #F8FAFB 0%, #F0F9FF 100%);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.vital-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.vital-icon {
+    width: 28px;
+    height: 28px;
+    stroke: #28A745;
+    flex-shrink: 0;
+}
+
+.vital-modal-title h3 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #0F172A;
+    margin: 0;
+    letter-spacing: -0.5px;
+}
+
+.modal-close-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: none;
+    background: #F1F5F9;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.modal-close-btn:hover {
+    background: #E2E8F0;
+    transform: scale(1.05);
+}
+
+.modal-close-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: #64748B;
+}
+
+/* Patient Info Banner */
+.vital-patient-banner {
+    background: linear-gradient(135deg, #E0F2FE 0%, #DBEAFE 100%);
+    border: 2px solid #BAE6FD;
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin: 24px 32px;
+}
+
+.patient-info-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.patient-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+
+.patient-avatar svg {
+    width: 28px;
+    height: 28px;
+    stroke: white;
+    stroke-width: 2.5;
+}
+
+.patient-details {
+    flex: 1;
+}
+
+.patient-name {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0F172A;
+    margin-bottom: 4px;
+}
+
+.patient-meta {
+    font-size: 0.875rem;
+    color: #475569;
+    font-weight: 500;
+}
+
+.vital-update-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #FEF9C3;
+    border: 1.5px solid #FDE047;
+    border-radius: 10px;
+    font-size: 0.8125rem;
+    color: #92400E;
+    font-weight: 600;
+}
+
+.vital-update-badge svg {
+    width: 16px;
+    height: 16px;
+    stroke: #D97706;
+    flex-shrink: 0;
+}
+
+/* Form Container */
+.vital-form {
+    padding: 24px 32px 32px;
+}
+
+/* Section Styling */
+.vital-section {
+    margin-bottom: 28px;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #E8F5E9;
+}
+
+.section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0F172A;
+    letter-spacing: -0.3px;
+}
+
+/* Labels */
+.vital-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 8px;
+    letter-spacing: 0.2px;
+}
+
+.vital-label.required::after {
+    content: '*';
+    color: #EF4444;
+    margin-left: 2px;
+    font-weight: 700;
+}
+
+.label-icon {
+    font-size: 1.125rem;
+    line-height: 1;
+}
+
+.vital-metric-icon {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+/* Input Fields */
+.vital-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #E2E8F0;
+    border-radius: 12px;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: #0F172A;
+    background: #FFFFFF;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.vital-input:focus {
+    outline: none;
+    border-color: #28A745;
+    box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
+}
+
+.vital-input::placeholder {
+    color: #94A3B8;
+    font-weight: 400;
+}
+
+.vital-textarea {
+    resize: vertical;
+    min-height: 80px;
+    line-height: 1.5;
+}
+
+/* Vital Signs Grid */
+.vital-signs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.vital-field {
+    position: relative;
+}
+
+.vital-unit {
+    position: absolute;
+    right: 16px;
+    top: 38px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #64748B;
+    pointer-events: none;
+}
+
+.vital-field input.vital-input {
+    padding-right: 60px;
+}
+
+/* Error Message */
+.vital-error {
+    background: #FEE2E2;
+    border: 1.5px solid #FCA5A5;
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: #991B1B;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vital-error::before {
+    content: '⚠';
+    font-size: 1.125rem;
+}
+
+/* Action Buttons */
+.vital-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 24px;
+    border-top: 2px solid #F1F5F9;
+}
+
+.vital-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    letter-spacing: 0.3px;
+}
+
+.vital-btn-primary {
+    background: linear-gradient(135deg, #28A745 0%, #1B5E20 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.vital-btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+
+.vital-btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.vital-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.vital-btn .btn-icon {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+}
+
+.vital-btn.is-loading .btn-label {
+    opacity: 0;
+}
+
+.vital-btn.is-loading .btn-spinner {
+    display: inline-block;
+}
+
+/* Scrollbar Styling */
+.vital-assessment-modal::-webkit-scrollbar {
+    width: 10px;
+}
+
+.vital-assessment-modal::-webkit-scrollbar-track {
+    background: #F8FAFC;
+}
+
+.vital-assessment-modal::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 5px;
+}
+
+.vital-assessment-modal::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .vital-modal-header {
+        padding: 20px 24px;
+    }
+    
+    .vital-modal-title h3 {
+        font-size: 1.25rem;
+    }
+    
+    .vital-form {
+        padding: 20px 24px 28px;
+    }
+    
+    .vital-patient-banner {
+        margin: 20px 24px;
+        padding: 16px 20px;
+    }
+    
+    .vital-signs-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .vital-actions {
+        flex-direction: column;
+    }
+    
+    .vital-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Legacy Support - Keep old class for backwards compatibility */
 .assessment-field-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

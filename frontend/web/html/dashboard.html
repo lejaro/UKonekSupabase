@@ -1335,71 +1335,201 @@
 
       <!-- Vital Assessment Modal (triggered from On Call ticket cards) -->
       <div id="vital-assessment-modal" class="modal-overlay hidden" style="z-index:1200;">
-        <div class="modal-box" style="max-width:560px; text-align:left; max-height:90vh; overflow-y:auto;">
-          <h3 class="modal-heading" style="display:flex; align-items:center; gap:8px;">
-            <svg style="width:20px;height:20px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="#0369a1" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-            Vital Assessment
-          </h3>
+        <div class="modal-box vital-assessment-modal">
+          <!-- Modal Header -->
+          <div class="vital-modal-header">
+            <div class="vital-modal-title">
+              <svg class="vital-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+              <h3>Vital Signs Assessment</h3>
+            </div>
+            <button type="button" id="va-cancel-btn" class="modal-close-btn" aria-label="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
 
-          <!-- Patient info banner -->
-          <div id="vital-modal-patient-banner" style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:12px 16px; margin-bottom:16px; display:none;">
-            <div style="font-weight:700; font-size:15px; color:#0f172a;" id="vital-modal-patient-name">—</div>
-            <div style="font-size:12px; color:#475569; margin-top:2px;" id="vital-modal-patient-meta">—</div>
-            <div id="vital-modal-existing-badge" style="display:none; margin-top:8px; padding:4px 10px; background:#fef9c3; border:1px solid #fde047; border-radius:6px; font-size:12px; color:#92400e; font-weight:600;">
-              ⚠ Previous assessment found — submitting will update it.
+          <!-- Patient Info Banner -->
+          <div id="vital-modal-patient-banner" class="vital-patient-banner" style="display:none;">
+            <div class="patient-info-row">
+              <div class="patient-avatar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+              <div class="patient-details">
+                <div class="patient-name" id="vital-modal-patient-name">—</div>
+                <div class="patient-meta" id="vital-modal-patient-meta">—</div>
+              </div>
+            </div>
+            <div id="vital-modal-existing-badge" class="vital-update-badge" style="display:none;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <span>Previous assessment found — submitting will update it</span>
             </div>
           </div>
 
-          <form id="vital-assessment-form" novalidate autocomplete="off">
+          <form id="vital-assessment-form" class="vital-form" novalidate autocomplete="off">
             <input type="hidden" id="va-queue-ticket-id" />
             <input type="hidden" id="va-citizen-id" />
 
-            <div class="field">
-              <label class="inputLabel" for="va-chief-complaint">Chief Complaint <span style="color:#ef4444">*</span></label>
-              <textarea id="va-chief-complaint" class="manual-entry-input" rows="2" style="width:100%;" placeholder="What is the patient's chief complaint?" required></textarea>
+            <!-- Chief Complaint -->
+            <div class="vital-section">
+              <label class="vital-label required" for="va-chief-complaint">
+                <span class="label-icon">📋</span>
+                Chief Complaint
+              </label>
+              <textarea 
+                id="va-chief-complaint" 
+                class="vital-input vital-textarea" 
+                rows="2" 
+                placeholder="What is the patient's main concern or reason for visit?"
+                required
+              ></textarea>
             </div>
 
-            <div class="assessment-field-grid">
-              <div class="field">
-                <label class="inputLabel" for="va-bp">Blood Pressure (mmHg)</label>
-                <input id="va-bp" class="manual-entry-input" type="text" placeholder="e.g. 120/80" />
+            <!-- Vital Signs Grid -->
+            <div class="vital-section">
+              <div class="section-header">
+                <span class="label-icon">❤️</span>
+                <span class="section-title">Vital Signs</span>
               </div>
-              <div class="field">
-                <label class="inputLabel" for="va-hr">Heart Rate (bpm)</label>
-                <input id="va-hr" class="manual-entry-input" type="number" min="20" max="300" placeholder="e.g. 72" />
-              </div>
-              <div class="field">
-                <label class="inputLabel" for="va-rr">Resp. Rate (bpm)</label>
-                <input id="va-rr" class="manual-entry-input" type="number" min="1" max="100" placeholder="e.g. 16" />
-              </div>
-              <div class="field">
-                <label class="inputLabel" for="va-temp">Temperature (°C)</label>
-                <input id="va-temp" class="manual-entry-input" type="number" step="0.1" min="30" max="45" placeholder="36.5" />
-              </div>
-              <div class="field">
-                <label class="inputLabel" for="va-spo2">SpO₂ (%)</label>
-                <input id="va-spo2" class="manual-entry-input" type="number" min="1" max="100" placeholder="98" />
+              
+              <div class="vital-signs-grid">
+                <!-- Blood Pressure -->
+                <div class="vital-field">
+                  <label class="vital-label" for="va-bp">
+                    <span class="vital-metric-icon">🩺</span>
+                    Blood Pressure
+                  </label>
+                  <input 
+                    id="va-bp" 
+                    class="vital-input" 
+                    type="text" 
+                    placeholder="120/80"
+                    pattern="[0-9]{2,3}/[0-9]{2,3}"
+                  />
+                  <span class="vital-unit">mmHg</span>
+                </div>
+
+                <!-- Heart Rate -->
+                <div class="vital-field">
+                  <label class="vital-label" for="va-hr">
+                    <span class="vital-metric-icon">💓</span>
+                    Heart Rate
+                  </label>
+                  <input 
+                    id="va-hr" 
+                    class="vital-input" 
+                    type="number" 
+                    min="20" 
+                    max="300" 
+                    placeholder="72"
+                  />
+                  <span class="vital-unit">bpm</span>
+                </div>
+
+                <!-- Respiratory Rate -->
+                <div class="vital-field">
+                  <label class="vital-label" for="va-rr">
+                    <span class="vital-metric-icon">🫁</span>
+                    Respiratory Rate
+                  </label>
+                  <input 
+                    id="va-rr" 
+                    class="vital-input" 
+                    type="number" 
+                    min="1" 
+                    max="100" 
+                    placeholder="16"
+                  />
+                  <span class="vital-unit">bpm</span>
+                </div>
+
+                <!-- Temperature -->
+                <div class="vital-field">
+                  <label class="vital-label" for="va-temp">
+                    <span class="vital-metric-icon">🌡️</span>
+                    Temperature
+                  </label>
+                  <input 
+                    id="va-temp" 
+                    class="vital-input" 
+                    type="number" 
+                    step="0.1" 
+                    min="30" 
+                    max="45" 
+                    placeholder="36.5"
+                  />
+                  <span class="vital-unit">°C</span>
+                </div>
+
+                <!-- Oxygen Saturation -->
+                <div class="vital-field">
+                  <label class="vital-label" for="va-spo2">
+                    <span class="vital-metric-icon">💨</span>
+                    Oxygen Saturation
+                  </label>
+                  <input 
+                    id="va-spo2" 
+                    class="vital-input" 
+                    type="number" 
+                    min="1" 
+                    max="100" 
+                    placeholder="98"
+                  />
+                  <span class="vital-unit">%</span>
+                </div>
               </div>
             </div>
 
-            <div class="field">
-              <label class="inputLabel" for="va-meds">Current Medications</label>
-              <textarea id="va-meds" class="manual-entry-input" rows="2" style="width:100%;" placeholder="List any medications currently being taken..."></textarea>
+            <!-- Additional Information -->
+            <div class="vital-section">
+              <label class="vital-label" for="va-meds">
+                <span class="label-icon">💊</span>
+                Current Medications
+              </label>
+              <textarea 
+                id="va-meds" 
+                class="vital-input vital-textarea" 
+                rows="2" 
+                placeholder="List any medications the patient is currently taking..."
+              ></textarea>
             </div>
 
-            <div class="field">
-              <label class="inputLabel" for="va-notes">Nurse Notes</label>
-              <textarea id="va-notes" class="manual-entry-input" rows="2" style="width:100%;" placeholder="Additional observations or notes for the doctor..."></textarea>
+            <div class="vital-section">
+              <label class="vital-label" for="va-notes">
+                <span class="label-icon">📝</span>
+                Nurse Notes
+              </label>
+              <textarea 
+                id="va-notes" 
+                class="vital-input vital-textarea" 
+                rows="2" 
+                placeholder="Additional observations or notes for the doctor..."
+              ></textarea>
             </div>
 
-            <div id="va-form-error" style="display:none; color:#b91c1c; font-size:13px; margin-bottom:10px;"></div>
+            <!-- Error Message -->
+            <div id="va-form-error" class="vital-error" style="display:none;"></div>
 
-            <div class="actions" style="justify-content:space-between; gap:8px; margin-top:4px;">
-              <button type="submit" id="va-submit-btn" class="btn" style="background:#0369a1; color:#fff; border:none;">
+            <!-- Action Buttons -->
+            <div class="vital-actions">
+              <button type="submit" id="va-submit-btn" class="vital-btn vital-btn-primary">
                 <span class="btn-spinner" aria-hidden="true"></span>
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                  <polyline points="17 21 17 13 7 13 7 21"/>
+                  <polyline points="7 3 7 8 15 8"/>
+                </svg>
                 <span class="btn-label">Save Assessment</span>
               </button>
-              <button type="button" id="va-cancel-btn" class="btn" style="background:#64748b; color:#fff; border:none;">Cancel</button>
             </div>
           </form>
         </div>
