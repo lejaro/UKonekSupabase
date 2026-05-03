@@ -11,14 +11,19 @@
 </head>
 <body class="tv-mode">
     <div id="tv-container" class="tv-container">
-        <!-- Sidebar for Upcoming -->
+        <!-- Sidebar for Waiting / On-Call -->
         <aside class="tv-upcoming">
             <div class="tv-header">
-                <h2>Upcoming</h2>
+                <h2>On Call</h2>
+            </div>
+            <div id="oncall-list" class="upcoming-list">
+                <div class="upcoming-placeholder">—</div>
+            </div>
+            <div class="tv-header" style="margin-top:18px;">
+                <h2>Waiting</h2>
             </div>
             <div id="upcoming-list" class="upcoming-list">
-                <!-- Upcoming numbers here -->
-                <div class="upcoming-placeholder">No upcoming tickets</div>
+                <div class="upcoming-placeholder">No waiting tickets</div>
             </div>
         </aside>
 
@@ -44,6 +49,7 @@
     <audio id="call-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
     <!-- Scripts -->
-    <script type="module" src="../js/tv-view.js"></script>
+    <script src="../js/runtime-config.js"></script>
+    <script type="module" src="../js/tv-view.js?v=20260503b"></script>
 </body>
 </html>

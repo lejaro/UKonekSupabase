@@ -37,6 +37,23 @@ const logoutBtn    = document.getElementById('ph-logout-btn');
 const userNameEl   = document.getElementById('ph-user-name');
 const listSubtitle = document.getElementById('ph-list-subtitle');
 
+// Dispense prescription DOM refs
+const rxCodeInput       = document.getElementById('rx-code-input');
+const rxLookupBtn       = document.getElementById('rx-lookup-btn');
+const rxClearBtn        = document.getElementById('rx-clear-btn');
+const rxDetailCard      = document.getElementById('rx-detail-card');
+const rxCodeDisplay     = document.getElementById('rx-code-display');
+const rxStatusBadge     = document.getElementById('rx-status-badge');
+const rxPatient         = document.getElementById('rx-patient');
+const rxDoctor          = document.getElementById('rx-doctor');
+const rxIssued          = document.getElementById('rx-issued');
+const rxItemsTbody      = document.getElementById('rx-items-tbody');
+const rxDispenseAction  = document.getElementById('rx-dispense-action');
+const rxConfirmBtn      = document.getElementById('rx-confirm-dispense-btn');
+const rxDispensedNotice = document.getElementById('rx-dispensed-notice');
+const rxDispensedBy     = document.getElementById('rx-dispensed-by');
+const rxCancelledNotice = document.getElementById('rx-cancelled-notice');
+
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function showToast(message, type = 'info') {
   const container = document.getElementById('ph-toast');
@@ -480,6 +497,147 @@ async function guardAccess() {
     return false;
   }
   return true;
+}
+
+// ── Dispense Prescription ─────────────────────────────────────────────────────
+
+let currentRxData = null;
+
+function rxShow(el) { if (el) el.style.display = ''; }
+function rxHide(el) { if (el) el.style.display = 'none'; }
+
+function renderRxStatusBadge(status) {
+  if (!rxStatusBadge) return;
+  const map = {
+    pending:   { cls: 'badge-blue',  label: 'Pending' },
+    dispensed: { cls: 'badge-green', label: 'Dispensed' },
+    cancelled: { cls: 'badge-red',   label: 'Cancelled' }
+  };
+  const s = map[status] || { cls: 'badge-gray', label: status };
+  rxStatusBadge.innerHTML = `<span class="badge ${s.cls}" style="font-size:13px;padding:5px 14px;">${s.label}</span>`;
+}
+
+function renderRxItems(items) {
+  if (!rxItemsTbody) return;
+  if (!Array.isArray(items) || !items.length) {
+    rxItemsTbody.innerHTML = '<tr class="empty-row"><td colspan="6">No items.</td></tr>';
+    return;
+  }
+  rxItemsTbody.innerHTML = items.map(it => `
+    <tr>
+      <td><strong>${escHtml(it.medicine_name)}</strong></td>
+      <td>${it.quantity}</td>
+      <td>${escHtml(it.unit) || '—'}</td>
+      <td>${escHtml(it.dosage) || '—'}</td>
+      <td>${escHtml(it.frequency) || '—'}</td>
+      <td style="font-size:13px;color:#64748b;">${escHtml(it.instructions) || '—'}</td>
+    </tr>
+  `).join('');
+}
+
+function clearRxLookup() {
+  currentRxData = null;
+  if (rxCodeInput) rxCodeInput.value = '';
+  rxHide(rxDetailCard);
+  rxHide(rxClearBtn);
+  rxHide(rxDispenseAction);
+  rxHide(rxDispensedNotice);
+  rxHide(rxCancelledNotice);
+}
+
+async function lookupPrescription() {
+  const code = (rxCodeInput?.value || '').trim().toUpperCase();
+  if (!code) { showToast('Enter a Prescription ID.', 'warning'); return; }
+
+  setLoading(rxLookupBtn, true);
+  try {
+    const sb = await getSupabase();
+    const { data, error } = await sb.rpc('lookup_prescription_by_code', { p_code: code });
+    if (error) throw new Error(error.message);
+    if (data?.error) throw new Error(data.error);
+
+    currentRxData = data;
+
+    // Populate header fields
+    if (rxCodeDisplay) rxCodeDisplay.textContent = data.prescription_code || code;
+    if (rxPatient)     rxPatient.textContent     = data.patient_identifier || '—';
+    if (rxDoctor)      rxDoctor.textContent      = data.doctor_name || '—';
+    if (rxIssued)      rxIssued.textContent      = data.issued_at ? new Date(data.issued_at).toLocaleString('en-PH') : '—';
+
+    renderRxStatusBadge(data.dispensing_status);
+    renderRxItems(data.items || []);
+
+    // Show correct action panel
+    rxHide(rxDispenseAction);
+    rxHide(rxDispensedNotice);
+    rxHide(rxCancelledNotice);
+
+    if (data.dispensing_status === 'pending') {
+      rxShow(rxDispenseAction);
+    } else if (data.dispensing_status === 'dispensed') {
+      const when = data.dispensed_at ? new Date(data.dispensed_at).toLocaleString('en-PH') : 'earlier';
+      if (rxDispensedBy) rxDispensedBy.textContent = `Dispensed on ${when}.`;
+      rxShow(rxDispensedNotice);
+    } else if (data.dispensing_status === 'cancelled') {
+      rxShow(rxCancelledNotice);
+    }
+
+    rxShow(rxDetailCard);
+    rxShow(rxClearBtn);
+  } catch (err) {
+    showToast(err.message || 'Lookup failed.', 'error');
+    rxHide(rxDetailCard);
+    rxHide(rxClearBtn);
+  } finally {
+    setLoading(rxLookupBtn, false);
+  }
+}
+
+async function confirmDispense() {
+  if (!currentRxData) return;
+  const code = currentRxData.prescription_code;
+
+  if (!confirm(`Confirm dispensing prescription ${code}?\n\nThis will deduct stock for all prescribed medicines and cannot be undone.`)) return;
+
+  setLoading(rxConfirmBtn, true);
+  try {
+    const sb = await getSupabase();
+    const { data, error } = await sb.rpc('dispense_prescription', { p_prescription_code: code });
+    if (error) throw new Error(error.message);
+    if (data?.error) throw new Error(data.error);
+
+    showToast(`Prescription ${code} dispensed. Stock updated.`, 'success');
+
+    // Refresh inventory list
+    await loadMedicines();
+    renderMedicines();
+
+    // Re-lookup to update the card status
+    await lookupPrescription();
+  } catch (err) {
+    showToast(err.message || 'Dispense failed.', 'error');
+  } finally {
+    setLoading(rxConfirmBtn, false);
+  }
+}
+
+// Event listeners
+if (rxLookupBtn) {
+  rxLookupBtn.addEventListener('click', lookupPrescription);
+}
+if (rxCodeInput) {
+  rxCodeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); lookupPrescription(); }
+  });
+  rxCodeInput.addEventListener('input', () => {
+    rxCodeInput.value = rxCodeInput.value.toUpperCase();
+  });
+}
+if (rxClearBtn) {
+  rxClearBtn.addEventListener('click', clearRxLookup);
+}
+if (rxConfirmBtn) {
+  rxConfirmBtn.addEventListener('click', confirmDispense);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

@@ -1,171 +1,155 @@
+// TV View — uses get_tv_queue_display RPC (security definer, anon-accessible)
+// No login session required.
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 let supabaseClient = null;
-let lastServingId = null;
+let lastServingIds = new Set();
+
+// ── Build anon Supabase client from runtime-config (no auth session needed) ──
+function buildAnonClient() {
+    const config = window.UKONEK_CONFIG || {};
+    const url    = String(config.SUPABASE_URL    || '').trim();
+    const key    = String(config.SUPABASE_ANON_KEY || '').trim();
+    if (!url || !key) throw new Error('Missing Supabase runtime config.');
+    return createClient(url, key, {
+        auth: { persistSession: false, autoRefreshToken: false }
+    });
+}
 
 const tvView = (() => {
     const init = async () => {
-        console.log('TV View initializing...');
         updateClock();
         setInterval(updateClock, 1000);
-        
+
         try {
-            const config = await import('./supabase-config.js');
-            supabaseClient = config.supabase;
-            console.log('Supabase initialized in TV View');
-            
+            supabaseClient = buildAnonClient();
             await loadQueueData();
             setupRealtimeListener();
-            
-            // Robust polling fallback every 30 seconds
-            setInterval(loadQueueData, 30000);
+            setInterval(loadQueueData, 5000);
         } catch (err) {
-            console.error('Failed to initialize TV View:', err);
-            document.getElementById('serving-label').textContent = 'Error connecting to database.';
+            console.error('TV View init error:', err);
+            const lbl = document.getElementById('serving-label');
+            if (lbl) lbl.textContent = 'Error connecting. Check runtime-config.js.';
         }
     };
 
-    const getTodayDateText = () => {
-        const now = new Date();
-        const y = now.getFullYear();
-        const m = String(now.getMonth() + 1).padStart(2, '0');
-        const d = String(now.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-    };
-
     const updateClock = () => {
-        const clockEl = document.getElementById('tv-clock');
-        if (!clockEl) return;
-        const now = new Date();
-        clockEl.textContent = now.toLocaleTimeString('en-US', { 
-            hour12: true, 
-            hour: '2-digit', 
-            minute: '2-digit'
+        const el = document.getElementById('tv-clock');
+        if (!el) return;
+        el.textContent = new Date().toLocaleTimeString('en-US', {
+            hour12: true, hour: '2-digit', minute: '2-digit'
         });
     };
 
     const setupRealtimeListener = () => {
         if (!supabaseClient) return;
         supabaseClient
-            .channel('public:queue_tickets_tv')
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'queue_tickets' 
-            }, (payload) => {
-                console.log('TV View sync event:', payload.eventType);
-                loadQueueData();
-            })
-            .subscribe();
+            .channel('tv-queue-changes')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'queue_tickets'
+            }, () => loadQueueData())
+            .subscribe((status) => {
+                console.log('TV realtime status:', status);
+            });
     };
 
     const loadQueueData = async () => {
-        if (!supabaseClient) {
-            console.warn('Supabase not ready yet');
-            return;
-        }
+        if (!supabaseClient) return;
         try {
-            const today = getTodayDateText();
-            console.log(`Loading queue for date: ${today}`);
-            
-            let { data, error } = await supabaseClient
-                .from('queue_tickets')
-                .select('*')
-                .eq('queue_date', today)
-                .neq('status', 'cancelled')
-                .neq('status', 'completed')
-                .order('queue_number', { ascending: true });
+            const { data, error } = await supabaseClient
+                .rpc('get_tv_queue_display');
 
-            if (error) {
-                console.error('Supabase query error:', error);
-                throw error;
-            }
+            if (error) throw new Error(error.message);
 
-            console.log(`Initial fetch: ${data?.length || 0} tickets found for ${today}`);
-
-            // If empty, try a broader fetch just to see if there's a date mismatch
-            if (!data || data.length === 0) {
-                console.log('No tickets for today, checking all active tickets...');
-                const fallback = await supabaseClient
-                    .from('queue_tickets')
-                    .select('*')
-                    .neq('status', 'cancelled')
-                    .neq('status', 'completed')
-                    .order('created_at', { ascending: false })
-                    .limit(20);
-                
-                if (!fallback.error && fallback.data?.length > 0) {
-                    console.log(`Found ${fallback.data.length} tickets in fallback (ignoring date)`);
-                    data = fallback.data;
-                }
-            }
-
-            renderView(data || []);
+            const result = typeof data === 'string' ? JSON.parse(data) : data;
+            renderView(result);
         } catch (err) {
-            console.error('TV View data load error:', err);
-            document.getElementById('serving-label').textContent = 'Connectivity error. Retrying...';
+            console.error('TV load error:', err);
+            const lbl = document.getElementById('serving-label');
+            if (lbl) lbl.textContent = 'Connectivity error. Retrying...';
         }
     };
 
-    const renderView = (tickets) => {
-        const normalizedStatus = (t) => String(t?.status || '').trim().toLowerCase();
-        
-        // Find the first serving ticket
-        const serving = tickets
-            .filter(t => normalizedStatus(t) === 'serving')
-            .sort((a, b) => a.queue_number - b.queue_number)[0];
-            
-        // Upcoming is everything else that is not completed or cancelled
-        const upcoming = tickets.filter(t => t.id !== serving?.id);
+    const renderView = (result) => {
+        const serving = result?.serving || [];
+        const onCall  = result?.on_call  || [];
+        const waiting = result?.waiting  || [];
 
-        console.log(`Rendering: Serving: ${serving?.queue_number || 'None'}, Upcoming: ${upcoming.length}`);
+        console.log(`TV: serving=${serving.length} on_call=${onCall.length} waiting=${waiting.length}`);
 
         updateServingDisplay(serving);
-        updateUpcomingDisplay(upcoming);
+        updateOnCallDisplay(onCall);
+        updateWaitingDisplay(waiting);
     };
 
-    const updateServingDisplay = (ticket) => {
-        const numberEl = document.getElementById('serving-number');
-        const labelEl = document.getElementById('serving-label');
-        const sound = document.getElementById('call-sound');
+    const fmt = (n) => `${String(n).padStart(3, '0')}`;
 
-        if (!ticket) {
-            numberEl.textContent = '---';
-            labelEl.textContent = 'Waiting for patients...';
-            lastServingId = null;
+    const updateServingDisplay = (tickets) => {
+        const numberEl = document.getElementById('serving-number');
+        const labelEl  = document.getElementById('serving-label');
+        const sound    = document.getElementById('call-sound');
+
+        if (!tickets.length) {
+            if (numberEl) numberEl.textContent = '---';
+            if (labelEl)  labelEl.textContent  = 'Waiting for patients...';
+            lastServingIds = new Set();
             return;
         }
 
-        const newNumber = `#${String(ticket.queue_number).padStart(3, '0')}`;
-        
-        if (lastServingId !== ticket.id) {
-            // New number called
-            if (sound && lastServingId !== null) {
-                sound.play().catch(e => console.warn('Sound play blocked:', e));
-            }
-            lastServingId = ticket.id;
-        }
+        // Show the first (lowest queue number) serving ticket in the main display
+        const primary = tickets[0];
+        const newNum  = fmt(primary.queue_number);
 
-        numberEl.textContent = newNumber;
-        labelEl.textContent = ticket.service_label || 'General Consultation';
+        // Play sound if a new ticket appeared in serving
+        const newIds = new Set(tickets.map(t => t.id));
+        const hasNew = tickets.some(t => !lastServingIds.has(t.id));
+        if (hasNew && lastServingIds.size > 0 && sound) {
+            sound.play().catch(e => console.warn('Sound blocked:', e));
+        }
+        lastServingIds = newIds;
+
+        if (numberEl) numberEl.textContent = newNum;
+        if (labelEl)  labelEl.textContent  = ''; // Hide service label as requested
+
+        // If multiple serving, show them all stacked under the label
+        const extra = tickets.slice(1);
+        const extraEl = document.getElementById('serving-extra');
+        if (extraEl) {
+            extraEl.innerHTML = extra.map(t =>
+                `<div style="font-size:1.4rem;opacity:0.7;">${fmt(t.queue_number)}</div>`
+            ).join('');
+        }
     };
 
-    const updateUpcomingDisplay = (upcoming) => {
+    const updateOnCallDisplay = (tickets) => {
+        const list = document.getElementById('oncall-list');
+        if (!list) return;
+        if (!tickets.length) {
+            list.innerHTML = '<div class="upcoming-placeholder">—</div>';
+            return;
+        }
+        list.innerHTML = tickets.map(t => `
+            <div class="upcoming-card" style="border-left:3px solid #f59e0b;">
+                <span class="upcoming-number">${fmt(t.queue_number)}</span>
+            </div>
+        `).join('');
+    };
+
+    const updateWaitingDisplay = (tickets) => {
         const list = document.getElementById('upcoming-list');
         if (!list) return;
-
-        if (upcoming.length === 0) {
-            list.innerHTML = '<div class="upcoming-placeholder">No upcoming tickets</div>';
+        if (!tickets.length) {
+            list.innerHTML = '<div class="upcoming-placeholder">No waiting tickets</div>';
             return;
         }
-
-        list.innerHTML = upcoming
-            .slice(0, 8) // Show top 8 upcoming
-            .map(t => `
-                <div class="upcoming-card">
-                    <span class="upcoming-number">#${String(t.queue_number).padStart(3, '0')}</span>
-                    <span class="upcoming-label">${t.service_key || 'Consult'}</span>
-                </div>
-            `)
-            .join('');
+        list.innerHTML = tickets.slice(0, 10).map(t => `
+            <div class="upcoming-card">
+                <span class="upcoming-number">${fmt(t.queue_number)}</span>
+            </div>
+        `).join('');
     };
 
     return { init };

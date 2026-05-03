@@ -102,6 +102,165 @@ class DoctorStatus {
   }
 }
 
+class PrescriptionRecord {
+  final int prescriptionId;
+  final String prescriptionCode;
+  final String dispensingStatus;
+  final DateTime issuedAt;
+  final DateTime? dispensedAt;
+  final String doctorName;
+  final String medicineName;
+  final int quantity;
+  final String unit;
+  final String dosage;
+  final String frequency;
+  final String instructions;
+  final String additionalInfo;
+
+  const PrescriptionRecord({
+    required this.prescriptionId,
+    required this.prescriptionCode,
+    required this.dispensingStatus,
+    required this.issuedAt,
+    this.dispensedAt,
+    required this.doctorName,
+    required this.medicineName,
+    required this.quantity,
+    required this.unit,
+    required this.dosage,
+    required this.frequency,
+    required this.instructions,
+    required this.additionalInfo,
+  });
+
+  String get displayDoctorName {
+    final n = doctorName.trim();
+    if (n.isEmpty) return 'Doctor';
+    if (n.toLowerCase().startsWith('dr.')) return n;
+    return 'Dr. $n';
+  }
+
+  bool get isDispensed  => dispensingStatus == 'dispensed';
+  bool get isCancelled  => dispensingStatus == 'cancelled';
+  bool get isPending    => dispensingStatus == 'pending';
+
+  factory PrescriptionRecord.fromMap(Map<String, dynamic> m) {
+    return PrescriptionRecord(
+      prescriptionId:   (m['prescription_id']   as num?)?.toInt() ?? 0,
+      prescriptionCode: (m['prescription_code']  as String?) ?? '',
+      dispensingStatus: (m['dispensing_status']  as String?) ?? 'pending',
+      issuedAt:         DateTime.parse((m['issued_at'] as String?) ?? DateTime.now().toIso8601String()),
+      dispensedAt:      m['dispensed_at'] != null ? DateTime.tryParse(m['dispensed_at'] as String) : null,
+      doctorName:       (m['doctor_name']        as String?) ?? '',
+      medicineName:     (m['medicine_name']      as String?) ?? '',
+      quantity:         (m['quantity']           as num?)?.toInt() ?? 0,
+      unit:             (m['unit']               as String?) ?? '',
+      dosage:           (m['dosage']             as String?) ?? '',
+      frequency:        (m['frequency']          as String?) ?? '',
+      instructions:     (m['instructions']       as String?) ?? '',
+      additionalInfo:   (m['additional_info']    as String?) ?? '',
+    );
+  }
+}
+
+class ScheduledMedicine {
+  final int prescriptionItemId;
+  final int prescriptionId;
+  final String prescriptionCode;
+  final String dispensingStatus;
+  final DateTime issuedAt;
+  final DateTime? dispensedAt;
+  final String doctorName;
+  final String medicineName;
+  final int quantity;
+  final String unit;
+  final String dosage;
+  final String frequency;
+  final String instructions;
+  final String additionalInfo;
+
+  const ScheduledMedicine({
+    required this.prescriptionItemId,
+    required this.prescriptionId,
+    required this.prescriptionCode,
+    required this.dispensingStatus,
+    required this.issuedAt,
+    this.dispensedAt,
+    required this.doctorName,
+    required this.medicineName,
+    required this.quantity,
+    required this.unit,
+    required this.dosage,
+    required this.frequency,
+    required this.instructions,
+    required this.additionalInfo,
+  });
+
+  String get displayDoctorName {
+    final n = doctorName.trim();
+    if (n.isEmpty) return 'Doctor';
+    if (n.toLowerCase().startsWith('dr.')) return n;
+    return 'Dr. $n';
+  }
+
+  // Parse frequency string into a count of daily doses.
+  // Handles: "Once a day", "2x a day", "3x a day", "4x a day",
+  // "Every 6 hours", "Every 8 hours", "Every 12 hours", etc.
+  int get dailyDoseCount {
+    final f = frequency.toLowerCase().trim();
+    if (f.isEmpty) return 1;
+    // "Nx a day" or "N times a day"
+    final xday = RegExp(r'(\d+)\s*x').firstMatch(f);
+    if (xday != null) return int.tryParse(xday.group(1)!) ?? 1;
+    final times = RegExp(r'(\d+)\s*time').firstMatch(f);
+    if (times != null) return int.tryParse(times.group(1)!) ?? 1;
+    // "once" / "daily"
+    if (f.contains('once') || f.contains('1x') || f.contains('daily')) return 1;
+    // "every N hours"
+    final hrs = RegExp(r'every\s+(\d+)\s+h').firstMatch(f);
+    if (hrs != null) {
+      final h = int.tryParse(hrs.group(1)!) ?? 8;
+      return (24 / h).floor();
+    }
+    // "twice"
+    if (f.contains('twice')) return 2;
+    return 1;
+  }
+
+  // Generate dose times starting at 08:00 spaced by 24/count hours.
+  List<String> get doseTimes {
+    final count = dailyDoseCount;
+    final intervalHours = count > 0 ? 24 ~/ count : 24;
+    return List.generate(count, (i) {
+      final totalMins = 8 * 60 + i * intervalHours * 60;
+      final h = (totalMins ~/ 60) % 24;
+      final m = totalMins % 60;
+      final period = h >= 12 ? 'PM' : 'AM';
+      final displayH = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+      return '${displayH.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $period';
+    });
+  }
+
+  factory ScheduledMedicine.fromMap(Map<String, dynamic> m) {
+    return ScheduledMedicine(
+      prescriptionItemId: (m['prescription_item_id'] as num?)?.toInt() ?? 0,
+      prescriptionId:     (m['prescription_id']      as num?)?.toInt() ?? 0,
+      prescriptionCode:   (m['prescription_code']    as String?) ?? '',
+      dispensingStatus:   (m['dispensing_status']    as String?) ?? '',
+      issuedAt:           DateTime.parse((m['issued_at'] as String?) ?? DateTime.now().toIso8601String()),
+      dispensedAt:        m['dispensed_at'] != null ? DateTime.tryParse(m['dispensed_at'] as String) : null,
+      doctorName:         (m['doctor_name']           as String?) ?? '',
+      medicineName:       (m['medicine_name']         as String?) ?? '',
+      quantity:           (m['quantity']              as num?)?.toInt() ?? 0,
+      unit:               (m['unit']                  as String?) ?? '',
+      dosage:             (m['dosage']                as String?) ?? '',
+      frequency:          (m['frequency']             as String?) ?? '',
+      instructions:       (m['instructions']          as String?) ?? '',
+      additionalInfo:     (m['additional_info']       as String?) ?? '',
+    );
+  }
+}
+
 class VitalSigns {
   final String id;
   final int citizenId;
@@ -1049,6 +1208,45 @@ class ApiService {
           .toList();
     } catch (e) {
       debugPrint('Error fetching vital signs: $e');
+      return [];
+    }
+  }
+
+  // ── Medicine Schedule ─────────────────────────────────────────────────────────
+
+  static Future<List<ScheduledMedicine>> getMedicineSchedule() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final response = await _client.rpc('get_my_medicine_schedule');
+      final rows = (response as List<dynamic>?) ?? const <dynamic>[];
+      return rows
+          .whereType<Map<String, dynamic>>()
+          .map(ScheduledMedicine.fromMap)
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching medicine schedule: $e');
+      return [];
+    }
+  }
+
+  // ── Prescriptions ────────────────────────────────────────────────────────────
+
+  static Future<List<PrescriptionRecord>> fetchPrescriptions({int limit = 50}) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final response = await _client
+          .rpc('get_my_prescribed_medicines', params: {'p_limit': limit});
+      final rows = (response as List<dynamic>?) ?? const [];
+      return rows
+          .whereType<Map<String, dynamic>>()
+          .map(PrescriptionRecord.fromMap)
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching prescriptions: $e');
       return [];
     }
   }

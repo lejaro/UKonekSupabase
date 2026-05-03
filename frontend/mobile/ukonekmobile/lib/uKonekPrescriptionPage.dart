@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'services/api_service.dart';
 
 class _C {
   static const primary      = Color(0xFF0A2E6E);
@@ -9,10 +11,34 @@ class _C {
   static const textDark     = Color(0xFF1A2740);
   static const textMuted    = Color(0xFF8A93A0);
   static const divider      = Color(0xFFEEF1F6);
-  static const heartRed     = Color(0xFFE53935);
   static const success      = Color(0xFF10B981);
   static const warning      = Color(0xFFF59E0B);
   static const shadow       = Color(0x0A000000);
+}
+
+// ── Groups all items under a single prescription header ──────────
+class _PrescriptionGroup {
+  final int prescriptionId;
+  final String prescriptionCode;
+  final String dispensingStatus;
+  final DateTime issuedAt;
+  final DateTime? dispensedAt;
+  final String doctorName;
+  final List<PrescriptionRecord> items;
+
+  const _PrescriptionGroup({
+    required this.prescriptionId,
+    required this.prescriptionCode,
+    required this.dispensingStatus,
+    required this.issuedAt,
+    this.dispensedAt,
+    required this.doctorName,
+    required this.items,
+  });
+
+  bool get isDispensed => dispensingStatus == 'dispensed';
+  bool get isCancelled => dispensingStatus == 'cancelled';
+  bool get isPending   => dispensingStatus == 'pending';
 }
 
 class PrescriptionPage extends StatefulWidget {
@@ -24,92 +50,57 @@ class PrescriptionPage extends StatefulWidget {
 
 class _PrescriptionPageState extends State<PrescriptionPage> {
   int _selectedFilter = 0;
-  final List<String> _filters = ['All', 'Active', 'Completed'];
+  final List<String> _filters = ['All', 'Pending', 'Dispensed'];
 
-  // ── Demo prescriptions ─────────────────────────────────────────
-  final List<Map<String, dynamic>> _prescriptions = [
-    {
-      'name':        'Amoxicillin',
-      'dosage':      '500mg',
-      'form':        'Capsule',
-      'frequency':   '3x a day',
-      'duration':    '7 days',
-      'meal':        'After meal',
-      'startDate':   'March 20, 2026',
-      'endDate':     'March 27, 2026',
-      'doctor':      'Dr. Maria Santos',
-      'status':      'Active',
-      'remaining':   5,
-      'total':       7,
-      'purpose':     'For bacterial infection / Upper respiratory tract infection',
-      'instructions':'Take every 8 hours. Complete the full course even if symptoms improve. Store at room temperature.',
-      'color':       Color(0xFF1565C0),
-      'icon':        Icons.medication_rounded,
-      'taken':       [true, true, false, false, false, false, false],
-    },
-    {
-      'name':        'Vitamin C',
-      'dosage':      '500mg',
-      'form':        'Tablet',
-      'frequency':   '1x a day',
-      'duration':    '30 days',
-      'meal':        'After meal',
-      'startDate':   'March 20, 2026',
-      'endDate':     'April 19, 2026',
-      'doctor':      'Dr. Maria Santos',
-      'status':      'Active',
-      'remaining':   28,
-      'total':       30,
-      'purpose':     'Vitamin C supplementation / Immune support',
-      'instructions':'Take once daily after breakfast. May be taken with or without water.',
-      'color':       Color(0xFF2E7D32),
-      'icon':        Icons.local_pharmacy_outlined,
-      'taken':       [true, true, false],
-    },
-    {
-      'name':        'Paracetamol',
-      'dosage':      '500mg',
-      'form':        'Tablet',
-      'frequency':   'Every 6 hrs (as needed)',
-      'duration':    '3 days',
-      'meal':        'With or without food',
-      'startDate':   'March 18, 2026',
-      'endDate':     'March 21, 2026',
-      'doctor':      'Dr. Maria Santos',
-      'status':      'Completed',
-      'remaining':   0,
-      'total':       12,
-      'purpose':     'Fever and pain relief',
-      'instructions':'Take every 6 hours only when needed for fever above 38°C or pain. Do not exceed 4g daily.',
-      'color':       Color(0xFF7B1FA2),
-      'icon':        Icons.medication_liquid_outlined,
-      'taken':       [],
-    },
-    {
-      'name':        'Cetirizine',
-      'dosage':      '10mg',
-      'form':        'Tablet',
-      'frequency':   '1x a day',
-      'duration':    '5 days',
-      'meal':        'Before bedtime',
-      'startDate':   'February 10, 2026',
-      'endDate':     'February 15, 2026',
-      'doctor':      'Dr. Jose Reyes',
-      'status':      'Completed',
-      'remaining':   0,
-      'total':       5,
-      'purpose':     'Allergic rhinitis / Seasonal allergies',
-      'instructions':'Take at bedtime. May cause drowsiness. Avoid driving or operating heavy machinery.',
-      'color':       Color(0xFFE65100),
-      'icon':        Icons.medication_rounded,
-      'taken':       [],
-    },
-  ];
+  bool _loading = true;
+  String? _error;
+  List<_PrescriptionGroup> _groups = [];
 
-  List<Map<String, dynamic>> get _filtered {
-    if (_selectedFilter == 0) return _prescriptions;
-    final f = _filters[_selectedFilter];
-    return _prescriptions.where((p) => p['status'] == f).toList();
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final records = await ApiService.fetchPrescriptions();
+      setState(() {
+        _groups = _buildGroups(records);
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  List<_PrescriptionGroup> _buildGroups(List<PrescriptionRecord> records) {
+    final Map<int, _PrescriptionGroup> map = {};
+    for (final r in records) {
+      if (map.containsKey(r.prescriptionId)) {
+        map[r.prescriptionId]!.items.add(r);
+      } else {
+        map[r.prescriptionId] = _PrescriptionGroup(
+          prescriptionId:   r.prescriptionId,
+          prescriptionCode: r.prescriptionCode,
+          dispensingStatus: r.dispensingStatus,
+          issuedAt:         r.issuedAt,
+          dispensedAt:      r.dispensedAt,
+          doctorName:       r.displayDoctorName,
+          items:            [r],
+        );
+      }
+    }
+    final list = map.values.toList()
+      ..sort((a, b) => b.issuedAt.compareTo(a.issuedAt));
+    return list;
+  }
+
+  List<_PrescriptionGroup> get _filtered {
+    if (_selectedFilter == 0) return _groups;
+    final f = _filters[_selectedFilter].toLowerCase();
+    return _groups.where((g) => g.dispensingStatus == f).toList();
   }
 
   @override
@@ -118,71 +109,87 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
       backgroundColor: _C.bg,
       body: Column(children: [
         _buildHeader(),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-            children: [
-              // ── Today's reminder strip ───────────────────────
-              const SizedBox(height: 16),
-              _buildTodayReminder(),
-              const SizedBox(height: 20),
-
-              // ── Filter chips ─────────────────────────────────
-              SizedBox(
-                height: 40,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _filters.length,
-                  itemBuilder: (_, i) {
-                    final sel = _selectedFilter == i;
-                    return GestureDetector(
-                      onTap: () =>
-                          setState(() => _selectedFilter = i),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.only(right: 8),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: sel
-                              ? _C.primaryMid
-                              : _C.surface,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: sel
-                                ? _C.primaryMid
-                                : _C.divider,
-                          ),
-                          boxShadow: sel
-                              ? [BoxShadow(
-                            color: _C.primaryMid
-                                .withOpacity(0.25),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          )]
-                              : [],
-                        ),
-                        child: Text(_filters[i],
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: sel
-                                  ? Colors.white
-                                  : _C.textMuted,
-                            )),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // ── Prescription cards ───────────────────────────
-              ..._filtered.map((p) => _prescriptionCard(p)),
-            ],
-          ),
-        ),
+        Expanded(child: _buildBody()),
       ]),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, color: Colors.red, size: 48),
+          const SizedBox(height: 12),
+          Text('Failed to load prescriptions', style: TextStyle(color: _C.textDark, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Text(_error!, style: const TextStyle(color: _C.textMuted, fontSize: 12), textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _load,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(backgroundColor: _C.primaryMid, foregroundColor: Colors.white),
+          ),
+        ],
+      ));
+    }
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+        children: [
+          const SizedBox(height: 16),
+          // ── Filter chips ───────────────────────────────────
+          SizedBox(
+            height: 40,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _filters.length,
+              itemBuilder: (_, i) {
+                final sel = _selectedFilter == i;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedFilter = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: sel ? _C.primaryMid : _C.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: sel ? _C.primaryMid : _C.divider),
+                      boxShadow: sel
+                          ? [BoxShadow(color: _C.primaryMid.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 3))]
+                          : [],
+                    ),
+                    child: Text(_filters[i],
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                            color: sel ? Colors.white : _C.textMuted)),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          if (_filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 40),
+              child: Column(children: [
+                Icon(Icons.receipt_long_outlined, size: 56, color: _C.textMuted.withOpacity(0.4)),
+                const SizedBox(height: 12),
+                const Text('No prescriptions found',
+                    style: TextStyle(color: _C.textMuted, fontSize: 15, fontWeight: FontWeight.w500)),
+              ]),
+            )
+          else
+            ..._filtered.map((g) => _prescriptionGroupCard(g)),
+        ],
+      ),
     );
   }
 
@@ -213,35 +220,29 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                   color: Colors.white.withOpacity(0.18),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white, size: 18),
+                child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
               ),
             ),
             const SizedBox(width: 14),
             const Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Prescriptions',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.4,
-                    )),
+                Text('Prescriptions', style: TextStyle(color: Colors.white, fontSize: 20,
+                    fontWeight: FontWeight.bold, letterSpacing: -0.4)),
                 SizedBox(height: 2),
-                Text('Your medication details',
-                    style: TextStyle(
-                        color: Colors.white70, fontSize: 12)),
+                Text('Your medication records', style: TextStyle(color: Colors.white70, fontSize: 12)),
               ],
             )),
-            Container(
-              width: 38, height: 38,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(12),
+            GestureDetector(
+              onTap: _load,
+              child: Container(
+                width: 38, height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
               ),
-              child: const Icon(Icons.add_rounded,
-                  color: Colors.white, size: 22),
             ),
           ]),
         ),
@@ -249,196 +250,102 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     );
   }
 
-  // ── Today's reminder card ──────────────────────────────────────
-  Widget _buildTodayReminder() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(
-          color: const Color(0xFF2E7D32).withOpacity(0.25),
-          blurRadius: 12,
-          offset: const Offset(0, 4),
-        )],
-      ),
-      child: Row(children: [
-        Container(
-          width: 48, height: 48,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(Icons.alarm_rounded,
-              color: Colors.white, size: 26),
-        ),
-        const SizedBox(width: 14),
-        const Expanded(child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Today\'s Reminder',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                )),
-            SizedBox(height: 4),
-            Text('2 medications due — Amoxicillin & Vitamin C',
-                style: TextStyle(
-                    color: Colors.white70, fontSize: 12)),
-          ],
-        )),
-        Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Text('View',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              )),
-        ),
-      ]),
-    );
-  }
-
-  // ── Prescription card ──────────────────────────────────────────
-  Widget _prescriptionCard(Map<String, dynamic> p) {
-    final color     = p['color'] as Color;
-    final isActive  = p['status'] == 'Active';
-    final remaining = p['remaining'] as int;
-    final total     = p['total'] as int;
-    final progress  = total > 0 ? remaining / total : 0.0;
+  // ── Prescription group card ────────────────────────────────────
+  Widget _prescriptionGroupCard(_PrescriptionGroup g) {
+    final statusColor = g.isDispensed ? _C.success
+        : g.isCancelled ? Colors.red.shade300
+        : _C.warning;
+    final statusLabel = g.isDispensed ? 'Dispensed'
+        : g.isCancelled ? 'Cancelled'
+        : 'Pending';
 
     return GestureDetector(
-      onTap: () => _showPrescriptionDetail(p),
+      onTap: () => _showGroupDetail(g),
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
           color: _C.surface,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(
-            color: _C.shadow,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          )],
+          boxShadow: [BoxShadow(color: _C.shadow, blurRadius: 12, offset: const Offset(0, 4))],
         ),
         child: Column(children: [
-          // Color top strip
+          // Status colour strip
           Container(
             height: 4,
             decoration: BoxDecoration(
-              color: isActive ? color : _C.divider,
+              color: statusColor,
               borderRadius: const BorderRadius.only(
-                topLeft:  Radius.circular(20),
-                topRight: Radius.circular(20),
-              ),
+                  topLeft: Radius.circular(20), topRight: Radius.circular(20)),
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(children: [
-              // Top row
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // Header row
               Row(children: [
                 Container(
-                  width: 46, height: 46,
+                  width: 44, height: 44,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.10),
-                    borderRadius: BorderRadius.circular(13),
+                    color: _C.primaryMid.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(p['icon'] as IconData,
-                      color: color, size: 24),
+                  child: const Icon(Icons.receipt_long_rounded, color: _C.primaryMid, size: 22),
                 ),
                 const SizedBox(width: 12),
-                Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${p['name']} ${p['dosage']}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: _C.textDark,
-                          letterSpacing: -0.3,
-                        )),
-                    const SizedBox(height: 3),
-                    Text(
-                        '${p['form']} • ${p['frequency']}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: _C.textMuted,
-                        )),
-                  ],
-                )),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(g.prescriptionCode,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
+                          color: _C.textDark, letterSpacing: 0.5, fontFamily: 'monospace')),
+                  const SizedBox(height: 2),
+                  Text(g.doctorName,
+                      style: const TextStyle(fontSize: 12, color: _C.textMuted)),
+                ])),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: isActive
-                        ? _C.success.withOpacity(0.10)
-                        : _C.divider,
+                    color: statusColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(p['status'] as String,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isActive
-                            ? _C.success
-                            : _C.textMuted,
-                      )),
+                  child: Text(statusLabel,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
                 ),
               ]),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
-              // Info pills
+              // Medicine list preview (up to 3)
+              ...g.items.take(3).map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(children: [
+                  const Icon(Icons.medication_rounded, size: 14, color: _C.primaryMid),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(
+                    '${item.medicineName}${item.dosage.isNotEmpty ? " ${item.dosage}" : ""}${item.frequency.isNotEmpty ? " — ${item.frequency}" : ""}',
+                    style: const TextStyle(fontSize: 13, color: _C.textDark),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                  )),
+                  Text('×${item.quantity}${item.unit.isNotEmpty ? " ${item.unit}" : ""}',
+                      style: const TextStyle(fontSize: 12, color: _C.textMuted, fontWeight: FontWeight.w600)),
+                ]),
+              )),
+              if (g.items.length > 3)
+                Text('+${g.items.length - 3} more item(s)',
+                    style: const TextStyle(fontSize: 12, color: _C.textMuted)),
+
+              const SizedBox(height: 10),
+              // Footer row
               Row(children: [
-                _infoPill(Icons.schedule_rounded,
-                    p['meal'] as String),
-                const SizedBox(width: 8),
-                _infoPill(Icons.person_outline_rounded,
-                    p['doctor'] as String),
+                const Icon(Icons.calendar_today_rounded, size: 12, color: _C.textMuted),
+                const SizedBox(width: 4),
+                Text('Issued: ${DateFormat('MMM d, yyyy').format(g.issuedAt)}',
+                    style: const TextStyle(fontSize: 11, color: _C.textMuted)),
+                if (g.isDispensed && g.dispensedAt != null) ...[
+                  const SizedBox(width: 12),
+                  const Icon(Icons.check_circle_rounded, size: 12, color: _C.success),
+                  const SizedBox(width: 4),
+                  Text('Dispensed: ${DateFormat('MMM d, yyyy').format(g.dispensedAt!)}',
+                      style: const TextStyle(fontSize: 11, color: _C.success)),
+                ],
               ]),
-
-              if (isActive) ...[
-                const SizedBox(height: 14),
-                // Progress bar
-                Row(
-                  mainAxisAlignment:
-                  MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Days remaining: $remaining/$total',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: _C.textMuted,
-                        )),
-                    Text('${(progress * 100).toStringAsFixed(0)}%',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: color,
-                        )),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 8,
-                    backgroundColor: _C.divider,
-                    valueColor:
-                    AlwaysStoppedAnimation<Color>(color),
-                  ),
-                ),
-              ],
             ]),
           ),
         ]),
@@ -446,177 +353,95 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     );
   }
 
-  Widget _infoPill(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: _C.bg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _C.divider),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 12, color: _C.textMuted),
-        const SizedBox(width: 5),
-        Text(label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: _C.textMuted,
-              fontWeight: FontWeight.w500,
-            )),
-      ]),
-    );
-  }
-
-  // ── Prescription detail sheet ──────────────────────────────────
-  void _showPrescriptionDetail(Map<String, dynamic> p) {
-    final color    = p['color'] as Color;
-    final isActive = p['status'] == 'Active';
+  // ── Prescription group detail sheet ───────────────────────────
+  void _showGroupDetail(_PrescriptionGroup g) {
+    final statusColor = g.isDispensed ? _C.success
+        : g.isCancelled ? Colors.red.shade400
+        : _C.warning;
+    final statusLabel = g.isDispensed ? 'Dispensed'
+        : g.isCancelled ? 'Cancelled'
+        : 'Pending';
 
     showModalBottomSheet(
-      context:            context,
+      context: context,
       isScrollControlled: true,
-      backgroundColor:    Colors.transparent,
+      backgroundColor: Colors.transparent,
       builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.65,
-        maxChildSize:     0.92,
-        minChildSize:     0.45,
+        initialChildSize: 0.70,
+        maxChildSize: 0.95,
+        minChildSize: 0.45,
         builder: (_, sc) => Container(
           decoration: const BoxDecoration(
             color: _C.surface,
-            borderRadius: BorderRadius.vertical(
-                top: Radius.circular(28)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: Column(children: [
             Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: Container(
-                width: 36, height: 4,
-                decoration: BoxDecoration(
-                  color: _C.divider,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+              child: Container(width: 36, height: 4,
+                  decoration: BoxDecoration(color: _C.divider, borderRadius: BorderRadius.circular(2))),
             ),
-            // Detail header
+
+            // Header card
             Container(
-              margin: const EdgeInsets.all(20),
+              margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [color, color.withOpacity(0.7)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  colors: [_C.primary, _C.primaryMid],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Row(children: [
-                Container(
-                  width: 52, height: 52,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 24),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(g.prescriptionCode,
+                      style: const TextStyle(color: Colors.white, fontSize: 18,
+                          fontWeight: FontWeight.w800, letterSpacing: 0.5, fontFamily: 'monospace'))),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(statusLabel,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: statusColor)),
                   ),
-                  child: Icon(p['icon'] as IconData,
-                      color: Colors.white, size: 28),
-                ),
-                const SizedBox(width: 14),
-                Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${p['name']} ${p['dosage']}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        )),
-                    const SizedBox(height: 4),
-                    Text(p['form'] as String,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        )),
-                  ],
-                )),
+                ]),
+                const SizedBox(height: 10),
+                Row(children: [
+                  const Icon(Icons.person_outline_rounded, color: Colors.white70, size: 14),
+                  const SizedBox(width: 6),
+                  Text(g.doctorName, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                  const Spacer(),
+                  const Icon(Icons.calendar_today_rounded, color: Colors.white70, size: 14),
+                  const SizedBox(width: 6),
+                  Text(DateFormat('MMM d, yyyy').format(g.issuedAt),
+                      style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                ]),
+                if (g.isDispensed && g.dispensedAt != null) ...[
+                  const SizedBox(height: 6),
+                  Row(children: [
+                    const Icon(Icons.check_circle_rounded, color: _C.success, size: 14),
+                    const SizedBox(width: 6),
+                    Text('Dispensed on ${DateFormat('MMM d, yyyy – h:mm a').format(g.dispensedAt!)}',
+                        style: const TextStyle(color: _C.success, fontSize: 12)),
+                  ]),
+                ],
               ]),
             ),
 
             Expanded(
               child: ListView(
                 controller: sc,
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
                 children: [
-                  // Details grid
-                  _detailSection('Prescription Details', [
-                    _detailRow2('Frequency',  p['frequency'] as String),
-                    _detailRow2('Duration',   p['duration']  as String),
-                    _detailRow2('Take with',  p['meal']      as String),
-                    _detailRow2('Start Date', p['startDate'] as String),
-                    _detailRow2('End Date',   p['endDate']   as String),
-                    _detailRow2('Prescribed by', p['doctor'] as String),
-                  ]),
-                  const SizedBox(height: 16),
-
-                  // Purpose
-                  _detailSection('Purpose', [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(p['purpose'] as String,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: _C.textDark,
-                            height: 1.5,
-                          )),
-                    ),
-                  ]),
-                  const SizedBox(height: 16),
-
-                  // Instructions
-                  _detailSection('Instructions', [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(p['instructions'] as String,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: _C.textDark,
-                            height: 1.5,
-                          )),
-                    ),
-                  ]),
-
-                  if (isActive) ...[
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _C.primaryMid,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                              borderRadius:
-                              BorderRadius.circular(14)),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(const SnackBar(
-                            content: Text(
-                                'Marked as taken for today!'),
-                            backgroundColor: _C.success,
-                          ));
-                        },
-                        icon: const Icon(
-                            Icons.check_circle_outline_rounded),
-                        label: const Text('Mark as Taken Today',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            )),
-                      ),
-                    ),
-                  ],
+                  Text('${g.items.length} Prescribed Medicine${g.items.length != 1 ? 's' : ''}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _C.primaryMid)),
+                  const SizedBox(height: 12),
+                  ...g.items.map((item) => _medicineDetailCard(item)),
                 ],
               ),
             ),
@@ -626,48 +451,86 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     );
   }
 
-  Widget _detailSection(String title, List<Widget> children) {
+  // ── Per-medicine detail card in detail sheet ──────────────────
+  Widget _medicineDetailCard(PrescriptionRecord item) {
     return Container(
+      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _C.surface,
+        color: _C.bg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _C.divider),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: _C.primaryMid,
-              )),
-          ...children,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Name + quantity
+        Row(children: [
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(
+              color: _C.primaryMid.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.medication_rounded, color: _C.primaryMid, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(item.medicineName,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _C.textDark)),
+            if (item.dosage.isNotEmpty)
+              Text(item.dosage, style: const TextStyle(fontSize: 12, color: _C.textMuted)),
+          ])),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: _C.primaryMid.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text('×${item.quantity}${item.unit.isNotEmpty ? " ${item.unit}" : ""}',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _C.primaryMid)),
+          ),
+        ]),
+
+        if (item.frequency.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _infoRow(Icons.schedule_rounded, 'Frequency', item.frequency),
         ],
-      ),
+        if (item.instructions.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          const Divider(height: 16),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.info_outline_rounded, size: 14, color: _C.primaryMid),
+            const SizedBox(width: 6),
+            const Text("Doctor's Notes", style: TextStyle(fontSize: 12,
+                fontWeight: FontWeight.w700, color: _C.primaryMid)),
+          ]),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _C.primaryMid.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _C.primaryMid.withOpacity(0.15)),
+            ),
+            child: Text(item.instructions,
+                style: const TextStyle(fontSize: 13, color: _C.textDark, height: 1.5)),
+          ),
+        ],
+        if (item.additionalInfo.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          _infoRow(Icons.note_outlined, 'Additional Info', item.additionalInfo),
+        ],
+      ]),
     );
   }
 
-  Widget _detailRow2(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: const TextStyle(
-                fontSize: 13,
-                color: _C.textMuted,
-              )),
-          Text(value,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: _C.textDark,
-              )),
-        ],
-      ),
-    );
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(icon, size: 13, color: _C.textMuted),
+      const SizedBox(width: 6),
+      Text('$label: ', style: const TextStyle(fontSize: 12, color: _C.textMuted)),
+      Expanded(child: Text(value,
+          style: const TextStyle(fontSize: 12, color: _C.textDark, fontWeight: FontWeight.w500))),
+    ]);
   }
 }

@@ -540,7 +540,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   Color  _getStatusColor(String s) => s.toLowerCase() == 'on_break' ? _C.warning : (s.toLowerCase() == 'unavailable' ? Colors.grey : _C.success);
-  String _getStatusLabel(String s) => s.toLowerCase() == 'on_break' ? 'On Break' : (s.toLowerCase() == 'unavailable' ? 'Offline' : 'Online');
+  String _getStatusLabel(String s) => s.toLowerCase() == 'on_break' ? 'On Break' : (s.toLowerCase() == 'unavailable' ? 'Unavailable' : 'Available');
 
   Widget _staffTile(String name, String sub, Color color, String label, IconData icon) {
     return Padding(

@@ -17,7 +17,7 @@ let authSessionModulePromise = null;
 let cachedSessionUser = null;
 let sessionUserRole = null;
 const DEFAULT_SECTION_ID = 'dashboard-section';
-const STAFF_PRESENCE_TIMEOUT_MS = 2 * 60 * 1000;
+const STAFF_PRESENCE_TIMEOUT_MS = 3 * 60 * 1000;
 const STAFF_PRESENCE_HEARTBEAT_MS = 60 * 1000;
 const ADMIN_DASHBOARD_REFRESH_MS = 15000;
 let presenceHeartbeatTimer = null;
@@ -101,7 +101,7 @@ function detectRoleFromTitle() {
 
   const title = document.title.toLowerCase();
   if (title.includes('admin')) return 'doctor';
-  if (title.includes('specialist')) return 'specialist';
+  if (title.includes('pharmacist')) return 'pharmacist';
   return 'nurse';
 }
 
@@ -537,16 +537,16 @@ function isAdminUser(user) {
 }
 
 const SECTION_ROLE_RULES = {
-  'dashboard-section': ['doctor', 'nurse', 'specialist'],
-  'users-section': ['doctor', 'nurse', 'specialist'],
+  'dashboard-section': ['doctor', 'nurse', 'pharmacist'],
+  'users-section': ['doctor', 'nurse', 'pharmacist'],
   'reports-section': ['doctor', 'nurse'],
-  'medicine-section': ['doctor', 'nurse', 'specialist'],
-  'consultation-section': ['doctor', 'nurse', 'specialist'],
-  'schedule-section': ['doctor', 'nurse', 'specialist'],
-  'vitals-section': ['doctor', 'nurse', 'specialist'],
-  'queue-section': ['doctor', 'nurse', 'specialist'],
-  'lab-section': ['doctor', 'nurse', 'specialist'],
-  'profile-section': ['doctor', 'nurse', 'specialist']
+  'medicine-section': ['doctor', 'nurse', 'pharmacist'],
+  'consultation-section': ['doctor', 'nurse', 'pharmacist'],
+  'schedule-section': ['doctor', 'nurse', 'pharmacist'],
+  'vitals-section': ['doctor', 'nurse', 'pharmacist'],
+  'queue-section': ['doctor', 'nurse', 'pharmacist'],
+
+  'profile-section': ['doctor', 'nurse', 'pharmacist']
 };
 
 function isSectionAllowedForRole(sectionId, role) {
@@ -595,7 +595,7 @@ function isDoctorRole(value) {
 
 function isScheduleRole(value) {
   const key = String(value || '').trim().toLowerCase();
-  return key === 'doctor' || key === 'nurse' || key === 'specialist';
+  return key === 'doctor' || key === 'nurse' || key === 'pharmacist';
 }
 
 function getDoctorDisplayName(doctor) {
@@ -654,8 +654,8 @@ function getRoleLogoConfig(roleValue) {
       return { className: 'role-logo-doctor', label: 'Doctor', icon: 'stethoscope' };
     case 'nurse':
       return { className: 'role-logo-nurse', label: 'Nurse', icon: 'heart' };
-    case 'specialist':
-      return { className: 'role-logo-specialist', label: 'Specialist', icon: 'spark' };
+    case 'pharmacist':
+      return { className: 'role-logo-pharmacist', label: 'Pharmacist', icon: 'capsule' };
     case 'staff':
       return { className: 'role-logo-nurse', label: 'Nurse Dashboard', icon: 'heart' };
     case 'citizen':
@@ -692,7 +692,7 @@ function applyRoleLogos(roleValue) {
     'role-logo-admin',
     'role-logo-doctor',
     'role-logo-nurse',
-    'role-logo-specialist',
+    'role-logo-pharmacist',
     'role-logo-staff',
     'role-logo-citizen',
     'role-logo-default'
@@ -790,9 +790,9 @@ function applyRoleAccess(user) {
 }
 
 const MEDICINE_PERMISSIONS = {
-  doctor:     { adjust: true, add: false },
-  nurse:      { adjust: true, add: true },
-  specialist: { adjust: true, add: false },
+  doctor:     { adjust: false, add: false },
+  nurse:      { adjust: false, add: false },
+  pharmacist: { adjust: true, add: true },
   pharmacist: { adjust: true, add: true }
 };
 
@@ -3159,17 +3159,13 @@ function formatDateTime(value) {
 }
 
 function isCurrentlyLoggedInStaffAccount(user) {
-  if (!user?.is_online) return false;
-
   const lastSeenValue = user?.last_seen;
   if (!lastSeenValue) return false;
 
   const lastSeenAt = new Date(lastSeenValue).getTime();
   if (!Number.isFinite(lastSeenAt)) return false;
 
-  if (Date.now() - lastSeenAt > STAFF_PRESENCE_TIMEOUT_MS) return false;
-
-  return true;
+  return Date.now() - lastSeenAt <= STAFF_PRESENCE_TIMEOUT_MS;
 }
 
 function getStaffPresenceStatus(user) {
@@ -4297,7 +4293,7 @@ function fillAccountEditForm(user) {
     let roleValue = String(user.role || 'nurse').trim().toLowerCase();
     if (roleValue === 'admin') roleValue = 'doctor';
     if (roleValue === 'staff') roleValue = 'nurse';
-    const allowed = ['doctor', 'nurse', 'specialist'];
+    const allowed = ['doctor', 'nurse', 'pharmacist'];
     modalEditRole.value = allowed.includes(roleValue) ? roleValue : 'nurse';
   }
   if (modalEditBirthday) modalEditBirthday.value = normalizeDateInput(user.birthday);
@@ -4746,6 +4742,7 @@ const medicineReportBtn = document.getElementById('medicine-report-btn');
 const medicineArchivedToggleBtn = document.getElementById('medicine-archived-toggle-btn');
 const medicineArchivedPanel = document.getElementById('medicine-archived-panel');
 const medicineArchivedTbody = document.getElementById('medicine-archived-tbody');
+const medicineSearchInput = document.getElementById('medicine-search-input');
 
 function openConsultationModal(prefill = {}) {
   if (!consultationModal) return;
@@ -4781,8 +4778,74 @@ function openConsultationModal(prefill = {}) {
   const notesInput = document.getElementById('consult-notes');
   if (notesInput && prefill.notes) notesInput.value = prefill.notes;
 
+  // Hide vitals banner initially, then fetch if ticket linked
+  const vitalsBanner = document.getElementById('consult-vitals-banner');
+  if (vitalsBanner) vitalsBanner.style.display = 'none';
+  if (prefill.queueTicketId) {
+    loadVitalsForConsultation(Number(prefill.queueTicketId));
+  }
+
   initConsultationTabs();
   consultationModal.classList.remove('hidden');
+}
+
+async function loadVitalsForConsultation(queueTicketId) {
+  if (!queueTicketId) return;
+  try {
+    const { supabase } = await loadSupabaseModule();
+    const { data, error } = await supabase.rpc('get_vitals_for_ticket', {
+      p_queue_ticket_id: queueTicketId
+    });
+    if (error || !data) return;
+
+    const banner      = document.getElementById('consult-vitals-banner');
+    const grid        = document.getElementById('consult-vitals-grid');
+    const complaintEl = document.getElementById('consult-vitals-complaint');
+    const notesEl     = document.getElementById('consult-vitals-notes');
+    if (!banner || !grid) return;
+
+    const vitals = [
+      { label: 'BP',   value: data.blood_pressure       ? `${data.blood_pressure} mmHg` : null },
+      { label: 'HR',   value: data.heart_rate            ? `${data.heart_rate} bpm`       : null },
+      { label: 'Temp', value: data.temperature           ? `${data.temperature} °C`       : null },
+      { label: 'RR',   value: data.respiratory_rate      ? `${data.respiratory_rate} bpm` : null },
+      { label: 'SpO₂', value: data.oxygen_saturation     ? `${data.oxygen_saturation}%`   : null },
+    ].filter(v => v.value);
+
+    if (vitals.length === 0 && !data.chief_complaint) return;
+
+    grid.innerHTML = vitals.map(v => `
+      <div style="background:#fff; border:1px solid #bbf7d0; border-radius:8px; padding:8px 10px; text-align:center;">
+        <div style="font-size:11px; color:#6b7280; margin-bottom:2px;">${v.label}</div>
+        <div style="font-size:14px; font-weight:700; color:#0f172a;">${v.value}</div>
+      </div>
+    `).join('');
+
+    if (complaintEl) {
+      complaintEl.innerHTML = data.chief_complaint
+        ? `<strong>Chief Complaint:</strong> ${data.chief_complaint}`
+        : '';
+    }
+    if (notesEl) {
+      const nurseName = data.nurse_name ? ` (${data.nurse_name})` : '';
+      notesEl.innerHTML = data.notes
+        ? `<strong>Nurse Notes${nurseName}:</strong> ${data.notes}`
+        : (nurseName ? `<span style="color:#6b7280;">Assessed by${nurseName}</span>` : '');
+      if (data.current_medications) {
+        notesEl.innerHTML += `<br><strong>Current Meds:</strong> ${data.current_medications}`;
+      }
+    }
+
+    // Pre-fill HPI with chief complaint if HPI is empty
+    const hpiInput = document.getElementById('consult-hpi');
+    if (hpiInput && !hpiInput.value && data.chief_complaint) {
+      hpiInput.value = data.chief_complaint;
+    }
+
+    banner.style.display = 'block';
+  } catch (_) {
+    // Non-critical — vitals banner just stays hidden
+  }
 }
 
 function closeConsultationModal() {
@@ -5316,6 +5379,12 @@ async function createPrescriptionEntry({ patientId, consultationDbId, items }) {
 function renderMedicines() {
   if (!medicineTbody) return;
 
+  const searchQuery = (medicineSearchInput?.value || '').toLowerCase().trim();
+  const filtered = medicines.filter(m => 
+    m.name.toLowerCase().includes(searchQuery) || 
+    (m.description || '').toLowerCase().includes(searchQuery)
+  );
+
   const role = getSessionRole();
   const allowAdjust = canAdjustMedicineInventory(role);
   const allowAddNew = canAddNewMedicine(role);
@@ -5331,16 +5400,34 @@ function renderMedicines() {
   }
 
   medicineTbody.innerHTML = '';
-  if (!Array.isArray(medicines) || medicines.length === 0) {
-    medicineTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No medicine inventory yet.</td></tr>';
+  if (!Array.isArray(filtered) || filtered.length === 0) {
+    const msg = searchQuery ? 'No medicines match your search.' : 'No medicine inventory yet.';
+    medicineTbody.innerHTML = `<tr><td class="table-cell" colspan="7">${msg}</td></tr>`;
     return;
   }
-  medicines.forEach(m => {
+  filtered.forEach(m => {
     const tr = document.createElement('tr');
+    
+    // Status logic
+    const isLowStock = m.qty <= 5 && m.qty > 0;
+    const isOutOfStock = m.qty <= 0;
+    const isExpired = m.expiry_date && new Date(m.expiry_date) < new Date();
+    
+    let statusHtml = '<span class="badge badge-success">In Stock</span>';
+    if (isExpired) statusHtml = '<span class="badge badge-error">Expired</span>';
+    else if (isOutOfStock) statusHtml = '<span class="badge badge-error">Out of Stock</span>';
+    else if (isLowStock) statusHtml = '<span class="badge badge-warning">Low Stock</span>';
+
+    const expiryText = m.expiry_date ? new Date(m.expiry_date).toLocaleDateString() : '—';
+    const descriptionText = m.description || '—';
+
     tr.innerHTML = `
-      <td class="table-cell">${m.name}</td>
+      <td class="table-cell"><strong>${m.name}</strong></td>
+      <td class="table-cell">${descriptionText}</td>
       <td class="table-cell">${m.qty}</td>
       <td class="table-cell">${m.unit || ''}</td>
+      <td class="table-cell">${expiryText}</td>
+      <td class="table-cell">${statusHtml}</td>
       <td class="table-cell"></td>
     `;
 
@@ -5989,32 +6076,38 @@ function addPrescriptionLine() {
   if (!prescriptionLines) return;
   const line = document.createElement('div');
   line.className = 'field prescription-line-item';
-  line.style.padding = '12px';
+  line.style.padding = '16px';
   line.style.background = '#f8fafc';
-  line.style.borderRadius = '8px';
-  line.style.marginBottom = '12px';
+  line.style.borderRadius = '12px';
+  line.style.marginBottom = '16px';
   line.style.border = '1px solid #e2e8f0';
+  line.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
   line.innerHTML = `
-    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; align-items: end;">
+    <div style="display: grid; grid-template-columns: 2.5fr 0.8fr 1.2fr 1.2fr auto; gap: 14px; align-items: end;">
       <div class="field" style="margin: 0;">
-        <label class="inputLabel">Medicine</label>
-        <select class="pres-med" style="width: 100%;" required>
+        <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Medicine Name</label>
+        <select class="pres-med" style="width: 100%; height: 38px; padding: 0 10px;" required>
+          <option value="">Select medicine...</option>
           ${medicines.map(m => `<option value="${m.name}">${m.name} (${m.unit || ''})</option>`).join('')}
         </select>
       </div>
       <div class="field" style="margin: 0;">
-        <label class="inputLabel">Qty</label>
-        <input type="number" class="pres-qty" value="1" min="1" style="width: 100%;" required />
+        <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Qty</label>
+        <input type="number" class="pres-qty" value="1" min="1" style="width: 100%; height: 38px; padding: 0 10px;" required />
       </div>
       <div class="field" style="margin: 0;">
-        <label class="inputLabel">Dosage</label>
-        <input type="text" class="pres-dosage" placeholder="500mg" style="width: 100%;" />
+        <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Dosage</label>
+        <input type="text" class="pres-dosage" placeholder="e.g. 500mg" style="width: 100%; height: 38px; padding: 0 10px;" />
       </div>
       <div class="field" style="margin: 0;">
-        <label class="inputLabel">Freq.</label>
-        <input type="text" class="pres-freq" placeholder="3x a day" style="width: 100%;" />
+        <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Frequency</label>
+        <input type="text" class="pres-freq" placeholder="e.g. 3x a day" style="width: 100%; height: 38px; padding: 0 10px;" />
       </div>
-      <button type="button" class="btn small btn-delete" data-action="remove-line" style="padding: 8px; margin-bottom: 2px;">×</button>
+      <button type="button" class="btn small btn-delete" data-action="remove-line" style="height: 38px; width: 38px; min-width: 38px; display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; padding: 0; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; margin: 0;">×</button>
+    </div>
+    <div style="margin-top: 14px; padding-top: 14px; border-top: 1px dashed #e2e8f0;">
+      <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Special Instructions / Remarks</label>
+      <textarea class="pres-instructions" placeholder="Enter specific intake instructions or notes for the patient..." rows="2" style="width: 100%; max-width: 100%; box-sizing: border-box; resize: vertical; font-size: 13px; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: white; display: block;"></textarea>
     </div>
   `;
   prescriptionLines.appendChild(line);
@@ -6055,12 +6148,19 @@ if (prescriptionForm) {
     const qtys     = prescriptionForm.querySelectorAll('.pres-qty');
     const dosages  = prescriptionForm.querySelectorAll('.pres-dosage');
     const freqs    = prescriptionForm.querySelectorAll('.pres-freq');
+    const notes    = prescriptionForm.querySelectorAll('.pres-instructions');
     const items = [];
     for (let i = 0; i < selects.length; i++) {
       const name = selects[i].value;
       const qty  = Number(qtys[i].value) || 0;
       if (name && qty > 0) {
-        items.push({ name, qty, dosage: dosages[i]?.value || '', frequency: freqs[i]?.value || '' });
+        items.push({
+          name,
+          qty,
+          dosage:       dosages[i]?.value || '',
+          frequency:    freqs[i]?.value   || '',
+          instructions: notes[i]?.value   || ''
+        });
       }
     }
     if (!items.length) { showToast('Add at least one medicine.', 'warning'); return; }
@@ -6077,20 +6177,9 @@ if (prescriptionForm) {
         })
       });
 
-      // Decrement inventory
-      try {
-        for (const it of items) {
-          await reduceMedicineStockByName(it.name, Number(it.qty));
-        }
-        await refreshMedicineData();
-      } catch (invErr) {
-        console.error('Inventory update failed after prescription:', invErr);
-        showToast('Prescription saved, but inventory update failed.', 'warning');
-      }
-
       if (prescriptionModal) prescriptionModal.classList.add('hidden');
       if (prescriptionForm) prescriptionForm.dataset.consultationDbId = '';
-      showToast('Prescription created and inventory updated.', 'success');
+      showToast('Prescription created. Patient can present it to the pharmacist for dispensing.', 'success');
     } catch (error) {
       console.error('Failed to save prescription:', error);
       showToast(error.message || 'Unable to create prescription.', 'error');

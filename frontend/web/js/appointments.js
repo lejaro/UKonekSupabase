@@ -6,6 +6,9 @@ const appointments = (() => {
   let supabaseClientPromise = null;
   let pendingUndo = null;
   let currentQueueTickets = [];
+  let currentlyViewedTicketId = null;
+  // Map of ticketId -> true for tickets that already have a vital assessment
+  const assessedTicketIds = new Set();
 
   const init = async () => {
     const queueSection = document.getElementById('queue-section');
@@ -13,8 +16,38 @@ const appointments = (() => {
 
     setupEventListeners();
     setupTicketModalHandlers();
+    setupLaneDropZones();
     await loadQueueTickets();
     setupRealtimeListener();
+  };
+
+  const setupLaneDropZones = () => {
+    const lanes = ['queue-waiting-list', 'queue-oncall-list', 'queue-serving-list'];
+    lanes.forEach(id => {
+      const container = document.getElementById(id);
+      if (!container) return;
+
+      container.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        container.classList.add('drag-over');
+      });
+
+      container.addEventListener('dragleave', () => {
+        container.classList.remove('drag-over');
+      });
+
+      container.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        container.classList.remove('drag-over');
+        const ticketId = e.dataTransfer.getData('text/plain');
+        if (!ticketId) return;
+
+        const targetLane = container.getAttribute('data-lane');
+        if (targetLane) {
+          await moveTicketToLane(ticketId, targetLane);
+        }
+      });
+    });
   };
 
   const setupRealtimeListener = async () => {
@@ -100,6 +133,15 @@ const appointments = (() => {
         if (Number.isFinite(ticketId) && targetLane) {
           await moveTicketToLane(ticketId, targetLane);
         }
+        return;
+      }
+
+      const vitalBtn = event.target.closest('[data-action="ticket-vital"]');
+      if (vitalBtn) {
+        const ticketId = Number(vitalBtn.getAttribute('data-ticket-id'));
+        const ticket = currentQueueTickets.find((item) => Number(item.id) === ticketId);
+        if (ticket) await openVitalAssessmentModal(ticket);
+        return;
       }
     });
   };
@@ -112,6 +154,15 @@ const appointments = (() => {
     modal?.addEventListener('click', (event) => {
       if (event.target === modal) closeTicketDetailModal();
     });
+
+    const deleteBtn = document.getElementById('queue-ticket-delete-btn');
+    deleteBtn?.addEventListener('click', async () => {
+      if (Number.isFinite(currentlyViewedTicketId)) {
+        await deleteQueueTicket(currentlyViewedTicketId);
+      }
+    });
+
+    setupVitalAssessmentModal();
   };
 
   const loadQueueTickets = async () => {
@@ -136,7 +187,7 @@ const appointments = (() => {
           created_at,
           served_at,
           completed_at,
-          citizen:citizens(id, firstname, surname, email)
+          citizen:citizens(id, firstname, surname, email, date_of_birth, sex)
         `)
         .eq('queue_date', today)
         .neq('status', 'cancelled')
@@ -150,11 +201,36 @@ const appointments = (() => {
       }
 
       currentQueueTickets = response.data || [];
+      await refreshAssessedTicketIds(supabase);
       renderQueue();
       document.dispatchEvent(new CustomEvent('ukonek:queue-updated'));
     } catch (err) {
       console.error('Error loading queue tickets:', err);
       showToast('Failed to load queue', 'error');
+    }
+  };
+
+  const refreshAssessedTicketIds = async (supabase) => {
+    try {
+      const onCallIds = currentQueueTickets
+        .filter((t) => String(t?.status || '').trim().toLowerCase() === 'on_call')
+        .map((t) => Number(t.id));
+
+      assessedTicketIds.clear();
+      if (onCallIds.length === 0) return;
+
+      const { data, error } = await supabase
+        .from('vital_signs')
+        .select('queue_ticket_id')
+        .in('queue_ticket_id', onCallIds);
+
+      if (!error && Array.isArray(data)) {
+        data.forEach((row) => {
+          if (row.queue_ticket_id) assessedTicketIds.add(Number(row.queue_ticket_id));
+        });
+      }
+    } catch (_) {
+      // Non-critical — badge will just show "Start Vitals" on failure
     }
   };
 
@@ -209,8 +285,13 @@ const appointments = (() => {
     }
 
     if (lane === 'on_call') {
+      const assessed = assessedTicketIds.has(Number(ticketId));
+      const vitalBadgeOrBtn = assessed
+        ? `<span class="queue-vital-done-badge" title="Vital assessment recorded">&#10003; Vitals Done</span>`
+        : `<button class="queue-ticket-btn btn-vital" type="button" data-action="ticket-vital" data-ticket-id="${ticketId}">&#9829; Start Vitals</button>`;
       return `
-        <button class="queue-ticket-btn" type="button" data-action="ticket-move" data-target-lane="waiting" data-ticket-id="${ticketId}">Back to Waiting</button>
+        ${vitalBadgeOrBtn}
+        <button class="queue-ticket-btn" type="button" data-action="ticket-move" data-target-lane="waiting" data-ticket-id="${ticketId}">Back</button>
         <button class="queue-ticket-btn" type="button" data-action="ticket-move" data-target-lane="serving" data-ticket-id="${ticketId}">Serve Now</button>
       `;
     }
@@ -243,7 +324,7 @@ const appointments = (() => {
         const citizenType = formatCitizenType(ticket.citizen_type);
         const laneActions = getLaneActionButtons(lane, ticket.id);
         return `
-          <div class="queue-ticket-card" data-ticket-id="${ticket.id}">
+          <div class="queue-ticket-card" draggable="true" data-ticket-id="${ticket.id}" data-current-lane="${lane}">
             <div class="queue-ticket-top">
               <span class="queue-ticket-queue">#${queueNumber > 0 ? String(queueNumber).padStart(3, '0') : '-'}</span>
               <span class="queue-ticket-code">${ticketCode}</span>
@@ -261,6 +342,14 @@ const appointments = (() => {
       .join('');
 
     container.querySelectorAll('.queue-ticket-card').forEach((card) => {
+      card.addEventListener('dragstart', (e) => {
+        card.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', card.getAttribute('data-ticket-id'));
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+      });
+
       card.addEventListener('click', (event) => {
         const actionBtn = event.target.closest('[data-action]');
         if (actionBtn) return;
@@ -348,6 +437,9 @@ const appointments = (() => {
 
     showToast('Ticket moved to On Call.', 'success');
     await loadQueueTickets();
+    // Auto-open vital assessment modal for this ticket
+    const updatedTicket = currentQueueTickets.find((t) => Number(t.id) === Number(ticket.id));
+    if (updatedTicket) await openVitalAssessmentModal(updatedTicket);
   };
 
   const updateTicketStatus = async (ticketId, status) => {
@@ -483,6 +575,7 @@ const appointments = (() => {
   };
 
   const openTicketDetailModal = (ticket) => {
+    currentlyViewedTicketId = Number(ticket?.id) || null;
     const modal = document.getElementById('queue-ticket-detail-modal');
     const body = document.getElementById('queue-ticket-detail-body');
     if (!modal || !body) return;
@@ -509,8 +602,34 @@ const appointments = (() => {
   };
 
   const closeTicketDetailModal = () => {
+    currentlyViewedTicketId = null;
     const modal = document.getElementById('queue-ticket-detail-modal');
     if (modal) modal.classList.add('hidden');
+  };
+
+  const deleteQueueTicket = async (ticketId) => {
+    const proceed = await confirmAction({
+      title: 'Delete Queue Ticket',
+      message: 'Are you sure you want to delete this ticket? This will remove it from the system entirely.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    });
+    if (!proceed) return;
+
+    const supabase = await getSupabaseClient();
+    const { error } = await supabase
+      .from('queue_tickets')
+      .delete()
+      .eq('id', Number(ticketId));
+
+    if (error) {
+      showToast('Failed to delete ticket: ' + error.message, 'error');
+      return;
+    }
+
+    showToast('Ticket deleted successfully.', 'success');
+    closeTicketDetailModal();
+    await loadQueueTickets();
   };
 
   const confirmAction = async ({
@@ -557,6 +676,165 @@ const appointments = (() => {
     if (normalized === 'regular') return 'Regular';
     return normalized || 'Regular';
   };
+
+  // ── Vital Assessment Modal ───────────────────────────────────────────────
+
+  const setupVitalAssessmentModal = () => {
+    const modal   = document.getElementById('vital-assessment-modal');
+    const form    = document.getElementById('vital-assessment-form');
+    const cancelBtn = document.getElementById('va-cancel-btn');
+
+    if (!modal || !form) return;
+
+    const closeModal = () => {
+      modal.classList.add('hidden');
+      form.reset();
+      const errEl = document.getElementById('va-form-error');
+      if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+      const badge = document.getElementById('vital-modal-existing-badge');
+      if (badge) badge.style.display = 'none';
+    };
+
+    cancelBtn?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await submitVitalAssessment(closeModal);
+    });
+  };
+
+  const openVitalAssessmentModal = async (ticket) => {
+    const modal     = document.getElementById('vital-assessment-modal');
+    const form      = document.getElementById('vital-assessment-form');
+    const banner    = document.getElementById('vital-modal-patient-banner');
+    const nameEl    = document.getElementById('vital-modal-patient-name');
+    const metaEl    = document.getElementById('vital-modal-patient-meta');
+    const badgeEl   = document.getElementById('vital-modal-existing-badge');
+    const ticketHid = document.getElementById('va-queue-ticket-id');
+    const citizenHid = document.getElementById('va-citizen-id');
+    if (!modal || !form) return;
+
+    // Reset form
+    form.reset();
+    const errEl = document.getElementById('va-form-error');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+
+    const citizenId = ticket?.citizen?.id ? Number(ticket.citizen.id) : null;
+    const firstName = String(ticket?.citizen?.firstname || '').trim();
+    const lastName  = String(ticket?.citizen?.surname  || '').trim();
+    const fullName  = `${firstName} ${lastName}`.trim() || 'Unknown Patient';
+    const gender    = String(ticket?.citizen?.sex          || '').trim();
+    const birthday  = ticket?.citizen?.date_of_birth;
+    const service   = String(ticket?.service_label || '').trim() || 'General Consultation';
+    const qNum      = String(ticket?.queue_number || '').padStart(3, '0');
+
+    let ageText = '';
+    if (birthday) {
+      const birthDate = new Date(birthday);
+      const ageDiff = Date.now() - birthDate.getTime();
+      const age = Math.floor(ageDiff / (1000 * 60 * 60 * 24 * 365.25));
+      if (Number.isFinite(age) && age >= 0) ageText = `, ${age} yrs`;
+    }
+
+    if (nameEl) nameEl.textContent = fullName;
+    if (metaEl) metaEl.textContent = `#${qNum} · ${service}${gender ? ` · ${gender}` : ''}${ageText}`;
+    if (banner) banner.style.display = 'block';
+
+    if (ticketHid)  ticketHid.value  = String(ticket.id);
+    if (citizenHid) citizenHid.value = citizenId ? String(citizenId) : '';
+
+    // Pre-fill chief complaint from ticket reason/symptoms
+    const complaintEl = document.getElementById('va-chief-complaint');
+    if (complaintEl) {
+      const reason   = String(ticket?.reason   || '').trim();
+      const symptoms = String(ticket?.symptoms || '').trim();
+      complaintEl.value = symptoms || reason || '';
+    }
+
+    // Check for existing assessment and pre-fill if found
+    if (badgeEl) badgeEl.style.display = 'none';
+    try {
+      const supabase = await getSupabaseClient();
+      const { data: existing } = await supabase
+        .from('vital_signs')
+        .select('chief_complaint, blood_pressure, heart_rate, temperature, respiratory_rate, oxygen_saturation, current_medications, notes')
+        .eq('queue_ticket_id', Number(ticket.id))
+        .maybeSingle();
+
+      if (existing) {
+        if (badgeEl) badgeEl.style.display = 'block';
+        if (complaintEl && existing.chief_complaint) complaintEl.value = existing.chief_complaint;
+        const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+        set('va-bp',    existing.blood_pressure);
+        set('va-hr',    existing.heart_rate);
+        set('va-temp',  existing.temperature);
+        set('va-rr',    existing.respiratory_rate);
+        set('va-spo2',  existing.oxygen_saturation);
+        set('va-meds',  existing.current_medications);
+        set('va-notes', existing.notes);
+      }
+    } catch (_) {
+      // Non-critical prefill failure — form stays empty
+    }
+
+    modal.classList.remove('hidden');
+  };
+
+  const submitVitalAssessment = async (closeModal) => {
+    const submitBtn  = document.getElementById('va-submit-btn');
+    const errEl      = document.getElementById('va-form-error');
+    const ticketId   = Number(document.getElementById('va-queue-ticket-id')?.value  || 0);
+    const citizenId  = Number(document.getElementById('va-citizen-id')?.value       || 0);
+    const complaint  = String(document.getElementById('va-chief-complaint')?.value  || '').trim();
+    const bp         = String(document.getElementById('va-bp')?.value    || '').trim() || null;
+    const hr         = Number(document.getElementById('va-hr')?.value)    || null;
+    const temp       = parseFloat(document.getElementById('va-temp')?.value) || null;
+    const rr         = Number(document.getElementById('va-rr')?.value)   || null;
+    const spo2       = Number(document.getElementById('va-spo2')?.value) || null;
+    const meds       = String(document.getElementById('va-meds')?.value  || '').trim() || null;
+    const notes      = String(document.getElementById('va-notes')?.value || '').trim() || null;
+
+    const showErr = (msg) => {
+      if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+    };
+
+    if (!ticketId || !citizenId) { showErr('Unable to identify ticket or patient.'); return; }
+    if (!complaint)              { showErr('Chief complaint is required.'); return; }
+
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.querySelector('.btn-label').textContent = 'Saving…'; }
+    if (errEl)     { errEl.style.display = 'none'; errEl.textContent = ''; }
+
+    try {
+      const supabase = await getSupabaseClient();
+      const { data: result, error } = await supabase.rpc('upsert_vital_assessment', {
+        p_queue_ticket_id:    ticketId,
+        p_citizen_id:         citizenId,
+        p_chief_complaint:    complaint,
+        p_blood_pressure:     bp,
+        p_heart_rate:         Number.isFinite(hr)   ? hr   : null,
+        p_temperature:        Number.isFinite(temp) ? temp : null,
+        p_respiratory_rate:   Number.isFinite(rr)   ? rr   : null,
+        p_oxygen_saturation:  Number.isFinite(spo2) ? spo2 : null,
+        p_current_medications: meds,
+        p_notes:              notes,
+      });
+
+      if (error) throw new Error(error.message);
+      if (result?.error) throw new Error(result.error);
+
+      assessedTicketIds.add(ticketId);
+      renderQueue();
+      closeModal();
+      if (typeof showToast === 'function') showToast('Vital assessment saved successfully.', 'success');
+    } catch (err) {
+      showErr(err.message || 'Failed to save assessment. Please try again.');
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.querySelector('.btn-label').textContent = 'Save Assessment'; }
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   return {
     init,
