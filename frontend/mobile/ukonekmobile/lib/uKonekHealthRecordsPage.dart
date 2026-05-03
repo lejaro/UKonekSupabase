@@ -34,29 +34,49 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
   @override
   void initState() {
     super.initState();
-    _loadVitals();
+    _loadRecords();
   }
 
-  Future<void> _loadVitals() async {
+  Future<void> _loadRecords() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final vitals = await ApiService.fetchVitalSigns();
-      final List<Map<String, dynamic>> mapped = vitals.map((v) => {
+      final consults = await ApiService.fetchConsultations();
+
+      final List<Map<String, dynamic>> vitalsMapped = vitals.map((v) => {
+        'id': v.id,
         'date': DateFormat('MMMM dd, yyyy').format(v.createdAt),
-        'service': 'Vital Signs Assessment',
+        'timestamp': v.createdAt,
+        'service': 'Vitals Assessment',
         'provider': 'Clinic Nurse',
         'diagnosis': v.chiefComplaint,
-        'isRecent': vitals.indexOf(v) == 0,
         'color': _C.primaryMid,
         'icon': Icons.monitor_heart_outlined,
+        'type': 'vitals',
         'raw': v,
       }).toList();
+
+      final List<Map<String, dynamic>> consultsMapped = consults.map((c) => {
+        'id': c.id.toString(),
+        'date': DateFormat('MMMM dd, yyyy').format(c.consultedAt),
+        'timestamp': c.consultedAt,
+        'service': 'Doctor Consultation',
+        'provider': c.doctorName ?? 'Health Center Doctor',
+        'diagnosis': c.diagnosis,
+        'color': const Color(0xFF007AFF), // Medical Blue
+        'icon': Icons.medical_information_outlined,
+        'type': 'consultation',
+        'raw': c,
+      }).toList();
+
+      final List<Map<String, dynamic>> combined = [...vitalsMapped, ...consultsMapped];
+      combined.sort((a, b) => (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime));
 
       if (mounted) {
         setState(() {
           _allRecords.clear();
-          _allRecords.addAll(mapped);
+          _allRecords.addAll(combined);
           _foundRecords = List.from(_allRecords);
           _isLoading = false;
         });
@@ -191,7 +211,7 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
 
   Widget _buildRecordList() {
     return RefreshIndicator(
-      onRefresh: _loadVitals,
+      onRefresh: _loadRecords,
       color: _C.primaryMid,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -231,7 +251,10 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
   }
 
   Widget _buildSummaryCard(Map<String, dynamic> last) {
-    final raw = last['raw'] as VitalSigns;
+    final isVitals = last['type'] == 'vitals';
+    final rawVitals = isVitals ? last['raw'] as VitalSigns : null;
+    final rawConsult = !isVitals ? last['raw'] as Consultation : null;
+
     return Container(
       decoration: BoxDecoration(
         color: _C.surface,
@@ -242,17 +265,17 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
-            color: _C.primaryMid.withOpacity(0.06),
+            color: (last['color'] as Color).withOpacity(0.06),
             borderRadius: const BorderRadius.only(
               topLeft:  Radius.circular(24),
               topRight: Radius.circular(24),
             ),
           ),
           child: Row(children: [
-            const Icon(Icons.history_edu_rounded, color: _C.primaryMid, size: 16),
+            Icon(last['icon'] as IconData, color: last['color'] as Color, size: 16),
             const SizedBox(width: 10),
-            const Text('LATEST ASSESSMENT',
-                style: TextStyle(color: _C.primaryMid, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1)),
+            Text(last['service'].toString().toUpperCase(),
+                style: TextStyle(color: last['color'] as Color, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1)),
             const Spacer(),
             Text(last['date'],
                 style: const TextStyle(color: _C.textDark, fontWeight: FontWeight.bold, fontSize: 13)),
@@ -264,9 +287,9 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
             Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Primary Concern', style: TextStyle(color: Colors.grey.shade400, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text(isVitals ? 'Primary Concern' : 'Final Diagnosis', style: TextStyle(color: Colors.grey.shade400, fontSize: 11, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(raw.chiefComplaint, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _C.textDark, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: -0.4)),
+                Text(last['diagnosis'], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _C.textDark, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: -0.4)),
               ],
             )),
             Container(width: 1, height: 40, color: _C.divider),
@@ -274,9 +297,14 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
             Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Blood Pressure', style: TextStyle(color: Colors.grey.shade400, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text(isVitals ? 'BP / HR' : 'Practitioner', style: TextStyle(color: Colors.grey.shade400, fontSize: 11, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(raw.bp ?? '—', style: const TextStyle(color: _C.textDark, fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(
+                  isVitals 
+                    ? '${rawVitals?.bp ?? '—'} / ${rawVitals?.heartRate ?? '—'}'
+                    : (rawConsult?.doctorName ?? 'Doctor'), 
+                  style: const TextStyle(color: _C.textDark, fontSize: 16, fontWeight: FontWeight.bold)
+                ),
               ],
             )),
           ]),
@@ -410,16 +438,41 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
                 children: [
                   _detailSection('Practitioner', data['provider'] as String),
-                  _detailSection('Chief Complaint', raw.chiefComplaint),
-                  Row(children: [
-                    Expanded(child: _detailSection('Blood Pressure', raw.bp ?? '—')),
-                    Expanded(child: _detailSection('Temperature', raw.temp != null ? '${raw.temp}°C' : '—')),
-                  ]),
-                  Row(children: [
-                    Expanded(child: _detailSection('Resp. Rate', raw.rr != null ? '${raw.rr} bpm' : '—')),
-                    Expanded(child: _detailSection('Oxygen (SpO2)', raw.spo2 != null ? '${raw.spo2}%' : '—')),
-                  ]),
-                  _detailSection('Current Medications', raw.meds ?? 'None recorded'),
+                  
+                  if (data['type'] == 'vitals') ...[
+                    _detailSection('Chief Complaint', (data['raw'] as VitalSigns).chiefComplaint),
+                    Row(children: [
+                      Expanded(child: _detailSection('Blood Pressure', (data['raw'] as VitalSigns).bp ?? '—')),
+                      Expanded(child: _detailSection('Heart Rate', (data['raw'] as VitalSigns).heartRate != null ? '${(data['raw'] as VitalSigns).heartRate} bpm' : '—')),
+                    ]),
+                    Row(children: [
+                      Expanded(child: _detailSection('Resp. Rate', (data['raw'] as VitalSigns).rr != null ? '${(data['raw'] as VitalSigns).rr} bpm' : '—')),
+                      Expanded(child: _detailSection('Temperature', (data['raw'] as VitalSigns).temp != null ? '${(data['raw'] as VitalSigns).temp}°C' : '—')),
+                    ]),
+                    _detailSection('Oxygen (SpO2)', (data['raw'] as VitalSigns).spo2 != null ? '${(data['raw'] as VitalSigns).spo2}%' : '—'),
+                    _detailSection('Current Medications', (data['raw'] as VitalSigns).meds ?? 'None recorded'),
+                  ] else ...[
+                    if ((data['raw'] as Consultation).allergies?.isNotEmpty == true)
+                      _buildAllergyAlert((data['raw'] as Consultation).allergies!),
+                      
+                    _detailSection('Primary Diagnosis', (data['raw'] as Consultation).diagnosis),
+                    
+                    if ((data['raw'] as Consultation).hpi?.isNotEmpty == true)
+                      _detailSection('History of Present Illness', (data['raw'] as Consultation).hpi!),
+                    
+                    if ((data['raw'] as Consultation).pmh?.isNotEmpty == true)
+                      _detailSection('Past Medical History', (data['raw'] as Consultation).pmh!),
+
+                    if ((data['raw'] as Consultation).labOrders?.isNotEmpty == true)
+                      _detailSection('Lab Requests / Orders', (data['raw'] as Consultation).labOrders!),
+
+                    if ((data['raw'] as Consultation).notes?.isNotEmpty == true)
+                      _detailSection('Clinical Notes & Plan', (data['raw'] as Consultation).notes!),
+
+                    if ((data['raw'] as Consultation).followupDate != null)
+                      _detailSection('Follow-up Date', DateFormat('MMMM dd, yyyy').format((data['raw'] as Consultation).followupDate!)),
+                  ],
+
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -440,6 +493,30 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
           ]),
         ),
       ),
+    );
+  }
+
+  Widget _buildAllergyAlert(String allergies) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.red.shade100),
+      ),
+      child: Row(children: [
+        const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 24),
+        const SizedBox(width: 12),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('KNOWN ALLERGIES', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1)),
+            const SizedBox(height: 4),
+            Text(allergies, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13)),
+          ],
+        )),
+      ]),
     );
   }
 

@@ -103,12 +103,9 @@ function loadAuthSessionModule() {
 }
 
 function resolveDashboardPath(username = '', role = '') {
-    const roleKey = String(role || '').trim().toLowerCase();
-    if (roleKey === 'nurse' || roleKey === 'staff') {
-        return './dashboard-nurse.html';
-    }
-    // Default to doctor dashboard for admin/doctor and fallbacks
-    return './dashboard-doctor.html';
+    // Shared dashboard for all staff roles. Role-based UI gating is
+    // handled inside dashboard.js via SECTION_ROLE_RULES and permissions.
+    return './dashboard.html';
 }
 
 

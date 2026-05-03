@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 :root {
     --bg: #f8fafc;
     --card: #ffffff;
@@ -18,7 +20,63 @@
     --radius-lg: 16px;
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* Clinical Module Enhancements */
+.modal-tabs {
+    display: flex;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 20px;
+    gap: 20px;
+}
+
+.modal-tab {
+    padding: 10px 4px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+}
+
+.modal-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.allergy-alert {
+    background: #fff1f2;
+    border: 1px solid #fecdd3;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #9f1239;
+    font-weight: 600;
+}
+
+.allergy-icon {
+    font-size: 20px;
+}
+
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 
 html,
 body {
@@ -730,13 +788,33 @@ select:focus {
         transform 0.48s cubic-bezier(0.22, 1, 0.36, 1),
         padding 0.48s cubic-bezier(0.22, 1, 0.36, 1);
     box-shadow: 8px 0 26px rgba(2, 6, 23, 0.14);
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
     will-change: width, flex-basis, transform;
 }
 
 
 /* sidebar nav already handled below */
 
+
+.sidebar::-webkit-scrollbar {
+    width: 5px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
 
 .sidebar-inner {
     box-sizing: border-box;
@@ -946,14 +1024,10 @@ select:focus {
     flex-direction: column;
     gap: 6px;
     min-height: 0;
-    overflow: hidden;
-    scrollbar-width: none;
+    overflow: visible;
 }
 
-.sidebar .nav::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-}
+
 
 .sidebar .nav a,
 .sidebar .nav .nav-btn {
@@ -1115,7 +1189,10 @@ select:focus {
 }
 
 .mainview {
-    flex: 1;
+    box-sizing: border-box;
+    flex: 0 1 auto;
+    width: calc(100% - 310px);
+    min-width: 0;
     background: linear-gradient(180deg, #f7f9fc 0%, #eef3fb 100%);
     margin: 10px 10px 10px 300px;
     min-height: calc(100vh - 20px);
@@ -1127,6 +1204,7 @@ select:focus {
 
 .sidebar.collapsed~.mainview {
     margin-left: 92px;
+    width: calc(100% - 102px);
 }
 
 .topbar {
@@ -1433,9 +1511,17 @@ select:focus {
 
     .mainview {
         margin: 0;
+        width: 100%;
         min-height: 100vh;
         border-radius: 0;
         padding: 12px
+    }
+}
+
+@media(min-width: 769px) and (max-width: 900px) {
+    .sidebar.slid~.mainview {
+        margin-left: 280px;
+        width: calc(100% - 280px);
     }
 }
 
@@ -1837,10 +1923,15 @@ select:focus {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 88px;
-    height: 88px;
+    width: 150px;
+    height: 150px;
     transform-origin: center center;
     animation: heartbeat 900ms ease-in-out 0s 3;
+}
+
+.preloader .preloader-logo img {
+    width: 100%;
+    height: auto;
 }
 
 @keyframes heartbeat {
