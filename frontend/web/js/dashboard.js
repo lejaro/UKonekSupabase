@@ -58,6 +58,20 @@ if (document.readyState === 'complete') {
 // Failsafe: always dismiss after 5 seconds even if window.load never fires
 setTimeout(dismissPagePreloader, 5000);
 
+/**
+ * Flicker-free DOM swap: builds new content into a DocumentFragment off-screen,
+ * then replaces the container's children in a single paint. Prevents the blank
+ * flash caused by clearing innerHTML before new data is ready.
+ * @param {Element} container - The element whose children will be replaced.
+ * @param {function(DocumentFragment): void} buildFn - Receives a fragment; append rows into it.
+ */
+function swapContainer(container, buildFn) {
+  if (!container) return;
+  const fragment = document.createDocumentFragment();
+  buildFn(fragment);
+  container.replaceChildren(fragment);
+}
+
 function setLoading(btn, isLoading) {
   if (!btn) return;
   const label = btn.querySelector('.btn-label');
@@ -1777,9 +1791,6 @@ function renderScheduleDoctors(staffList, user) {
   const nurseTbody = document.getElementById('schedule-nurses-tbody');
   if (!doctorTbody || !nurseTbody) return;
 
-  doctorTbody.innerHTML = '';
-  nurseTbody.innerHTML = '';
-
   const doctors = staffList.filter((s) => {
     const r = String(s?.role || '').toLowerCase();
     return r === 'doctor' || r === 'specialist';
@@ -1789,64 +1800,63 @@ function renderScheduleDoctors(staffList, user) {
     return r === 'nurse' || r === 'staff';
   });
 
-  const renderRow = (staff, tbody) => {
-    const tr = document.createElement('tr');
-    const roleLabel = toTitleCase(staff?.role || 'Staff');
-    const statusText = getAvailabilityStatusText(staff);
-    const statusClass = getAvailabilityBadgeClass(staff);
-    const availabilityStatus = normalizeAvailabilityStatus(
-      staff?.availability_status || staff?.availabilityStatus
-    );
-    tr.innerHTML = `
-      <td class="table-cell">${getDoctorDisplayName(staff)} (${roleLabel})</td>
-      <td class="table-cell">${staff.email || '—'}</td>
-      <td class="table-cell"><span class="${statusClass}">${statusText}</span></td>
-      <td class="table-cell"></td>
-    `;
+  const buildRows = (list, emptyMsg) => (fragment) => {
+    if (!list.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="table-cell" colspan="4">${emptyMsg}</td>`;
+      fragment.appendChild(tr);
+      return;
+    }
+    list.forEach((staff) => {
+      const tr = document.createElement('tr');
+      const roleLabel = toTitleCase(staff?.role || 'Staff');
+      const statusText = getAvailabilityStatusText(staff);
+      const statusClass = getAvailabilityBadgeClass(staff);
+      const availabilityStatus = normalizeAvailabilityStatus(
+        staff?.availability_status || staff?.availabilityStatus
+      );
+      tr.innerHTML = `
+        <td class="table-cell">${getDoctorDisplayName(staff)} (${roleLabel})</td>
+        <td class="table-cell">${staff.email || '—'}</td>
+        <td class="table-cell"><span class="${statusClass}">${statusText}</span></td>
+        <td class="table-cell"></td>
+      `;
 
-    const actionsCell = tr.querySelector('td:last-child');
-    if (!actionsCell) return;
+      const actionsCell = tr.querySelector('td:last-child');
+      if (!actionsCell) return;
 
-    const canEditAvailability = isAdminUser(user);
-    const toggleGroup = document.createElement('div');
-    toggleGroup.className = 'availability-toggle-group';
-    toggleGroup.dataset.staffId = String(staff.id || '');
+      const canEditAvailability = isAdminUser(user);
+      const toggleGroup = document.createElement('div');
+      toggleGroup.className = 'availability-toggle-group';
+      toggleGroup.dataset.staffId = String(staff.id || '');
 
-    const options = [
-      { value: 'available', label: 'Available', className: 'availability-available' },
-      { value: 'on_break', label: 'On Break', className: 'availability-break' },
-      { value: 'unavailable', label: 'Unavailable', className: 'availability-unavailable' }
-    ];
+      const options = [
+        { value: 'available', label: 'Available', className: 'availability-available' },
+        { value: 'on_break', label: 'On Break', className: 'availability-break' },
+        { value: 'unavailable', label: 'Unavailable', className: 'availability-unavailable' }
+      ];
 
-    options.forEach((option) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `chip-btn chip-btn-outline availability-toggle ${option.className}`;
-      btn.textContent = option.label;
-      btn.dataset.status = option.value;
-      btn.disabled = !canEditAvailability;
-      if (availabilityStatus === option.value) {
-        btn.classList.add('is-active');
-      }
-      btn.addEventListener('click', () => handleAvailabilityToggle(staff, option.value, toggleGroup));
-      toggleGroup.appendChild(btn);
+      options.forEach((option) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `chip-btn chip-btn-outline availability-toggle ${option.className}`;
+        btn.textContent = option.label;
+        btn.dataset.status = option.value;
+        btn.disabled = !canEditAvailability;
+        if (availabilityStatus === option.value) {
+          btn.classList.add('is-active');
+        }
+        btn.addEventListener('click', () => handleAvailabilityToggle(staff, option.value, toggleGroup));
+        toggleGroup.appendChild(btn);
+      });
+
+      actionsCell.appendChild(toggleGroup);
+      fragment.appendChild(tr);
     });
-
-    actionsCell.appendChild(toggleGroup);
-    tbody.appendChild(tr);
   };
 
-  if (!doctors.length) {
-    doctorTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No doctor accounts found.</td></tr>';
-  } else {
-    doctors.forEach((staff) => renderRow(staff, doctorTbody));
-  }
-
-  if (!nurses.length) {
-    nurseTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No nurse accounts found.</td></tr>';
-  } else {
-    nurses.forEach((staff) => renderRow(staff, nurseTbody));
-  }
+  swapContainer(doctorTbody, buildRows(doctors, 'No doctor accounts found.'));
+  swapContainer(nurseTbody, buildRows(nurses, 'No nurse accounts found.'));
 }
 
 function updateAvailabilityInCaches(staffId, status, newRow = null) {
@@ -2600,6 +2610,274 @@ const citizensFinderInput = document.getElementById('citizens-finder-input');
 const userPaneIds = ['accounts-pane', 'registration-pane'];
 const chartAnimationState = { frameId: null };
 
+// ── Citizen Health Records Modal ──────────────────────────────────────────────
+
+const citizenHealthModal = document.getElementById('citizen-health-modal');
+
+function closeCitizenHealthModal() {
+  if (citizenHealthModal) citizenHealthModal.classList.add('hidden');
+}
+
+document.getElementById('chr-close-btn')?.addEventListener('click', closeCitizenHealthModal);
+citizenHealthModal?.addEventListener('click', (e) => {
+  if (e.target === citizenHealthModal) closeCitizenHealthModal();
+});
+
+// Tab switching
+citizenHealthModal?.addEventListener('click', (e) => {
+  const tab = e.target.closest('.chr-tab');
+  if (!tab) return;
+  const targetId = tab.dataset.chrTab;
+  citizenHealthModal.querySelectorAll('.chr-tab').forEach(t => {
+    const active = t.dataset.chrTab === targetId;
+    t.style.color = active ? '#0369a1' : '#64748b';
+    t.style.borderBottomColor = active ? '#0369a1' : 'transparent';
+    t.classList.toggle('active', active);
+  });
+  citizenHealthModal.querySelectorAll('.chr-tab-content').forEach(c => {
+    c.style.display = c.id === targetId ? '' : 'none';
+  });
+});
+
+function chrEmptyState(msg) {
+  return `<p style="color:#94a3b8;font-size:13px;padding:12px 0;">${msg}</p>`;
+}
+
+function chrLoadingState() {
+  return `<p style="color:#94a3b8;font-size:13px;padding:12px 0;">Loading…</p>`;
+}
+
+async function openCitizenHealthModal(citizen) {
+  if (!citizenHealthModal) return;
+
+  // Reset tabs to first
+  citizenHealthModal.querySelectorAll('.chr-tab').forEach((t, i) => {
+    const active = i === 0;
+    t.style.color = active ? '#0369a1' : '#64748b';
+    t.style.borderBottomColor = active ? '#0369a1' : 'transparent';
+    t.classList.toggle('active', active);
+  });
+  citizenHealthModal.querySelectorAll('.chr-tab-content').forEach((c, i) => {
+    c.style.display = i === 0 ? '' : 'none';
+  });
+
+  // Header
+  const fullName = [citizen.firstname, citizen.surname].filter(Boolean).join(' ') || citizen.username || citizen.name || '—';
+  document.getElementById('chr-name').textContent = fullName;
+  document.getElementById('chr-meta').textContent = citizen.email || '';
+
+  // Profile strip
+  const profileEl = document.getElementById('chr-profile');
+  const profileFields = [
+    { label: 'Sex', value: citizen.sex || '—' },
+    { label: 'Age', value: citizen.age || '—' },
+    { label: 'Date of Birth', value: citizen.date_of_birth ? new Date(citizen.date_of_birth).toLocaleDateString() : '—' },
+    { label: 'Contact', value: citizen.contact_number || '—' },
+    { label: 'Address', value: citizen.complete_address || '—' },
+    { label: 'Emergency Contact', value: citizen.emergency_contact_complete_name || '—' },
+  ];
+  profileEl.innerHTML = profileFields.map(f => `
+    <div>
+      <div style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">${f.label}</div>
+      <div style="font-size:13px;color:#1e293b;margin-top:2px;">${f.value}</div>
+    </div>
+  `).join('');
+
+  // Set loading state on all tab bodies
+  ['chr-consultations-body','chr-vitals-body','chr-prescriptions-body','chr-laborders-body','chr-appointments-body']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = chrLoadingState(); });
+
+  citizenHealthModal.classList.remove('hidden');
+
+  // Fetch all health data in parallel
+  try {
+    const { supabase } = await loadSupabaseModule();
+    const citizenId = Number(citizen.id);
+
+    const [consultRes, vitalsRes, rxRes, labRes, apptRes] = await Promise.all([
+      supabase.from('consultations')
+        .select('id,diagnosis,symptoms,notes,consulted_at,doctor:staff(firstname,surname)')
+        .eq('patient_citizen_id', citizenId)
+        .order('consulted_at', { ascending: false })
+        .limit(50),
+      supabase.from('vital_signs')
+        .select('blood_pressure,respiratory_rate,temperature,oxygen_saturation,chief_complaint,current_medications,created_at,nurse:staff!nurse_id(firstname,surname)')
+        .eq('citizen_id', citizenId)
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase.from('prescription_headers')
+        .select('id,issued_at,patient_identifier,doctor:staff(firstname,surname),items:prescription_items(medicine_name,quantity,unit,dosage,frequency)')
+        .eq('patient_identifier', `CIT-${citizenId}`)
+        .order('issued_at', { ascending: false })
+        .limit(50),
+      supabase.from('lab_orders')
+        .select('test_name,status,created_at,doctor:staff(firstname,surname)')
+        .eq('patient_citizen_id', citizenId)
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase.from('appointments')
+        .select('appointment_date,appointment_time,status,patient_notes,doctor_notes,doctor:staff(firstname,surname)')
+        .eq('citizen_id', citizenId)
+        .order('appointment_date', { ascending: false })
+        .limit(50),
+    ]);
+
+    // Render Consultations
+    const consultEl = document.getElementById('chr-consultations-body');
+    if (consultEl) {
+      const rows = consultRes.data || [];
+      if (!rows.length) {
+        consultEl.innerHTML = chrEmptyState('No consultation records found.');
+      } else {
+        consultEl.innerHTML = `
+          <table class="accounts-table" style="width:100%;">
+            <thead><tr class="table-header-row">
+              <th class="table-header-cell">Date</th>
+              <th class="table-header-cell">Diagnosis</th>
+              <th class="table-header-cell">Symptoms</th>
+              <th class="table-header-cell">Doctor</th>
+            </tr></thead>
+            <tbody>${rows.map(r => `
+              <tr>
+                <td class="table-cell" style="white-space:nowrap;">${r.consulted_at ? new Date(r.consulted_at).toLocaleDateString() : '—'}</td>
+                <td class="table-cell">${r.diagnosis || '—'}</td>
+                <td class="table-cell" style="color:#64748b;font-size:12px;">${(r.symptoms || '—').substring(0, 80)}</td>
+                <td class="table-cell" style="white-space:nowrap;">${r.doctor ? `Dr. ${r.doctor.firstname} ${r.doctor.surname}` : '—'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>`;
+      }
+    }
+
+    // Render Vitals
+    const vitalsEl = document.getElementById('chr-vitals-body');
+    if (vitalsEl) {
+      const rows = vitalsRes.data || [];
+      if (!rows.length) {
+        vitalsEl.innerHTML = chrEmptyState('No vital sign records found.');
+      } else {
+        vitalsEl.innerHTML = `
+          <table class="accounts-table" style="width:100%;">
+            <thead><tr class="table-header-row">
+              <th class="table-header-cell">Date</th>
+              <th class="table-header-cell">BP</th>
+              <th class="table-header-cell">Temp</th>
+              <th class="table-header-cell">RR</th>
+              <th class="table-header-cell">SpO₂</th>
+              <th class="table-header-cell">Chief Complaint</th>
+            </tr></thead>
+            <tbody>${rows.map(r => `
+              <tr>
+                <td class="table-cell" style="white-space:nowrap;">${r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}</td>
+                <td class="table-cell">${r.blood_pressure ? `${r.blood_pressure} mmHg` : '—'}</td>
+                <td class="table-cell">${r.temperature ? `${r.temperature} °C` : '—'}</td>
+                <td class="table-cell">${r.respiratory_rate ? `${r.respiratory_rate} bpm` : '—'}</td>
+                <td class="table-cell">${r.oxygen_saturation ? `${r.oxygen_saturation}%` : '—'}</td>
+                <td class="table-cell" style="color:#64748b;font-size:12px;">${(r.chief_complaint || '—').substring(0, 60)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>`;
+      }
+    }
+
+    // Render Prescriptions
+    const rxEl = document.getElementById('chr-prescriptions-body');
+    if (rxEl) {
+      const rows = rxRes.data || [];
+      if (!rows.length) {
+        rxEl.innerHTML = chrEmptyState('No prescriptions found.');
+      } else {
+        rxEl.innerHTML = rows.map(rx => {
+          const items = (rx.items || []).map(it =>
+            `<li style="font-size:12px;color:#374151;">${it.medicine_name} — ${it.quantity} ${it.unit || ''} ${it.dosage ? `(${it.dosage})` : ''} ${it.frequency || ''}</li>`
+          ).join('');
+          const doctor = rx.doctor ? `Dr. ${rx.doctor.firstname} ${rx.doctor.surname}` : '—';
+          const date = rx.issued_at ? new Date(rx.issued_at).toLocaleDateString() : '—';
+          return `
+            <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-size:13px;font-weight:600;color:#1e293b;">${date}</span>
+                <span style="font-size:12px;color:#64748b;">${doctor}</span>
+              </div>
+              <ul style="margin:0;padding-left:18px;">${items || '<li style="font-size:12px;color:#94a3b8;">No items</li>'}</ul>
+            </div>`;
+        }).join('');
+      }
+    }
+
+    // Render Lab Orders
+    const labEl = document.getElementById('chr-laborders-body');
+    if (labEl) {
+      const rows = labRes.data || [];
+      if (!rows.length) {
+        labEl.innerHTML = chrEmptyState('No lab orders found.');
+      } else {
+        labEl.innerHTML = `
+          <table class="accounts-table" style="width:100%;">
+            <thead><tr class="table-header-row">
+              <th class="table-header-cell">Date</th>
+              <th class="table-header-cell">Test</th>
+              <th class="table-header-cell">Status</th>
+              <th class="table-header-cell">Doctor</th>
+            </tr></thead>
+            <tbody>${rows.map(r => {
+              const statusClass = r.status === 'Completed' ? 'badge badge-success' : 'badge badge-warning';
+              return `<tr>
+                <td class="table-cell" style="white-space:nowrap;">${r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}</td>
+                <td class="table-cell"><strong>${r.test_name || '—'}</strong></td>
+                <td class="table-cell"><span class="${statusClass}">${r.status || '—'}</span></td>
+                <td class="table-cell" style="white-space:nowrap;">${r.doctor ? `Dr. ${r.doctor.firstname} ${r.doctor.surname}` : '—'}</td>
+              </tr>`;
+            }).join('')}
+            </tbody>
+          </table>`;
+      }
+    }
+
+    // Render Appointments
+    const apptEl = document.getElementById('chr-appointments-body');
+    if (apptEl) {
+      const rows = apptRes.data || [];
+      if (!rows.length) {
+        apptEl.innerHTML = chrEmptyState('No appointments found.');
+      } else {
+        apptEl.innerHTML = `
+          <table class="accounts-table" style="width:100%;">
+            <thead><tr class="table-header-row">
+              <th class="table-header-cell">Date</th>
+              <th class="table-header-cell">Time</th>
+              <th class="table-header-cell">Doctor</th>
+              <th class="table-header-cell">Status</th>
+              <th class="table-header-cell">Notes</th>
+            </tr></thead>
+            <tbody>${rows.map(r => {
+              const statusColors = { confirmed:'#16a34a', pending:'#d97706', completed:'#0369a1', cancelled:'#dc2626', 'no-show':'#9333ea' };
+              const color = statusColors[r.status] || '#64748b';
+              return `<tr>
+                <td class="table-cell" style="white-space:nowrap;">${r.appointment_date ? new Date(r.appointment_date).toLocaleDateString() : '—'}</td>
+                <td class="table-cell" style="white-space:nowrap;">${r.appointment_time || '—'}</td>
+                <td class="table-cell" style="white-space:nowrap;">${r.doctor ? `Dr. ${r.doctor.firstname} ${r.doctor.surname}` : '—'}</td>
+                <td class="table-cell"><span style="font-size:12px;font-weight:600;color:${color};text-transform:capitalize;">${r.status || '—'}</span></td>
+                <td class="table-cell" style="color:#64748b;font-size:12px;">${(r.patient_notes || '—').substring(0, 60)}</td>
+              </tr>`;
+            }).join('')}
+            </tbody>
+          </table>`;
+      }
+    }
+
+  } catch (err) {
+    console.error('Failed to load citizen health records:', err);
+    ['chr-consultations-body','chr-vitals-body','chr-prescriptions-body','chr-laborders-body','chr-appointments-body']
+      .forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = chrEmptyState('Failed to load records.');
+      });
+  }
+}
+
+
+
 function applyStaffFinder() {
   const query = String(staffFinderInput?.value || '').trim().toLowerCase();
   const selectedRole = String(roleFilterInput?.value || '').trim().toLowerCase();
@@ -2617,33 +2895,39 @@ function applyStaffFinder() {
 function renderCitizensTable(filteredList) {
   if (!patientsTbody) return;
 
-  patientsTbody.innerHTML = '';
-  if (filteredList.length === 0) {
-    patientsTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No citizen accounts found.</td></tr>';
-    return;
-  }
-
-  filteredList.forEach(user => {
-    const row = document.createElement('tr');
-    row.className = 'citizen-row';
-    row.innerHTML = `
-      <td class="table-cell">${user.username || user.name || '—'}</td>
-      <td class="table-cell">${user.email || '—'}</td>
-      <td class="table-cell">${user.contact_number || '—'}</td>
-      <td class="table-cell">${formatDateTime(user.created_at)}</td>
-    `;
-    patientsTbody.appendChild(row);
-    attachDetailRow(row, () => ({
-      tag: 'Citizens',
-      title: user.username || user.name || 'Citizen Account',
-      subtitle: user.email || '',
-      items: [
-        { label: 'Username', value: user.username || user.name || '—' },
-        { label: 'Email', value: user.email || '—' },
-        { label: 'Contact Number', value: user.contact_number || '—' },
-        { label: 'Registered', value: user.created_at ? new Date(user.created_at) : '—' }
-      ]
-    }));
+  swapContainer(patientsTbody, (fragment) => {
+    if (filteredList.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td class="table-cell" colspan="4">No citizen accounts found.</td>';
+      fragment.appendChild(tr);
+      return;
+    }
+    filteredList.forEach(user => {
+      const row = document.createElement('tr');
+      row.className = 'citizen-row';
+      row.style.cursor = 'pointer';
+      row.innerHTML = `
+        <td class="table-cell">${user.username || user.name || '—'}</td>
+        <td class="table-cell">${user.email || '—'}</td>
+        <td class="table-cell">${user.contact_number || '—'}</td>
+        <td class="table-cell">${formatDateTime(user.created_at)}</td>
+      `;
+      row.addEventListener('click', async () => {
+        // Fetch full citizen profile (includes health-related fields not in the list query)
+        try {
+          const { supabase } = await loadSupabaseModule();
+          const { data } = await supabase
+            .from('citizens')
+            .select('id,firstname,surname,username,email,contact_number,sex,age,date_of_birth,complete_address,emergency_contact_complete_name,emergency_contact_contact_number,relation,created_at')
+            .eq('id', user.id)
+            .single();
+          openCitizenHealthModal(data || user);
+        } catch (_) {
+          openCitizenHealthModal(user);
+        }
+      });
+      fragment.appendChild(row);
+    });
   });
 }
 
@@ -4914,48 +5198,51 @@ function renderServingQueue() {
   const tbody = document.getElementById('serving-queue-tbody');
   if (!tbody) return;
   const allowConsult = canConsultPatients();
-  tbody.innerHTML = '';
-  
+
   // Hard filter to ensure no completed/cancelled tickets ever show up in this active list
   const activeTickets = consultationQueueTickets.filter(c => {
     const status = String(c?.queueStatus || '').trim().toLowerCase();
     return status === 'serving' || status === 'on_call';
   });
 
-  if (!activeTickets.length) {
-    tbody.innerHTML = '<tr><td class="table-cell" colspan="5" style="color:#64748b;">No patients currently being served.</td></tr>';
-    return;
-  }
-  activeTickets.forEach(c => {
-    const displayName = c.patientName || c.patientId || '—';
-    const tr = document.createElement('tr');
-    tr.style.background = '#f0fdf4';
-    tr.innerHTML = `
-      <td class="table-cell"><strong>${displayName}</strong><br><span style="font-size:11px;color:#64748b">${c.patientId || ''}</span></td>
-      <td class="table-cell">${c.serviceLabel || 'General Consultation'}</td>
-      <td class="table-cell"><span style="font-weight:700;color:#0369a1">#${String(c.queueNumber || 0).padStart(3,'0')}</span></td>
-      <td class="table-cell">${formatDateTime(c.created_at)}</td>
-      <td class="table-cell">
-        ${allowConsult
-          ? `<button class="btn small" data-action="consult" data-id="${c.id}" style="background:#0369a1;color:#fff;border-color:#0369a1;">Consult</button>`
-          : '<span style="color:#94a3b8;font-size:12px">View only</span>'}
-      </td>
-    `;
-    tbody.appendChild(tr);
-    attachDetailRow(tr, () => ({
-      tag: 'Now Serving',
-      title: displayName,
-      subtitle: c.serviceLabel || 'General Consultation',
-      items: [
-        { label: 'Patient Name', value: c.patientName || '—' },
-        { label: 'Patient ID', value: c.patientId },
-        { label: 'Service', value: c.serviceLabel || '—' },
-        { label: 'Queue Number', value: c.queueNumber > 0 ? `#${String(c.queueNumber).padStart(3,'0')}` : '—' },
-        { label: 'Symptoms', value: c.symptoms || '—' },
-        { label: 'Reason', value: c.notes || '—' },
-        { label: 'Since', value: new Date(c.created_at) }
-      ]
-    }));
+  swapContainer(tbody, (fragment) => {
+    if (!activeTickets.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td class="table-cell" colspan="5" style="color:#64748b;">No patients currently being served.</td>';
+      fragment.appendChild(tr);
+      return;
+    }
+    activeTickets.forEach(c => {
+      const displayName = c.patientName || c.patientId || '—';
+      const tr = document.createElement('tr');
+      tr.style.background = '#f0fdf4';
+      tr.innerHTML = `
+        <td class="table-cell"><strong>${displayName}</strong><br><span style="font-size:11px;color:#64748b">${c.patientId || ''}</span></td>
+        <td class="table-cell">${c.serviceLabel || 'General Consultation'}</td>
+        <td class="table-cell"><span style="font-weight:700;color:#0369a1">#${String(c.queueNumber || 0).padStart(3,'0')}</span></td>
+        <td class="table-cell">${formatDateTime(c.created_at)}</td>
+        <td class="table-cell">
+          ${allowConsult
+            ? `<button class="btn small" data-action="consult" data-id="${c.id}" style="background:#0369a1;color:#fff;border-color:#0369a1;">Consult</button>`
+            : '<span style="color:#94a3b8;font-size:12px">View only</span>'}
+        </td>
+      `;
+      fragment.appendChild(tr);
+      attachDetailRow(tr, () => ({
+        tag: 'Now Serving',
+        title: displayName,
+        subtitle: c.serviceLabel || 'General Consultation',
+        items: [
+          { label: 'Patient Name', value: c.patientName || '—' },
+          { label: 'Patient ID', value: c.patientId },
+          { label: 'Service', value: c.serviceLabel || '—' },
+          { label: 'Queue Number', value: c.queueNumber > 0 ? `#${String(c.queueNumber).padStart(3,'0')}` : '—' },
+          { label: 'Symptoms', value: c.symptoms || '—' },
+          { label: 'Reason', value: c.notes || '—' },
+          { label: 'Since', value: new Date(c.created_at) }
+        ]
+      }));
+    });
   });
 }
 
@@ -4970,8 +5257,7 @@ function renderConsultations() {
   const dateTo = dateToInput?.value ? new Date(dateToInput.value + 'T23:59:59') : null;
 
   const allowPrescribe = canCreatePrescriptions();
-  consultationsTbody.innerHTML = '';
-  
+
   let rows = consultations.slice();
 
   // Apply date range filter
@@ -4992,39 +5278,43 @@ function renderConsultations() {
     rows.sort((a, b) => (a.patientName || '').localeCompare(b.patientName || ''));
   }
 
-  if (!rows.length) {
-    const msg = (dateFrom || dateTo) ? 'No consultations found for the selected date range.' : 'No consultation records yet.';
-    consultationsTbody.innerHTML = `<tr><td class="table-cell" colspan="5" style="color:#64748b;">${msg}</td></tr>`;
-    return;
-  }
-  rows.forEach(c => {
-    const displayName = c.patientName || c.patientId || '—';
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="table-cell"><strong>${displayName}</strong></td>
-      <td class="table-cell" style="color:#64748b;font-size:13px;">${c.patientId || '—'}</td>
-      <td class="table-cell">${(c.diagnosis || '').substring(0, 60)}</td>
-      <td class="table-cell">${formatDateTime(c.created_at)}</td>
-      <td class="table-cell" style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="btn small" data-action="view" data-id="${c.id}" style="background:#64748b;color:#fff;border-color:#64748b;">View</button>
-        ${allowPrescribe ? `<button class="btn small" data-action="prescribe" data-id="${c.id}" style="background:#16a34a;color:#fff;border-color:#16a34a;">Prescribe</button>` : ''}
-      </td>
-    `;
-    consultationsTbody.appendChild(tr);
-    attachDetailRow(tr, () => ({
-      tag: 'Consultation',
-      title: displayName,
-      subtitle: c.id,
-      items: [
-        { label: 'Consultation ID', value: c.id },
-        { label: 'Patient Name', value: c.patientName || '—' },
-        { label: 'Patient ID', value: c.patientId },
-        { label: 'Symptoms', value: c.symptoms || '—' },
-        { label: 'Diagnosis', value: c.diagnosis || '—' },
-        { label: 'Notes', value: c.notes || '—' },
-        { label: 'Recorded', value: new Date(c.created_at) }
-      ]
-    }));
+  swapContainer(consultationsTbody, (fragment) => {
+    if (!rows.length) {
+      const msg = (dateFrom || dateTo) ? 'No consultations found for the selected date range.' : 'No consultation records yet.';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="table-cell" colspan="5" style="color:#64748b;">${msg}</td>`;
+      fragment.appendChild(tr);
+      return;
+    }
+    rows.forEach(c => {
+      const displayName = c.patientName || c.patientId || '—';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="table-cell"><strong>${displayName}</strong></td>
+        <td class="table-cell" style="color:#64748b;font-size:13px;">${c.patientId || '—'}</td>
+        <td class="table-cell">${(c.diagnosis || '').substring(0, 60)}</td>
+        <td class="table-cell">${formatDateTime(c.created_at)}</td>
+        <td class="table-cell" style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn small" data-action="view" data-id="${c.id}" style="background:#64748b;color:#fff;border-color:#64748b;">View</button>
+          ${allowPrescribe ? `<button class="btn small" data-action="prescribe" data-id="${c.id}" style="background:#16a34a;color:#fff;border-color:#16a34a;">Prescribe</button>` : ''}
+        </td>
+      `;
+      fragment.appendChild(tr);
+      attachDetailRow(tr, () => ({
+        tag: 'Consultation',
+        title: displayName,
+        subtitle: c.id,
+        items: [
+          { label: 'Consultation ID', value: c.id },
+          { label: 'Patient Name', value: c.patientName || '—' },
+          { label: 'Patient ID', value: c.patientId },
+          { label: 'Symptoms', value: c.symptoms || '—' },
+          { label: 'Diagnosis', value: c.diagnosis || '—' },
+          { label: 'Notes', value: c.notes || '—' },
+          { label: 'Recorded', value: new Date(c.created_at) }
+        ]
+      }));
+    });
   });
 }
 
@@ -5572,6 +5862,16 @@ function renderMedicines() {
   const allowAdjust = canAdjustMedicineInventory(role);
   const allowAddNew = canAddNewMedicine(role);
   const allowRemove = canAddNewMedicine(role);
+  // Doctors and nurses see a simplified read-only view — no expiry date, no actions column
+  const showExpiryAndActions = allowAdjust || allowAddNew || !['doctor','nurse'].includes((role || '').toLowerCase());
+
+  // Toggle header cells
+  const thExpiry = document.getElementById('medicine-th-expiry');
+  const thActions = document.getElementById('medicine-th-actions');
+  if (thExpiry) thExpiry.style.display = showExpiryAndActions ? '' : 'none';
+  if (thActions) thActions.style.display = showExpiryAndActions ? '' : 'none';
+
+  const colCount = showExpiryAndActions ? 7 : 5;
 
   const medicineFormEl = document.getElementById('medicine-form');
   if (medicineFormEl) {
@@ -5582,77 +5882,82 @@ function renderMedicines() {
     });
   }
 
-  medicineTbody.innerHTML = '';
-  if (!Array.isArray(filtered) || filtered.length === 0) {
-    const msg = searchQuery ? 'No medicines match your search.' : 'No medicine inventory yet.';
-    medicineTbody.innerHTML = `<tr><td class="table-cell" colspan="7">${msg}</td></tr>`;
-    return;
-  }
-  filtered.forEach(m => {
-    const tr = document.createElement('tr');
-    
-    // Status logic
-    const isLowStock = m.qty <= 5 && m.qty > 0;
-    const isOutOfStock = m.qty <= 0;
-    const isExpired = m.expiry_date && new Date(m.expiry_date) < new Date();
-    
-    let statusHtml = '<span class="badge badge-success">In Stock</span>';
-    if (isExpired) statusHtml = '<span class="badge badge-error">Expired</span>';
-    else if (isOutOfStock) statusHtml = '<span class="badge badge-error">Out of Stock</span>';
-    else if (isLowStock) statusHtml = '<span class="badge badge-warning">Low Stock</span>';
-
-    const expiryText = m.expiry_date ? new Date(m.expiry_date).toLocaleDateString() : '—';
-    const descriptionText = m.description || '—';
-
-    tr.innerHTML = `
-      <td class="table-cell"><strong>${m.name}</strong></td>
-      <td class="table-cell">${descriptionText}</td>
-      <td class="table-cell">${m.qty}</td>
-      <td class="table-cell">${m.unit || ''}</td>
-      <td class="table-cell">${expiryText}</td>
-      <td class="table-cell">${statusHtml}</td>
-      <td class="table-cell"></td>
-    `;
-
-    const actionsTd = tr.querySelector('td:last-child');
-    if (allowAdjust) {
-      const addBtn = document.createElement('button');
-      addBtn.className = 'btn small';
-      addBtn.dataset.action = 'add';
-      addBtn.dataset.name = m.name;
-      addBtn.textContent = '+ Add';
-
-      const subBtn = document.createElement('button');
-      subBtn.className = 'btn small outline';
-      subBtn.dataset.action = 'sub';
-      subBtn.dataset.name = m.name;
-      subBtn.textContent = '- Subtract';
-
-      actionsTd.appendChild(addBtn);
-      actionsTd.appendChild(subBtn);
-      if (allowRemove) {
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'btn small outline';
-        removeBtn.dataset.action = 'remove';
-        removeBtn.dataset.name = m.name;
-        removeBtn.textContent = 'Remove';
-        actionsTd.appendChild(removeBtn);
-      }
-    } else {
-      actionsTd.textContent = 'View only';
+  swapContainer(medicineTbody, (fragment) => {
+    if (!Array.isArray(filtered) || filtered.length === 0) {
+      const msg = searchQuery ? 'No medicines match your search.' : 'No medicine inventory yet.';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="table-cell" colspan="${colCount}">${msg}</td>`;
+      fragment.appendChild(tr);
+      return;
     }
+    filtered.forEach(m => {
+      const tr = document.createElement('tr');
 
-    medicineTbody.appendChild(tr);
-    attachDetailRow(tr, () => ({
-      tag: 'Inventory',
-      title: m.name,
-      subtitle: 'Medicine Stock Detail',
-      items: [
-        { label: 'Name', value: m.name },
-        { label: 'Quantity', value: m.qty },
-        { label: 'Unit', value: m.unit || '—' }
-      ]
-    }));
+      // Status logic
+      const isLowStock = m.qty <= 5 && m.qty > 0;
+      const isOutOfStock = m.qty <= 0;
+      const isExpired = m.expiry_date && new Date(m.expiry_date) < new Date();
+
+      let statusHtml = '<span class="badge badge-success">In Stock</span>';
+      if (isExpired) statusHtml = '<span class="badge badge-error">Expired</span>';
+      else if (isOutOfStock) statusHtml = '<span class="badge badge-error">Out of Stock</span>';
+      else if (isLowStock) statusHtml = '<span class="badge badge-warning">Low Stock</span>';
+
+      const expiryText = m.expiry_date ? new Date(m.expiry_date).toLocaleDateString() : '—';
+      const descriptionText = m.description || '—';
+
+      tr.innerHTML = `
+        <td class="table-cell"><strong>${m.name}</strong></td>
+        <td class="table-cell">${descriptionText}</td>
+        <td class="table-cell">${m.qty}</td>
+        <td class="table-cell">${m.unit || ''}</td>
+        ${showExpiryAndActions ? `<td class="table-cell">${expiryText}</td>` : ''}
+        <td class="table-cell">${statusHtml}</td>
+        ${showExpiryAndActions ? `<td class="table-cell"></td>` : ''}
+      `;
+
+      if (showExpiryAndActions) {
+        const actionsTd = tr.querySelector('td:last-child');
+        if (allowAdjust) {
+          const addBtn = document.createElement('button');
+          addBtn.className = 'btn small';
+          addBtn.dataset.action = 'add';
+          addBtn.dataset.name = m.name;
+          addBtn.textContent = '+ Add';
+
+          const subBtn = document.createElement('button');
+          subBtn.className = 'btn small outline';
+          subBtn.dataset.action = 'sub';
+          subBtn.dataset.name = m.name;
+          subBtn.textContent = '- Subtract';
+
+          actionsTd.appendChild(addBtn);
+          actionsTd.appendChild(subBtn);
+          if (allowRemove) {
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'btn small outline';
+            removeBtn.dataset.action = 'remove';
+            removeBtn.dataset.name = m.name;
+            removeBtn.textContent = 'Remove';
+            actionsTd.appendChild(removeBtn);
+          }
+        } else {
+          actionsTd.textContent = '—';
+        }
+      }
+
+      fragment.appendChild(tr);
+      attachDetailRow(tr, () => ({
+        tag: 'Inventory',
+        title: m.name,
+        subtitle: 'Medicine Stock Detail',
+        items: [
+          { label: 'Name', value: m.name },
+          { label: 'Quantity', value: m.qty },
+          { label: 'Unit', value: m.unit || '—' }
+        ]
+      }));
+    });
   });
 }
 
@@ -5716,46 +6021,49 @@ function renderArchivedMedicines() {
     return;
   }
 
-  medicineArchivedTbody.innerHTML = '';
-  if (!Array.isArray(archivedMedicines) || archivedMedicines.length === 0) {
-    medicineArchivedTbody.innerHTML = '<tr><td class="table-cell" colspan="5">No archived medicines.</td></tr>';
-    return;
-  }
-
   const canRestore = canAddNewMedicine(getSessionRole());
   const canHardDelete = isAdminUser(cachedSessionUser);
-  archivedMedicines.forEach((m) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="table-cell">${m.name}</td>
-      <td class="table-cell">${m.qty}</td>
-      <td class="table-cell">${m.unit || ''}</td>
-      <td class="table-cell">${formatDateTime(m.archived_at)}</td>
-      <td class="table-cell"></td>
-    `;
 
-    const actionCell = tr.querySelector('td:last-child');
-    if (canRestore) {
-      const restoreBtn = document.createElement('button');
-      restoreBtn.className = 'btn small';
-      restoreBtn.dataset.action = 'restore';
-      restoreBtn.dataset.id = String(m.id || '');
-      restoreBtn.textContent = 'Restore';
-      actionCell.appendChild(restoreBtn);
+  swapContainer(medicineArchivedTbody, (fragment) => {
+    if (!Array.isArray(archivedMedicines) || archivedMedicines.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td class="table-cell" colspan="5">No archived medicines.</td>';
+      fragment.appendChild(tr);
+      return;
     }
-    if (canHardDelete) {
-      const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'btn small outline';
-      deleteBtn.dataset.action = 'hard-delete';
-      deleteBtn.dataset.id = String(m.id || '');
-      deleteBtn.textContent = 'Delete Permanently';
-      actionCell.appendChild(deleteBtn);
-    }
-    if (!canRestore && !canHardDelete) {
-      actionCell.textContent = 'View only';
-    }
+    archivedMedicines.forEach((m) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="table-cell">${m.name}</td>
+        <td class="table-cell">${m.qty}</td>
+        <td class="table-cell">${m.unit || ''}</td>
+        <td class="table-cell">${formatDateTime(m.archived_at)}</td>
+        <td class="table-cell"></td>
+      `;
 
-    medicineArchivedTbody.appendChild(tr);
+      const actionCell = tr.querySelector('td:last-child');
+      if (canRestore) {
+        const restoreBtn = document.createElement('button');
+        restoreBtn.className = 'btn small';
+        restoreBtn.dataset.action = 'restore';
+        restoreBtn.dataset.id = String(m.id || '');
+        restoreBtn.textContent = 'Restore';
+        actionCell.appendChild(restoreBtn);
+      }
+      if (canHardDelete) {
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn small outline';
+        deleteBtn.dataset.action = 'hard-delete';
+        deleteBtn.dataset.id = String(m.id || '');
+        deleteBtn.textContent = 'Delete Permanently';
+        actionCell.appendChild(deleteBtn);
+      }
+      if (!canRestore && !canHardDelete) {
+        actionCell.textContent = 'View only';
+      }
+
+      fragment.appendChild(tr);
+    });
   });
 }
 

@@ -78,6 +78,12 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* Flicker-free table refresh: rows and queue cards fade in after a DOM swap */
+.accounts-table tbody tr,
+.queue-ticket-card {
+    animation: fadeIn 0.15s ease both;
+}
+
 html,
 body {
     height: 100%;

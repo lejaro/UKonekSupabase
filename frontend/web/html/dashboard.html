@@ -188,47 +188,67 @@
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 14px;
-      margin-top: 10px;
+      margin-top: 14px;
       min-width: 780px;
     }
 
     .queue-lane {
-      border: 1px solid rgba(148, 163, 184, 0.35);
+      border: 1px solid rgba(148, 163, 184, 0.3);
       border-radius: 14px;
       background: #f8fafc;
       min-height: 360px;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Lane color accents */
+    .queue-lane--waiting {
+      border-top: 3px solid #f59e0b;
+      background: #fffbeb;
+    }
+    .queue-lane--oncall {
+      border-top: 3px solid #8b5cf6;
+      background: #faf5ff;
+    }
+    .queue-lane--serving {
+      border-top: 3px solid #16a34a;
+      background: #f0fdf4;
     }
 
     .queue-lane-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 12px;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
     }
 
     .queue-lane-header h4 {
       margin: 0;
-      font-size: 14px;
+      font-size: 13px;
+      font-weight: 700;
       color: #0f172a;
+      letter-spacing: 0.01em;
     }
 
     .queue-lane-count {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
-      color: #475569;
-      background: #e2e8f0;
       border-radius: 999px;
-      padding: 2px 8px;
+      padding: 2px 9px;
+      min-width: 24px;
+      text-align: center;
     }
+    .queue-lane-count--waiting  { background: #fef3c7; color: #92400e; }
+    .queue-lane-count--oncall   { background: #ede9fe; color: #5b21b6; }
+    .queue-lane-count--serving  { background: #dcfce7; color: #166534; }
 
     .queue-card-list {
       padding: 10px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
       min-height: 280px;
       flex: 1;
     }
@@ -239,12 +259,18 @@
     }
 
     .queue-ticket-card {
-      border: 1px solid rgba(148, 163, 184, 0.35);
+      border: 1px solid rgba(148, 163, 184, 0.3);
       border-radius: 12px;
       background: #ffffff;
-      padding: 10px;
+      padding: 12px;
       cursor: grab;
-      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+      transition: box-shadow 0.15s ease, transform 0.15s ease;
+    }
+
+    .queue-ticket-card:hover {
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
+      transform: translateY(-1px);
     }
 
     .queue-ticket-card:active {
@@ -254,22 +280,23 @@
     .queue-ticket-top {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       gap: 8px;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
 
     .queue-ticket-code {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
-      color: #0f172a;
-      background: #e2e8f0;
+      color: #475569;
+      background: #f1f5f9;
       border-radius: 999px;
       padding: 2px 8px;
     }
 
     .queue-ticket-queue {
-      font-size: 13px;
-      font-weight: 700;
+      font-size: 15px;
+      font-weight: 800;
       color: #0369a1;
     }
 
@@ -277,35 +304,45 @@
       font-size: 14px;
       font-weight: 700;
       color: #0f172a;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
 
     .queue-ticket-meta {
       font-size: 12px;
-      color: #475569;
-      margin-bottom: 8px;
+      color: #64748b;
+      margin-bottom: 10px;
     }
 
     .queue-ticket-actions {
       display: flex;
-      justify-content: flex-end;
+      flex-wrap: wrap;
       gap: 6px;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 10px;
+      margin-top: 2px;
     }
 
     .queue-ticket-btn {
       border: 1px solid #cbd5e1;
       background: #f8fafc;
       border-radius: 8px;
-      padding: 4px 8px;
+      padding: 5px 10px;
       font-size: 12px;
-      font-weight: 700;
-      color: #0f172a;
+      font-weight: 600;
+      color: #334155;
       cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+      white-space: nowrap;
+    }
+
+    .queue-ticket-btn:hover {
+      background: #e2e8f0;
+      border-color: #94a3b8;
     }
 
     .queue-ticket-empty {
       text-align: center;
-      padding: 20px 10px;
+      padding: 32px 10px;
       color: #94a3b8;
       font-size: 13px;
     }
@@ -1190,7 +1227,6 @@
               <input type="text" id="medicine-search-input" class="search-input" placeholder="Search medicine name..." style="min-width: 200px;">
               <select id="medicine-sort-select" class="chip-btn chip-btn-outline" style="min-width: 150px; cursor: pointer;">
                 <option value="name-asc">Name (A-Z)</option>
-                <option value="expiry-asc">Expiry (Nearest)</option>
                 <option value="stock-desc">Highest Stock</option>
                 <option value="stock-asc">Lowest Stock</option>
               </select>
@@ -1206,9 +1242,9 @@
                   <th class="table-header-cell">Description</th>
                   <th class="table-header-cell">Stock Qty</th>
                   <th class="table-header-cell">Unit</th>
-                  <th class="table-header-cell">Expiry Date</th>
+                  <th class="table-header-cell" id="medicine-th-expiry">Expiry Date</th>
                   <th class="table-header-cell">Status</th>
-                  <th class="table-header-cell">Actions</th>
+                  <th class="table-header-cell" id="medicine-th-actions">Actions</th>
                 </tr>
               </thead>
               <tbody id="medicine-tbody"></tbody>
@@ -1233,40 +1269,56 @@
 
       <section id="queue-section" class="section-top hidden">
         <div class="panel">
-          <div class="panel-head">
-            <h3>Queue Today</h3>
-            <span class="panel-hint">Use the action buttons on each card to move tickets between Waiting, On Call, and Now Serving.</span>
-            <span id="queue-current-serving-badge" class="panel-hint" style="padding: 6px 10px; border-radius: 999px; background: #e0f2fe; color: #0369a1; font-weight: 700;">Current serving: none</span>
-            <span id="queue-summary-badge" class="panel-hint" style="padding: 6px 10px; border-radius: 999px; background: #f1f5f9; color: #475569; font-weight: 700;">Waiting: 0 | On Call: 0</span>
-            <div class="management-actions">
+          <div class="panel-head" style="flex-wrap:wrap;gap:12px;">
+            <div>
+              <h3 style="margin:0;">Queue Today</h3>
+              <span class="panel-hint">Move tickets between lanes using the action buttons on each card.</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto;">
+              <span id="queue-current-serving-badge" style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:#e0f2fe;color:#0369a1;font-size:12px;font-weight:700;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Current serving: none
+              </span>
+              <span id="queue-summary-badge" style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:12px;font-weight:700;">
+                Waiting: 0 | On Call: 0
+              </span>
               <button id="queue-refresh-btn" class="chip-btn">Refresh</button>
-              <button id="open-tv-view-btn" class="chip-btn chip-btn-outline" type="button">TV View Mode</button>
+              <button id="open-tv-view-btn" class="chip-btn chip-btn-outline" type="button">TV View</button>
             </div>
           </div>
           <div class="queue-board">
-            <div class="queue-lane" data-lane="waiting">
+            <div class="queue-lane queue-lane--waiting" data-lane="waiting">
               <div class="queue-lane-header">
-                <h4>Waiting</h4>
-                <span id="queue-waiting-count" class="queue-lane-count">0</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;flex-shrink:0;"></span>
+                  <h4>Waiting</h4>
+                </div>
+                <span id="queue-waiting-count" class="queue-lane-count queue-lane-count--waiting">0</span>
               </div>
               <div id="queue-waiting-list" class="queue-card-list" data-lane="waiting"></div>
             </div>
-            <div class="queue-lane" data-lane="on_call">
+            <div class="queue-lane queue-lane--oncall" data-lane="on_call">
               <div class="queue-lane-header">
-                <h4>On Call</h4>
-                <span id="queue-oncall-count" class="queue-lane-count">0</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:#8b5cf6;display:inline-block;flex-shrink:0;"></span>
+                  <h4>On Call</h4>
+                </div>
+                <span id="queue-oncall-count" class="queue-lane-count queue-lane-count--oncall">0</span>
               </div>
               <div id="queue-oncall-list" class="queue-card-list" data-lane="on_call"></div>
             </div>
-            <div class="queue-lane" data-lane="serving">
+            <div class="queue-lane queue-lane--serving" data-lane="serving">
               <div class="queue-lane-header">
-                <h4>Now Serving</h4>
-                <span id="queue-serving-count" class="queue-lane-count">0</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block;flex-shrink:0;box-shadow:0 0 0 3px rgba(22,163,74,0.2);"></span>
+                  <h4>Now Serving</h4>
+                </div>
+                <span id="queue-serving-count" class="queue-lane-count queue-lane-count--serving">0</span>
               </div>
               <div id="queue-serving-list" class="queue-card-list" data-lane="serving"></div>
             </div>
           </div>
-          <p class="note" style="margin: 0; color: #64748b;">Completed tickets are automatically removed from today's queue list.</p>
+          <p class="note" style="margin:8px 0 0;color:#94a3b8;font-size:12px;">Completed tickets are automatically removed from today's queue list.</p>
         </div>
       </section>
 
@@ -1656,6 +1708,55 @@
           </div>
           <div class="actions" id="data-detail-actions" style="padding: 20px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; margin: 0; justify-content: flex-end; display: flex; gap: 12px;">
             <button id="data-detail-dismiss" class="btn btn-close" style="margin: 0;">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Citizen Health Records Modal -->
+      <div id="citizen-health-modal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width:860px;width:95%;max-height:92vh;overflow-y:auto;text-align:left;padding:0;">
+          <!-- Header -->
+          <div style="padding:24px 28px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;position:relative;">
+            <p style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#64748b;margin:0 0 4px;">Health Records</p>
+            <h3 id="chr-name" style="margin:0;font-size:20px;color:#1e293b;padding-right:40px;"></h3>
+            <p id="chr-meta" style="margin:4px 0 0;font-size:13px;color:#64748b;"></p>
+            <button id="chr-close-btn" title="Close" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border:none;background:transparent;cursor:pointer;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:18px;line-height:1;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='transparent'">&#x2715;</button>
+          </div>
+
+          <!-- Profile strip -->
+          <div id="chr-profile" style="padding:16px 28px;background:#fff;border-bottom:1px solid #e2e8f0;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px 20px;font-size:13px;"></div>
+
+          <!-- Tabs -->
+          <div style="padding:0 28px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;gap:0;overflow-x:auto;">
+            <button class="chr-tab active" data-chr-tab="chr-tab-consultations" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#0369a1;border-bottom:2px solid #0369a1;cursor:pointer;white-space:nowrap;">Consultations</button>
+            <button class="chr-tab" data-chr-tab="chr-tab-vitals" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Vitals</button>
+            <button class="chr-tab" data-chr-tab="chr-tab-prescriptions" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Prescriptions</button>
+            <button class="chr-tab" data-chr-tab="chr-tab-laborders" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Lab Orders</button>
+            <button class="chr-tab" data-chr-tab="chr-tab-appointments" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Appointments</button>
+          </div>
+
+          <!-- Tab content -->
+          <div style="padding:20px 28px;">
+            <!-- Consultations -->
+            <div id="chr-tab-consultations" class="chr-tab-content">
+              <div id="chr-consultations-body"></div>
+            </div>
+            <!-- Vitals -->
+            <div id="chr-tab-vitals" class="chr-tab-content" style="display:none;">
+              <div id="chr-vitals-body"></div>
+            </div>
+            <!-- Prescriptions -->
+            <div id="chr-tab-prescriptions" class="chr-tab-content" style="display:none;">
+              <div id="chr-prescriptions-body"></div>
+            </div>
+            <!-- Lab Orders -->
+            <div id="chr-tab-laborders" class="chr-tab-content" style="display:none;">
+              <div id="chr-laborders-body"></div>
+            </div>
+            <!-- Appointments -->
+            <div id="chr-tab-appointments" class="chr-tab-content" style="display:none;">
+              <div id="chr-appointments-body"></div>
+            </div>
           </div>
         </div>
       </div>

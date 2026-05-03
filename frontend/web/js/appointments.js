@@ -327,55 +327,63 @@ const appointments = (() => {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    if (tickets.length === 0) {
-      container.innerHTML = `<div class="queue-ticket-empty">${emptyText}</div>`;
-      return;
-    }
+    const sorted = tickets.slice().sort((a, b) => Number(a?.queue_number || 0) - Number(b?.queue_number || 0));
 
-    container.innerHTML = tickets
-      .sort((a, b) => Number(a?.queue_number || 0) - Number(b?.queue_number || 0))
-      .map((ticket) => {
+    const fragment = document.createDocumentFragment();
+
+    if (sorted.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'queue-ticket-empty';
+      empty.textContent = emptyText;
+      fragment.appendChild(empty);
+    } else {
+      sorted.forEach((ticket) => {
         const queueNumber = Number(ticket.queue_number || 0);
         const ticketCode = String(ticket.ticket_code || '').trim() || 'N/A';
         const citizenName = formatCitizenName(ticket.citizen);
         const serviceLabel = String(ticket.service_label || '').trim() || 'General Consultation';
         const citizenType = formatCitizenType(ticket.citizen_type);
         const laneActions = getLaneActionButtons(lane, ticket.id);
-        return `
-          <div class="queue-ticket-card" draggable="true" data-ticket-id="${ticket.id}" data-current-lane="${lane}">
-            <div class="queue-ticket-top">
-              <span class="queue-ticket-queue">#${queueNumber > 0 ? String(queueNumber).padStart(3, '0') : '-'}</span>
-              <span class="queue-ticket-code">${ticketCode}</span>
-            </div>
-            <div class="queue-ticket-name">${citizenName}</div>
-            <div class="queue-ticket-meta">${serviceLabel} • ${citizenType}</div>
-            <div class="queue-ticket-actions">
-              ${laneActions}
-              <button class="queue-ticket-btn" type="button" data-action="ticket-info" data-ticket-id="${ticket.id}">Info</button>
-              ${allowComplete ? `<button class="queue-ticket-btn" type="button" data-action="ticket-complete" data-ticket-id="${ticket.id}">Complete</button>` : ''}
-            </div>
+
+        const card = document.createElement('div');
+        card.className = 'queue-ticket-card';
+        card.draggable = true;
+        card.dataset.ticketId = ticket.id;
+        card.dataset.currentLane = lane;
+        card.innerHTML = `
+          <div class="queue-ticket-top">
+            <span class="queue-ticket-queue">#${queueNumber > 0 ? String(queueNumber).padStart(3, '0') : '-'}</span>
+            <span class="queue-ticket-code">${ticketCode}</span>
+          </div>
+          <div class="queue-ticket-name">${citizenName}</div>
+          <div class="queue-ticket-meta">${serviceLabel} • ${citizenType}</div>
+          <div class="queue-ticket-actions">
+            ${laneActions}
+            <button class="queue-ticket-btn" type="button" data-action="ticket-info" data-ticket-id="${ticket.id}">Info</button>
+            ${allowComplete ? `<button class="queue-ticket-btn" type="button" data-action="ticket-complete" data-ticket-id="${ticket.id}">Complete</button>` : ''}
           </div>
         `;
-      })
-      .join('');
 
-    container.querySelectorAll('.queue-ticket-card').forEach((card) => {
-      card.addEventListener('dragstart', (e) => {
-        card.classList.add('dragging');
-        e.dataTransfer.setData('text/plain', card.getAttribute('data-ticket-id'));
-      });
-      card.addEventListener('dragend', () => {
-        card.classList.remove('dragging');
-      });
+        card.addEventListener('dragstart', (e) => {
+          card.classList.add('dragging');
+          e.dataTransfer.setData('text/plain', card.getAttribute('data-ticket-id'));
+        });
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+        });
+        card.addEventListener('click', (event) => {
+          const actionBtn = event.target.closest('[data-action]');
+          if (actionBtn) return;
+          const ticketId = Number(card.getAttribute('data-ticket-id'));
+          const t = currentQueueTickets.find((item) => Number(item.id) === ticketId);
+          if (t) openTicketDetailModal(t);
+        });
 
-      card.addEventListener('click', (event) => {
-        const actionBtn = event.target.closest('[data-action]');
-        if (actionBtn) return;
-        const ticketId = Number(card.getAttribute('data-ticket-id'));
-        const ticket = currentQueueTickets.find((item) => Number(item.id) === ticketId);
-        if (ticket) openTicketDetailModal(ticket);
+        fragment.appendChild(card);
       });
-    });
+    }
+
+    container.replaceChildren(fragment);
   };
 
   const updateLaneCount = (id, count) => {
