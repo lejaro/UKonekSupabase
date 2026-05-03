@@ -21,7 +21,6 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
   bool _obscurePassword = true;
   bool _isLoading = false;
 
-  // ── Attempt & lockout state ──────────────────────────────────
   int _attemptsLeft = 3;
   bool _isLocked = false;
   int _lockSecondsLeft = 60;
@@ -31,26 +30,20 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
 
-  // ── Updated Medical Green Design Tokens ──────────────────────
-  static const _primary      = Color(0xFF28A745); // Health Green
-  static const _primary2     = Color(0xFF1B5E20); // Forest Green
-  static const _bg           = Color(0xFFF8FCF9); // Mint Background
-  static const _textDark     = Color(0xFF1B2E1E); // Dark Forest Charcoal
-  static const _textMuted    = Color(0xFF637367); // Muted Sage
-  static const _fieldBdr     = Color(0xFFE2E9E3); // Light Mist Border
+  static const _primary   = Color(0xFF28A745);
+  static const _primary2  = Color(0xFF1B5E20);
+  static const _bg        = Color(0xFFF8FCF9);
+  static const _textDark  = Color(0xFF1B2E1E);
+  static const _textMuted = Color(0xFF637367);
+  static const _fieldBdr  = Color(0xFFE2E9E3);
 
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-    _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
+    _animController = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+    _fadeAnim  = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
-        .animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
-    );
+        .animate(CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic));
     _animController.forward();
   }
 
@@ -64,19 +57,12 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
   }
 
   void _startLockout() {
-    setState(() {
-      _isLocked = true;
-      _lockSecondsLeft = 60;
-    });
+    setState(() { _isLocked = true; _lockSecondsLeft = 60; });
     _lockTimer?.cancel();
     _lockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_lockSecondsLeft <= 1) {
         timer.cancel();
-        setState(() {
-          _isLocked = false;
-          _attemptsLeft = 3;
-          _lockSecondsLeft = 60;
-        });
+        setState(() { _isLocked = false; _attemptsLeft = 3; _lockSecondsLeft = 60; });
         passwordController.clear();
       } else {
         setState(() => _lockSecondsLeft--);
@@ -92,7 +78,6 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
       _showSnack('Enter your email first, then tap Resend OTP.', isError: true);
       return;
     }
-
     try {
       await ApiService.requestCitizenOtp(email: email, purpose: 'email_verification');
       if (!mounted) return;
@@ -104,15 +89,17 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
   }
 
   void _showSnack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: isError ? Colors.redAccent : _primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: isError ? Colors.redAccent : _primary,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
   }
+
+  // ── Helper: safely read a string field from the map ──────────
+  String _str(Map<String, dynamic> map, String key) =>
+      (map[key] as String?)?.trim() ?? '';
 
   Future<void> login() async {
     if (_isLocked || _isLoading) return;
@@ -122,49 +109,102 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
     try {
       final response = await ApiService.loginCitizen(
         identifier: usernameController.text,
-        password: passwordController.text,
+        password:   passwordController.text,
       );
 
       if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _attemptsLeft = 3;
-      });
+      setState(() { _isLoading = false; _attemptsLeft = 3; });
 
-      final user = response['user'] as Map<String, dynamic>?;
-      final displayName = (user?['username'] as String?)?.trim().isNotEmpty == true
-          ? user!['username'] as String
-          : usernameController.text.trim();
+      // ── Extract citizen profile returned by loginCitizen() ────
+      // loginCitizen() does: select('*') from citizens table
+      // so all columns are available here
+      final user = (response['user'] as Map<String, dynamic>?) ?? {};
+
+      // ── Debug: print all keys so you can verify column names ──
+      // Remove these lines once profile fields display correctly
+      debugPrint('═══════════ CITIZEN PROFILE ═══════════');
+      debugPrint('Keys:      ${user.keys.toList()}');
+      debugPrint('firstname: "${_str(user, 'firstname')}"');
+      debugPrint('middle:    "${_str(user, 'middle_initial')}"');
+      debugPrint('surname:   "${_str(user, 'surname')}"');
+      debugPrint('dob:       "${_str(user, 'date_of_birth')}"');
+      debugPrint('age:       "${user['age']}"');
+      debugPrint('sex:       "${_str(user, 'sex')}"');
+      debugPrint('email:     "${_str(user, 'email')}"');
+      debugPrint('phone:     "${_str(user, 'contact_number')}"');
+      debugPrint('address:   "${_str(user, 'complete_address')}"');
+      debugPrint('eContact:  "${_str(user, 'emergency_contact_complete_name')}"');
+      debugPrint('eNumber:   "${_str(user, 'emergency_contact_contact_number')}"');
+      debugPrint('relation:  "${_str(user, 'relation')}"');
+      debugPrint('username:  "${_str(user, 'username')}"');
+      debugPrint('═══════════════════════════════════════');
+
+      // ── Name fields ───────────────────────────────────────────
+      final firstName  = _str(user, 'firstname');
+      final middleName = _str(user, 'middle_initial');
+      final surname = _str(user, 'surname').isNotEmpty
+          ? _str(user, 'surname')
+          : _str(user, 'last_name');
+
+      // Build display name: prefer username from DB, fallback to email
+      final displayName = _str(user, 'username').isNotEmpty
+          ? _str(user, 'username')
+          : firstName.isNotEmpty
+          ? firstName
+          : usernameController.text.trim().split('@').first;
+
+      // Build full name from non-empty parts
+      final fullName = [firstName, middleName, surname]
+          .where((s) => s.isNotEmpty)
+          .join(' ')
+          .trim()
+          .let((n) => n.isNotEmpty ? n : displayName); // fallback to username if all empty
 
       Navigator.pushAndRemoveUntil(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, _, _) => uKonekDashboardPage(
-            username: displayName,
-            citizenId: (user?['id'] ?? '').toString(),
+          pageBuilder: (_, __, ___) => uKonekDashboardPage(
+            // ── Core ─────────────────────────────────────────────
+            username:         displayName,
+            citizenId:        (user['id'] ?? '').toString(),
+            fullname:         fullName,
+            // ── Personal ─────────────────────────────────────────
+            firstName:        firstName,
+            middleName:       middleName,
+            surname:          surname,
+            nameExtension:    _str(user, 'name_extension'),
+            dob:              _str(user, 'date_of_birth'),
+            age:              (user['age']?.toString()) ?? '',
+            sex:              _str(user, 'sex'),
+            // ── Contact ──────────────────────────────────────────
+            email:            _str(user, 'email'),
+            phone:            _str(user, 'contact_number'),
+            address:          _str(user, 'complete_address'),
+            // ── Emergency ────────────────────────────────────────
+            emergencyName:    _str(user, 'emergency_contact_complete_name'),
+            emergencyContact: _str(user, 'emergency_contact_contact_number'),
+            relation:         _str(user, 'relation'),
           ),
           transitionDuration: const Duration(milliseconds: 500),
-          transitionsBuilder: (_, animation, _, child) =>
+          transitionsBuilder: (_, animation, __, child) =>
               FadeTransition(opacity: animation, child: child),
         ),
             (route) => false,
       );
     } catch (error) {
       if (!mounted) return;
-      final loginError = error is LoginFailureException ? error : null;
-      final message = loginError?.message ?? error.toString().replaceFirst('Exception: ', '');
+      final loginError      = error is LoginFailureException ? error : null;
+      final message         = loginError?.message ?? error.toString().replaceFirst('Exception: ', '');
       final countsAsAttempt = loginError?.countsAsAttempt ?? false;
 
       if (loginError?.type == LoginFailureType.unverifiedEmail) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Email not verified. Tap RESEND OTP for a magic link.'),
-            backgroundColor: Colors.orange.shade800,
-            duration: const Duration(seconds: 6),
-            action: SnackBarAction(label: 'RESEND', textColor: Colors.white, onPressed: _resendVerificationOtp),
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Email not verified. Tap RESEND OTP for a magic link.'),
+          backgroundColor: Colors.orange.shade800,
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(label: 'RESEND', textColor: Colors.white, onPressed: _resendVerificationOtp),
+        ));
         return;
       }
 
@@ -188,34 +228,26 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return Scaffold(
-      backgroundColor: _bg, // Updated mint background
+      backgroundColor: _bg,
       body: Stack(
         children: [
-          // ── Green gradient top ────────────────────────────────
           Container(
             height: size.height * 0.42,
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [_primary, _primary2], // Updated Green Gradient
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              gradient: LinearGradient(colors: [_primary, _primary2], begin: Alignment.topLeft, end: Alignment.bottomRight),
             ),
           ),
-
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnim,
               child: SlideTransition(
                 position: _slideAnim,
                 child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildHeaderSection(),
-                      _buildLoginCard(),
-                      const SizedBox(height: 40),
-                    ],
-                  ),
+                  child: Column(children: [
+                    _buildHeaderSection(),
+                    _buildLoginCard(),
+                    const SizedBox(height: 40),
+                  ]),
                 ),
               ),
             ),
@@ -228,44 +260,33 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
   Widget _buildHeaderSection() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 28, 28, 0),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const uKonekMenuPage()),
-                      (route) => false,
-                ),
-                child: Container(
-                  width: 38, height: 38,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Container(
-            width: 70, height: 70,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 8))],
+      child: Column(children: [
+        Row(children: [
+          GestureDetector(
+            onTap: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const uKonekMenuPage()), (route) => false),
+            child: Container(
+              width: 38, height: 38,
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
             ),
-            child: const Icon(Icons.health_and_safety_rounded, color: _primary, size: 34), // Updated icon
           ),
-          const SizedBox(height: 14),
-          const Text("Welcome Back", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          const Text("Sign in to your U-Konek+ account", style: TextStyle(color: Colors.white70, fontSize: 13)),
-          const SizedBox(height: 36),
-        ],
-      ),
+        ]),
+        const SizedBox(height: 24),
+        Container(
+          width: 70, height: 70,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 8))],
+          ),
+          child: const Icon(Icons.health_and_safety_rounded, color: _primary, size: 34),
+        ),
+        const SizedBox(height: 14),
+        const Text('Welcome Back', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        const Text('Sign in to your U-Konek+ account', style: TextStyle(color: Colors.white70, fontSize: 13)),
+        const SizedBox(height: 36),
+      ]),
     );
   }
 
@@ -283,26 +304,26 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Sign In", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark)),
+            const Text('Sign In', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark)),
             const SizedBox(height: 4),
-            const Text("Enter your credentials to continue", style: TextStyle(fontSize: 12, color: _textMuted)),
+            const Text('Enter your credentials to continue', style: TextStyle(fontSize: 12, color: _textMuted)),
             const SizedBox(height: 24),
 
             _inputField(
-              label: "Email",
+              label: 'Email',
               controller: usernameController,
               icon: Icons.person_outline_rounded,
               enabled: !_isLocked,
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return "Email is required";
-                if (!v.contains('@') || !v.contains('.')) return "Enter a valid email address";
+                if (v == null || v.trim().isEmpty) return 'Email is required';
+                if (!v.contains('@') || !v.contains('.')) return 'Enter a valid email address';
                 return null;
               },
             ),
             const SizedBox(height: 14),
 
             _inputField(
-              label: "Password",
+              label: 'Password',
               controller: passwordController,
               icon: Icons.lock_outline_rounded,
               obscure: _obscurePassword,
@@ -311,7 +332,7 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                 icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20, color: _textMuted.withOpacity(0.5)),
                 onPressed: _isLocked ? null : () => setState(() => _obscurePassword = !_obscurePassword),
               ),
-              validator: (v) => (v == null || v.isEmpty) ? "Password is required" : (v.length < 8 ? "Min. 8 characters" : null),
+              validator: (v) => (v == null || v.isEmpty) ? 'Password is required' : (v.length < 8 ? 'Min. 8 characters' : null),
             ),
 
             const SizedBox(height: 10),
@@ -322,7 +343,7 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const uKonekForgotPasswordPage())),
-                child: const Text("Forgot password?", style: TextStyle(color: _primary, fontSize: 12, fontWeight: FontWeight.w600)),
+                child: const Text('Forgot password?', style: TextStyle(color: _primary, fontSize: 12, fontWeight: FontWeight.w600)),
               ),
             ),
 
@@ -330,7 +351,6 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
             _buildInfoTip(),
             const SizedBox(height: 24),
 
-            // Sign in button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -348,8 +368,10 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                     : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(_isLocked ? "Locked — ${_lockSecondsLeft}s" : "SIGN IN",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1.2, color: _isLocked ? _textMuted : Colors.white)),
+                    Text(
+                      _isLocked ? 'Locked — ${_lockSecondsLeft}s' : 'SIGN IN',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 1.2, color: _isLocked ? _textMuted : Colors.white),
+                    ),
                     if (!_isLocked) ...[const SizedBox(width: 8), const Icon(Icons.arrow_forward_rounded, size: 18)],
                   ],
                 ),
@@ -364,9 +386,10 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                   children: [
                     const TextSpan(text: "Don't have an account? "),
                     TextSpan(
-                      text: "Register here",
+                      text: 'Register here',
                       style: const TextStyle(color: _primary, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
-                      recognizer: TapGestureRecognizer()..onTap = () => Navigator.push(context, MaterialPageRoute(builder: (_) => const uKonekRegisterWrapper())),
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () => Navigator.push(context, MaterialPageRoute(builder: (_) => const uKonekRegisterWrapper())),
                     ),
                   ],
                 ),
@@ -386,38 +409,28 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
         border: Border.all(color: _primary.withOpacity(0.1)),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline_rounded, color: _primary, size: 18),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text("Use your registered citizen email address.", style: TextStyle(fontSize: 11, color: _primary2, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
+      child: const Row(children: [
+        Icon(Icons.info_outline_rounded, color: _primary, size: 18),
+        SizedBox(width: 8),
+        Expanded(child: Text('Use your registered citizen email address.', style: TextStyle(fontSize: 11, color: _primary2, fontWeight: FontWeight.w600))),
+      ]),
     );
   }
 
   Widget _attemptIndicator() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
-          const SizedBox(width: 6),
-          Text("$_attemptsLeft attempt${_attemptsLeft == 1 ? '' : 's'} left", style: const TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.w600)),
-          const SizedBox(width: 10),
-          Row(
-            children: List.generate(3, (i) {
-              return Container(
-                width: 10, height: 10,
-                margin: const EdgeInsets.only(right: 5),
-                decoration: BoxDecoration(shape: BoxShape.circle, color: i < _attemptsLeft ? Colors.orange : _fieldBdr),
-              );
-            }),
-          ),
-        ],
-      ),
+      child: Row(children: [
+        const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
+        const SizedBox(width: 6),
+        Text('$_attemptsLeft attempt${_attemptsLeft == 1 ? '' : 's'} left', style: const TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(width: 10),
+        Row(children: List.generate(3, (i) => Container(
+          width: 10, height: 10,
+          margin: const EdgeInsets.only(right: 5),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: i < _attemptsLeft ? Colors.orange : _fieldBdr),
+        ))),
+      ]),
     );
   }
 
@@ -426,31 +439,21 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: Colors.red.shade50, border: Border.all(color: Colors.red.shade100), borderRadius: BorderRadius.circular(14)),
-      child: Row(
-        children: [
-          const Icon(Icons.lock_rounded, color: Colors.red, size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Account Locked", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13)),
-                Text("Try again in $_lockSecondsLeft seconds.", style: TextStyle(color: Colors.red.shade400, fontSize: 12)),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: 44, height: 44,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(value: _lockSecondsLeft / 60, strokeWidth: 3, backgroundColor: Colors.red.shade100, valueColor: const AlwaysStoppedAnimation<Color>(Colors.red)),
-                Text("$_lockSecondsLeft", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.red)),
-              ],
-            ),
-          ),
-        ],
-      ),
+      child: Row(children: [
+        const Icon(Icons.lock_rounded, color: Colors.red, size: 22),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Account Locked', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13)),
+          Text('Try again in $_lockSecondsLeft seconds.', style: TextStyle(color: Colors.red.shade400, fontSize: 12)),
+        ])),
+        SizedBox(
+          width: 44, height: 44,
+          child: Stack(alignment: Alignment.center, children: [
+            CircularProgressIndicator(value: _lockSecondsLeft / 60, strokeWidth: 3, backgroundColor: Colors.red.shade100, valueColor: const AlwaysStoppedAnimation<Color>(Colors.red)),
+            Text('$_lockSecondsLeft', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.red)),
+          ]),
+        ),
+      ]),
     );
   }
 
@@ -464,23 +467,28 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
     required String? Function(String?) validator,
   }) {
     return TextFormField(
-      controller: controller,
+      controller:  controller,
       obscureText: obscure,
-      enabled: enabled,
-      validator: validator,
+      enabled:     enabled,
+      validator:   validator,
       style: const TextStyle(fontSize: 14, color: _textDark),
       decoration: InputDecoration(
-        labelText: label,
+        labelText:  label,
         labelStyle: const TextStyle(fontSize: 13, color: _textMuted),
         prefixIcon: Icon(icon, color: _primary.withOpacity(0.6), size: 20),
         suffixIcon: suffixIcon,
-        filled: true,
-        fillColor: enabled ? _bg : _fieldBdr.withOpacity(0.3),
+        filled:     true,
+        fillColor:  enabled ? _bg : _fieldBdr.withOpacity(0.3),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _fieldBdr)),
+        border:        OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _fieldBdr)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _fieldBdr)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _primary, width: 1.8)),
       ),
     );
   }
+}
+
+// ── Extension to allow .let() chaining on any type ────────────
+extension _Let<T> on T {
+  R let<R>(R Function(T) block) => block(this);
 }

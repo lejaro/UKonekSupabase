@@ -81,14 +81,18 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
   // ── Navigate to profile with ALL registration fields ──────────
   void _navigateToProfile() {
-    final String fullNameString = "${widget.firstName} ${widget.middleName} ${widget.surname} ${widget.nameExtension}";
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => uKonekProfilePage(
           username:         widget.username,
           citizenId:        widget.citizenId,
-          fullName: fullNameString,
+          fullName:         widget.fullname,
+          // ✅ Add these — were missing causing profile to show incomplete name
+          firstName:        widget.firstName,
+          middleName:       widget.middleName,
+          surname:          widget.surname,
+          nameExtension:    widget.nameExtension,
           dob:              widget.dob,
           age:              widget.age,
           sex:              widget.sex,
@@ -196,7 +200,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('AFM ROQUERO', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF1B5E20))),
-                            Text('Medical & Dental Clinic', style: TextStyle(fontSize: 12, color: Color(0xFF637367))),
+                            Text('Medical Clinic', style: TextStyle(fontSize: 12, color: Color(0xFF637367))),
                           ],
                         ),
                       ],
