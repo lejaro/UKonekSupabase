@@ -499,9 +499,13 @@ class _uKonekCredentialsPageState
             onPressed: toggle,
           ),
         ),
-        validator: (v) => (v == null || v.length < 8)
-            ? 'Min. 8 characters'
-            : null,
+        validator: (v) {
+          if (v == null || v.isEmpty) return 'Password is required';
+          if (v.length < 8) return 'Min. 8 characters';
+          if (!v.contains(RegExp(r'[A-Z]'))) return 'Add at least one uppercase letter';
+          if (!v.contains(RegExp(r'[0-9]'))) return 'Add at least one number';
+          return null;
+        },
       ),
     );
   }
