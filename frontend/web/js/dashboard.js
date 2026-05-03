@@ -2949,7 +2949,6 @@ const announcementDetailTitle = document.getElementById('announcement-detail-tit
 const announcementDetailBody = document.getElementById('announcement-detail-body');
 const announcementDetailDate = document.getElementById('announcement-detail-date');
 const dataDetailModal = document.getElementById('data-detail-modal');
-const dataDetailCloseBtn = document.getElementById('data-detail-close');
 const dataDetailDismissBtn = document.getElementById('data-detail-dismiss');
 const dataDetailActions = document.getElementById('data-detail-actions');
 const dataDetailTitle = document.getElementById('data-detail-title');
@@ -3064,7 +3063,7 @@ function attachDetailRow(row, detailFactory) {
   });
 }
 
-if (dataDetailCloseBtn) dataDetailCloseBtn.addEventListener('click', closeDataDetail);
+
 if (dataDetailDismissBtn) dataDetailDismissBtn.addEventListener('click', closeDataDetail);
 if (dataDetailModal) {
   dataDetailModal.addEventListener('click', (event) => {

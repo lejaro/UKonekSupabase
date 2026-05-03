@@ -1174,13 +1174,13 @@
             <table class="accounts-table">
               <thead>
                 <tr class="table-header-row">
-                  <th>Medicine Name</th>
-                  <th>Description</th>
-                  <th>Stock Qty</th>
-                  <th>Unit</th>
-                  <th>Expiry Date</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th class="table-header-cell">Medicine Name</th>
+                  <th class="table-header-cell">Description</th>
+                  <th class="table-header-cell">Stock Qty</th>
+                  <th class="table-header-cell">Unit</th>
+                  <th class="table-header-cell">Expiry Date</th>
+                  <th class="table-header-cell">Status</th>
+                  <th class="table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody id="medicine-tbody"></tbody>
@@ -1618,14 +1618,17 @@
       </div>
 
       <div id="data-detail-modal" class="modal-overlay hidden">
-        <div class="modal-box" style="max-width:540px;text-align:left;position:relative;">
-          <button id="data-detail-close" class="modal-close" aria-label="Close details">&times;</button>
-          <p id="data-detail-tag" style="display:none;font-size:12px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#475569;margin-bottom:4px;"></p>
-          <h3 class="modal-heading" id="data-detail-title" style="margin-bottom:4px;">Record Detail</h3>
-          <p id="data-detail-subtitle" style="margin-bottom:16px;color:#475569;"></p>
-          <dl id="data-detail-list" style="display:grid;grid-template-columns: minmax(120px, 150px) 1fr;gap:10px 16px;margin:0 0 16px 0;"></dl>
-          <div class="actions" id="data-detail-actions" style="justify-content:flex-end;gap:8px;">
-            <button id="data-detail-dismiss" class="btn btn-close">Close</button>
+        <div class="modal-box" style="max-width: 600px; text-align: left; padding: 0; overflow: hidden; border-radius: 16px;">
+          <div style="padding: 24px 32px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+            <p id="data-detail-tag" style="display:none; font-size:11px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#64748b; margin-bottom:6px;"></p>
+            <h3 class="modal-heading" id="data-detail-title" style="margin: 0; color: #1e293b; font-size: 20px;">Record Detail</h3>
+            <p id="data-detail-subtitle" style="margin-top:4px; color:#64748b; font-size:13px; display:none;"></p>
+          </div>
+          <div style="padding: 32px; max-height: 60vh; overflow-y: auto;">
+            <dl id="data-detail-list" style="display:grid; grid-template-columns: minmax(140px, 160px) 1fr; gap:16px 24px; margin:0;"></dl>
+          </div>
+          <div class="actions" id="data-detail-actions" style="padding: 20px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; margin: 0; justify-content: flex-end; display: flex; gap: 12px;">
+            <button id="data-detail-dismiss" class="btn btn-close" style="margin: 0;">Close</button>
           </div>
         </div>
       </div>
