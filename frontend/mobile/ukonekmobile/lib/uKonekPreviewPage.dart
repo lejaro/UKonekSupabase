@@ -5,7 +5,7 @@ class uKonekPreviewPage extends StatelessWidget {
   final String firstName, middleName, surname, nameExtension;
   final String dob, age, contact, sex, email, address;
   final String emergencyName, emergencyContact, relation;
-  final String extractedOcrText;
+
 
   const uKonekPreviewPage({
     super.key,
@@ -22,22 +22,22 @@ class uKonekPreviewPage extends StatelessWidget {
     required this.emergencyName,
     required this.emergencyContact,
     required this.relation,
-    this.extractedOcrText = '',
   });
 
-  static const _primary   = Color(0xFF0A2E6E);
-  static const _primary2  = Color(0xFF1565C0);
-  static const _bg        = Color(0xFFF0F4FA);
+  // ── Updated Medical Green Color Palette ────────────────────────
+  static const _primary   = Color(0xFF28A745); // Health Green[cite: 1]
+  static const _primary2  = Color(0xFF1B5E20); // Forest Green[cite: 1]
+  static const _bg        = Color(0xFFF8FCF9); // Mint-tinted Background[cite: 1]
   static const _surface   = Colors.white;
-  static const _textDark  = Color(0xFF1A2740);
-  static const _textMuted = Color(0xFF8A93A0);
-  static const _divider   = Color(0xFFEEF1F6);
-  static const _success   = Color(0xFF10B981);
+  static const _textDark  = Color(0xFF1B2E1E); // Dark Forest Charcoal[cite: 1]
+  static const _textMuted = Color(0xFF637367); // Muted Sage[cite: 1]
+  static const _divider   = Color(0xFFE2E9E3); // Light Mist Divider[cite: 1]
+  static const _success   = Color(0xFF28A745);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: _bg, // Updated to Mint-tinted background[cite: 1]
       body: Column(children: [
         _buildHeader(context),
         Expanded(
@@ -72,7 +72,6 @@ class uKonekPreviewPage extends StatelessWidget {
                   _Row('Relation',  relation),
                 ],
               ),
-              const SizedBox(height: 14),
               const SizedBox(height: 28),
               _buildSubmitBtn(context),
               const SizedBox(height: 12),
@@ -85,12 +84,12 @@ class uKonekPreviewPage extends StatelessWidget {
     );
   }
 
-  // ── Header ───────────────────────────────────────────────────
+  // ── Header (Green Gradient) ───────────────────────────────────
   Widget _buildHeader(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [_primary, _primary2],
+          colors: [_primary, _primary2], // Updated to Green Gradient[cite: 1]
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -140,7 +139,7 @@ class uKonekPreviewPage extends StatelessWidget {
     );
   }
 
-  // ── Profile Banner ───────────────────────────────────────────
+  // ── Profile Banner (Green Accents) ─────────────────────────────
   Widget _buildProfileBanner() {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -148,13 +147,13 @@ class uKonekPreviewPage extends StatelessWidget {
         color: _surface,
         borderRadius: BorderRadius.circular(22),
         boxShadow: [BoxShadow(
-          color: Colors.black.withOpacity(0.05),
+          color: _textDark.withOpacity(0.05),
           blurRadius: 14,
           offset: const Offset(0, 4),
         )],
       ),
       child: Row(children: [
-        // Avatar
+        // Avatar with Medical Green Gradient[cite: 1]
         Container(
           width: 56, height: 56,
           decoration: const BoxDecoration(
@@ -193,7 +192,7 @@ class uKonekPreviewPage extends StatelessWidget {
     );
   }
 
-  // ── Info card ────────────────────────────────────────────────
+  // ── Info card (Green Accents) ──────────────────────────────────
   Widget _infoCard({
     required IconData icon,
     required String title,
@@ -204,7 +203,7 @@ class uKonekPreviewPage extends StatelessWidget {
         color: _surface,
         borderRadius: BorderRadius.circular(22),
         boxShadow: [BoxShadow(
-          color: Colors.black.withOpacity(0.05),
+          color: _textDark.withOpacity(0.05),
           blurRadius: 14,
           offset: const Offset(0, 4),
         )],
@@ -267,13 +266,13 @@ class uKonekPreviewPage extends StatelessWidget {
   }
 
 
-  // ── Submit button ────────────────────────────────────────────
+  // ── Submit button (Green Theme) ──────────────────────────────
   Widget _buildSubmitBtn(BuildContext context) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: _primary,
+          backgroundColor: _primary, // Now Health Green[cite: 1]
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           elevation: 4,
@@ -324,7 +323,7 @@ class uKonekPreviewPage extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 14),
           side: const BorderSide(
-              color: Color(0xFFDDE3F0), width: 1.5),
+              color: _divider, width: 1.5), // Updated to Light Mist Divider[cite: 1]
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16)),
           foregroundColor: _textMuted,

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
-import 'package:image_picker/image_picker.dart';
-import 'services/api_service.dart';
 import 'uKonekLoginPage.dart';
+import 'services/api_service.dart';
 
 class uKonekCredentialsPage extends StatefulWidget {
   final String firstName, middleName, surname, nameExtension;
@@ -46,15 +45,16 @@ class _uKonekCredentialsPageState
   bool _agreedToTerms   = false;
   bool _isSubmitting    = false;
 
-  static const _primary   = Color(0xFF0A2E6E);
-  static const _primary2  = Color(0xFF1565C0);
-  static const _bg        = Color(0xFFF0F4FA);
+  // ── Updated Medical Green Color Palette ────────────────────────
+  static const _primary   = Color(0xFF28A745); // Health Green
+  static const _primary2  = Color(0xFF1B5E20); // Forest Green
+  static const _bg        = Color(0xFFF8FCF9); // Mint-tinted Background
   static const _surface   = Colors.white;
-  static const _textDark  = Color(0xFF1A2740);
-  static const _textMuted = Color(0xFF8A93A0);
-  static const _fieldBg   = Color(0xFFF8FAFF);
-  static const _fieldBdr  = Color(0xFFDDE3F0);
-  static const _success   = Color(0xFF10B981);
+  static const _textDark  = Color(0xFF1B2E1E); // Dark Forest Charcoal
+  static const _textMuted = Color(0xFF637367); // Muted Sage
+  static const _fieldBg   = Color(0xFFF8FCF9); // Mint-tinted Field
+  static const _fieldBdr  = Color(0xFFE2E9E3); // Light Mist Divider
+  static const _success   = Color(0xFF28A745);
 
   // ── Password strength ────────────────────────────────────────
   int get _strengthLevel {
@@ -75,7 +75,6 @@ class _uKonekCredentialsPageState
   String get _strengthLabel =>
       ['', 'Weak', 'Fair', 'Good', 'Strong'][_strengthLevel];
 
-  // ── Terms dialog (unchanged) ─────────────────────────────────
   void _showTermsDialog() {
     showDialog(
       context: context,
@@ -107,7 +106,7 @@ class _uKonekCredentialsPageState
                     )),
               ]),
               const SizedBox(height: 16),
-              Divider(color: Colors.grey.shade100),
+              const Divider(color: _fieldBdr),
               const SizedBox(height: 12),
               ConstrainedBox(
                 constraints: BoxConstraints(
@@ -164,7 +163,6 @@ class _uKonekCredentialsPageState
     return '${parsed.year.toString().padLeft(4, '0')}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
   }
 
-  // ── Submit (unchanged logic) ──────────────────────────────────
   Future<void> _submitRegistration() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
@@ -222,10 +220,10 @@ class _uKonekCredentialsPageState
                         letterSpacing: -0.5,
                       )),
                   const SizedBox(height: 4),
-                  Text('Create your login credentials.',
+                  const Text('Create your login credentials.',
                       style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade500)),
+                          color: _textMuted)),
                   const SizedBox(height: 24),
 
                   // ── Credentials card ──────────────────────
@@ -235,7 +233,7 @@ class _uKonekCredentialsPageState
                       color: _surface,
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: _textDark.withOpacity(0.05),
                         blurRadius: 16,
                         offset: const Offset(0, 6),
                       )],
@@ -266,7 +264,7 @@ class _uKonekCredentialsPageState
                                     value: _strengthLevel / 4,
                                     minHeight: 6,
                                     backgroundColor:
-                                    Colors.grey.shade100,
+                                    _fieldBdr,
                                     valueColor:
                                     AlwaysStoppedAnimation(
                                         _strengthColor),
@@ -346,24 +344,33 @@ class _uKonekCredentialsPageState
                   const SizedBox(height: 28),
 
                   // ── Submit button ─────────────────────────
+                  // ── Updated Submit Button Logic ─────────────────────────
                   SizedBox(
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _agreedToTerms
+                        // Button only lights up if terms are agreed AND password is strong
+                        backgroundColor: (_agreedToTerms && _strengthLevel == 4)
                             ? _primary
-                            : Colors.grey.shade200,
+                            : _fieldBdr,
                         foregroundColor: Colors.white,
-                        elevation: _agreedToTerms ? 4 : 0,
-                        shadowColor:
-                        _primary.withOpacity(0.3),
+                        elevation: (_agreedToTerms && _strengthLevel == 4) ? 4 : 0,
+                        shadowColor: _primary.withOpacity(0.3),
                         shape: RoundedRectangleBorder(
-                            borderRadius:
-                            BorderRadius.circular(16)),
+                            borderRadius: BorderRadius.circular(16)),
                       ),
                       onPressed: (_agreedToTerms && !_isSubmitting)
-                          ? _submitRegistration
+                          ? () {
+                        if (_strengthLevel < 4) {
+                          _snackBar(
+                              'Password must be "Strong" (Include uppercase, numbers, and symbols).',
+                              Colors.orange.shade800
+                          );
+                        } else {
+                          _submitRegistration();
+                        }
+                      }
                           : null,
                       child: _isSubmitting
                           ? const SizedBox(
@@ -372,24 +379,22 @@ class _uKonekCredentialsPageState
                               color: Colors.white,
                               strokeWidth: 2.5))
                           : Row(
-                        mainAxisAlignment:
-                        MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                              'CREATE ACCOUNT',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1,
-                                fontSize: 15,
-                                color: _agreedToTerms
-                                    ? Colors.white
-                                    : Colors.grey.shade400,
-                              )),
-                          if (_agreedToTerms) ...[
+                            'CREATE ACCOUNT',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1,
+                              fontSize: 15,
+                              color: (_agreedToTerms && _strengthLevel == 4)
+                                  ? Colors.white
+                                  : _textMuted.withOpacity(0.4),
+                            ),
+                          ),
+                          if (_agreedToTerms && _strengthLevel == 4) ...[
                             const SizedBox(width: 8),
-                            const Icon(
-                                Icons.arrow_forward_rounded,
-                                size: 18),
+                            const Icon(Icons.arrow_forward_rounded, size: 18),
                           ],
                         ],
                       ),
@@ -404,7 +409,6 @@ class _uKonekCredentialsPageState
     );
   }
 
-  // ── Header ───────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
@@ -459,7 +463,6 @@ class _uKonekCredentialsPageState
     );
   }
 
-  // ── Field builders ───────────────────────────────────────────
   Widget _inputField(String label, TextEditingController ctrl,
       IconData icon) {
     return Padding(
@@ -494,7 +497,7 @@ class _uKonekCredentialsPageState
                   ? Icons.visibility_off_outlined
                   : Icons.visibility_outlined,
               size: 20,
-              color: Colors.grey.shade400,
+              color: _textMuted.withOpacity(0.4),
             ),
             onPressed: toggle,
           ),
@@ -513,8 +516,8 @@ class _uKonekCredentialsPageState
   InputDecoration _decoration(String label, IconData icon) {
     return InputDecoration(
       labelText:  label,
-      labelStyle: TextStyle(
-          fontSize: 13, color: Colors.grey.shade500),
+      labelStyle: const TextStyle(
+          fontSize: 13, color: _textMuted),
       prefixIcon: Icon(icon,
           color: _primary.withOpacity(0.6), size: 20),
       filled:     true,
@@ -530,14 +533,13 @@ class _uKonekCredentialsPageState
       focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(
-              color: _primary2, width: 1.8)),
+              color: _primary, width: 1.8)),
       errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Colors.redAccent)),
     );
   }
 
-  // ── Helpers ──────────────────────────────────────────────────
   void _snackBar(String msg, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
