@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'services/api_service.dart';
 
 class _C {
-  static const primary    = Color(0xFF0A2E6E);
-  static const primaryMid = Color(0xFF1565C0);
-  static const accent     = Color(0xFF1976D2);
+  static const primary    = Color(0xFF2D5A27); // Brand Green
+  static const primaryMid = Color(0xFF3E7D32);
+  static const accent     = Color(0xFF4CAF50); // Vibrant Green
   static const bg         = Color(0xFFF0F4FA);
   static const surface    = Colors.white;
   static const textDark   = Color(0xFF1A2740);
   static const textMuted  = Color(0xFF8A93A0);
   static const divider    = Color(0xFFEEF1F6);
-  static const success    = Color(0xFF10B981);
+  static const success    = Color(0xFF4CAF50);
   static const shadow     = Color(0x0A000000);
 }
 
@@ -21,38 +23,30 @@ class uKonekHealthRecordsPage extends StatefulWidget {
       _uKonekHealthRecordsPageState();
 }
 
-class _uKonekHealthRecordsPageState
-    extends State<uKonekHealthRecordsPage> {
+class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
+  List<VitalSigns> _vitalSigns = [];
+  bool _isLoading = true;
 
-  final List<Map<String, dynamic>> _records = [
-    {
-      'date':     'March 20, 2026',
-      'service':  'General Consultation',
-      'provider': 'Dr. Cruz',
-      'diagnosis':'Seasonal Flu',
-      'isRecent': true,
-      'color':    const Color(0xFF1565C0),
-      'icon':     Icons.medical_services_outlined,
-    },
-    {
-      'date':     'Jan 15, 2026',
-      'service':  'Dental',
-      'provider': 'Dr. Reyes',
-      'diagnosis':'Routine Cleaning',
-      'isRecent': false,
-      'color':    const Color(0xFF10B981),
-      'icon':     Icons.health_and_safety,
-    },
-    {
-      'date':     'Nov 10, 2025',
-      'service':  'Vaccination',
-      'provider': 'Nurse Santos',
-      'diagnosis':'Flu Shot (Annual)',
-      'isRecent': false,
-      'color':    const Color(0xFF7B1FA2),
-      'icon':     Icons.vaccines_outlined,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadVitals();
+  }
+
+  Future<void> _loadVitals() async {
+    setState(() => _isLoading = true);
+    try {
+      final vitals = await ApiService.fetchVitalSigns();
+      if (mounted) {
+        setState(() {
+          _vitalSigns = vitals;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,15 +55,16 @@ class _uKonekHealthRecordsPageState
       body: Column(children: [
         _buildHeader(),
         Expanded(
-          child: _records.isEmpty
-              ? _buildEmptyState()
-              : _buildRecordList(),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: _C.accent))
+              : _vitalSigns.isEmpty
+                  ? _buildEmptyState()
+                  : _buildRecordList(),
         ),
       ]),
     );
   }
 
-  // ── Header ───────────────────────────────────────────────────
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
@@ -115,97 +110,61 @@ class _uKonekHealthRecordsPageState
                         letterSpacing: -0.4,
                       )),
                   SizedBox(height: 2),
-                  Text('View your consultation history',
+                  Text('View your clinical assessments',
                       style: TextStyle(
                           color: Colors.white70, fontSize: 12)),
                 ],
               )),
-             /*Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text('Export',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    )),
-              ),*/
             ]),
-            const SizedBox(height: 18),
-            _buildSearchBar(),
           ]),
         ),
       ),
     );
   }
 
-  Widget _buildSearchBar() {
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.25)),
-      ),
-      child: Row(children: [
-        const SizedBox(width: 16),
-        Icon(Icons.search_rounded,
-            color: Colors.white.withOpacity(0.6), size: 20),
-        const SizedBox(width: 10),
-        Text('Search by date or service...',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 14,
-            )),
-      ]),
-    );
-  }
-
-  // ── Record List ──────────────────────────────────────────────
   Widget _buildRecordList() {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSummaryCard(),
-          const SizedBox(height: 28),
-          const Text('Visit History',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: _C.textDark,
-                letterSpacing: -0.4,
-              )),
-          const SizedBox(height: 14),
-          ...(_records.map(
-                  (r) => _buildHistoryCard(r)).toList()),
-          const SizedBox(height: 12),
-          Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.lock_outline_rounded,
-                    size: 13, color: _C.textMuted),
-                const SizedBox(width: 6),
-                Text('Your records are secure and private',
-                    style: const TextStyle(
-                        color: _C.textMuted, fontSize: 11)),
-              ],
+    return RefreshIndicator(
+      onRefresh: _loadVitals,
+      color: _C.accent,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSummaryCard(_vitalSigns.first),
+            const SizedBox(height: 28),
+            const Text('Vital Assessment History',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: _C.textDark,
+                  letterSpacing: -0.4,
+                )),
+            const SizedBox(height: 14),
+            ...(_vitalSigns.map((v) => _buildVitalsCard(v)).toList()),
+            const SizedBox(height: 20),
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.lock_outline_rounded,
+                      size: 13, color: _C.textMuted),
+                  const SizedBox(width: 6),
+                  Text('Your records are secure and private',
+                      style: const TextStyle(
+                          color: _C.textMuted, fontSize: 11)),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // ── Summary Card ─────────────────────────────────────────────
-  Widget _buildSummaryCard() {
+  Widget _buildSummaryCard(VitalSigns last) {
+    final dateStr = DateFormat('MMMM dd, yyyy').format(last.createdAt);
     return Container(
       decoration: BoxDecoration(
         color: _C.surface,
@@ -217,10 +176,8 @@ class _uKonekHealthRecordsPageState
         )],
       ),
       child: Column(children: [
-        // Top strip
         Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 20, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
             color: _C.primaryMid.withOpacity(0.06),
             borderRadius: const BorderRadius.only(
@@ -229,10 +186,9 @@ class _uKonekHealthRecordsPageState
             ),
           ),
           child: Row(children: [
-            const Icon(Icons.calendar_today_rounded,
-                color: _C.primaryMid, size: 16),
+            const Icon(Icons.calendar_today_rounded, color: _C.primaryMid, size: 16),
             const SizedBox(width: 10),
-            const Text('LAST VISIT:',
+            const Text('LATEST ASSESSMENT:',
                 style: TextStyle(
                   color: _C.primaryMid,
                   fontWeight: FontWeight.w900,
@@ -240,55 +196,55 @@ class _uKonekHealthRecordsPageState
                   letterSpacing: 1,
                 )),
             const Spacer(),
-            const Text('March 20, 2026',
-                style: TextStyle(
+            Text(dateStr,
+                style: const TextStyle(
                   color: _C.textDark,
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
                 )),
           ]),
         ),
-        // Bottom section
         Padding(
           padding: const EdgeInsets.all(20),
           child: Row(children: [
             Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Diagnosis',
+                Text('Chief Complaint',
                     style: TextStyle(
                       color: Colors.grey.shade400,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     )),
                 const SizedBox(height: 4),
-                const Text('Seasonal Flu',
-                    style: TextStyle(
+                Text(last.chiefComplaint,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
                       color: _C.textDark,
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       letterSpacing: -0.4,
                     )),
               ],
             )),
-            Container(width: 1, height: 40,
-                color: _C.divider),
+            Container(width: 1, height: 40, color: _C.divider),
             const SizedBox(width: 20),
             Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Handled by',
+                Text('Blood Pressure',
                     style: TextStyle(
                       color: Colors.grey.shade400,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     )),
                 const SizedBox(height: 4),
-                const Text('Nurse Maria',
-                    style: TextStyle(
+                Text(last.bp ?? '—',
+                    style: const TextStyle(
                       color: _C.textDark,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     )),
               ],
             )),
@@ -298,11 +254,10 @@ class _uKonekHealthRecordsPageState
     );
   }
 
-  // ── History Card ─────────────────────────────────────────────
-  Widget _buildHistoryCard(Map<String, dynamic> data) {
-    final color = data['color'] as Color;
+  Widget _buildVitalsCard(VitalSigns v) {
+    final dateStr = DateFormat('MMM dd, yyyy • hh:mm a').format(v.createdAt);
     return GestureDetector(
-      onTap: () => _showDetailsSheet(data),
+      onTap: () => _showDetailsSheet(v),
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
@@ -315,12 +270,11 @@ class _uKonekHealthRecordsPageState
           )],
         ),
         child: Column(children: [
-          // Color top strip
           Container(
             height: 4,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: const BorderRadius.only(
+            decoration: const BoxDecoration(
+              color: _C.accent,
+              borderRadius: BorderRadius.only(
                 topLeft:  Radius.circular(20),
                 topRight: Radius.circular(20),
               ),
@@ -335,74 +289,45 @@ class _uKonekHealthRecordsPageState
                   Container(
                     width: 42, height: 42,
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.10),
+                      color: _C.accent.withOpacity(0.10),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(data['icon'] as IconData,
-                        color: color, size: 22),
+                    child: const Icon(Icons.monitor_heart_outlined, color: _C.accent, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(data['date'] as String,
+                      Text(dateStr,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                             color: _C.textDark,
                           )),
                       const SizedBox(height: 2),
-                      Text(data['service'] as String,
-                          style: TextStyle(
-                            color: color,
+                      Text(v.chiefComplaint,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _C.accent,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
                           )),
                     ],
                   )),
-                  if (data['isRecent'] as bool)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _C.success.withOpacity(0.10),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text('RECENT',
-                          style: TextStyle(
-                            color: _C.success,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
-                            letterSpacing: 0.5,
-                          )),
-                    ),
+                  const Icon(Icons.chevron_right_rounded, color: _C.textMuted, size: 20),
                 ]),
                 const SizedBox(height: 14),
                 Divider(height: 1, color: _C.divider),
                 const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('DIAGNOSIS',
-                          style: TextStyle(
-                            color: _C.textMuted,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.8,
-                          )),
-                      const SizedBox(height: 3),
-                      Text(data['diagnosis'] as String,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: _C.textDark,
-                          )),
-                    ],
-                  )),
-                  const Icon(Icons.chevron_right_rounded,
-                      color: _C.textMuted, size: 20),
-                ]),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _miniStat('BP', v.bp ?? '—'),
+                    _miniStat('TEMP', v.temp != null ? '${v.temp}°C' : '—'),
+                    _miniStat('SPO2', v.spo2 != null ? '${v.spo2}%' : '—'),
+                  ],
+                ),
               ],
             ),
           ),
@@ -411,7 +336,17 @@ class _uKonekHealthRecordsPageState
     );
   }
 
-  // ── Empty State ──────────────────────────────────────────────
+  Widget _miniStat(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: _C.textMuted, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+        const SizedBox(height: 2),
+        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _C.textDark)),
+      ],
+    );
+  }
+
   Widget _buildEmptyState() {
     return Center(child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -422,105 +357,85 @@ class _uKonekHealthRecordsPageState
             color: _C.primaryMid.withOpacity(0.06),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.folder_open_outlined,
-              size: 50, color: _C.textMuted),
+          child: const Icon(Icons.health_and_safety_outlined, size: 50, color: _C.textMuted),
         ),
         const SizedBox(height: 20),
-        const Text('No health records yet',
+        const Text('No assessments yet',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: _C.textDark,
             )),
         const SizedBox(height: 8),
-        const Text('Your consultations will appear here',
+        const Text('Your clinic records will appear here',
             style: TextStyle(color: _C.textMuted, fontSize: 14)),
       ],
     ));
   }
 
-  // ── Detail Sheet ─────────────────────────────────────────────
-  void _showDetailsSheet(Map<String, dynamic> data) {
-    final color = data['color'] as Color;
+  void _showDetailsSheet(VitalSigns v) {
+    final dateStr = DateFormat('MMMM dd, yyyy • hh:mm a').format(v.createdAt);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
+        initialChildSize: 0.7,
         maxChildSize:     0.9,
         expand: false,
         builder: (_, sc) => Container(
           decoration: const BoxDecoration(
             color: _C.surface,
-            borderRadius: BorderRadius.vertical(
-                top: Radius.circular(28)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: Column(children: [
             Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: Container(
-                width: 36, height: 4,
-                decoration: BoxDecoration(
-                  color: _C.divider,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+              child: Container(width: 36, height: 4, decoration: BoxDecoration(color: _C.divider, borderRadius: BorderRadius.circular(2))),
             ),
-            // Sheet header
             Container(
               margin: const EdgeInsets.all(20),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [color, color.withOpacity(0.7)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                gradient: const LinearGradient(colors: [_C.primary, _C.accent], begin: Alignment.topLeft, end: Alignment.bottomRight),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(children: [
                 Container(
                   width: 46, height: 46,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Icon(data['icon'] as IconData,
-                      color: Colors.white, size: 24),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(13)),
+                  child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Record Details',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        )),
+                    const Text('Assessment Details', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 2),
-                    Text(data['date'] as String,
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 12)),
+                    Text(dateStr, style: const TextStyle(color: Colors.white70, fontSize: 12)),
                   ],
                 )),
               ]),
             ),
-            // Scrollable content
             Expanded(
               child: ListView(
                 controller: sc,
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
                 children: [
-                  _detailSection('Provider & Location',
-                      '${data['provider']}\nBrgy. Ugong Health Center'),
-                  _detailSection('Service Type',
-                      data['service'] as String),
-                  _detailSection('Symptoms',
-                      'Patient reported moderate fever, dry cough, and body aches for 2 days.'),
-                  _detailSection('Diagnosis',
-                      data['diagnosis'] as String),
+                  _detailSection('Chief Complaint', v.chiefComplaint),
+                  Row(
+                    children: [
+                      Expanded(child: _detailSection('Blood Pressure', v.bp ?? '—')),
+                      Expanded(child: _detailSection('Temperature', v.temp != null ? '${v.temp}°C' : '—')),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Expanded(child: _detailSection('Resp. Rate', v.rr != null ? '${v.rr} bpm' : '—')),
+                      Expanded(child: _detailSection('Oxygen (SpO2)', v.spo2 != null ? '${v.spo2}%' : '—')),
+                    ],
+                  ),
+                  _detailSection('Current Medications', v.meds ?? 'None recorded'),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -529,18 +444,10 @@ class _uKonekHealthRecordsPageState
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _C.primaryMid,
                         elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius:
-                            BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
-                      child: const Text('CLOSE',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          )),
+                      child: const Text('CLOSE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
                   ),
                 ],
@@ -558,20 +465,9 @@ class _uKonekHealthRecordsPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title.toUpperCase(),
-              style: const TextStyle(
-                color: _C.primaryMid,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-              )),
+          Text(title.toUpperCase(), style: const TextStyle(color: _C.primaryMid, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
           const SizedBox(height: 8),
-          Text(content,
-              style: const TextStyle(
-                fontSize: 14,
-                color: _C.textDark,
-                height: 1.6,
-              )),
+          Text(content, style: const TextStyle(fontSize: 14, color: _C.textDark, height: 1.6)),
         ],
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'uKonekMenuPage.dart';
+import 'services/api_service.dart';
 
 // ── Design tokens ──────────────────────────────────────────────
 class _C {
@@ -882,12 +883,16 @@ class _uKonekProfilePageState
               )),
               const SizedBox(width: 12),
               Expanded(child: ElevatedButton(
-                onPressed: () => Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const uKonekMenuPage()),
-                      (route) => false,
-                ),
+                onPressed: () async {
+                  await ApiService.signOut();
+                  if (!context.mounted) return;
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const uKonekMenuPage()),
+                        (route) => false,
+                  );
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent,
                   foregroundColor: Colors.white,

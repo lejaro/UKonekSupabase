@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'services/api_service.dart';
 import 'uKonekJoinQueuePage.dart';
 import 'uKonekHealthRecordsPage.dart';
@@ -141,8 +140,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                 children: [
                   _buildAnnouncements(), // Horizontal Announcement Section
                   const SizedBox(height: 24),
-                  _buildQrSection(),
-                  const SizedBox(height: 20),
                   _buildDoctorStatusSection(),
                   const SizedBox(height: 24),
                   _buildQueueCard(),
@@ -323,39 +320,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
 
 
-  Widget _buildQrSection() {
-    if (widget.citizenId.isEmpty) return const SizedBox.shrink();
-    return Center(
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: _C.surface,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 20, offset: Offset(0, 8))],
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: _C.bg, borderRadius: BorderRadius.circular(20)),
-              child: QrImageView(
-                data: widget.citizenId,
-                version: QrVersions.auto,
-                size: 160.0,
-                eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: _C.primaryMid),
-                dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: _C.primaryMid),
-              ),
-            ),
-            const SizedBox(height: 18),
-            const Text('Your Citizen QR Code', style: TextStyle(color: _C.textDark, fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            const Text('Scan for check-in at the health center', textAlign: TextAlign.center, style: TextStyle(color: _C.textMuted, fontSize: 13)),
-          ],
-        ),
-      ),
-    );
-  }
 
   // ── Doctor Status ───────────────────────────────────────────
   Widget _buildDoctorStatusSection() {

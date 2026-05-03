@@ -1,13 +1,13 @@
 :root {
     --bg: #f8fafc;
     --card: #ffffff;
-    --accent: #2563eb;
-    --accent-light: #3b82f6;
-    --accent-glow: rgba(37, 99, 235, 0.12);
+    --accent: #4CAF50;
+    --accent-light: #81C784;
+    --accent-glow: rgba(76, 175, 80, 0.12);
     --muted: #64748b;
     --border: #e2e8f0;
-    --primary: #00277F;
-    --primary-light: #0a3a9d;
+    --primary: #2D5A27;
+    --primary-light: #3E7D32;
     --secondary: #D0504F;
     --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.04);
     --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.06);
@@ -60,7 +60,7 @@ body {
 
 .brand h1 {
     font-size: 30px;
-    color: #00277F;
+    color: var(--primary);
     margin: 0;
 }
 
@@ -93,7 +93,7 @@ body {
 
 .tab.active {
     background-color: #FEFEFE;
-    color: #002278;
+    color: var(--primary);
     font-weight: 600;
     box-shadow: 0 4px 12px rgba(58, 60, 65, 0.363);
 }
@@ -140,7 +140,7 @@ select:focus {
 }
 
 .btn {
-    background: #00277F;
+    background: var(--accent);
     color: #fff;
     font-weight: 700;
     padding: 10px 14px;
@@ -198,7 +198,7 @@ select:focus {
 .btn:hover {
     filter: brightness(1.05);
     transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 6px 18px rgba(2, 39, 121, 0.18);
+    box-shadow: 0 6px 18px var(--accent-glow);
 }
 
 .btn:active {
@@ -207,7 +207,7 @@ select:focus {
 
 .btn:focus {
     outline: 0;
-    box-shadow: 0 0 0 4px rgba(0, 39, 127, 0.12);
+    box-shadow: 0 0 0 4px var(--accent-glow);
 }
 
 .link {
@@ -243,7 +243,7 @@ select:focus {
 
 .side h1 {
     font-size: 50px;
-    color: #00277F;
+    color: var(--primary);
     margin: 0;
     font-weight: 800;
 }
@@ -279,8 +279,14 @@ select:focus {
 .inputLabel {
     font-size: 13px;
     margin-bottom: 6px;
-    color: #002278;
+    color: var(--primary);
     font-weight: 600
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--primary);
+    color: var(--primary);
 }
 
 .field-error {
@@ -449,53 +455,138 @@ select:focus {
     gap: 10px;
 }
 
-/* Schedule Days Styling */
-.schedule-days-container {
+/* Vital Assessment & Queue Modal Enhancements */
+.assessment-field-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
-    gap: 8px;
-    margin-top: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
 }
 
-.day-pill {
-    position: relative;
+.manual-entry-input {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    padding: 12px 16px;
+    font-weight: 500;
+    color: #0f172a;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.manual-entry-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    background: #fff;
+}
+
+.queue-selection-modal .modal-box {
+    max-width: 550px;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.queue-modal-header {
+    padding: 24px 32px;
+    background: #ffffff;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.queue-modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.queue-list-container {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 8px 0;
+    background: #fcfcfd;
+}
+
+.queue-item {
+    padding: 16px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+    transition: all 0.2s ease;
     cursor: pointer;
 }
 
-.day-pill input[type="checkbox"] {
-    display: none;
+.queue-item:hover {
+    background: #f1f5f9;
 }
 
-.day-pill span {
+.queue-item:last-child {
+    border-bottom: none;
+}
+
+.queue-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.queue-item-name {
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 1rem;
+}
+
+.queue-item-meta {
+    font-size: 0.875rem;
+    color: #64748b;
     display: flex;
     align-items: center;
-    justify-content: center;
-    padding: 10px 8px;
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    background: #f8f9fa;
+    gap: 8px;
+}
+
+.queue-item-badge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.badge-waiting { background: #eef2ff; color: #4338ca; }
+.badge-on_call { background: #ecfdf5; color: #059669; }
+
+.queue-modal-footer {
+    padding: 20px 32px;
+    background: #f8fafc;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.empty-queue-state {
+    padding: 60px 32px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.empty-queue-icon {
+    font-size: 48px;
+    color: #cbd5e1;
+}
+
+.empty-queue-text {
     color: #64748b;
-    font-weight: 600;
-    font-size: 12px;
-    transition: all 0.2s ease;
-    user-select: none;
-}
-
-.day-pill input[type="checkbox"]:checked+span {
-    background: #00277F;
-    color: #ffffff;
-    border-color: #00277F;
-    box-shadow: 0 2px 8px rgba(0, 39, 127, 0.2);
-}
-
-.day-pill:hover span {
-    border-color: #00277F;
-    background: #f0f4ff;
-}
-
-.day-pill input[type="checkbox"]:checked:hover+span {
-    background: #001a5e;
-    border-color: #001a5e;
+    font-size: 0.95rem;
+    max-width: 250px;
+    line-height: 1.5;
 }
 
 @media(max-width: 420px) {
@@ -623,7 +714,7 @@ select:focus {
     left: 10px;
     bottom: 10px;
     z-index: 30;
-    background: linear-gradient(180deg, #002b8f 0%, #012165 100%);
+    background: linear-gradient(180deg, #2D5A27 0%, #1B331A 100%);
     color: #fff;
     padding: 18px 14px;
     border-radius: 18px;
@@ -2382,10 +2473,29 @@ body.dashboard-loading {
 }
 
 .chip-btn.create-btn {
-    background: #0b5fff;
+    background: var(--accent);
     color: white;
     padding: 8px 12px;
     border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.chip-btn {
+    background: #f1f5f9;
+    color: #475569;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.chip-btn:hover {
+    background: #e2e8f0;
 }
 
 .btn.small {
@@ -2396,7 +2506,7 @@ body.dashboard-loading {
 .btn.small.outline {
     background: none;
     border: 1px solid var(--border);
-    color: #00277F;
+    color: var(--primary);
 }
 
 .badge-active {

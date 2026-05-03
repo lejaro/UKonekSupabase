@@ -58,6 +58,24 @@ if (document.readyState === 'complete') {
 // Failsafe: always dismiss after 5 seconds even if window.load never fires
 setTimeout(dismissPagePreloader, 5000);
 
+function setLoading(btn, isLoading) {
+  if (!btn) return;
+  const label = btn.querySelector('.btn-label');
+  const spinner = btn.querySelector('.btn-spinner');
+  if (isLoading) {
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+    if (label) label.dataset.originalText = label.textContent;
+    if (label) label.textContent = 'SAVING...';
+  } else {
+    btn.disabled = false;
+    btn.classList.remove('is-loading');
+    if (label && label.dataset.originalText) {
+      label.textContent = label.dataset.originalText;
+    }
+  }
+}
+
 function getSectionFromHash() {
   const value = String(window.location.hash || '').replace(/^#/, '').trim();
   if (!value) return null;
@@ -3433,7 +3451,7 @@ async function listCitizensFromSupabase() {
   const { supabase } = await loadSupabaseModule();
   const { data, error } = await supabase
     .from('citizens')
-    .select('username,firstname,surname,email,contact_number,created_at')
+    .select('id,username,firstname,surname,email,contact_number,created_at')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -3533,6 +3551,34 @@ function initVitalsSection() {
     }
   });
 
+  // Add Manual Entry Button
+  if (!document.getElementById('manual-entry-btn')) {
+    const manualBtn = document.createElement('button');
+    manualBtn.id = 'manual-entry-btn';
+    manualBtn.className = 'chip-btn';
+    manualBtn.textContent = 'Manual Entry';
+    manualBtn.style.marginLeft = '10px';
+    startBtn.parentNode.appendChild(manualBtn);
+
+    manualBtn.addEventListener('click', () => {
+      stopScanner();
+      statusText.textContent = 'Manual entry mode enabled.';
+      statusText.style.color = '';
+      formContainer.classList.remove('hidden');
+      vitalsForm.reset();
+      document.getElementById('vitals-citizen-id').value = '';
+    });
+  }
+
+  // Select from Queue logic
+  const selectQueueBtn = document.getElementById('vitals-select-queue-btn');
+  if (selectQueueBtn) {
+    selectQueueBtn.addEventListener('click', () => {
+      stopScanner();
+      openQueueSelectionModal();
+    });
+  }
+
   stopBtn.addEventListener('click', stopScanner);
 
   async function stopScanner() {
@@ -3547,14 +3593,16 @@ function initVitalsSection() {
     }
     startBtn.classList.remove('hidden');
     stopBtn.classList.add('hidden');
-    statusText.textContent = 'Scanner stopped.';
+    statusText.textContent = 'Scanner ready.';
     statusText.style.color = '';
   }
 
-  vitalsForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    await handleVitalsSubmission();
-  });
+  if (vitalsForm) {
+    vitalsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await handleVitalsSubmission();
+    });
+  }
 
   const resetBtn = document.getElementById('vitals-reset-btn');
   if (resetBtn) {
@@ -3569,53 +3617,204 @@ function initVitalsSection() {
 async function handleQRDecoded(decodedText) {
   const statusText = document.getElementById('qr-status');
   const formContainer = document.getElementById('vitals-form-container');
-  const patientNameSpan = document.getElementById('identified-patient-name');
-  const patientUserSpan = document.getElementById('identified-patient-username');
   const citizenIdInput = document.getElementById('vitals-citizen-id');
+  
+  const nameInput = document.getElementById('vitals-name');
+  const ageInput = document.getElementById('vitals-age');
+  const addressInput = document.getElementById('vitals-address');
+  const contactInput = document.getElementById('vitals-contact');
+  const complaintInput = document.getElementById('vitals-complaint');
 
-  statusText.textContent = 'Looking up patient...';
+  statusText.textContent = 'Processing QR data...';
   
   try {
     const { supabase } = await loadSupabaseModule();
-    // Assuming decodedText is the username or id
-    const { data, error } = await supabase
-      .from('citizens')
-      .select('id, username, firstname, surname')
-      .or(`username.eq."${decodedText}",id.eq."${decodedText}"`)
-      .maybeSingle();
+
+    // Check if it's our new rich data format
+    if (decodedText.includes('NAME:') && decodedText.includes('TICKET:')) {
+      const data = {};
+      decodedText.split('\n').forEach(line => {
+        const parts = line.split(': ');
+        if (parts.length >= 2) {
+          const key = parts[0].trim().toUpperCase();
+          const value = parts.slice(1).join(': ').trim();
+          data[key] = value;
+        }
+      });
+
+      nameInput.value = data.NAME || '';
+      ageInput.value = data.AGE || '';
+      addressInput.value = data.ADDRESS || '';
+      contactInput.value = data.CONTACT || '';
+      complaintInput.value = data.COMPLAINT || '';
+
+      // Try to resolve citizen ID via ticket
+      if (data.TICKET) {
+        const { data: ticketData } = await supabase
+          .from('queue_tickets')
+          .select('citizen_id')
+          .eq('ticket_code', data.TICKET)
+          .maybeSingle();
+        
+        if (ticketData) {
+          citizenIdInput.value = ticketData.citizen_id;
+        }
+      }
+    } else {
+      // Fallback to legacy format (ID or Username)
+      statusText.textContent = 'Legacy QR detected. Looking up patient...';
+      const { data: citizen, error } = await supabase
+        .from('citizens')
+        .select('id, username, firstname, surname, age, complete_address, contact_number')
+        .or(`username.eq."${decodedText}",id.eq."${decodedText}"`)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!citizen) {
+        statusText.textContent = 'Patient not found. Invalid QR code.';
+        statusText.style.color = '#b91c1c';
+        return;
+      }
+
+      nameInput.value = `${citizen.firstname} ${citizen.surname}`.trim();
+      ageInput.value = citizen.age || '';
+      addressInput.value = citizen.complete_address || '';
+      contactInput.value = citizen.contact_number || '';
+      citizenIdInput.value = citizen.id;
+    }
+
+    formContainer.classList.remove('hidden');
+    statusText.textContent = 'Patient data loaded successfully.';
+    statusText.style.color = '#15803d';
+    formContainer.scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    console.error('QR handle error:', err);
+    statusText.textContent = 'Error processing patient data.';
+    statusText.style.color = '#b91c1c';
+  }
+}
+
+async function openQueueSelectionModal() {
+  const modal = document.getElementById('queue-selection-modal');
+  const closeBtn = document.getElementById('queue-selection-close');
+  const cancelBtn = document.getElementById('queue-selection-cancel');
+  const refreshBtn = document.getElementById('queue-selection-refresh');
+
+  modal.classList.remove('hidden');
+
+  const closeModal = () => modal.classList.add('hidden');
+  closeBtn.onclick = closeModal;
+  cancelBtn.onclick = closeModal;
+  refreshBtn.onclick = loadQueueForSelection;
+
+  loadQueueForSelection();
+}
+
+async function loadQueueForSelection() {
+  const listContainer = document.getElementById('queue-selection-list');
+  listContainer.innerHTML = '<p class="note" style="text-align: center; padding: 20px;">Fetching active queue...</p>';
+
+  try {
+    const { supabase } = await loadSupabaseModule();
+    // Get today's tickets in waiting or on_call status
+    const { data: tickets, error } = await supabase
+      .from('queue_tickets')
+      .select(`
+        id, 
+        queue_number, 
+        service_label, 
+        status, 
+        reason, 
+        symptoms,
+        citizen_id,
+        citizens (
+          firstname, 
+          surname, 
+          age, 
+          complete_address, 
+          contact_number
+        )
+      `)
+      .eq('queue_date', new Date().toISOString().split('T')[0])
+      .in('status', ['waiting', 'on_call'])
+      .order('queue_number', { ascending: true });
 
     if (error) throw error;
 
-    if (!data) {
-      statusText.textContent = 'Patient not found. Invalid QR code.';
-      statusText.style.color = '#b91c1c';
+    if (!tickets || tickets.length === 0) {
+      listContainer.innerHTML = `
+        <div class="empty-queue-state">
+          <span class="empty-queue-icon">📋</span>
+          <p class="empty-queue-text">No patients currently in the queue for today.</p>
+        </div>
+      `;
       return;
     }
 
-    const firstName = String(data.firstname || '').trim();
-    const surname = String(data.surname || '').trim();
-    const fullName = [firstName, surname].filter(Boolean).join(' ') || data.username;
+    listContainer.innerHTML = '';
+    tickets.forEach(t => {
+      const citizen = t.citizens;
+      const fullName = `${citizen.firstname} ${citizen.surname}`.trim();
+      
+      const item = document.createElement('div');
+      item.className = 'queue-item';
+      item.innerHTML = `
+        <div class="queue-item-info">
+          <strong class="queue-item-name">#${String(t.queue_number).padStart(3, '0')} — ${fullName}</strong>
+          <div class="queue-item-meta">
+            <span class="queue-item-badge badge-${t.status}">${t.status.replace('_', ' ').toUpperCase()}</span>
+            <span>${t.service_label}</span>
+          </div>
+        </div>
+        <button class="chip-btn" style="background: #3b82f6; color: #fff; border: none; padding: 6px 12px; font-weight: 600;">Select</button>
+      `;
 
-    patientNameSpan.textContent = fullName;
-    patientUserSpan.textContent = data.username;
-    citizenIdInput.value = data.id;
+      item.onclick = () => {
+        populateVitalsFormFromQueue(t);
+        document.getElementById('queue-selection-modal').classList.add('hidden');
+      };
 
-    formContainer.classList.remove('hidden');
-    statusText.textContent = 'Patient identified successfully.';
-    statusText.style.color = '#15803d';
-    
-    // Scroll to form
-    formContainer.scrollIntoView({ behavior: 'smooth' });
+      listContainer.appendChild(item);
+    });
   } catch (err) {
-    console.error('Patient lookup error:', err);
-    statusText.textContent = 'Error identifying patient.';
-    statusText.style.color = '#b91c1c';
+    console.error('Error loading queue for selection:', err);
+    listContainer.innerHTML = '<p class="note" style="text-align: center; padding: 20px; color: #ef4444;">Failed to load queue.</p>';
   }
+}
+
+function populateVitalsFormFromQueue(ticket) {
+  const formContainer = document.getElementById('vitals-form-container');
+  const statusText = document.getElementById('qr-status');
+  const vitalsForm = document.getElementById('vitals-form');
+  
+  const nameInput = document.getElementById('vitals-name');
+  const ageInput = document.getElementById('vitals-age');
+  const addressInput = document.getElementById('vitals-address');
+  const contactInput = document.getElementById('vitals-contact');
+  const complaintInput = document.getElementById('vitals-complaint');
+  const citizenIdInput = document.getElementById('vitals-citizen-id');
+
+  vitalsForm.reset();
+
+  const citizen = ticket.citizens;
+  nameInput.value = `${citizen.firstname} ${citizen.surname}`.trim();
+  ageInput.value = citizen.age || '';
+  addressInput.value = citizen.complete_address || '';
+  contactInput.value = citizen.contact_number || '';
+  citizenIdInput.value = ticket.citizen_id;
+  complaintInput.value = `${ticket.reason}${ticket.symptoms ? ': ' + ticket.symptoms : ''}`;
+
+  formContainer.classList.remove('hidden');
+  statusText.textContent = `Selected Patient: #${String(ticket.queue_number).padStart(3, '0')}`;
+  statusText.style.color = '#3b82f6';
+  formContainer.scrollIntoView({ behavior: 'smooth' });
 }
 
 async function handleVitalsSubmission() {
   const submitBtn = document.getElementById('vitals-submit-btn');
   const citizenId = document.getElementById('vitals-citizen-id').value;
+  const name = document.getElementById('vitals-name').value;
   const complaint = document.getElementById('vitals-complaint').value;
   const bp = document.getElementById('vitals-bp').value;
   const rr = document.getElementById('vitals-rr').value;
@@ -3623,8 +3822,8 @@ async function handleVitalsSubmission() {
   const spo2 = document.getElementById('vitals-spo2').value;
   const meds = document.getElementById('vitals-meds').value;
 
-  if (!citizenId || !complaint) {
-    showToast('Patient identification and chief complaint are required.', 'error');
+  if (!complaint || (!citizenId && !name)) {
+    showToast('Patient name and chief complaint are required.', 'error');
     return;
   }
 
@@ -3634,8 +3833,46 @@ async function handleVitalsSubmission() {
     const user = await ensureAuthenticatedSession();
     const { supabase } = await loadSupabaseModule();
 
+    let finalCitizenId = citizenId;
+
+    // If no citizenId (manual entry), try to find or create citizen
+    if (!finalCitizenId && name) {
+      // Simple lookup by name
+      const { data: existing } = await supabase
+        .from('citizens')
+        .select('id')
+        .eq('firstname', name.split(' ')[0] || '')
+        .eq('surname', name.split(' ').slice(1).join(' ') || '')
+        .maybeSingle();
+      
+      if (existing) {
+        finalCitizenId = existing.id;
+      } else {
+        // Create a walk-in record
+        const { data: created, error: createError } = await supabase
+          .from('citizens')
+          .insert([{
+            firstname: name.split(' ')[0] || 'Unknown',
+            surname: name.split(' ').slice(1).join(' ') || 'Patient',
+            contact_number: document.getElementById('vitals-contact').value || null,
+            complete_address: document.getElementById('vitals-address').value || null,
+            age: parseInt(document.getElementById('vitals-age').value) || null,
+            email: `walkin_${Date.now()}@ukonek.local` // Temporary email for walk-ins
+          }])
+          .select()
+          .single();
+        
+        if (createError) throw createError;
+        finalCitizenId = created.id;
+      }
+    }
+
+    if (!finalCitizenId) {
+      throw new Error('Could not identify or create patient record.');
+    }
+
     const payload = {
-      citizen_id: citizenId,
+      citizen_id: finalCitizenId,
       nurse_id: user?.id || null,
       chief_complaint: complaint,
       blood_pressure: bp || null,

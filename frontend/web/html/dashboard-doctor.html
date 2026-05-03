@@ -695,49 +695,77 @@
           
           <div id="qr-scanner-container" class="p-20">
             <div id="reader" style="width: 100%; max-width: 500px; margin: 0 auto; border-radius: 12px; overflow: hidden;"></div>
-            <div id="scanner-controls" class="actions" style="justify-content: center; margin-top: 15px;">
+            <div id="scanner-controls" class="actions" style="justify-content: center; margin-top: 15px; gap: 10px;">
               <button id="start-scanner-btn" class="btn">Start Scanner</button>
               <button id="stop-scanner-btn" class="chip-btn hidden">Stop Scanner</button>
+              <button id="vitals-select-queue-btn" class="btn btn-outline" style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534;">
+                Select from Queue
+              </button>
             </div>
             <p id="qr-status" class="note" style="text-align: center; margin-top: 10px;">Scanner ready.</p>
           </div>
 
           <div id="vitals-form-container" class="hidden">
             <div class="p-20" style="border-top: 1px solid #e2e8f0; background: #f8fafc;">
-              <h4 style="margin: 0;">Patient Identified: <span id="identified-patient-name" style="color: #3b82f6;">—</span></h4>
-              <p class="note" style="margin: 5px 0 0 0;">Username: <span id="identified-patient-username">—</span></p>
+              <h4 style="margin: 0; font-weight: 700;">Patient Information</h4>
+              <p class="note" style="margin: 5px 0 0 0; color: #64748b;">Verify and record vital signs below.</p>
             </div>
             
             <form id="vitals-form" class="p-20" novalidate autocomplete="off">
               <input type="hidden" id="vitals-citizen-id" />
               
+              <div class="assessment-field-grid">
+                <div class="field">
+                  <label class="inputLabel" for="vitals-name">Patient Name</label>
+                  <input id="vitals-name" class="manual-entry-input" type="text" placeholder="Full Name" required />
+                </div>
+                <div class="field">
+                  <label class="inputLabel" for="vitals-age">Age</label>
+                  <input id="vitals-age" class="manual-entry-input" type="number" placeholder="Age" required />
+                </div>
+              </div>
+
+              <div class="assessment-field-grid" style="grid-template-columns: 2fr 1fr;">
+                <div class="field">
+                  <label class="inputLabel" for="vitals-address">Complete Address</label>
+                  <input id="vitals-address" class="manual-entry-input" type="text" placeholder="House No., Street, Brgy, City" required />
+                </div>
+                <div class="field">
+                  <label class="inputLabel" for="vitals-contact">Contact Number</label>
+                  <input id="vitals-contact" class="manual-entry-input" type="text" placeholder="09XXXXXXXXX" required />
+                </div>
+              </div>
+
               <div class="field">
                 <label class="inputLabel" for="vitals-complaint">Chief Complaint</label>
-                <textarea id="vitals-complaint" rows="3" placeholder="Describe the reason for visit..." required></textarea>
+                <textarea id="vitals-complaint" class="manual-entry-input" rows="2" style="width: 100%;" placeholder="What is the patient feeling?" required></textarea>
               </div>
+
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+              <h5 style="margin-bottom: 15px; font-weight: 700; color: #1e293b;">Vital Signs</h5>
               
-              <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+              <div class="assessment-field-grid">
                 <div class="field">
                   <label class="inputLabel" for="vitals-bp">Blood Pressure (mmHg)</label>
-                  <input id="vitals-bp" type="text" placeholder="e.g. 120/80" />
+                  <input id="vitals-bp" class="manual-entry-input" type="text" placeholder="e.g. 120/80" />
                 </div>
                 <div class="field">
-                  <label class="inputLabel" for="vitals-rr">Respiratory Rate (bpm)</label>
-                  <input id="vitals-rr" type="number" placeholder="e.g. 16" />
+                  <label class="inputLabel" for="vitals-rr">Resp. Rate (bpm)</label>
+                  <input id="vitals-rr" class="manual-entry-input" type="number" placeholder="e.g. 16" />
                 </div>
                 <div class="field">
-                  <label class="inputLabel" for="vitals-temp">Temperature (°C)</label>
-                  <input id="vitals-temp" type="number" step="0.1" placeholder="e.g. 36.5" />
+                  <label class="inputLabel" for="vitals-temp">Temp (°C)</label>
+                  <input id="vitals-temp" class="manual-entry-input" type="number" step="0.1" placeholder="36.5" />
                 </div>
                 <div class="field">
-                  <label class="inputLabel" for="vitals-spo2">Oxygen Saturation (SpO₂ %)</label>
-                  <input id="vitals-spo2" type="number" placeholder="e.g. 98" />
+                  <label class="inputLabel" for="vitals-spo2">SpO₂ (%)</label>
+                  <input id="vitals-spo2" class="manual-entry-input" type="number" placeholder="98" />
                 </div>
               </div>
               
               <div class="field">
                 <label class="inputLabel" for="vitals-meds">Current Medications</label>
-                <textarea id="vitals-meds" rows="2" placeholder="List medications currently being taken..."></textarea>
+                <textarea id="vitals-meds" class="manual-entry-input" rows="2" placeholder="List medications currently being taken..."></textarea>
               </div>
               
               <div class="actions">
@@ -1424,6 +1452,25 @@
           <div class="actions dialog-actions">
             <button id="dialog-cancel-btn" type="button" class="btn btn-close">Cancel</button>
             <button id="dialog-confirm-btn" type="button" class="btn">Confirm</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="queue-selection-modal" class="modal-overlay queue-selection-modal hidden">
+        <div class="modal-box">
+          <div class="queue-modal-header">
+            <h3>Select Patient from Queue</h3>
+            <button id="queue-selection-close" class="icon-btn" style="color: #64748b; border: none; font-size: 20px;">✕</button>
+          </div>
+          <div id="queue-selection-list" class="queue-list-container">
+            <div class="empty-queue-state">
+              <span class="empty-queue-icon">📋</span>
+              <p class="empty-queue-text">Fetching active queue...</p>
+            </div>
+          </div>
+          <div class="queue-modal-footer">
+            <button id="queue-selection-refresh" class="chip-btn" style="background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">Refresh List</button>
+            <button id="queue-selection-cancel" class="btn" style="width: auto; background: #64748b;">Cancel</button>
           </div>
         </div>
       </div>

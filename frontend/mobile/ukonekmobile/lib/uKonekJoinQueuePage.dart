@@ -315,7 +315,12 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage> {
             child: Column(
               children: [
                 QrImageView(
-                  data: queue.ticketCode,
+                  data: 'NAME: ${queue.citizenFullname ?? 'N/A'}\n'
+                        'AGE: ${queue.citizenAge ?? 'N/A'}\n'
+                        'ADDRESS: ${queue.citizenAddress ?? 'N/A'}\n'
+                        'CONTACT: ${queue.citizenContact ?? 'N/A'}\n'
+                        'COMPLAINT: ${queue.chiefComplaint ?? 'N/A'}\n'
+                        'TICKET: ${queue.ticketCode}',
                   size: 180,
                   eyeStyle: const QrEyeStyle(color: _C.primaryMid, eyeShape: QrEyeShape.square),
                 ),

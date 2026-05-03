@@ -102,6 +102,44 @@ class DoctorStatus {
   }
 }
 
+class VitalSigns {
+  final String id;
+  final int citizenId;
+  final String chiefComplaint;
+  final String? bp;
+  final int? rr;
+  final double? temp;
+  final int? spo2;
+  final String? meds;
+  final DateTime createdAt;
+
+  const VitalSigns({
+    required this.id,
+    required this.citizenId,
+    required this.chiefComplaint,
+    this.bp,
+    this.rr,
+    this.temp,
+    this.spo2,
+    this.meds,
+    required this.createdAt,
+  });
+
+  factory VitalSigns.fromMap(Map<String, dynamic> map) {
+    return VitalSigns(
+      id: map['id']?.toString() ?? '',
+      citizenId: (map['citizen_id'] as num?)?.toInt() ?? 0,
+      chiefComplaint: map['chief_complaint'] ?? 'No complaint recorded',
+      bp: map['blood_pressure'],
+      rr: (map['respiratory_rate'] as num?)?.toInt(),
+      temp: (map['temperature'] as num?)?.toDouble(),
+      spo2: (map['oxygen_saturation'] as num?)?.toInt(),
+      meds: map['current_medications'],
+      createdAt: DateTime.parse(map['created_at']),
+    );
+  }
+}
+
 class FeedbackSubmission {
   final String subject;
   final String message;
@@ -208,6 +246,11 @@ class QueueDashboardSnapshot {
   final DateTime? queueDate;
   final bool isOnCall;
   final int waitingCount;
+  final String? citizenFullname;
+  final int? citizenAge;
+  final String? citizenAddress;
+  final String? citizenContact;
+  final String? chiefComplaint;
 
   const QueueDashboardSnapshot({
     required this.queueId,
@@ -221,6 +264,11 @@ class QueueDashboardSnapshot {
     required this.queueDate,
     required this.isOnCall,
     required this.waitingCount,
+    this.citizenFullname,
+    this.citizenAge,
+    this.citizenAddress,
+    this.citizenContact,
+    this.chiefComplaint,
   });
 
   bool get hasActiveQueue => queueId != null && myQueueNumber != null;
@@ -245,6 +293,11 @@ class QueueDashboardSnapshot {
       queueDate: parsedDate,
       isOnCall: map['is_on_call'] == true,
       waitingCount: (map['waiting_count'] as num?)?.toInt() ?? 0,
+      citizenFullname: map['citizen_fullname']?.toString(),
+      citizenAge: (map['citizen_age'] as num?)?.toInt(),
+      citizenAddress: map['citizen_address']?.toString(),
+      citizenContact: map['citizen_contact']?.toString(),
+      chiefComplaint: map['chief_complaint']?.toString(),
     );
   }
 
@@ -886,10 +939,52 @@ class ApiService {
     return response == true;
   }
 
+  /// Fetches the logged-in citizen's profile data.
+  static Future<Map<String, dynamic>> fetchMyCitizenProfile() async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('Not authenticated');
+
+    final response = await _client
+        .from('citizens')
+        .select('*')
+        .eq('auth_user_id', user.id)
+        .maybeSingle();
+
+    if (response == null) {
+      throw Exception('Citizen profile not found');
+    }
+    return response;
+  }
+
   static String _asDate(DateTime value) {
     final d = DateTime(value.year, value.month, value.day);
     final mm = d.month.toString().padLeft(2, '0');
     final dd = d.day.toString().padLeft(2, '0');
     return '${d.year}-$mm-$dd';
+  }
+
+  static Future<List<VitalSigns>> fetchVitalSigns() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final profile = await fetchMyCitizenProfile();
+      final citizenId = profile['id'];
+
+      final response = await _client
+          .from('vital_signs')
+          .select()
+          .eq('citizen_id', citizenId)
+          .order('created_at', ascending: false);
+
+      final rows = (response as List<dynamic>?) ?? const [];
+      return rows
+          .whereType<Map<String, dynamic>>()
+          .map(VitalSigns.fromMap)
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching vital signs: $e');
+      return [];
+    }
   }
 }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'uKonekOnBoardingPage.dart';
 import 'uKonekMenuPage.dart'; 
+import 'uKonekDashboardPage.dart';
+import 'services/api_service.dart';
 
 const _supabaseUrl = 'https://dqjxpwbsbzagbjtulhue.supabase.co';
 const _supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxanhwd2JzYnphZ2JqdHVsaHVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNTM5ODUsImV4cCI6MjA4OTgyOTk4NX0.0Gvbjf2qrcVy9VF5QCKWaHXw19rVOsOTBz9DmHWPX9g';
@@ -22,9 +24,6 @@ class UKonekApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    
-    final session = Supabase.instance.client.auth.currentSession;
-
     return MaterialApp(
       title: 'uKonek',
       debugShowCheckedModeBanner: false,
@@ -33,8 +32,83 @@ class UKonekApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Poppins',
       ),
-      
-      home: session != null ? const uKonekMenuPage() : const OnboardingPage(),
+      home: const RootHandler(),
+    );
+  }
+}
+
+class RootHandler extends StatefulWidget {
+  const RootHandler({super.key});
+
+  @override
+  State<RootHandler> createState() => _RootHandlerState();
+}
+
+class _RootHandlerState extends State<RootHandler> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkSession();
+    });
+  }
+
+  Future<void> _checkSession() async {
+    // Add a tiny delay to allow the loading spinner to be visible and everything to settle
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    final authClient = Supabase.instance.client.auth;
+    final session = authClient.currentSession;
+    
+    debugPrint('RootHandler: Checking session... ${session != null ? "Session Found" : "No Session"}');
+
+    if (session == null) {
+      _navigate(const OnboardingPage());
+      return;
+    }
+
+    try {
+      debugPrint('RootHandler: Fetching profile for user ${session.user.id}...');
+      final profile = await ApiService.fetchMyCitizenProfile();
+      debugPrint('RootHandler: Profile fetched successfully.');
+
+      final displayName = profile['username'] ?? session.user.email ?? 'User';
+
+      _navigate(uKonekDashboardPage(
+        username: displayName,
+        citizenId: profile['id'].toString(),
+        fullname: '${profile['firstname']} ${profile['surname']}',
+        email: profile['email'] ?? '',
+        phone: profile['contact_number'] ?? '',
+        address: profile['complete_address'] ?? '',
+      ));
+    } catch (e) {
+      debugPrint('RootHandler: Error fetching profile: $e');
+      // If error (e.g. profile missing), clear session and go to onboarding
+      try {
+        await ApiService.signOut();
+      } catch (signOutError) {
+        debugPrint('RootHandler: SignOut error: $signOutError');
+      }
+      _navigate(const OnboardingPage());
+    }
+  }
+
+  void _navigate(Widget page) {
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => page),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28A745)),
+        ),
+      ),
     );
   }
 }
