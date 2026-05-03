@@ -524,11 +524,7 @@ class ApiService {
     try {
       await _client.auth.updateUser(UserAttributes(password: password));
     } on AuthException catch (error) {
-      final message = error.message.toLowerCase();
-      if (message.contains('password')) {
-        throw Exception('Please choose a stronger password.');
-      }
-      rethrow;
+      throw Exception(error.message);
     }
 
     final response = await _client.rpc(
