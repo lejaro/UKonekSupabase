@@ -1,0 +1,191 @@
+-- Standardize staff authentication to resolve "wrong credentials" issues.
+-- This migration ensures that manually created auth accounts are fully compatible with GoTrue
+-- by setting the confirmed_at field and ensuring consistent hashing.
+
+create or replace function public.create_staff_account_admin(
+  p_first_name text,
+  p_middle_name text,
+  p_last_name text,
+  p_birthday date,
+  p_gender text,
+  p_username text,
+  p_email text,
+  p_role text,
+  p_password text,
+  p_consent_given boolean default true,
+  p_status text default 'Active'
+)
+returns json
+language plpgsql
+security definer
+set search_path = public, auth, extensions
+as $$
+declare
+  v_email text;
+  v_username text;
+  v_employee_id text;
+  v_employee_number bigint;
+  v_role text;
+  v_auth_user_id uuid;
+begin
+  if not public.is_admin() then
+    return json_build_object('error', 'Forbidden: admin role required');
+  end if;
+
+  v_email := lower(trim(coalesce(p_email, '')));
+  v_username := trim(coalesce(p_username, ''));
+  v_role := lower(trim(coalesce(p_role, 'staff')));
+
+  -- Lock to prevent duplicate employee IDs
+  perform pg_advisory_xact_lock(hashtext('public.staff.employee_id')::bigint);
+
+  select coalesce(max(coalesce((substring(employee_id from '[0-9]+'))::bigint, 0)), 1000) + 1
+    into v_employee_number
+  from public.staff
+  where employee_id ~ '^UK-[0-9]+$';
+
+  v_employee_id := 'UK-' || v_employee_number::text;
+
+  if v_email = '' or v_username = '' then
+    return json_build_object('error', 'Email and username are required');
+  end if;
+
+  if trim(coalesce(p_first_name, '')) = '' or trim(coalesce(p_last_name, '')) = '' then
+    return json_build_object('error', 'First name and last name are required');
+  end if;
+
+  if length(coalesce(p_password, '')) < 8 then
+    return json_build_object('error', 'Password must be at least 8 characters');
+  end if;
+
+  if exists (select 1 from public.staff where lower(email) = v_email) then
+    return json_build_object('error', 'A staff account with this email already exists');
+  end if;
+
+  if exists (select 1 from public.staff where lower(username) = lower(v_username)) then
+    return json_build_object('error', 'Username is already taken');
+  end if;
+
+  if exists (select 1 from auth.users where lower(email) = v_email) then
+    return json_build_object('error', 'An auth account with this email already exists');
+  end if;
+
+  v_auth_user_id := extensions.gen_random_uuid();
+
+  -- Insert into auth.users with ALL necessary fields for a "fully confirmed" account
+  insert into auth.users (
+    instance_id,
+    id,
+    aud,
+    role,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    last_sign_in_at,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    created_at,
+    updated_at,
+    is_sso_user,
+    is_anonymous,
+    confirmation_token,
+    recovery_token,
+    email_change_token_new,
+    email_change
+  )
+  values (
+    '00000000-0000-0000-0000-000000000000',
+    v_auth_user_id,
+    'authenticated',
+    'authenticated',
+    v_email,
+    extensions.crypt(p_password, extensions.gen_salt('bf', 10)), -- Ensure 10 rounds
+    now(),
+    now(), -- last_sign_in_at (allows immediate login)
+    jsonb_build_object(
+      'provider', 'email',
+      'providers', array['email'],
+      'email_verified', true -- Bypass verification checks
+    ),
+    jsonb_build_object(
+      'role', 'staff',
+      'created_by', auth.uid(),
+      'first_name', p_first_name,
+      'last_name', p_last_name
+    ),
+    now(),
+    now(),
+    false,
+    false,
+    '',
+    '',
+    '',
+    ''
+  );
+
+  -- Insert into auth.identities
+  insert into auth.identities (
+    id,
+    user_id,
+    identity_data,
+    provider,
+    provider_id,
+    last_sign_in_at,
+    created_at,
+    updated_at
+  )
+  values (
+    v_auth_user_id,
+    v_auth_user_id,
+    jsonb_build_object(
+      'sub', v_auth_user_id::text,
+      'email', v_email,
+      'email_verified', true
+    ),
+    'email',
+    v_email, -- For email provider, provider_id is the email
+    now(),
+    now(),
+    now()
+  );
+
+  -- Insert into public.staff
+  insert into public.staff (
+    first_name,
+    middle_name,
+    last_name,
+    birthday,
+    gender,
+    username,
+    employee_id,
+    email,
+    role,
+    consent_given,
+    status,
+    auth_user_id
+  )
+  values (
+    trim(coalesce(p_first_name, '')),
+    nullif(trim(coalesce(p_middle_name, '')), ''),
+    trim(coalesce(p_last_name, '')),
+    p_birthday,
+    nullif(trim(coalesce(p_gender, '')), ''),
+    v_username,
+    v_employee_id,
+    v_email,
+    v_role,
+    coalesce(p_consent_given, true),
+    coalesce(nullif(trim(coalesce(p_status, '')), ''), 'Active'),
+    v_auth_user_id
+  );
+
+  return json_build_object(
+    'message', 'Staff account created successfully',
+    'auth_user_id', v_auth_user_id,
+    'employee_id', v_employee_id
+  );
+exception
+  when others then
+    return json_build_object('error', coalesce(sqlerrm, 'Unable to create staff account'));
+end;
+$$;

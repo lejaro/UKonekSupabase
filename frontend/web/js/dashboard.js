@@ -526,30 +526,48 @@ async function ensureAuthenticatedSession(force = false) {
 }
 
 function getSessionRole() {
-  return (sessionUserRole || detectRoleFromTitle()).toLowerCase();
+  const role = (sessionUserRole || detectRoleFromTitle() || '').toLowerCase();
+  return role === 'staff' ? 'nurse' : role;
 }
 
 
 function isAdminUser(user) {
-  return String(user?.role || '').trim().toLowerCase() === 'doctor';
+  const role = String(user?.role || '').trim().toLowerCase();
+  return role === 'admin' || role === 'doctor' || role === 'nurse' || role === 'staff';
 }
 
 const SECTION_ROLE_RULES = {
-  'dashboard-section': ['doctor'],
+  'dashboard-section': ['doctor', 'nurse', 'specialist'],
   'users-section': ['doctor', 'nurse', 'specialist'],
-  'reports-section': ['doctor'],
+  'reports-section': ['doctor', 'nurse'],
   'medicine-section': ['doctor', 'nurse', 'specialist'],
   'consultation-section': ['doctor', 'nurse', 'specialist'],
   'schedule-section': ['doctor', 'nurse', 'specialist'],
   'vitals-section': ['doctor', 'nurse', 'specialist'],
+  'queue-section': ['doctor', 'nurse', 'specialist'],
+  'lab-section': ['doctor', 'nurse', 'specialist'],
   'profile-section': ['doctor', 'nurse', 'specialist']
 };
 
 function isSectionAllowedForRole(sectionId, role) {
-  const roleKey = String(role || '').trim().toLowerCase();
+  let roleKey = String(role || '').trim().toLowerCase();
+  if (roleKey === 'staff') roleKey = 'nurse';
   const allowed = SECTION_ROLE_RULES[sectionId];
   if (!allowed || allowed.length === 0) return true;
   return allowed.includes(roleKey);
+}
+
+function syncRoleNavigationAccess(role) {
+  document.querySelectorAll('[data-section]').forEach((element) => {
+    const sectionId = element.getAttribute('data-section');
+    if (!sectionId || element.classList.contains('section-top')) return;
+
+    if (isSectionAllowedForRole(sectionId, role)) {
+      element.classList.remove('hidden');
+    } else {
+      element.classList.add('hidden');
+    }
+  });
 }
 
 function toTitleCase(value) {
@@ -577,7 +595,7 @@ function isDoctorRole(value) {
 
 function isScheduleRole(value) {
   const key = String(value || '').trim().toLowerCase();
-  return key === 'doctor' || key === 'nurse';
+  return key === 'doctor' || key === 'nurse' || key === 'specialist';
 }
 
 function getDoctorDisplayName(doctor) {
@@ -721,6 +739,7 @@ function updateNonAdminWorkspace(user) {
 
 function applyRoleAccess(user) {
   const adminAccess = isAdminUser(user);
+  const role = String(user?.role || detectRoleFromTitle()).trim().toLowerCase();
   document.querySelectorAll('.admin-only').forEach((element) => {
     const isSectionContainer = element.classList.contains('section-top');
     if (adminAccess) {
@@ -733,7 +752,9 @@ function applyRoleAccess(user) {
     }
   });
 
-  sessionUserRole = String(user?.role || detectRoleFromTitle()).trim().toLowerCase() || sessionUserRole;
+  syncRoleNavigationAccess(role);
+
+  sessionUserRole = role || sessionUserRole;
 
   const userNameNode = document.querySelector('.user-name');
   if (userNameNode) {
@@ -880,21 +901,10 @@ if (navContainer) {
 
     // Nav activation logic
     if (sectionId || isDropdownBtn) {
-      hideAllSections();
-      clearActiveNav();
-
-      // Activate clicked element
-      el.classList.add('is-active');
-
-      // Activate parent dropdown btn for dropdown items
-      if (isDropdownItem && parentItem) {
-        const parentBtn = parentItem.querySelector('.nav-btn');
-        if (parentBtn) parentBtn.classList.add('is-active');
-      } else if (!isDropdownBtn) {
-        closeSidebarDropdownMenus();
+      const targetId = sectionId || el.getAttribute('data-section');
+      if (targetId) {
+        navigateToSection(targetId, sectionOptions);
       }
-
-      showSection(sectionId || el.getAttribute('data-section'), sectionOptions);
     }
   });
 }
@@ -1054,7 +1064,8 @@ async function showSection(sectionId, options = {}) {
 
   const user = await ensureAuthenticatedSession();
   if (!user) return;
-  const role = String(user?.role || getSessionRole()).toLowerCase();
+  let role = String(user?.role || getSessionRole()).toLowerCase();
+  if (role === 'staff') role = 'nurse';
   if (!isSectionAllowedForRole(sectionId, role)) {
     showToast('Access denied for this section.', 'warning');
     if (sectionId !== 'profile-section') {
@@ -1085,8 +1096,27 @@ async function showSection(sectionId, options = {}) {
         }
         renderDashboardInsights();
         break;
+      case 'reports-section':
+        initReportsSection();
+        const subTab = options.tab || 'tab-announcements';
+        if (subTab === 'tab-stats') {
+          renderClinicalStats();
+        }
+        break;
+      case 'lab-section':
+        initLabSection();
+        break;
+      case 'queue-section':
+        if (typeof appointments !== 'undefined' && appointments.loadQueueTickets) {
+          appointments.loadQueueTickets();
+        }
+        break;
       case 'vitals-section':
         initVitalsSection();
+        break;
+      case 'consultation-section':
+        initClinicalData();
+        initConsultationTabs();
         break;
       // Add more as needed
     }
@@ -1450,7 +1480,7 @@ async function initProfileAndSchedule() {
   if (user) {
     applyRoleAccess(user);
     populateProfile(user);
-    loadSchedules(user);
+    await loadSchedules(user);
     subscribeToStaffAvailability();
   }
 }
@@ -1742,26 +1772,33 @@ function hasScheduleConflict({ doctorStaffId, scheduleDate, startTime, endTime, 
 }
 
 function renderScheduleDoctors(staffList, user) {
-  const tbody = document.getElementById('schedule-doctors-tbody');
-  if (!tbody) return;
+  const doctorTbody = document.getElementById('schedule-doctors-tbody');
+  const nurseTbody = document.getElementById('schedule-nurses-tbody');
+  if (!doctorTbody || !nurseTbody) return;
 
-  tbody.innerHTML = '';
-  if (!staffList.length) {
-    tbody.innerHTML = '<tr><td class="table-cell" colspan="4">No doctor or nurse accounts found.</td></tr>';
-    return;
-  }
+  doctorTbody.innerHTML = '';
+  nurseTbody.innerHTML = '';
 
-  staffList.forEach((doctor) => {
+  const doctors = staffList.filter((s) => {
+    const r = String(s?.role || '').toLowerCase();
+    return r === 'doctor' || r === 'specialist';
+  });
+  const nurses = staffList.filter((s) => {
+    const r = String(s?.role || '').toLowerCase();
+    return r === 'nurse' || r === 'staff';
+  });
+
+  const renderRow = (staff, tbody) => {
     const tr = document.createElement('tr');
-    const roleLabel = toTitleCase(doctor?.role || 'Staff');
-    const statusText = getAvailabilityStatusText(doctor);
-    const statusClass = getAvailabilityBadgeClass(doctor);
+    const roleLabel = toTitleCase(staff?.role || 'Staff');
+    const statusText = getAvailabilityStatusText(staff);
+    const statusClass = getAvailabilityBadgeClass(staff);
     const availabilityStatus = normalizeAvailabilityStatus(
-      doctor?.availability_status || doctor?.availabilityStatus
+      staff?.availability_status || staff?.availabilityStatus
     );
     tr.innerHTML = `
-      <td class="table-cell">${getDoctorDisplayName(doctor)} (${roleLabel})</td>
-      <td class="table-cell">${doctor.email || '—'}</td>
+      <td class="table-cell">${getDoctorDisplayName(staff)} (${roleLabel})</td>
+      <td class="table-cell">${staff.email || '—'}</td>
       <td class="table-cell"><span class="${statusClass}">${statusText}</span></td>
       <td class="table-cell"></td>
     `;
@@ -1772,7 +1809,7 @@ function renderScheduleDoctors(staffList, user) {
     const canEditAvailability = isAdminUser(user);
     const toggleGroup = document.createElement('div');
     toggleGroup.className = 'availability-toggle-group';
-    toggleGroup.dataset.staffId = String(doctor.id || '');
+    toggleGroup.dataset.staffId = String(staff.id || '');
 
     const options = [
       { value: 'available', label: 'Available', className: 'availability-available' },
@@ -1790,14 +1827,25 @@ function renderScheduleDoctors(staffList, user) {
       if (availabilityStatus === option.value) {
         btn.classList.add('is-active');
       }
-      btn.addEventListener('click', () => handleAvailabilityToggle(doctor, option.value, toggleGroup));
+      btn.addEventListener('click', () => handleAvailabilityToggle(staff, option.value, toggleGroup));
       toggleGroup.appendChild(btn);
     });
 
     actionsCell.appendChild(toggleGroup);
-
     tbody.appendChild(tr);
-  });
+  };
+
+  if (!doctors.length) {
+    doctorTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No doctor accounts found.</td></tr>';
+  } else {
+    doctors.forEach((staff) => renderRow(staff, doctorTbody));
+  }
+
+  if (!nurses.length) {
+    nurseTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No nurse accounts found.</td></tr>';
+  } else {
+    nurses.forEach((staff) => renderRow(staff, nurseTbody));
+  }
 }
 
 function updateAvailabilityInCaches(staffId, status, newRow = null) {
@@ -1937,7 +1985,7 @@ function populateScheduleDoctorSelect(selectedDoctorId = null) {
   if (!select) return;
 
   const selected = selectedDoctorId ? String(selectedDoctorId) : '';
-  select.innerHTML = '<option value="">Select doctor</option>';
+  select.innerHTML = '<option value="">Select staff member</option>';
 
   cachedScheduleDoctors.forEach((doctor) => {
     const option = document.createElement('option');
@@ -1971,7 +2019,7 @@ async function loadSchedules(user) {
       if (staffResp.ok) {
         const staff = await staffResp.json();
         staffRoster = Array.isArray(staff) ? staff : [];
-        doctors = staffRoster.filter((item) => isDoctorRole(item?.role));
+        doctors = staffRoster.filter((item) => isScheduleRole(item?.role));
       }
 
       if (!schedulesResp.ok || !staffResp.ok || doctors.length === 0 || schedules.length === 0) {
@@ -1981,7 +2029,7 @@ async function loadSchedules(user) {
         if (doctors.length === 0) {
           const fallbackStaff = await staffService.listStaff();
           staffRoster = Array.isArray(fallbackStaff) ? fallbackStaff : [];
-          doctors = staffRoster.filter((item) => isDoctorRole(item?.role));
+          doctors = staffRoster.filter((item) => isScheduleRole(item?.role));
         }
 
         if (schedules.length === 0) {
@@ -2027,7 +2075,7 @@ async function loadSchedules(user) {
         ? (Array.isArray(staffRpc.data) ? staffRpc.data : [])
         : await staffService.listStaff();
       staffRoster = Array.isArray(staff) ? staff : [];
-      doctors = staffRoster.filter((item) => isDoctorRole(item?.role));
+      doctors = staffRoster.filter((item) => isScheduleRole(item?.role));
 
       const scheduleRpc = await supabase.rpc('list_doctor_schedules');
       if (!scheduleRpc.error) {
@@ -2467,8 +2515,39 @@ if (scheduleSuccessOkBtn) {
 async function initializeDashboard() {
   try {
     // Master init - call all content population functions
-    initProfileAndSchedule();
-    initClinicalData();
+    await initProfileAndSchedule().catch(e => console.error('Profile init failed:', e));
+    await initClinicalData().catch(e => console.error('Clinical init failed:', e));
+    const tabStats = document.getElementById('tab-stats');
+    const statsPane = document.getElementById('stats-pane');
+
+    if (tabAnnouncements && tabFeedback && tabStats) {
+      tabAnnouncements.onclick = () => {
+        tabAnnouncements.classList.add('active');
+        tabFeedback.classList.remove('active');
+        tabStats.classList.remove('active');
+        announcementsPane.classList.remove('hidden');
+        feedbackPane.classList.add('hidden');
+        statsPane.classList.add('hidden');
+      };
+      tabFeedback.onclick = () => {
+        tabAnnouncements.classList.remove('active');
+        tabFeedback.classList.add('active');
+        tabStats.classList.remove('active');
+        announcementsPane.classList.add('hidden');
+        feedbackPane.classList.remove('hidden');
+        statsPane.classList.add('hidden');
+        refreshFeedbackData();
+      };
+      tabStats.onclick = () => {
+        tabAnnouncements.classList.remove('active');
+        tabFeedback.classList.remove('active');
+        tabStats.classList.add('active');
+        announcementsPane.classList.add('hidden');
+        feedbackPane.classList.add('hidden');
+        statsPane.classList.remove('hidden');
+        renderClinicalStats();
+      };
+    }
     await Promise.all([
       refreshAnnouncementsData().catch((err) => console.warn('Announcements failed:', err)),
       refreshFeedbackData().catch((err) => console.warn('Feedback failed:', err))
@@ -2634,7 +2713,8 @@ function clearActiveNav() {
 
 function navigateToSection(sectionId, options = {}) {
   const targetId = document.getElementById(sectionId) ? sectionId : DEFAULT_SECTION_ID;
-  const currentRole = getSessionRole();
+  let currentRole = getSessionRole();
+  if (currentRole === 'staff') currentRole = 'nurse';
   const allowedTarget = isSectionAllowedForRole(targetId, currentRole)
     ? targetId
     : (isSectionAllowedForRole('users-section', currentRole) ? 'users-section' : 'profile-section');
@@ -2645,6 +2725,8 @@ function navigateToSection(sectionId, options = {}) {
 
   hideAllSections();
   clearActiveNav();
+  const targetSection = document.getElementById(allowedTarget);
+  if (targetSection) targetSection.classList.remove('hidden');
   showSection(allowedTarget, options);
   const navMatch = document.querySelector(`.nav [data-section="${allowedTarget}"]`);
   if (navMatch) navMatch.classList.add('is-active');
@@ -3806,7 +3888,15 @@ function populateVitalsFormFromQueue(ticket) {
   complaintInput.value = `${ticket.reason}${ticket.symptoms ? ': ' + ticket.symptoms : ''}`;
 
   formContainer.classList.remove('hidden');
-  statusText.textContent = `Selected Patient: #${String(ticket.queue_number).padStart(3, '0')}`;
+    const waitTime = (index * 15);
+    const timeLabel = waitTime === 0 ? 'Next' : `~${waitTime}m`;
+
+    card.innerHTML = `
+      <div class="ticket-header">
+        <span class="ticket-id">#${String(ticket.queue_number).padStart(3, '0')}</span>
+        <span class="ticket-wait">${timeLabel}</span>
+      </div>
+atient: #${String(ticket.queue_number).padStart(3, '0')}`;
   statusText.style.color = '#3b82f6';
   formContainer.scrollIntoView({ behavior: 'smooth' });
 }
@@ -3871,11 +3961,14 @@ async function handleVitalsSubmission() {
       throw new Error('Could not identify or create patient record.');
     }
 
+    const hr = document.getElementById('vitals-hr')?.value;
+
     const payload = {
       citizen_id: finalCitizenId,
       nurse_id: user?.id || null,
       chief_complaint: complaint,
       blood_pressure: bp || null,
+      heart_rate: hr ? parseInt(hr) : null,
       respiratory_rate: rr ? parseInt(rr) : null,
       temperature: temp ? parseFloat(temp) : null,
       oxygen_saturation: spo2 ? parseInt(spo2) : null,
@@ -3984,6 +4077,97 @@ async function loadStaffData() {
 }
 
 // Initial load (after auth check)
+let diagnosisChart = null;
+let consultsChart = null;
+
+async function renderClinicalStats() {
+  const { supabase } = await loadSupabaseModule();
+  
+  // 1. Fetch Data
+  const { data: consults } = await supabase.from('consultations').select('diagnosis, consulted_at');
+  const { data: vitals } = await supabase.from('vital_signs').select('temperature, blood_pressure');
+
+  if (!consults || !vitals) return;
+
+  // 2. Aggregate Top Diagnoses
+  const diagMap = {};
+  consults.forEach(c => {
+    const d = (c.diagnosis || 'Unknown').trim();
+    diagMap[d] = (diagMap[d] || 0) + 1;
+  });
+  const sortedDiags = Object.entries(diagMap).sort((a,b) => b[1] - a[1]).slice(0, 5);
+
+  // 3. Aggregate Daily Consults (Last 7 days)
+  const dailyMap = {};
+  const last7Days = [...Array(7)].map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    return d.toISOString().split('T')[0];
+  }).reverse();
+
+  last7Days.forEach(day => dailyMap[day] = 0);
+  consults.forEach(c => {
+    const day = c.consulted_at.split('T')[0];
+    if (dailyMap.hasOwnProperty(day)) dailyMap[day]++;
+  });
+
+  // 4. Vitals Metrics
+  const temps = vitals.map(v => v.temperature).filter(t => t > 0);
+  const avgTemp = temps.length ? (temps.reduce((a,b) => a+b, 0) / temps.length).toFixed(1) : '—';
+  
+  let hypertensionCount = 0;
+  vitals.forEach(v => {
+    if (v.blood_pressure) {
+      const parts = v.blood_pressure.split('/');
+      if (parts.length === 2) {
+        const sys = parseInt(parts[0]);
+        const dia = parseInt(parts[1]);
+        if (sys >= 140 || dia >= 90) hypertensionCount++;
+      }
+    }
+  });
+
+  document.getElementById('avg-temp').textContent = temps.length ? `${avgTemp}°C` : '—';
+  document.getElementById('hypertension-count').textContent = hypertensionCount;
+
+  // 5. Render Charts
+  const ctxDiag = document.getElementById('diagnoses-chart');
+  if (ctxDiag) {
+    if (diagnosisChart) diagnosisChart.destroy();
+    diagnosisChart = new Chart(ctxDiag, {
+      type: 'doughnut',
+      data: {
+        labels: sortedDiags.map(d => d[0]),
+        datasets: [{
+          data: sortedDiags.map(d => d[1]),
+          backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+  }
+
+  const ctxCons = document.getElementById('consults-chart');
+  if (ctxCons) {
+    if (consultsChart) consultsChart.destroy();
+    consultsChart = new Chart(ctxCons, {
+      type: 'line',
+      data: {
+        labels: last7Days.map(d => d.split('-').slice(1).join('/')),
+        datasets: [{
+          label: 'Consultations',
+          data: last7Days.map(d => dailyMap[d]),
+          borderColor: '#3b82f6',
+          tension: 0.3,
+          fill: true,
+          backgroundColor: 'rgba(59, 130, 246, 0.1)'
+        }]
+      },
+      options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+    });
+  }
+}
+
 async function initDashboardData() {
   try {
     const sessionUser = await ensureAuthenticatedSession();
@@ -3992,9 +4176,11 @@ async function initDashboardData() {
     startPresenceHeartbeat();
     applyRoleAccess(sessionUser);
 
-    await loadPatientData();
-    storedAccounts.clear();
-    await loadStaffData();
+    // Parallelize non-dependent data loads
+    await Promise.all([
+      loadPatientData().catch(e => console.error('Patient data failed:', e)),
+      loadStaffData().catch(e => console.error('Staff data failed:', e))
+    ]);
 
     if (!isAdminUser(sessionUser)) {
       stopAdminDashboardAutoRefresh();
@@ -4002,10 +4188,11 @@ async function initDashboardData() {
       return;
     }
 
-    // Do not force section visibility here; active section is managed by navigateToSection.
     startAdminDashboardAutoRefresh();
-    // Refresh counts after all data loaded
     renderDashboardInsights();
+  } catch (error) {
+    console.error('Dashboard data initialization failed:', error);
+    showToast('Some data could not be loaded. Please refresh.', 'error');
   } finally {
     dismissPagePreloader();
   }
@@ -4797,19 +4984,64 @@ async function refreshConsultationData() {
   renderConsultations();
 }
 
-async function createConsultationEntry({ patientId, symptoms, diagnosis, notes }) {
-  const cleanPatientId = String(patientId || '').trim();
-  const cleanSymptoms = String(symptoms || '').trim();
-  const cleanDiagnosis = String(diagnosis || '').trim();
-  const cleanNotes = String(notes || '').trim();
+function initConsultationTabs() {
+  const tabs = document.querySelectorAll('.modal-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetId = tab.dataset.tab;
+      
+      // Update tabs
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      
+      // Update content
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+      });
+      document.getElementById(targetId)?.classList.add('active');
+    });
+  });
 
+  const allergyInput = document.getElementById('consult-allergies');
+  const allergyBanner = document.getElementById('allergy-alert-banner');
+  const allergySummary = document.getElementById('allergy-summary');
+
+  if (allergyInput && allergyBanner && allergySummary) {
+    allergyInput.addEventListener('input', () => {
+      const val = allergyInput.value.trim();
+      if (val) {
+        allergyBanner.style.background = '#fff1f2';
+        allergyBanner.style.borderColor = '#fecdd3';
+        allergyBanner.style.color = '#9f1239';
+        allergySummary.textContent = `CRITICAL: ${val}`;
+      } else {
+        allergyBanner.style.background = '#f8fafc';
+        allergyBanner.style.borderColor = '#e2e8f0';
+        allergyBanner.style.color = '#64748b';
+        allergySummary.textContent = 'No known drug allergies reported yet.';
+      }
+    });
+  }
+}
+
+async function createConsultationEntry(payload) {
   if (isDemoMode || isApiMode) {
     const entry = {
       id: `C-${Date.now()}`,
-      patientId: cleanPatientId,
-      symptoms: cleanSymptoms,
-      diagnosis: cleanDiagnosis,
-      notes: cleanNotes,
+      patientId: payload.patientId,
+      symptoms: payload.symptoms || '',
+      diagnosis: payload.diagnosis,
+      notes: payload.notes || '',
+      hpi: payload.hpi,
+      pmh: payload.pmh,
+      allergies: payload.allergies,
+      immunization_status: payload.immunization,
+      social_history: payload.social,
+      physical_exam: payload.physical_exam,
+      differential_diagnosis: payload.differential,
+      lab_orders: payload.lab_orders,
+      follow_up_date: payload.followup,
       created_at: new Date().toISOString()
     };
     consultations.push(entry);
@@ -4822,28 +5054,109 @@ async function createConsultationEntry({ patientId, symptoms, diagnosis, notes }
     throw new Error('Unable to resolve the logged-in doctor account.');
   }
 
-  const payload = {
-    patient_identifier: cleanPatientId,
-    patient_citizen_id: resolveCitizenIdFromIdentifier(cleanPatientId),
+  const dbPayload = {
+    patient_identifier: String(payload.patientId || '').trim(),
+    patient_citizen_id: resolveCitizenIdFromIdentifier(payload.patientId),
     doctor_staff_id: doctorStaffId,
-    symptoms: cleanSymptoms || null,
-    diagnosis: cleanDiagnosis,
-    notes: cleanNotes || null,
+    symptoms: String(payload.symptoms || '').trim() || null,
+    diagnosis: String(payload.diagnosis || '').trim(),
+    notes: String(payload.notes || '').trim() || null,
+    hpi: String(payload.hpi || '').trim() || null,
+    pmh: String(payload.pmh || '').trim() || null,
+    allergies: String(payload.allergies || '').trim() || null,
+    immunization_status: String(payload.immunization || '').trim() || null,
+    social_history: String(payload.social || '').trim() || null,
+    physical_exam: payload.physical_exam || {},
+    differential_diagnosis: String(payload.differential || '').trim() || null,
+    lab_orders: String(payload.lab_orders || '').trim() || null,
+    follow_up_date: payload.followup || null,
     consulted_at: new Date().toISOString()
   };
 
   const { supabase } = await loadSupabaseModule();
   const { data, error } = await supabase
     .from('consultations')
-    .insert(payload)
-    .select('id,patient_identifier,symptoms,diagnosis,notes,consulted_at,created_at,doctor_staff_id')
+    .insert(dbPayload)
+    .select('*')
     .single();
 
   if (error) {
     throw new Error(error.message || 'Unable to save consultation.');
   }
 
+  // Create Lab Orders if specified
+  if (payload.lab_orders) {
+    const tests = payload.lab_orders.split(',').map(t => t.trim()).filter(t => t);
+    if (tests.length > 0) {
+      const orderRows = tests.map(test => ({
+        consultation_id: data.id,
+        patient_citizen_id: dbPayload.patient_citizen_id,
+        doctor_staff_id: doctorStaffId,
+        test_name: test,
+        status: 'Pending'
+      }));
+      await supabase.from('lab_orders').insert(orderRows);
+    }
+  }
+
   return mapConsultationRow(data);
+}
+
+async function initLabSection() {
+  const tbody = document.getElementById('lab-orders-tbody');
+  if (!tbody) return;
+
+  const { supabase } = await loadSupabaseModule();
+  const { data, error } = await supabase
+    .from('lab_orders')
+    .select('*, doctor:staff(firstname, surname), patient:citizens(firstname, surname)')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    tbody.innerHTML = '<tr><td colspan="6" class="table-cell">Error loading orders.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  if (data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="table-cell">No lab orders found.</td></tr>';
+    return;
+  }
+
+  data.forEach(order => {
+    const tr = document.createElement('tr');
+    tr.className = 'account-row';
+    const drName = order.doctor ? `Dr. ${order.doctor.firstname} ${order.doctor.surname}` : '—';
+    const ptName = order.patient ? `${order.patient.firstname} ${order.patient.surname}` : '—';
+    const statusClass = order.status === 'Completed' ? 'badge success' : 'badge warning';
+    
+    tr.innerHTML = `
+      <td class="table-cell">${ptName}</td>
+      <td class="table-cell"><strong>${order.test_name}</strong></td>
+      <td class="table-cell">${drName}</td>
+      <td class="table-cell"><span class="${statusClass}">${order.status}</span></td>
+      <td class="table-cell">${new Date(order.created_at).toLocaleDateString()}</td>
+      <td class="table-cell">
+        ${order.status === 'Pending' ? `<button class="btn small" onclick="updateLabOrderStatus('${order.id}', 'Completed')">Mark Done</button>` : '—'}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+window.updateLabOrderStatus = async function(orderId, status) {
+  const { supabase } = await loadSupabaseModule();
+  const { error } = await supabase
+    .from('lab_orders')
+    .update({ status, completed_at: new Date().toISOString() })
+    .eq('id', orderId);
+
+  if (error) {
+    showToast('Failed to update lab order.', 'error');
+  } else {
+    showToast('Lab order updated.', 'success');
+    initLabSection();
+  }
 }
 
 async function createPrescriptionEntry({ patientId, consultationDbId, items }) {
@@ -5867,24 +6180,55 @@ if (consultationForm) {
       showToast('Only doctors can create consultations.', 'warning');
       return;
     }
-    const patientId = document.getElementById('consult-patient-id').value.trim();
-    const symptoms = document.getElementById('consult-symptoms').value.trim();
-    const diagnosis = document.getElementById('consult-diagnosis').value.trim();
-    const notes = document.getElementById('consult-notes').value.trim();
-    if (!patientId || !diagnosis) { showToast('Patient ID and diagnosis required', 'warning'); return; }
+    const payload = {
+      patientId: document.getElementById('consult-patient-id').value.trim(),
+      diagnosis: document.getElementById('consult-diagnosis').value.trim(),
+      notes: document.getElementById('consult-notes').value.trim(),
+      hpi: document.getElementById('consult-hpi')?.value.trim(),
+      pmh: document.getElementById('consult-pmh')?.value.trim(),
+      allergies: document.getElementById('consult-allergies')?.value.trim(),
+      immunization: document.getElementById('consult-immunization')?.value.trim(),
+      social: document.getElementById('consult-social')?.value.trim(),
+      physical_exam: {
+        heent: document.getElementById('exam-heent')?.value.trim(),
+        chest: document.getElementById('exam-chest')?.value.trim(),
+        abdomen: document.getElementById('exam-abdomen')?.value.trim(),
+        extremities: document.getElementById('exam-extremities')?.value.trim(),
+        others: document.getElementById('exam-others')?.value.trim()
+      },
+      differential: document.getElementById('consult-differential')?.value.trim(),
+      lab_orders: document.getElementById('consult-lab-orders')?.value.trim(),
+      followup: document.getElementById('consult-followup')?.value || null
+    };
+
+    if (!payload.patientId || !payload.diagnosis) { 
+      showToast('Patient ID and diagnosis required', 'warning'); 
+      return; 
+    }
 
     try {
-      await createConsultationEntry({ patientId, symptoms, diagnosis, notes });
+      setLoading(e.submitter, true);
+      const result = await createConsultationEntry(payload);
       await refreshConsultationData();
+      
+      const isPrescribe = e.submitter.id === 'consult-prescribe-btn';
+      
       if (consultationModal) {
         closeConsultationModal();
       } else {
         consultationForm.reset();
       }
-      showToast('Consultation saved', 'success');
+      
+      showToast('Consultation finalized', 'success');
+
+      if (isPrescribe && result.id) {
+        openPrescriptionModalForPatient(payload.patientId, result.id);
+      }
     } catch (error) {
       console.error('Failed to save consultation:', error);
       showToast(error.message || 'Unable to save consultation.', 'error');
+    } finally {
+      setLoading(e.submitter, false);
     }
   });
 }
@@ -5915,15 +6259,35 @@ function openPrescriptionModalForPatient(patientId = '', consultationDbId = null
 
 function addPrescriptionLine() {
   const line = document.createElement('div');
-  line.className = 'field';
+  line.className = 'field prescription-line-item';
+  line.style.padding = '12px';
+  line.style.background = '#f8fafc';
+  line.style.borderRadius = '8px';
+  line.style.marginBottom = '12px';
+  line.style.border = '1px solid #e2e8f0';
+
   line.innerHTML = `
-    <label class="inputLabel">Medicine</label>
-    <select class="pres-med" required>
-      ${medicines.map(m => `<option value="${m.name}">${m.name} (${m.unit||''})</option>`).join('')}
-    </select>
-    <label class="inputLabel">Quantity</label>
-    <input type="number" class="pres-qty" value="1" min="1" required />
-    <button type="button" class="btn small" data-action="remove-line">Remove</button>
+    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; align-items: end;">
+      <div class="field" style="margin: 0;">
+        <label class="inputLabel">Medicine</label>
+        <select class="pres-med" style="width: 100%;" required>
+          ${medicines.map(m => `<option value="${m.name}">${m.name} (${m.unit||''})</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="margin: 0;">
+        <label class="inputLabel">Qty</label>
+        <input type="number" class="pres-qty" value="1" min="1" style="width: 100%;" required />
+      </div>
+      <div class="field" style="margin: 0;">
+        <label class="inputLabel">Dosage</label>
+        <input type="text" class="pres-dosage" placeholder="500mg" style="width: 100%;" />
+      </div>
+      <div class="field" style="margin: 0;">
+        <label class="inputLabel">Freq.</label>
+        <input type="text" class="pres-freq" placeholder="3x a day" style="width: 100%;" />
+      </div>
+      <button type="button" class="btn small btn-delete" data-action="remove-line" style="padding: 8px; margin-bottom: 2px;">×</button>
+    </div>
   `;
   prescriptionLines.appendChild(line);
   line.querySelector('[data-action="remove-line"]').addEventListener('click', () => line.remove());
@@ -5948,10 +6312,14 @@ if (prescriptionForm) {
     const items = [];
     const selects = prescriptionForm.querySelectorAll('.pres-med');
     const qtys = prescriptionForm.querySelectorAll('.pres-qty');
+    const dosages = prescriptionForm.querySelectorAll('.pres-dosage');
+    const freqs = prescriptionForm.querySelectorAll('.pres-freq');
     for (let i = 0; i < selects.length; i++) {
       const name = selects[i].value;
       const qty = Number(qtys[i].value) || 0;
-      if (name && qty > 0) items.push({ name, qty });
+      const dosage = dosages[i]?.value || '';
+      const frequency = freqs[i]?.value || '';
+      if (name && qty > 0) items.push({ name, qty, dosage, frequency });
     }
     if (items.length === 0) { showToast('Add at least one medicine', 'warning'); return; }
 
