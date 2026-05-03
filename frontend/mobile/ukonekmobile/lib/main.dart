@@ -119,17 +119,6 @@ class _RootHandlerState extends State<RootHandler> {
           valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28A745)),
         ),
       ),
-
-        // Consistent AppBar styling for clinical pages
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF1B5E20),
-          foregroundColor: Colors.white,
-          elevation: 0,
-        ),
-      ),
-
-      // Navigate to the main menu if logged in, otherwise show onboarding
-      home: session != null ? const uKonekMenuPage() : const OnboardingPage(),
     );
   }
 }

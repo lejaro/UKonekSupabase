@@ -556,8 +556,15 @@ select:focus {
     text-transform: uppercase;
 }
 
-.badge-waiting { background: #eef2ff; color: #4338ca; }
-.badge-on_call { background: #ecfdf5; color: #059669; }
+.badge-waiting {
+    background: #eef2ff;
+    color: #4338ca;
+}
+
+.badge-on_call {
+    background: #ecfdf5;
+    color: #059669;
+}
 
 .queue-modal-footer {
     padding: 20px 32px;
