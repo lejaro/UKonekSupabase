@@ -3021,3 +3021,105 @@ body.dashboard-loading {
     color: var(--muted);
     font-weight: 600;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOTIFICATION PANEL STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.notification-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px;
+    margin-bottom: 12px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+}
+
+.notification-item:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    box-shadow: var(--shadow-sm);
+}
+
+.notification-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.notification-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.notif-type {
+    display: inline-block;
+    padding: 6px 12px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.notif-type-announcement {
+    background: #3b82f6;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.notif-type-feedback {
+    background: #8b5cf6;
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.notification-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.4;
+    flex: 1;
+}
+
+.notif-meta {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.5;
+}
+
+.notification-dismiss {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+    color: #94a3b8;
+    padding: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    margin-left: 12px;
+}
+
+.notification-dismiss:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.notification-dismiss:active {
+    transform: scale(0.95);
+}

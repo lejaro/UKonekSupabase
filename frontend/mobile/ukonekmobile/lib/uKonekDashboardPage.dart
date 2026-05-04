@@ -165,12 +165,15 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     }
   }
 
-  void _showEPrescriptionModal(PrescriptionRecord record) {
-    final medName = record.medicineName;
-    final dosage = record.dosage.isNotEmpty ? record.dosage : 'As prescribed';
-    final instructions = record.instructions.isNotEmpty ? record.instructions : 'Follow doctor\'s verbal instructions.';
-    final expiryDate = DateFormat('MM/dd/yyyy').format(record.issuedAt.add(const Duration(days: 30)));
-    final doctorName = record.displayDoctorName;
+  void _showEPrescriptionModal(List<PrescriptionRecord> prescriptionItems) {
+    if (prescriptionItems.isEmpty) return;
+    
+    final firstItem = prescriptionItems.first;
+    final prescriptionCode = firstItem.prescriptionCode;
+    final doctorName = firstItem.displayDoctorName;
+    final issuedDate = DateFormat('MM/dd/yyyy').format(firstItem.issuedAt);
+    final expiryDate = DateFormat('MM/dd/yyyy').format(firstItem.issuedAt.add(const Duration(days: 30)));
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -220,20 +223,26 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     // ── Patient Info ───────────────────────────────────
                     const Text('PATIENT INFORMATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF28A745), letterSpacing: 1.2)),
                     const SizedBox(height: 8),
-                    // Concatenated name integration
                     Text("${widget.firstName} ${widget.middleName} ${widget.surname} ${widget.nameExtension}".trim(),
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B2E1E))),
                     const SizedBox(height: 4),
                     Text('ID: ${widget.citizenId}', style: const TextStyle(fontSize: 12, color: Color(0xFF637367))),
                     const SizedBox(height: 4),
                     Text('Doctor: $doctorName', style: const TextStyle(fontSize: 12, color: Color(0xFF637367), fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Text('Prescription: $prescriptionCode', style: const TextStyle(fontSize: 12, color: Color(0xFF637367), fontWeight: FontWeight.w600, fontFamily: 'monospace')),
 
                     const SizedBox(height: 24),
 
-                    // ── Rx Symbol & Medication ──────────────────────────
+                    // ── Rx Symbol & Medications ──────────────────────────
                     const Text('℞', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20), height: 1)),
                     const SizedBox(height: 8),
-                    Container(
+                    const Text('PRESCRIBED MEDICATIONS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF28A745), letterSpacing: 1.2)),
+                    const SizedBox(height: 12),
+                    
+                    // ── List all medicines in this prescription ──────────
+                    ...prescriptionItems.map((item) => Container(
+                      margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                           color: const Color(0xFFF8FCF9),
@@ -243,14 +252,69 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(medName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B2E1E))),
+                          Text(item.medicineName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B2E1E))),
                           const SizedBox(height: 4),
-                          Text(dosage, style: const TextStyle(fontSize: 14, color: Color(0xFF28A745), fontWeight: FontWeight.w600)),
+                          Text(item.dosage.isNotEmpty ? item.dosage : 'As prescribed', 
+                              style: const TextStyle(fontSize: 14, color: Color(0xFF28A745), fontWeight: FontWeight.w600)),
                           const SizedBox(height: 12),
                           const Divider(color: Color(0xFFD6E8DA)),
                           const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              const Icon(Icons.info_outline, size: 16, color: Color(0xFF637367)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  item.instructions.isNotEmpty ? item.instructions : 'Follow doctor\'s verbal instructions.',
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF637367), height: 1.4),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (item.frequency.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(Icons.schedule, size: 16, color: Color(0xFF637367)),
+                                const SizedBox(width: 6),
+                                Text('Frequency: ${item.frequency}', style: const TextStyle(fontSize: 12, color: Color(0xFF637367))),
+                              ],
+                            ),
+                          ],
+                          if (item.quantity > 0) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF637367)),
+                                const SizedBox(width: 6),
+                                Text('Quantity: ${item.quantityLabel}', style: const TextStyle(fontSize: 12, color: Color(0xFF637367))),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    )).toList(),
 
-                          // NEW: Expiration Date Row
+                    const SizedBox(height: 24),
+
+                    // ── Prescription Details ──────────────────────────
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FCF9),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFD6E8DA)),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('ISSUED DATE:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF637367))),
+                              Text(issuedDate, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1B2E1E))),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -262,11 +326,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                               ),
                             ],
                           ),
-
-                          const SizedBox(height: 16),
-                          const Text('INSTRUCTIONS:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF637367))),
-                          const SizedBox(height: 4),
-                          Text(instructions, style: const TextStyle(fontSize: 14, color: Color(0xFF1B2E1E), height: 1.4)),
                         ],
                       ),
                     ),
@@ -280,7 +339,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                           const Text('PHARMACY VERIFICATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF637367), letterSpacing: 1)),
                           const SizedBox(height: 12),
                           QrImageView(
-                            data: 'RX-${widget.citizenId}-$medName-$expiryDate',
+                            data: 'RX-$prescriptionCode-${widget.citizenId}',
                             version: QrVersions.auto,
                             size: 140.0,
                             eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF1B5E20)),
@@ -343,6 +402,20 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   _sectionHeader('Quick Actions'),
                   const SizedBox(height: 14),
                   _buildQuickActionGrid(),
+                  const SizedBox(height: 28),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _sectionHeader('My Prescriptions'),
+                      if (_prescribedMedicines.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrescriptionPage())),
+                          child: const Text('View All', style: TextStyle(color: _C.primaryMid, fontSize: 13, fontWeight: FontWeight.w600)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _buildMedicineCard(),
                 ],
               ),
             ),
@@ -678,7 +751,15 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         // NEW: View E-Prescription Button (Dynamic)
         _actionBtn('E-Prescription', Icons.receipt_long_rounded, const Color(0xFF6F42C1), () {
           if (_prescribedMedicines.isNotEmpty) {
-            _showEPrescriptionModal(_prescribedMedicines.first);
+            // Group prescriptions by prescription_id and get the latest one
+            final Map<int, List<PrescriptionRecord>> grouped = {};
+            for (var item in _prescribedMedicines) {
+              grouped.putIfAbsent(item.prescriptionId, () => []).add(item);
+            }
+            
+            // Get the latest prescription (first group since data is ordered by issued_at desc)
+            final latestPrescriptionItems = grouped.values.first.toList();
+            _showEPrescriptionModal(latestPrescriptionItems);
           } else {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const PrescriptionPage()));
           }

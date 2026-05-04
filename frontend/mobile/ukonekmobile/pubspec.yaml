@@ -21,10 +21,6 @@ dependencies:
   cupertino_icons: ^1.0.8
   intl: ^0.20.2
 
-# Override to avoid native assets issue on Windows with spaces in username
-dependency_overrides:
-  objective_c: 2.3.0  # Use older version without native assets
-
 dev_dependencies:
   flutter_test:
     sdk: flutter

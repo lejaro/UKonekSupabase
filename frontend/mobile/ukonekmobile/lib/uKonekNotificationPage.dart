@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class _C {
   static const primary    = Color(0xFF1B5E20);
@@ -26,29 +27,107 @@ class uKonekNotificationPage extends StatefulWidget {
 }
 
 class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
-  final List<Map<String, dynamic>> _notifications = [
-    {
-      'title': 'Appointment Reminder',
-      'body': 'You have a dental check-up scheduled for tomorrow at 9:00 AM.',
-      'time': '2 hours ago',
-      'type': 'reminder',
-      'isRead': false,
-    },
-    {
-      'title': 'Queue Update',
-      'body': 'Your number #042 is now being called at Station 1.',
-      'time': '5 hours ago',
-      'type': 'queue',
-      'isRead': true,
-    },
-    {
-      'title': 'New Medical Record',
-      'body': 'Your recent Dental Prophylaxis results are now available.',
-      'time': 'Yesterday',
-      'type': 'record',
-      'isRead': true,
-    },
-  ];
+  List<Map<String, dynamic>> _notifications = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final client = Supabase.instance.client;
+      
+      // Load announcements visible to citizens or all
+      final response = await client
+          .from('announcements')
+          .select('id, title, content, created_at, visibility')
+          .in_('visibility', ['all', 'citizen'])
+          .order('created_at', ascending: false)
+          .limit(50);
+
+      final List<Map<String, dynamic>> notifications = [];
+      
+      for (var announcement in response) {
+        notifications.add({
+          'id': announcement['id'],
+          'title': announcement['title'] ?? 'Announcement',
+          'body': announcement['content'] ?? '',
+          'time': _formatTime(announcement['created_at']),
+          'type': 'announcement',
+          'isRead': false,
+          'rawDate': announcement['created_at'],
+        });
+      }
+
+      setState(() {
+        _notifications = notifications;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading notifications: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String _formatTime(String? dateStr) {
+    if (dateStr == null) return 'Recently';
+    
+    try {
+      final date = DateTime.parse(dateStr);
+      final now = DateTime.now();
+      final diff = now.difference(date);
+
+      if (diff.inMinutes < 60) {
+        return '${diff.inMinutes} min ago';
+      } else if (diff.inHours < 24) {
+        return '${diff.inHours} hour${diff.inHours > 1 ? 's' : ''} ago';
+      } else if (diff.inDays == 1) {
+        return 'Yesterday';
+      } else if (diff.inDays < 7) {
+        return '${diff.inDays} days ago';
+      } else {
+        return '${date.month}/${date.day}/${date.year}';
+      }
+    } catch (e) {
+      return 'Recently';
+    }
+  }
+
+  void _dismissNotification(int index) {
+    setState(() {
+      _notifications.removeAt(index);
+    });
+  }
+
+  void _dismissAll() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear All Notifications'),
+        content: const Text('Are you sure you want to remove all notifications?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _notifications.clear();
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('Clear All', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,9 +137,11 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
         children: [
           _buildHeader(),
           Expanded(
-            child: _notifications.isEmpty
-                ? _buildEmptyState()
-                : _buildNotificationList(),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: _C.primaryMid))
+                : _notifications.isEmpty
+                    ? _buildEmptyState()
+                    : _buildNotificationList(),
           ),
         ],
       ),
@@ -99,17 +180,33 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Notifications',
+                    const Text('Notifications',
                         style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: -0.4)),
-                    SizedBox(height: 2),
-                    Text('Stay updated with your clinic visits', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    const SizedBox(height: 2),
+                    Text('${_notifications.length} announcement${_notifications.length != 1 ? 's' : ''}', 
+                        style: const TextStyle(color: Colors.white70, fontSize: 12)),
                   ],
                 ),
               ),
+              if (_notifications.isNotEmpty)
+                GestureDetector(
+                  onTap: _dismissAll,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'Clear All',
+                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -124,54 +221,90 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
       itemCount: _notifications.length,
       itemBuilder: (context, index) {
         final item = _notifications[index];
-        return _buildNotificationCard(item);
+        return _buildNotificationCard(item, index);
       },
     );
   }
 
-  Widget _buildNotificationCard(Map<String, dynamic> item) {
+  Widget _buildNotificationCard(Map<String, dynamic> item, int index) {
     bool isRead = item['isRead'];
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isRead ? _C.surface.withOpacity(0.7) : _C.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 10, offset: Offset(0, 4))],
-        border: isRead ? Border.all(color: _C.divider) : Border.all(color: _C.primaryMid.withOpacity(0.3), width: 1.5),
+    return Dismissible(
+      key: Key('notification_${item['id']}_$index'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        alignment: Alignment.centerRight,
+        child: const Icon(Icons.delete_outline, color: Colors.white, size: 28),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 48, height: 48,
-            decoration: BoxDecoration(
-              color: _getIconBgColor(item['type']),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(_getIcon(item['type']), color: _getIconColor(item['type']), size: 22),
+      onDismissed: (direction) {
+        _dismissNotification(index);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${item['title']} dismissed'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(item['title'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _C.textDark)),
-                    if (!isRead)
-                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFFFF5252), shape: BoxShape.circle)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(item['body'], style: const TextStyle(color: _C.textMuted, fontSize: 12, height: 1.4)),
-                const SizedBox(height: 8),
-                Text(item['time'], style: TextStyle(color: _C.textMuted.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.bold)),
-              ],
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isRead ? _C.surface.withOpacity(0.7) : _C.surface,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 10, offset: Offset(0, 4))],
+          border: isRead ? Border.all(color: _C.divider) : Border.all(color: _C.primaryMid.withOpacity(0.3), width: 1.5),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 48, height: 48,
+              decoration: BoxDecoration(
+                color: _getIconBgColor(item['type']),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(_getIcon(item['type']), color: _getIconColor(item['type']), size: 22),
             ),
-          ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(item['title'], 
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _C.textDark)),
+                      ),
+                      GestureDetector(
+                        onTap: () => _dismissNotification(index),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          child: const Icon(Icons.close, size: 18, color: _C.textMuted),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(item['body'], 
+                      style: const TextStyle(color: _C.textMuted, fontSize: 12, height: 1.4),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 8),
+                  Text(item['time'], 
+                      style: TextStyle(color: _C.textMuted.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -184,7 +317,10 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
           Icon(Icons.notifications_none_rounded, size: 64, color: _C.textMuted.withOpacity(0.3)),
           const SizedBox(height: 16),
           const Text('No notifications yet', style: TextStyle(color: _C.textDark, fontWeight: FontWeight.bold, fontSize: 16)),
-          const Text('We\'ll notify you when something comes up.', style: TextStyle(color: _C.textMuted, fontSize: 13)),
+          const SizedBox(height: 8),
+          const Text('We\'ll notify you when something comes up.', 
+              style: TextStyle(color: _C.textMuted, fontSize: 13),
+              textAlign: TextAlign.center),
         ],
       ),
     );
@@ -192,6 +328,7 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
 
   IconData _getIcon(String type) {
     switch (type) {
+      case 'announcement': return Icons.campaign_rounded;
       case 'reminder': return Icons.alarm_on_rounded;
       case 'queue': return Icons.confirmation_number_rounded;
       case 'record': return Icons.assignment_turned_in_rounded;
@@ -201,6 +338,7 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
 
   Color _getIconColor(String type) {
     switch (type) {
+      case 'announcement': return const Color(0xFF3B82F6);
       case 'reminder': return const Color(0xFFF59E0B);
       case 'queue': return _C.primaryMid;
       case 'record': return const Color(0xFF17A2B8);

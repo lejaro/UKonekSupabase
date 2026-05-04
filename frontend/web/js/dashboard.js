@@ -954,8 +954,8 @@ function getTodayNotifications() {
   const items = [];
 
   latestAnnouncementsList.forEach((announcement) => {
-    if (!isToday(announcement?.date)) return;
-    const parsedDate = parseDateValue(announcement?.date);
+    if (!isToday(announcement?.created_at)) return;
+    const parsedDate = parseDateValue(announcement?.created_at);
     const id = `announcement:${announcement?.id || announcement?.title || ''}:${parsedDate ? parsedDate.toISOString().slice(0, 10) : ''}`;
     items.push({
       id,
@@ -967,8 +967,8 @@ function getTodayNotifications() {
   });
 
   latestFeedbackList.forEach((feedback) => {
-    if (!isToday(feedback?.date)) return;
-    const parsedDate = parseDateValue(feedback?.date);
+    if (!isToday(feedback?.created_at)) return;
+    const parsedDate = parseDateValue(feedback?.created_at);
     const id = `feedback:${feedback?.id || feedback?.subject || ''}:${parsedDate ? parsedDate.toISOString().slice(0, 10) : ''}`;
     items.push({
       id,
@@ -1003,22 +1003,28 @@ function populateNotificationPanel() {
 
   items.forEach((item) => {
     const li = document.createElement('li');
-    li.style.display = 'flex';
-    li.style.justifyContent = 'space-between';
-    li.style.alignItems = 'flex-start';
+    li.className = 'notification-item';
+    li.setAttribute('data-type', item.type.toLowerCase());
 
     const body = document.createElement('div');
-    body.style.flex = '1';
+    body.className = 'notification-body';
+    
+    const header = document.createElement('div');
+    header.className = 'notification-header';
+    
     const typeLabel = document.createElement('span');
-    typeLabel.className = 'notif-type';
-    typeLabel.textContent = item.type;
-    body.appendChild(typeLabel);
+    typeLabel.className = `notif-type notif-type-${item.type.toLowerCase()}`;
+    typeLabel.textContent = item.type.toUpperCase();
+    header.appendChild(typeLabel);
 
-    const strong = document.createElement('strong');
-    strong.textContent = item.title;
-    body.appendChild(strong);
+    const title = document.createElement('span');
+    title.className = 'notification-title';
+    title.textContent = item.title;
+    header.appendChild(title);
+    
+    body.appendChild(header);
 
-    const meta = document.createElement('span');
+    const meta = document.createElement('div');
     meta.className = 'notif-meta';
     const timeStamp = item.date
       ? item.date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -1030,15 +1036,9 @@ function populateNotificationPanel() {
 
     const clearBtn = document.createElement('button');
     clearBtn.type = 'button';
+    clearBtn.className = 'notification-dismiss';
     clearBtn.textContent = '×';
     clearBtn.setAttribute('aria-label', 'Clear notification');
-    clearBtn.style.background = 'transparent';
-    clearBtn.style.border = 'none';
-    clearBtn.style.cursor = 'pointer';
-    clearBtn.style.fontSize = '18px';
-    clearBtn.style.lineHeight = '1';
-    clearBtn.style.color = '#8a93a0';
-    clearBtn.style.marginLeft = '10px';
     clearBtn.addEventListener('click', () => {
       dismissNotification(item.id);
       populateNotificationPanel();
@@ -3425,6 +3425,244 @@ let latestStaffList = [];
 let latestPatientsList = [];
 let latestAnnouncementsList = [];
 let latestFeedbackList = [];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEEDBACK DATA LOADING AND RENDERING
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function refreshFeedbackData() {
+  if (isDemoMode) {
+    // Demo mode: use mock data
+    latestFeedbackList = [
+      {
+        id: 1,
+        from_email: 'patient@example.com',
+        subject: 'Great service!',
+        message: 'The staff was very helpful and professional.',
+        rating: 5,
+        created_at: new Date().toISOString()
+      },
+      {
+        id: 2,
+        from_email: 'user@test.com',
+        subject: 'Long wait time',
+        message: 'Had to wait for 2 hours before being seen.',
+        rating: 3,
+        created_at: new Date(Date.now() - 86400000).toISOString()
+      }
+    ];
+    renderFeedbackTable();
+    return;
+  }
+
+  try {
+    const { supabase } = await loadSupabaseModule();
+    const { data, error } = await supabase
+      .from('feedbacks')
+      .select(`
+        id,
+        from_email,
+        subject,
+        message,
+        rating,
+        created_at,
+        citizen:citizens(id, firstname, surname, email)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error('Failed to load feedback:', error);
+      showToast('Failed to load feedback data.', 'error');
+      latestFeedbackList = [];
+      return;
+    }
+
+    latestFeedbackList = (data || []).map(item => ({
+      id: item.id,
+      from_email: item.from_email || item.citizen?.email || 'Anonymous',
+      subject: item.subject || 'No subject',
+      message: item.message || '',
+      rating: item.rating,
+      created_at: item.created_at,
+      citizen_name: item.citizen 
+        ? `${item.citizen.firstname || ''} ${item.citizen.surname || ''}`.trim() 
+        : null
+    }));
+
+    renderFeedbackTable();
+  } catch (err) {
+    console.error('Error loading feedback:', err);
+    latestFeedbackList = [];
+  }
+}
+
+function renderFeedbackTable() {
+  const tbody = document.getElementById('feedback-tbody');
+  if (!tbody) return;
+
+  if (!latestFeedbackList || latestFeedbackList.length === 0) {
+    tbody.innerHTML = `
+      <tr class="empty-row">
+        <td colspan="5" style="text-align:center; padding:40px; color:#64748b;">
+          No feedback received yet
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = latestFeedbackList.map(feedback => {
+    const rating = feedback.rating ? '⭐'.repeat(feedback.rating) : '—';
+    const fromName = feedback.citizen_name || feedback.from_email || 'Anonymous';
+    const date = formatDateTime(feedback.created_at);
+    const subject = escapeHtml(feedback.subject || 'No subject');
+    const message = escapeHtml(feedback.message || '').substring(0, 100);
+    const messagePreview = message.length >= 100 ? message + '...' : message;
+
+    return `
+      <tr>
+        <td><strong>${escapeHtml(fromName)}</strong></td>
+        <td>${subject}</td>
+        <td style="color:#64748b; font-size:13px;">${messagePreview}</td>
+        <td style="text-align:center;">${rating}</td>
+        <td style="color:#64748b; font-size:13px;">${date}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+async function refreshAnnouncementsData() {
+  if (isDemoMode) {
+    latestAnnouncementsList = [
+      {
+        id: 1,
+        title: 'Clinic Hours Update',
+        content: 'The clinic will be open from 8 AM to 5 PM starting next week.',
+        visibility: 'all',
+        created_at: new Date().toISOString()
+      },
+      {
+        id: 2,
+        title: 'New Services Available',
+        content: 'We now offer telemedicine consultations. Book your appointment today!',
+        visibility: 'citizen',
+        created_at: new Date(Date.now() - 86400000).toISOString()
+      }
+    ];
+    renderAnnouncementsTable();
+    return;
+  }
+
+  try {
+    const { supabase } = await loadSupabaseModule();
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('Failed to load announcements:', error);
+      latestAnnouncementsList = [];
+      renderAnnouncementsTable();
+      return;
+    }
+
+    latestAnnouncementsList = data || [];
+    renderAnnouncementsTable();
+  } catch (err) {
+    console.error('Error loading announcements:', err);
+    latestAnnouncementsList = [];
+    renderAnnouncementsTable();
+  }
+}
+
+function renderAnnouncementsTable() {
+  const tbody = document.getElementById('announcements-tbody');
+  if (!tbody) return;
+
+  if (!latestAnnouncementsList || latestAnnouncementsList.length === 0) {
+    tbody.innerHTML = `
+      <tr class="empty-row">
+        <td colspan="4" style="text-align:center; padding:40px; color:#64748b;">
+          No announcements yet
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = latestAnnouncementsList.map(announcement => {
+    const title = escapeHtml(announcement.title || 'Untitled');
+    const content = escapeHtml(announcement.content || '').substring(0, 150);
+    const contentPreview = content.length >= 150 ? content + '...' : content;
+    const visibility = announcement.visibility || 'all';
+    const visibilityBadge = getVisibilityBadge(visibility);
+    const date = formatDateTime(announcement.created_at);
+
+    return `
+      <tr>
+        <td><strong>${title}</strong></td>
+        <td style="color:#64748b; font-size:13px;">${contentPreview}</td>
+        <td style="text-align:center;">${visibilityBadge}</td>
+        <td style="color:#64748b; font-size:13px;">${date}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function getVisibilityBadge(visibility) {
+  const badges = {
+    'all': '<span class="badge" style="background:#e0f2fe; color:#0369a1; font-size:11px; padding:4px 10px;">All</span>',
+    'staff': '<span class="badge" style="background:#fef3c7; color:#92400e; font-size:11px; padding:4px 10px;">Staff</span>',
+    'citizen': '<span class="badge" style="background:#dcfce7; color:#166534; font-size:11px; padding:4px 10px;">Citizens</span>'
+  };
+  return badges[visibility] || badges['all'];
+}
+
+async function createAnnouncementEntry({ title, content, visibility }) {
+  if (isDemoMode) {
+    const newAnnouncement = {
+      id: Date.now(),
+      title,
+      content,
+      visibility,
+      created_at: new Date().toISOString()
+    };
+    latestAnnouncementsList.unshift(newAnnouncement);
+    renderAnnouncementsTable();
+    return;
+  }
+
+  try {
+    const { supabase } = await loadSupabaseModule();
+    const { data, error } = await supabase
+      .from('announcements')
+      .insert([{
+        title: title.trim(),
+        content: content.trim(),
+        visibility: visibility || 'all'
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message || 'Failed to create announcement');
+    }
+
+    return data;
+  } catch (err) {
+    console.error('Error creating announcement:', err);
+    throw err;
+  }
+}
 
 function formatDateTime(value) {
   if (!value) return '—';
@@ -6752,4 +6990,406 @@ if (consultAddPrescBtn && prescriptionModal) {
     const name = consultationForm?.dataset?.patientName || '';
     openPrescriptionModalForPatient(pid, null, name);
   });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHARMACY DISPENSING MODULE
+// ═══════════════════════════════════════════════════════════════════════════
+
+let currentPrescriptionData = null;
+let currentMedicineItems = [];
+
+// Initialize pharmacy module
+function initPharmacyModule() {
+  const searchBtn = document.getElementById('pharmacy-search-btn');
+  const clearBtn = document.getElementById('pharmacy-clear-btn');
+  const searchInput = document.getElementById('pharmacy-prescription-search');
+  const dispenseSelectedBtn = document.getElementById('pharmacy-dispense-selected-btn');
+  const dispenseAllBtn = document.getElementById('pharmacy-dispense-all-btn');
+  const cancelBtn = document.getElementById('pharmacy-cancel-prescription-btn');
+  const selectAllCheckbox = document.getElementById('pharmacy-select-all');
+
+  if (searchBtn) {
+    searchBtn.addEventListener('click', searchPrescription);
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', clearPharmacySearch);
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        searchPrescription();
+      }
+    });
+  }
+
+  if (dispenseSelectedBtn) {
+    dispenseSelectedBtn.addEventListener('click', dispenseSelectedMedicines);
+  }
+
+  if (dispenseAllBtn) {
+    dispenseAllBtn.addEventListener('click', dispenseAllMedicines);
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', cancelPrescription);
+  }
+
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', (e) => {
+      const checkboxes = document.querySelectorAll('.pharmacy-medicine-checkbox');
+      checkboxes.forEach(cb => {
+        if (!cb.disabled) {
+          cb.checked = e.target.checked;
+        }
+      });
+    });
+  }
+}
+
+async function searchPrescription() {
+  const searchInput = document.getElementById('pharmacy-prescription-search');
+  const prescriptionCode = searchInput.value.trim();
+
+  if (!prescriptionCode) {
+    showToast('Please enter a prescription code', 'error');
+    return;
+  }
+
+  try {
+    const { supabase } = await loadSupabaseModule();
+
+    // Search for prescription header
+    const { data: prescriptionData, error: prescriptionError } = await supabase
+      .from('prescription_headers')
+      .select(`
+        id,
+        prescription_code,
+        dispensing_status,
+        issued_at,
+        dispensed_at,
+        consultation_id,
+        patient_identifier,
+        doctor_staff_id,
+        doctor:staff(firstname, surname)
+      `)
+      .eq('prescription_code', prescriptionCode)
+      .single();
+
+    if (prescriptionError || !prescriptionData) {
+      showToast('Prescription not found', 'error');
+      return;
+    }
+
+    // Get patient information
+    let patientName = 'Unknown Patient';
+    let patientId = prescriptionData.patient_identifier || '-';
+
+    if (prescriptionData.consultation_id) {
+      const { data: consultationData } = await supabase
+        .from('consultations')
+        .select('patient_citizen_id, patient:citizens(firstname, surname)')
+        .eq('id', prescriptionData.consultation_id)
+        .single();
+
+      if (consultationData && consultationData.patient) {
+        patientName = `${consultationData.patient.firstname} ${consultationData.patient.surname}`;
+        patientId = consultationData.patient_citizen_id;
+      }
+    } else if (prescriptionData.patient_identifier) {
+      // Try to get patient by ID
+      const { data: citizenData } = await supabase
+        .from('citizens')
+        .select('firstname, surname')
+        .eq('id', prescriptionData.patient_identifier)
+        .single();
+
+      if (citizenData) {
+        patientName = `${citizenData.firstname} ${citizenData.surname}`;
+      }
+    }
+
+    // Get prescription items
+    const { data: itemsData, error: itemsError } = await supabase
+      .from('prescription_items')
+      .select('*')
+      .eq('prescription_id', prescriptionData.id);
+
+    if (itemsError) {
+      showToast('Error loading prescription items', 'error');
+      return;
+    }
+
+    // Get current stock for each medicine
+    const medicineNames = itemsData.map(item => item.medicine_name);
+    const { data: stockData } = await supabase
+      .from('medicines')
+      .select('medicine_name, stock_quantity')
+      .in('medicine_name', medicineNames);
+
+    const stockMap = {};
+    if (stockData) {
+      stockData.forEach(item => {
+        stockMap[item.medicine_name] = item.stock_quantity;
+      });
+    }
+
+    // Store current prescription data
+    currentPrescriptionData = {
+      ...prescriptionData,
+      patientName,
+      patientId,
+      doctorName: prescriptionData.doctor 
+        ? `Dr. ${prescriptionData.doctor.firstname} ${prescriptionData.doctor.surname}`
+        : 'Unknown Doctor'
+    };
+
+    currentMedicineItems = itemsData.map(item => ({
+      ...item,
+      currentStock: stockMap[item.medicine_name] || 0
+    }));
+
+    // Display the prescription
+    displayPrescriptionData();
+
+  } catch (error) {
+    console.error('Error searching prescription:', error);
+    showToast('Error searching prescription', 'error');
+  }
+}
+
+function displayPrescriptionData() {
+  // Show results container, hide empty state
+  document.getElementById('pharmacy-results-container').classList.remove('hidden');
+  document.getElementById('pharmacy-empty-state').classList.add('hidden');
+
+  // Populate patient card
+  document.getElementById('pharmacy-patient-name').textContent = currentPrescriptionData.patientName;
+  document.getElementById('pharmacy-patient-id').textContent = currentPrescriptionData.patientId;
+  document.getElementById('pharmacy-prescription-code').textContent = currentPrescriptionData.prescription_code;
+  document.getElementById('pharmacy-doctor-name').textContent = currentPrescriptionData.doctorName;
+
+  const issuedDate = new Date(currentPrescriptionData.issued_at).toLocaleDateString();
+  const expiryDate = new Date(new Date(currentPrescriptionData.issued_at).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString();
+  document.getElementById('pharmacy-issued-date').textContent = issuedDate;
+  document.getElementById('pharmacy-expiry-date').textContent = expiryDate;
+
+  // Update status badge
+  const statusBadge = document.getElementById('pharmacy-status-badge');
+  const status = currentPrescriptionData.dispensing_status;
+  
+  if (status === 'dispensed') {
+    statusBadge.textContent = 'Dispensed';
+    statusBadge.style.background = '#dcfce7';
+    statusBadge.style.color = '#166534';
+  } else if (status === 'cancelled') {
+    statusBadge.textContent = 'Cancelled';
+    statusBadge.style.background = '#fee2e2';
+    statusBadge.style.color = '#991b1b';
+  } else {
+    statusBadge.textContent = 'Pending';
+    statusBadge.style.background = '#fef3c7';
+    statusBadge.style.color = '#92400e';
+  }
+
+  // Populate medicines table
+  const tbody = document.getElementById('pharmacy-medicines-tbody');
+  tbody.innerHTML = '';
+
+  let hasInsufficientStock = false;
+
+  currentMedicineItems.forEach((item, index) => {
+    const hasStock = item.currentStock >= item.quantity;
+    if (!hasStock) hasInsufficientStock = true;
+
+    const isDispensed = status === 'dispensed';
+    const isCancelled = status === 'cancelled';
+    const canSelect = !isDispensed && !isCancelled && hasStock;
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>
+        <input 
+          type="checkbox" 
+          class="pharmacy-medicine-checkbox" 
+          data-index="${index}"
+          ${canSelect ? '' : 'disabled'}
+          style="width: 18px; height: 18px; cursor: ${canSelect ? 'pointer' : 'not-allowed'};">
+      </td>
+      <td><strong>${escapeHtml(item.medicine_name)}</strong></td>
+      <td>${escapeHtml(item.dosage || '-')}</td>
+      <td>${item.quantity} ${escapeHtml(item.unit || '')}</td>
+      <td>
+        <span style="color: ${hasStock ? '#16a34a' : '#dc2626'}; font-weight: 600;">
+          ${item.currentStock} ${escapeHtml(item.unit || '')}
+        </span>
+      </td>
+      <td style="max-width: 200px; font-size: 12px; color: #64748b;">
+        ${escapeHtml(item.instructions || '-')}
+      </td>
+      <td>
+        ${hasStock 
+          ? '<span style="color: #16a34a; font-weight: 600;">✓ Available</span>' 
+          : '<span style="color: #dc2626; font-weight: 600;">✗ Insufficient</span>'}
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  // Show/hide warning message
+  const warningDiv = document.getElementById('pharmacy-warning-message');
+  if (hasInsufficientStock && status === 'pending') {
+    warningDiv.classList.remove('hidden');
+  } else {
+    warningDiv.classList.add('hidden');
+  }
+
+  // Disable buttons if already dispensed or cancelled
+  const dispenseSelectedBtn = document.getElementById('pharmacy-dispense-selected-btn');
+  const dispenseAllBtn = document.getElementById('pharmacy-dispense-all-btn');
+  const cancelBtn = document.getElementById('pharmacy-cancel-prescription-btn');
+
+  if (isDispensed || isCancelled) {
+    dispenseSelectedBtn.disabled = true;
+    dispenseAllBtn.disabled = true;
+    cancelBtn.disabled = true;
+    dispenseSelectedBtn.style.opacity = '0.5';
+    dispenseAllBtn.style.opacity = '0.5';
+    cancelBtn.style.opacity = '0.5';
+  } else {
+    dispenseSelectedBtn.disabled = false;
+    dispenseAllBtn.disabled = false;
+    cancelBtn.disabled = false;
+    dispenseSelectedBtn.style.opacity = '1';
+    dispenseAllBtn.style.opacity = '1';
+    cancelBtn.style.opacity = '1';
+  }
+}
+
+async function dispenseSelectedMedicines() {
+  const checkboxes = document.querySelectorAll('.pharmacy-medicine-checkbox:checked:not([disabled])');
+  
+  if (checkboxes.length === 0) {
+    showToast('Please select at least one medicine to dispense', 'warning');
+    return;
+  }
+
+  const selectedItems = Array.from(checkboxes).map(cb => {
+    const index = parseInt(cb.dataset.index);
+    return currentMedicineItems[index];
+  });
+
+  await dispenseMedicines(selectedItems, false);
+}
+
+async function dispenseAllMedicines() {
+  const availableItems = currentMedicineItems.filter(item => item.currentStock >= item.quantity);
+  
+  if (availableItems.length === 0) {
+    showToast('No medicines available to dispense', 'error');
+    return;
+  }
+
+  await dispenseMedicines(availableItems, true);
+}
+
+async function dispenseMedicines(items, isFullDispense) {
+  if (!confirm(`Are you sure you want to dispense ${items.length} medicine(s)?`)) {
+    return;
+  }
+
+  try {
+    const { supabase } = await loadSupabaseModule();
+
+    // Update medicine stock
+    for (const item of items) {
+      const newStock = item.currentStock - item.quantity;
+      
+      const { error: stockError } = await supabase
+        .from('medicines')
+        .update({ stock_quantity: newStock })
+        .eq('medicine_name', item.medicine_name);
+
+      if (stockError) {
+        console.error('Error updating stock:', stockError);
+        showToast(`Error updating stock for ${item.medicine_name}`, 'error');
+        return;
+      }
+    }
+
+    // Update prescription status if all items dispensed
+    if (isFullDispense || items.length === currentMedicineItems.length) {
+      const { error: prescriptionError } = await supabase
+        .from('prescription_headers')
+        .update({ 
+          dispensing_status: 'dispensed',
+          dispensed_at: new Date().toISOString()
+        })
+        .eq('id', currentPrescriptionData.id);
+
+      if (prescriptionError) {
+        console.error('Error updating prescription:', prescriptionError);
+      }
+
+      currentPrescriptionData.dispensing_status = 'dispensed';
+      currentPrescriptionData.dispensed_at = new Date().toISOString();
+    }
+
+    showToast(`Successfully dispensed ${items.length} medicine(s)`, 'success');
+    
+    // Refresh the display
+    await searchPrescription();
+
+  } catch (error) {
+    console.error('Error dispensing medicines:', error);
+    showToast('Error dispensing medicines', 'error');
+  }
+}
+
+async function cancelPrescription() {
+  if (!confirm('Are you sure you want to cancel this prescription? This action cannot be undone.')) {
+    return;
+  }
+
+  try {
+    const { supabase } = await loadSupabaseModule();
+
+    const { error } = await supabase
+      .from('prescription_headers')
+      .update({ dispensing_status: 'cancelled' })
+      .eq('id', currentPrescriptionData.id);
+
+    if (error) {
+      console.error('Error cancelling prescription:', error);
+      showToast('Error cancelling prescription', 'error');
+      return;
+    }
+
+    showToast('Prescription cancelled successfully', 'success');
+    currentPrescriptionData.dispensing_status = 'cancelled';
+    displayPrescriptionData();
+
+  } catch (error) {
+    console.error('Error cancelling prescription:', error);
+    showToast('Error cancelling prescription', 'error');
+  }
+}
+
+function clearPharmacySearch() {
+  document.getElementById('pharmacy-prescription-search').value = '';
+  document.getElementById('pharmacy-results-container').classList.add('hidden');
+  document.getElementById('pharmacy-empty-state').classList.remove('hidden');
+  document.getElementById('pharmacy-select-all').checked = false;
+  currentPrescriptionData = null;
+  currentMedicineItems = [];
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initPharmacyModule);
+} else {
+  initPharmacyModule();
 }
