@@ -33,23 +33,23 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
 
   void _subscribeAvailabilityUpdates() {
     final client = Supabase.instance.client;
+
     _availabilityChannel = client
         .channel('staff-availability')
-        .on(
-          RealtimeListenTypes.postgresChanges,
-          ChannelFilter(
-            event: '*',
-            schema: 'public',
-            table: 'staff',
-          ),
-          (payload, [ref]) {
-            final record = payload.newRecord;
-            if (record == null) return;
-            final role = (record['role'] ?? '').toString().toLowerCase();
-            if (role != 'doctor' && role != 'nurse') return;
-            _loadSchedules();
-          },
-        )
+        .onPostgresChanges(
+      event: PostgresChangeEvent.all, // Replaces event: '*'
+      schema: 'public',
+      table: 'staff',
+      callback: (payload) {
+        final record = payload.newRecord;
+        if (record.isEmpty) return; // In 2.x, newRecord is often a Map
+
+        final role = (record['role'] ?? '').toString().toLowerCase();
+        if (role != 'doctor' && role != 'nurse') return;
+
+        _loadSchedules();
+      },
+    )
         .subscribe();
   }
 
