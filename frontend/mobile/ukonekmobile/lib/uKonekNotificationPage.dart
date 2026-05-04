@@ -46,7 +46,7 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
       final response = await client
           .from('announcements')
           .select('id, title, content, created_at, visibility')
-          .in_('visibility', ['all', 'citizen'])
+          .inFilter('visibility', ['all', 'citizen'])
           .order('created_at', ascending: false)
           .limit(50);
 
