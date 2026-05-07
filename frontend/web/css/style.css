@@ -1217,8 +1217,8 @@ select:focus {
 }
 
 .sidebar.collapsed {
-    flex-basis: 72px;
-    width: 72px;
+    flex-basis: 90px;
+    width: 90px;
 }
 
 .sidebar .brand-row {
@@ -1510,7 +1510,7 @@ select:focus {
     margin-left: auto;
     font-size: 14px;
     opacity: 0.85;
-    transform: rotate(90deg);
+    transform: rotate(-90deg);
     transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
         opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -1591,8 +1591,8 @@ select:focus {
 }
 
 .sidebar.collapsed~.mainview {
-    margin-left: 92px;
-    width: calc(100% - 102px);
+    margin-left: 110px;
+    width: calc(100% - 120px);
 }
 
 .topbar {
@@ -1726,12 +1726,20 @@ select:focus {
     background: linear-gradient(145deg, #2563eb, #1d4ed8);
 }
 
+.role-logo-admin {
+    background: linear-gradient(145deg, #dc2626, #b91c1c);
+}
+
 .role-logo-doctor {
     background: linear-gradient(145deg, #0ea5e9, #0284c7);
 }
 
 .role-logo-nurse {
     background: linear-gradient(145deg, #10b981, #059669);
+}
+
+.role-logo-pharmacist {
+    background: linear-gradient(145deg, #8b5cf6, #7c3aed);
 }
 
 .role-logo-staff {
@@ -3122,4 +3130,34 @@ body.dashboard-loading {
 
 .notification-dismiss:active {
     transform: scale(0.95);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AVAILABILITY SECTION - ALIGNED COLUMNS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#schedule-section .accounts-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+#schedule-section .accounts-table th:nth-child(1),
+#schedule-section .accounts-table td:nth-child(1) {
+    width: 25%;
+}
+
+#schedule-section .accounts-table th:nth-child(2),
+#schedule-section .accounts-table td:nth-child(2) {
+    width: 25%;
+}
+
+#schedule-section .accounts-table th:nth-child(3),
+#schedule-section .accounts-table td:nth-child(3) {
+    width: 15%;
+}
+
+#schedule-section .accounts-table th:nth-child(4),
+#schedule-section .accounts-table td:nth-child(4) {
+    width: 35%;
 }

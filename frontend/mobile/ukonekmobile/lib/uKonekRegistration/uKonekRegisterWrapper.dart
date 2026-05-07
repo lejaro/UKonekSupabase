@@ -27,7 +27,6 @@ class _uKonekRegisterWrapperState
   final ageController            = TextEditingController();
   final contactController        = TextEditingController();
   final emailController          = TextEditingController();
-  final houseNumberController    = TextEditingController();
   final streetNameController     = TextEditingController();
   final barangayController       =
   TextEditingController();
@@ -36,7 +35,7 @@ class _uKonekRegisterWrapperState
   final relationController         = TextEditingController();
 
   DateTime? selectedDate;
-  String    selectedSex  = 'Male';
+  String    selectedSex  = '';
 
   // ── Updated Medical Green Color Palette ────────────────────────
   static const _primary   = Color(0xFF28A745); // Health Green[cite: 1]
@@ -89,6 +88,8 @@ class _uKonekRegisterWrapperState
       if (_step1Key.currentState!.validate()) {
         if (selectedDate == null) {
           _snackBar('Please select your date of birth');
+        } else if (selectedSex.isEmpty) {
+          _snackBar('Please select your sex');
         } else {
           canProceed = true;
         }
@@ -97,6 +98,11 @@ class _uKonekRegisterWrapperState
       }
     } else if (_currentStep == 1) {
       if (_step2Key.currentState!.validate()) {
+        // Check if emergency contact is same as registrant contact
+        if (contactController.text.trim() == emergencyContactController.text.trim()) {
+          _snackBar('Emergency contact number must be different from your contact number');
+          return;
+        }
         _navigateToPreview();
       } else {
         _snackBar('Please complete all required fields');
@@ -180,7 +186,6 @@ class _uKonekRegisterWrapperState
                 formKey:  _step2Key,
                 contact:  contactController,
                 email:    emailController,
-                houseNo:  houseNumberController,
                 street:   streetNameController,
                 brgy:     barangayController,
                 eName:    emergencyNameController,

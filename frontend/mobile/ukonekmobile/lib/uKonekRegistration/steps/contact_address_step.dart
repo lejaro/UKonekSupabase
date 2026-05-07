@@ -5,7 +5,6 @@
                                                       final GlobalKey<FormState> formKey;
                                                       final TextEditingController contact;
                                                       final TextEditingController email;
-                                                      final TextEditingController houseNo;
                                                       final TextEditingController street;
                                                       final TextEditingController brgy;
                                                       final TextEditingController eName;
@@ -17,7 +16,6 @@
                                                         required this.formKey,
                                                         required this.contact,
                                                         required this.email,
-                                                        required this.houseNo,
                                                         required this.street,
                                                         required this.brgy,
                                                         required this.eName,
@@ -73,20 +71,8 @@
                                                                     ),
                                                                     _sectionSubLabel('Home Address'),
                                                                     const SizedBox(height: 12),
-                                                                    Row(
-                                                                      children: [
-                                                                        Expanded(
-                                                                          child: _inputField(
-                                                                              houseNo, 'House #', Icons.home_outlined),
-                                                                        ),
-                                                                        const SizedBox(width: 12),
-                                                                        Expanded(
-                                                                          flex: 2,
-                                                                          child: _inputField(
-                                                                              street, 'Street Name', Icons.signpost_outlined),
-                                                                        ),
-                                                                      ],
-                                                                    ),
+                                                                    _inputField(
+                                                                        street, 'Street Name / House Number', Icons.signpost_outlined),
                                                                     _barangayDropdown(), // Integrated Valenzuela Barangay Dropdown[cite: 1]
                                                                   ],
                                                                 ),
@@ -98,7 +84,16 @@
                                                                   title: 'Emergency Contact',
                                                                   children: [
                                                                     _inputField(eName, 'Full Name', Icons.person_add_alt_1_outlined),
-                                                                    _phoneField(eContact, 'Emergency Number'),
+                                                                    _phoneField(
+                                                                      eContact, 
+                                                                      'Emergency Number',
+                                                                      customValidator: (v) {
+                                                                        if (v != null && v == contact.text.trim()) {
+                                                                          return 'Must be different from your number';
+                                                                        }
+                                                                        return null;
+                                                                      },
+                                                                    ),
                                                                     _relationshipDropdown(), // Integrated Relationship Dropdown[cite: 1]
                                                                   ],
                                                                 ),
@@ -169,7 +164,7 @@
                                                         ),
                                                       );
                                                     
-                                                      Widget _phoneField(TextEditingController ctrl, String label) {
+                                                      Widget _phoneField(TextEditingController ctrl, String label, {String? Function(String?)? customValidator}) {
                                                         return Padding(
                                                           padding: const EdgeInsets.only(bottom: 16),
                                                           child: TextFormField(
@@ -212,9 +207,15 @@
                                                                 fontWeight: FontWeight.normal,
                                                               ),
                                                             ),
-                                                            validator: (v) => (v == null || v.length != 10)
-                                                                ? 'Enter 10-digit number'
-                                                                : null,
+                                                            validator: (v) {
+                                                              if (v == null || v.length != 10) {
+                                                                return 'Enter 10-digit number';
+                                                              }
+                                                              if (customValidator != null) {
+                                                                return customValidator(v);
+                                                              }
+                                                              return null;
+                                                            },
                                                           ),
                                                         );
                                                       }

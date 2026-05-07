@@ -663,7 +663,7 @@ function getRoleLogoConfig(roleValue) {
   const key = String(roleValue || '').trim().toLowerCase();
   switch (key) {
     case 'admin':
-      return { className: 'role-logo-doctor', label: 'Doctor Dashboard', icon: 'stethoscope' };
+      return { className: 'role-logo-admin', label: 'Admin Dashboard', icon: 'shield' };
     case 'doctor':
       return { className: 'role-logo-doctor', label: 'Doctor', icon: 'stethoscope' };
     case 'nurse':
@@ -731,7 +731,7 @@ function updateNonAdminWorkspace(user) {
 
   const subtitleNode = document.getElementById('non-admin-subtitle');
   if (subtitleNode) {
-    subtitleNode.textContent = role === 'doctor'
+    subtitleNode.textContent = (role === 'doctor' || role === 'admin')
       ? 'Track your daily clinical tasks and coordinate with the lead doctor for account-related requests.'
       : 'Track your daily operations and coordinate with the lead nurse for account-related requests.';
   }
@@ -1320,7 +1320,7 @@ if (registerForm) {
     const password = document.getElementById('reg-password').value;
     const confirmPassword = document.getElementById('reg-confirm-password').value;
     const role = document.getElementById('reg-role').value;
-    const allowedRegRoles = ['doctor', 'nurse', 'pharmacist'];
+    const allowedRegRoles = ['admin', 'doctor', 'nurse', 'pharmacist'];
 
     const err = document.getElementById('register-error');
     const success = document.getElementById('register-success');
@@ -1809,14 +1809,13 @@ function renderScheduleDoctors(staffList, user) {
     }
     list.forEach((staff) => {
       const tr = document.createElement('tr');
-      const roleLabel = toTitleCase(staff?.role || 'Staff');
       const statusText = getAvailabilityStatusText(staff);
       const statusClass = getAvailabilityBadgeClass(staff);
       const availabilityStatus = normalizeAvailabilityStatus(
         staff?.availability_status || staff?.availabilityStatus
       );
       tr.innerHTML = `
-        <td class="table-cell">${getDoctorDisplayName(staff)} (${roleLabel})</td>
+        <td class="table-cell">${getDoctorDisplayName(staff)}</td>
         <td class="table-cell">${staff.email || '—'}</td>
         <td class="table-cell"><span class="${statusClass}">${statusText}</span></td>
         <td class="table-cell"></td>
@@ -4812,9 +4811,8 @@ function fillAccountEditForm(user) {
   if (modalEditEmployeeId) modalEditEmployeeId.value = String(user.employee_id || '').trim();
   if (modalEditRole) {
     let roleValue = String(user.role || 'nurse').trim().toLowerCase();
-    if (roleValue === 'admin') roleValue = 'doctor';
     if (roleValue === 'staff') roleValue = 'nurse';
-    const allowed = ['doctor', 'nurse', 'pharmacist'];
+    const allowed = ['admin', 'doctor', 'nurse', 'pharmacist'];
     modalEditRole.value = allowed.includes(roleValue) ? roleValue : 'nurse';
   }
   if (modalEditBirthday) modalEditBirthday.value = normalizeDateInput(user.birthday);

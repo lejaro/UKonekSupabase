@@ -921,7 +921,7 @@
             <table class="accounts-table compact-table">
               <thead>
                 <tr class="table-header-row">
-                  <th class="table-header-cell">Doctor Name</th>
+                  <th class="table-header-cell">Name</th>
                   <th class="table-header-cell">Email</th>
                   <th class="table-header-cell">Availability</th>
                   <th class="table-header-cell">Actions</th>
@@ -938,7 +938,7 @@
             <table class="accounts-table compact-table">
               <thead>
                 <tr class="table-header-row">
-                  <th class="table-header-cell">Nurse Name</th>
+                  <th class="table-header-cell">Name</th>
                   <th class="table-header-cell">Email</th>
                   <th class="table-header-cell">Availability</th>
                   <th class="table-header-cell">Actions</th>
@@ -966,6 +966,7 @@
               <input id="staff-finder-input" class="search-input" type="search" placeholder="Find staff by name, role, or employee ID" aria-label="Find staff" />
               <select id="role-filter" class="search-input" aria-label="Filter staff by role">
                 <option value="">All roles</option>
+                <option value="admin">Admin</option>
                 <option value="doctor">Doctor</option>
                 <option value="nurse">Nurse</option>
                 <option value="pharmacist">Pharmacist</option>
@@ -1059,6 +1060,7 @@
               <label class="inputLabel" for="reg-role">Role</label>
               <select id="reg-role" required>
                 <option value="">Select role</option>
+                <option value="admin">Admin</option>
                 <option value="doctor">Doctor</option>
                 <option value="nurse">Nurse</option>
                 <option value="pharmacist">Pharmacist</option>
@@ -1939,9 +1941,10 @@
             <div class="modal-group">
               <label class="modal-label" for="modal-edit-role">Role</label>
               <select id="modal-edit-role" class="search-input" required>
+                <option value="admin">Admin</option>
                 <option value="doctor">Doctor</option>
                 <option value="nurse">Nurse</option>
-                <option value="specialist">Specialist</option>
+                <option value="pharmacist">Pharmacist</option>
               </select>
             </div>
             <div class="modal-group">

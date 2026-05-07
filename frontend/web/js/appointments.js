@@ -149,18 +149,45 @@ const appointments = (() => {
   const setupTicketModalHandlers = () => {
     const modal = document.getElementById('queue-ticket-detail-modal');
     const closeBtn = document.getElementById('queue-ticket-detail-close');
-
-    closeBtn?.addEventListener('click', closeTicketDetailModal);
-    modal?.addEventListener('click', (event) => {
-      if (event.target === modal) closeTicketDetailModal();
-    });
-
     const deleteBtn = document.getElementById('queue-ticket-delete-btn');
-    deleteBtn?.addEventListener('click', async () => {
+
+    // Remove old listeners if they exist
+    const oldCloseHandler = closeBtn?._closeHandler;
+    if (oldCloseHandler) {
+      closeBtn.removeEventListener('click', oldCloseHandler);
+    }
+    
+    const closeHandler = () => closeTicketDetailModal();
+    closeBtn?._closeHandler = closeHandler;
+    closeBtn?.addEventListener('click', closeHandler);
+
+    const oldModalHandler = modal?._modalHandler;
+    if (oldModalHandler) {
+      modal.removeEventListener('click', oldModalHandler);
+    }
+    
+    const modalHandler = (event) => {
+      if (event.target === modal) closeTicketDetailModal();
+    };
+    modal?._modalHandler = modalHandler;
+    modal?.addEventListener('click', modalHandler);
+
+    // Remove old delete listener if it exists
+    const oldDeleteHandler = deleteBtn?._deleteHandler;
+    if (oldDeleteHandler) {
+      deleteBtn.removeEventListener('click', oldDeleteHandler);
+    }
+    
+    const deleteHandler = async () => {
       if (Number.isFinite(currentlyViewedTicketId)) {
         await deleteQueueTicket(currentlyViewedTicketId);
+      } else {
+        console.error('No ticket ID available for deletion');
+        showToast('No ticket selected', 'error');
       }
-    });
+    };
+    deleteBtn?._deleteHandler = deleteHandler;
+    deleteBtn?.addEventListener('click', deleteHandler);
 
     setupVitalAssessmentModal();
   };
@@ -634,6 +661,12 @@ const appointments = (() => {
   };
 
   const deleteQueueTicket = async (ticketId) => {
+    if (!ticketId || !Number.isFinite(Number(ticketId))) {
+      console.error('Invalid ticket ID for deletion:', ticketId);
+      showToast('Invalid ticket ID', 'error');
+      return;
+    }
+
     const proceed = await confirmAction({
       title: 'Delete Queue Ticket',
       message: 'Are you sure you want to delete this ticket? This will remove it from the system entirely.',
@@ -670,8 +703,8 @@ const appointments = (() => {
     confirmText = 'Confirm',
     cancelText = 'Cancel'
   } = {}) => {
-    if (typeof openDialogModal === 'function') {
-      const result = await openDialogModal({ title, message, confirmText, cancelText });
+    if (typeof window.openDialogModal === 'function') {
+      const result = await window.openDialogModal({ title, message, confirmText, cancelText });
       return Boolean(result?.confirmed);
     }
     return false;
