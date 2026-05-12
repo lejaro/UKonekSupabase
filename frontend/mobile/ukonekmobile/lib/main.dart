@@ -4,6 +4,7 @@ import 'uKonekOnBoardingPage.dart';
 import 'uKonekMenuPage.dart';
 import 'uKonekDashboardPage.dart';
 import 'services/api_service.dart';
+import 'services/notification_service.dart';
 
 // Database configuration
 const _supabaseUrl = 'https://dqjxpwbsbzagbjtulhue.supabase.co';
@@ -11,6 +12,9 @@ const _supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Notification Service
+  await NotificationService.init();
 
   // Initialize Supabase for patient authentication
   await Supabase.initialize(

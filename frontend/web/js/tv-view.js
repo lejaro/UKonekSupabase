@@ -1,36 +1,60 @@
 // TV View — uses get_tv_queue_display RPC (security definer, anon-accessible)
-// No login session required.
+// No login session required. Optimized for TV display boards.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 let supabaseClient = null;
 let lastServingIds = new Set();
+let isLoading = false;
+let realtimeChannel = null;
 
-// ── Build anon Supabase client from runtime-config (no auth session needed) ──
-function buildAnonClient() {
-    const config = window.UKONEK_CONFIG || {};
-    const url    = String(config.SUPABASE_URL    || '').trim();
-    const key    = String(config.SUPABASE_ANON_KEY || '').trim();
-    if (!url || !key) throw new Error('Missing Supabase runtime config.');
-    return createClient(url, key, {
-        auth: { persistSession: false, autoRefreshToken: false }
-    });
-}
-
+/**
+ * TV View Logic
+ * Fetches currently serving, on-call, and waiting tickets.
+ */
 const tvView = (() => {
+    
+    const getSupabaseClient = () => {
+        if (supabaseClient) return supabaseClient;
+        
+        const config = window.UKONEK_CONFIG || {};
+        const url    = String(config.SUPABASE_URL    || '').trim();
+        const key    = String(config.SUPABASE_ANON_KEY || '').trim();
+        
+        if (!url || !key) {
+            console.error('[TV View] Missing Supabase runtime config.');
+            return null;
+        }
+        
+        supabaseClient = createClient(url, key, {
+            auth: { persistSession: false, autoRefreshToken: false }
+        });
+        return supabaseClient;
+    };
+
     const init = async () => {
+        console.log('[TV View] Initializing...');
         updateClock();
         setInterval(updateClock, 1000);
 
+        // Setup Fullscreen toggle on double click
+        document.addEventListener('dblclick', toggleFullScreen);
+        
         try {
-            supabaseClient = buildAnonClient();
+            const client = getSupabaseClient();
+            if (!client) throw new Error('Client init failed');
+            
             await loadQueueData();
             setupRealtimeListener();
-            setInterval(loadQueueData, 5000);
+            
+            // Polling fallback (every 15 seconds is enough if realtime is active)
+            setInterval(loadQueueData, 15000);
+            
+            console.log('[TV View] Ready');
         } catch (err) {
-            console.error('TV View init error:', err);
+            console.error('[TV View] Initialization error:', err);
             const status = document.getElementById('serving-status');
-            if (status) status.textContent = 'Error connecting. Check runtime-config.js.';
+            if (status) status.textContent = 'Connection error. Check configuration.';
         }
     };
 
@@ -43,33 +67,57 @@ const tvView = (() => {
     };
 
     const setupRealtimeListener = () => {
-        if (!supabaseClient) return;
-        supabaseClient
-            .channel('tv-queue-changes')
+        const client = getSupabaseClient();
+        if (!client) return;
+        
+        if (realtimeChannel) {
+            client.removeChannel(realtimeChannel);
+        }
+
+        realtimeChannel = client
+            .channel('tv-queue-updates')
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'queue_tickets'
-            }, () => loadQueueData())
+            }, (payload) => {
+                console.log('[TV View] Realtime change detected:', payload.eventType);
+                loadQueueData();
+            })
             .subscribe((status) => {
-                console.log('TV realtime status:', status);
+                console.log('[TV View] Realtime status:', status);
+                if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+                    console.log('[TV View] Reconnecting realtime in 5s...');
+                    setTimeout(setupRealtimeListener, 5000);
+                }
             });
     };
 
     const loadQueueData = async () => {
-        if (!supabaseClient) return;
-        try {
-            const { data, error } = await supabaseClient
-                .rpc('get_tv_queue_display');
+        if (isLoading) return;
+        const client = getSupabaseClient();
+        if (!client) return;
 
-            if (error) throw new Error(error.message);
+        isLoading = true;
+        try {
+            console.log('[TV] Fetching TV display buckets with p_date: null');
+            const { data, error } = await client.rpc('get_tv_queue_display', { p_date: null });
+
+            if (error) {
+                console.error('[TV] RPC Error:', error);
+                throw error;
+            }
+
+            console.log('[TV] RPC success. Result:', data);
 
             const result = typeof data === 'string' ? JSON.parse(data) : data;
             renderView(result);
         } catch (err) {
-            console.error('TV load error:', err);
+            console.error('[TV View] Fetch error:', err);
             const status = document.getElementById('serving-status');
-            if (status) status.textContent = 'Connectivity error. Retrying...';
+            if (status) status.textContent = 'Connectivity issue. Retrying...';
+        } finally {
+            isLoading = false;
         }
     };
 
@@ -78,14 +126,12 @@ const tvView = (() => {
         const onCall  = result?.on_call  || [];
         const waiting = result?.waiting  || [];
 
-        console.log(`TV: serving=${serving.length} on_call=${onCall.length} waiting=${waiting.length}`);
-
         updateServingDisplay(serving);
         updateOnCallDisplay(onCall);
         updateWaitingDisplay(waiting);
     };
 
-    const fmt = (n) => `#${String(n).padStart(3, '0')}`;
+    const fmt = (n) => `#${String(n || 0).padStart(3, '0')}`;
 
     const updateServingDisplay = (tickets) => {
         const numberEl = document.getElementById('serving-number');
@@ -99,24 +145,24 @@ const tvView = (() => {
             return;
         }
 
-        // Show the first (lowest queue number) serving ticket
         const primary = tickets[0];
         const newNum  = fmt(primary.queue_number);
 
-        // Play sound if a new ticket appeared in serving
-        const newIds = new Set(tickets.map(t => t.id));
-        const hasNew = tickets.some(t => !lastServingIds.has(t.id));
-        if (hasNew && lastServingIds.size > 0 && sound) {
-            sound.play().catch(e => console.warn('Sound blocked:', e));
+        // Sound alert for new serving tickets
+        const currentIds = new Set(tickets.map(t => t.id));
+        const hasNewEntry = tickets.some(t => !lastServingIds.has(t.id));
+        
+        if (hasNewEntry && lastServingIds.size > 0 && sound) {
+            sound.play().catch(() => {/* ignore play block */});
         }
-        lastServingIds = newIds;
+        lastServingIds = currentIds;
 
         if (numberEl) numberEl.textContent = newNum;
         if (statusEl) {
             if (tickets.length > 1) {
-                statusEl.textContent = `+ ${tickets.length - 1} more being served`;
+                statusEl.textContent = `+ ${tickets.length - 1} more in progress`;
             } else {
-                statusEl.textContent = 'Please proceed to the clinic';
+                statusEl.textContent = "Please proceed to the doctor's office for consultation";
             }
         }
     };
@@ -130,8 +176,7 @@ const tvView = (() => {
             return;
         }
         
-        // Show up to 8 on-call tickets
-        list.innerHTML = tickets.slice(0, 8).map(t => `
+        list.innerHTML = tickets.slice(0, 12).map(t => `
             <div class="queue-number-card">
                 <span class="queue-number">${fmt(t.queue_number)}</span>
             </div>
@@ -147,15 +192,23 @@ const tvView = (() => {
             return;
         }
         
-        // Show up to 8 waiting tickets
-        list.innerHTML = tickets.slice(0, 8).map(t => `
+        list.innerHTML = tickets.slice(0, 12).map(t => `
             <div class="queue-number-card">
                 <span class="queue-number">${fmt(t.queue_number)}</span>
             </div>
         `).join('');
     };
 
-    return { init };
+    const toggleFullScreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(e => console.warn(e));
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+        }
+    };
+
+    return { init, loadQueueData };
 })();
 
 document.addEventListener('DOMContentLoaded', tvView.init);
+window.tvView = tvView; // Expose for debugging if needed

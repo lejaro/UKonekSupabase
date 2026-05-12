@@ -27,9 +27,9 @@ class _uKonekRegisterWrapperState
   final ageController            = TextEditingController();
   final contactController        = TextEditingController();
   final emailController          = TextEditingController();
+  final houseNumberController    = TextEditingController();
   final streetNameController     = TextEditingController();
-  final barangayController       =
-  TextEditingController();
+  final barangayController       = TextEditingController();
   final emergencyNameController    = TextEditingController();
   final emergencyContactController = TextEditingController();
   final relationController         = TextEditingController();
@@ -186,6 +186,7 @@ class _uKonekRegisterWrapperState
                 formKey:  _step2Key,
                 contact:  contactController,
                 email:    emailController,
+                houseNumber: houseNumberController,
                 street:   streetNameController,
                 brgy:     barangayController,
                 eName:    emergencyNameController,

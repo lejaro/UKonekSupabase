@@ -42,6 +42,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Insert into auth.identities (without ON CONFLICT since there's no unique constraint)
 INSERT INTO auth.identities (
+  provider_id,
   id,
   user_id,
   identity_data,
@@ -53,9 +54,12 @@ INSERT INTO auth.identities (
 SELECT
   'a0000000-0000-0000-0000-000000000001'::uuid,
   'a0000000-0000-0000-0000-000000000001'::uuid,
+  'a0000000-0000-0000-0000-000000000001'::uuid,
   jsonb_build_object(
     'sub', 'a0000000-0000-0000-0000-000000000001',
-    'email', 'admin@ukonek.local'
+    'email', 'admin@ukonek.local',
+    'email_verified', true,
+    'phone_verified', false
   ),
   'email',
   now(),
@@ -73,26 +77,26 @@ INSERT INTO public.staff (
   auth_user_id,
   email,
   first_name,
+  middle_name,
   last_name,
+  username,
+  employee_id,
   role,
-  specialization,
-  license_number,
-  contact_number,
-  is_available,
-  created_at,
-  updated_at
+  consent_given,
+  status,
+  created_at
 )
 VALUES (
   'a0000000-0000-0000-0000-000000000001'::uuid,
   'admin@ukonek.local',
   'System',
+  '',
   'Administrator',
   'admin',
-  'Administration',
   'ADMIN-001',
-  '+63-000-000-0000',
+  'admin',
   true,
-  now(),
+  'Active',
   now()
 )
 ON CONFLICT (auth_user_id) DO NOTHING;

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 
 enum LoginFailureType {
   invalidCredentials,
@@ -114,8 +115,11 @@ class PrescriptionRecord {
   final String unit;
   final String dosage;
   final String frequency;
+  final String duration;
   final String instructions;
   final String additionalInfo;
+  final bool isAvailable;
+  final bool isDispensed;
 
   const PrescriptionRecord({
     required this.prescriptionId,
@@ -129,8 +133,11 @@ class PrescriptionRecord {
     required this.unit,
     required this.dosage,
     required this.frequency,
+    required this.duration,
     required this.instructions,
     required this.additionalInfo,
+    required this.isAvailable,
+    required this.isDispensed,
   });
 
   String get displayDoctorName {
@@ -140,9 +147,9 @@ class PrescriptionRecord {
     return 'Dr. $n';
   }
 
-  bool get isDispensed  => dispensingStatus == 'dispensed';
-  bool get isCancelled  => dispensingStatus == 'cancelled';
-  bool get isPending    => dispensingStatus == 'pending';
+  bool get isPrescriptionDispensed => dispensingStatus == 'dispensed';
+  bool get isCancelled            => dispensingStatus == 'cancelled';
+  bool get isPending              => dispensingStatus == 'pending';
 
   String get quantityLabel {
     final normalizedUnit = unit.trim();
@@ -165,8 +172,11 @@ class PrescriptionRecord {
       unit:             (m['unit']               as String?) ?? '',
       dosage:           (m['dosage']             as String?) ?? '',
       frequency:        (m['frequency']          as String?) ?? '',
+      duration:         (m['duration']           as String?) ?? '',
       instructions:     (m['instructions']       as String?) ?? '',
       additionalInfo:   (m['additional_info']    as String?) ?? '',
+      isAvailable:      (m['is_available']       as bool?) ?? true,
+      isDispensed:      (m['is_dispensed']       as bool?) ?? false,
     );
   }
 }
@@ -184,8 +194,11 @@ class ScheduledMedicine {
   final String unit;
   final String dosage;
   final String frequency;
+  final String duration;
   final String instructions;
   final String additionalInfo;
+  final bool isAvailable;
+  final bool isDispensed;
 
   const ScheduledMedicine({
     required this.prescriptionItemId,
@@ -200,8 +213,11 @@ class ScheduledMedicine {
     required this.unit,
     required this.dosage,
     required this.frequency,
+    required this.duration,
     required this.instructions,
     required this.additionalInfo,
+    required this.isAvailable,
+    required this.isDispensed,
   });
 
   String get displayDoctorName {
@@ -211,34 +227,72 @@ class ScheduledMedicine {
     return 'Dr. $n';
   }
 
-  // Parse frequency string into a count of daily doses.
-  // Handles: "Once a day", "2x a day", "3x a day", "4x a day",
-  // "Every 6 hours", "Every 8 hours", "Every 12 hours", etc.
   int get dailyDoseCount {
     final f = frequency.toLowerCase().trim();
     if (f.isEmpty) return 1;
-    // "Nx a day" or "N times a day"
+
+    if (f.contains('prn') || f.contains('as needed')) return 0;
+    if (f.contains('stat')) return 1;
+    if (f.contains('od') || f.contains('once') || f.contains('om') || f.contains('on') || f.contains('daily')) return 1;
+    if (f.contains('bid') || f.contains('twice') || f.contains('q12h')) return 2;
+    if (f.contains('tid') || f.contains('thrice') || f.contains('q8h')) return 3;
+    if (f.contains('qid') || f.contains('q6h')) return 4;
+    if (f.contains('q4h')) return 6;
+    if (f.contains('q2h')) return 12;
+
+    // Fallbacks for regex "Nx a day"
     final xday = RegExp(r'(\d+)\s*x').firstMatch(f);
     if (xday != null) return int.tryParse(xday.group(1)!) ?? 1;
-    final times = RegExp(r'(\d+)\s*time').firstMatch(f);
-    if (times != null) return int.tryParse(times.group(1)!) ?? 1;
-    // "once" / "daily"
-    if (f.contains('once') || f.contains('1x') || f.contains('daily')) return 1;
-    // "every N hours"
+
+    // "Every N hours" or "qNh"
     final hrs = RegExp(r'every\s+(\d+)\s+h').firstMatch(f);
     if (hrs != null) {
       final h = int.tryParse(hrs.group(1)!) ?? 8;
       return (24 / h).floor();
     }
-    // "twice"
-    if (f.contains('twice')) return 2;
+    final qhr = RegExp(r'q(\d+)h').firstMatch(f);
+    if (qhr != null) {
+      final h = int.tryParse(qhr.group(1)!) ?? 8;
+      return (24 / h).floor();
+    }
+
     return 1;
+  }
+
+  int get doseIntervalMinutes {
+    final count = dailyDoseCount;
+    if (count <= 1) return 0;
+    return (24 * 60) ~/ count;
   }
 
   // Generate dose times starting at 08:00 spaced by 24/count hours.
   List<String> get doseTimes {
+    final f = frequency.toLowerCase().trim();
+    
+    // Immediate / STAT doses show current time (or issued time)
+    if (f.contains('stat')) {
+      try {
+        return [DateFormat('hh:mm a').format(issuedAt)];
+      } catch (_) {
+        return ['08:00 AM'];
+      }
+    }
+    
+    // Fixed daily timings
+    if (f.contains('om')) return ['08:00 AM'];
+    if (f.contains('on')) return ['08:00 PM'];
+    if (f.contains('hs')) return ['09:00 PM'];
+    
     final count = dailyDoseCount;
-    final intervalHours = count > 0 ? 24 ~/ count : 24;
+    if (count <= 0) return [];
+    
+    // Standard optimized schedule
+    if (count == 1) return ['08:00 AM'];
+    if (count == 2) return ['08:00 AM', '08:00 PM'];
+    if (count == 3) return ['08:00 AM', '02:00 PM', '08:00 PM'];
+    if (count == 4) return ['06:00 AM', '12:00 PM', '06:00 PM', '12:00 AM'];
+    
+    final intervalHours = 24 ~/ count;
     return List.generate(count, (i) {
       final totalMins = 8 * 60 + i * intervalHours * 60;
       final h = (totalMins ~/ 60) % 24;
@@ -263,8 +317,11 @@ class ScheduledMedicine {
       unit:               (m['unit']                  as String?) ?? '',
       dosage:             (m['dosage']                as String?) ?? '',
       frequency:          (m['frequency']             as String?) ?? '',
+      duration:           (m['duration']              as String?) ?? '',
       instructions:       (m['instructions']          as String?) ?? '',
       additionalInfo:     (m['additional_info']       as String?) ?? '',
+      isAvailable:        (m['is_available']          as bool?) ?? true,
+      isDispensed:        (m['is_dispensed']          as bool?) ?? false,
     );
   }
 }
@@ -572,6 +629,57 @@ class QueueDashboardSnapshot {
     isOnCall: false,
     waitingCount: 0,
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Queue Limiter Status Model
+// ═══════════════════════════════════════════════════════════════════════════
+
+class QueueLimiterStatus {
+  final bool enabled;
+  final int dailyLimit;
+  final int todayCount;
+  final bool limitReached;
+  final int remainingSlots;
+
+  const QueueLimiterStatus({
+    required this.enabled,
+    required this.dailyLimit,
+    required this.todayCount,
+    required this.limitReached,
+    required this.remainingSlots,
+  });
+
+  factory QueueLimiterStatus.fromMap(Map<String, dynamic> map) {
+    return QueueLimiterStatus(
+      enabled: map['enabled'] == true,
+      dailyLimit: (map['daily_limit'] as num?)?.toInt() ?? 20,
+      todayCount: (map['today_count'] as num?)?.toInt() ?? 0,
+      limitReached: map['limit_reached'] == true,
+      remainingSlots: (map['remaining_slots'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  factory QueueLimiterStatus.disabled() {
+    return const QueueLimiterStatus(
+      enabled: false,
+      dailyLimit: 20,
+      todayCount: 0,
+      limitReached: false,
+      remainingSlots: 20,
+    );
+  }
+
+  String get statusMessage {
+    if (!enabled) return '';
+    if (limitReached) {
+      return 'Daily consultation limit reached ($dailyLimit/$dailyLimit). Please try again tomorrow.';
+    }
+    if (remainingSlots <= 5) {
+      return 'Only $remainingSlots consultation slots remaining today.';
+    }
+    return '$remainingSlots consultation slots available today.';
+  }
 }
 
 class PrescribedMedicine {
@@ -1182,6 +1290,16 @@ class ApiService {
     return QueueDashboardSnapshot.fromMap(rows.first as Map<String, dynamic>);
   }
 
+  /// Get queue limiter status (daily limit info)
+  static Future<QueueLimiterStatus> getQueueLimiterStatus() async {
+    final response = await _client.rpc('get_queue_limiter_status');
+    final rows = (response as List<dynamic>?) ?? const [];
+    if (rows.isEmpty || rows.first is! Map<String, dynamic>) {
+      return QueueLimiterStatus.disabled();
+    }
+    return QueueLimiterStatus.fromMap(rows.first as Map<String, dynamic>);
+  }
+
   static Future<List<PrescribedMedicine>> getMyPrescribedMedicines() async {
     final response = await _client.rpc('get_my_prescribed_medicines');
     final rows = (response as List<dynamic>?) ?? const [];
@@ -1330,5 +1448,47 @@ class ApiService {
       debugPrint('Error fetching announcements: $e');
       return [];
     }
+  }
+  static Future<void> logMedicineIntake({
+    required int prescriptionItemId,
+    required String scheduledTime,
+    required int doseIndex,
+  }) async {
+    final profile = await fetchMyCitizenProfile();
+    final citizenId = profile['id'];
+
+    await _client.from('medicine_intake_logs').insert({
+      'citizen_id': citizenId,
+      'prescription_item_id': prescriptionItemId,
+      'scheduled_time': scheduledTime,
+      'dose_index': doseIndex,
+      'status': 'taken',
+      'actual_time': DateTime.now().toIso8601String(),
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> getIntakeLogsForToday() async {
+    final profile = await fetchMyCitizenProfile();
+    final citizenId = profile['id'];
+    
+    final startOfDay = DateTime.now().toUtc().copyWith(hour: 0, minute: 0, second: 0, millisecond: 0);
+    
+    final response = await _client
+        .from('medicine_intake_logs')
+        .select()
+        .eq('citizen_id', citizenId)
+        .gte('created_at', startOfDay.toIso8601String());
+        
+    return (response as List<dynamic>?)?.whereType<Map<String, dynamic>>().toList() ?? [];
+  }
+
+  static Future<void> updateMyCitizenProfile(Map<String, dynamic> data) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('Not authenticated');
+    
+    await _client
+        .from('citizens')
+        .update(data)
+        .eq('auth_user_id', user.id);
   }
 }

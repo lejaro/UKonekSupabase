@@ -37,7 +37,7 @@ BEGIN
     PERFORM cron.schedule(
       'delete-old-pending-queue-tickets',  -- job name
       '0 0 * * *',                          -- cron schedule: every day at midnight
-      $$SELECT public.delete_old_pending_queue_tickets();$$
+      'SELECT public.delete_old_pending_queue_tickets();'
     );
     RAISE NOTICE 'Scheduled job created successfully';
   EXCEPTION
