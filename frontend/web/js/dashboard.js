@@ -2673,7 +2673,9 @@ async function openCitizenHealthModal(citizen) {
     { label: 'Date of Birth', value: citizen.date_of_birth ? new Date(citizen.date_of_birth).toLocaleDateString() : '—' },
     { label: 'Contact', value: citizen.contact_number || '—' },
     { label: 'Address', value: citizen.complete_address || '—' },
-    { label: 'Emergency Contact', value: citizen.emergency_contact_complete_name || '—' },
+    { label: 'Emergency Name', value: citizen.emergency_contact_complete_name || '—' },
+    { label: 'Emergency Phone', value: citizen.emergency_contact_contact_number || '—' },
+    { label: 'Relation', value: citizen.relation || '—' },
   ];
   profileEl.innerHTML = profileFields.map(f => `
     <div>
@@ -3515,20 +3517,58 @@ function renderFeedbackTable() {
     const rating = feedback.rating ? '⭐'.repeat(feedback.rating) : '—';
     const fromName = feedback.citizen_name || feedback.from_email || 'Anonymous';
     const date = formatDateTime(feedback.created_at);
-    const subject = escapeHtml(feedback.subject || 'No subject');
-    const message = escapeHtml(feedback.message || '').substring(0, 100);
-    const messagePreview = message.length >= 100 ? message + '...' : message;
 
     return `
-      <tr>
+      <tr class="clickable-row" data-id="${feedback.id}">
         <td><strong>${escapeHtml(fromName)}</strong></td>
-        <td>${subject}</td>
-        <td style="color:#64748b; font-size:13px;">${messagePreview}</td>
         <td style="text-align:center;">${rating}</td>
-        <td style="color:#64748b; font-size:13px;">${date}</td>
+        <td style="color:#64748b; font-size:12px; text-align:center;">${date}</td>
+        <td style="text-align:center;">
+          <button class="chip-btn chip-btn-danger btn-delete-feedback" data-id="${feedback.id}" style="padding:4px 8px; font-size:10px;">Delete</button>
+        </td>
       </tr>
     `;
   }).join('');
+}
+
+function openFeedbackDetail(id) {
+  const feedback = latestFeedbackList.find(f => f.id === id);
+  if (!feedback) return;
+
+  const modal = document.getElementById('feedback-detail-modal');
+  const fromEl = document.getElementById('feedback-detail-from');
+  const dateEl = document.getElementById('feedback-detail-date');
+  const ratingEl = document.getElementById('feedback-detail-rating');
+  const subjectEl = document.getElementById('feedback-detail-subject');
+  const bodyEl = document.getElementById('feedback-detail-body');
+  const deleteBtn = document.getElementById('feedback-detail-delete-btn');
+
+  if (fromEl) fromEl.textContent = feedback.citizen_name || feedback.from_email || 'Anonymous';
+  if (dateEl) dateEl.textContent = formatDateTime(feedback.created_at);
+  if (ratingEl) ratingEl.innerHTML = feedback.rating ? '⭐'.repeat(feedback.rating) : '—';
+  if (subjectEl) subjectEl.textContent = feedback.subject || 'No Subject';
+  if (bodyEl) bodyEl.textContent = feedback.message || '';
+  if (deleteBtn) deleteBtn.onclick = () => deleteFeedback(feedback.id);
+
+  modal?.classList.remove('hidden');
+}
+
+async function deleteFeedback(id) {
+  if (!confirm('Are you sure you want to delete this feedback?')) return;
+  
+  try {
+    const { supabase } = await loadSupabaseModule();
+    const { error } = await supabase.from('feedback').delete().eq('id', id);
+    
+    if (error) throw error;
+    
+    showToast('Feedback deleted.', 'success');
+    latestFeedbackList = latestFeedbackList.filter(f => f.id !== id);
+    renderFeedbackTable();
+  } catch (err) {
+    console.error('Error deleting feedback:', err);
+    showToast('Failed to delete feedback.', 'error');
+  }
 }
 
 function escapeHtml(text) {
@@ -3555,6 +3595,62 @@ async function refreshAnnouncementsData() {
         created_at: new Date(Date.now() - 86400000).toISOString()
       }
     ];
+    // Tab switching for Reports
+    const reportTabs = document.querySelectorAll('#reports-section .tab');
+    const panes = {
+      'tab-announcements': document.getElementById('announcements-pane'),
+      'tab-feedback': document.getElementById('feedback-pane'),
+      'tab-stats': document.getElementById('stats-pane')
+    };
+
+    reportTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        reportTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        Object.values(panes).forEach(p => p?.classList.add('hidden'));
+        if (panes[tab.id]) panes[tab.id].classList.remove('hidden');
+        if (tab.id === 'tab-stats') initStatsCharts();
+      });
+    });
+
+    // Event delegation for row clicks and deletes
+    document.getElementById('announcements-tbody')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-delete-announcement');
+      if (btn) {
+        e.stopPropagation();
+        deleteAnnouncement(Number(btn.dataset.id));
+        return;
+      }
+      const row = e.target.closest('.clickable-row');
+      if (row) openAnnouncementDetail(Number(row.dataset.id));
+    });
+
+    document.getElementById('feedback-tbody')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-delete-feedback');
+      if (btn) {
+        e.stopPropagation();
+        deleteFeedback(Number(btn.dataset.id));
+        return;
+      }
+      const row = e.target.closest('.clickable-row');
+      if (row) openFeedbackDetail(Number(row.dataset.id));
+    });
+
+    // Close buttons for detail modals
+    document.getElementById('announcement-detail-close')?.addEventListener('click', () => {
+      document.getElementById('announcement-detail-modal')?.classList.add('hidden');
+    });
+    document.getElementById('feedback-detail-close')?.addEventListener('click', () => {
+      document.getElementById('feedback-detail-modal')?.classList.add('hidden');
+    });
+    
+    // Close on overlay click
+    [document.getElementById('announcement-detail-modal'), document.getElementById('feedback-detail-modal')].forEach(m => {
+      m?.addEventListener('click', (e) => {
+        if (e.target === m) m.classList.add('hidden');
+      });
+    });
+
     renderAnnouncementsTable();
     return;
   }
@@ -3600,21 +3696,58 @@ function renderAnnouncementsTable() {
 
   tbody.innerHTML = latestAnnouncementsList.map(announcement => {
     const title = escapeHtml(announcement.title || 'Untitled');
-    const content = escapeHtml(announcement.content || '').substring(0, 150);
-    const contentPreview = content.length >= 150 ? content + '...' : content;
-    const visibility = announcement.visibility || 'all';
-    const visibilityBadge = getVisibilityBadge(visibility);
+    const visibilityBadge = getVisibilityBadge(announcement.visibility || 'all');
     const date = formatDateTime(announcement.created_at);
 
     return `
-      <tr>
+      <tr class="clickable-row" data-id="${announcement.id}">
         <td><strong>${title}</strong></td>
-        <td style="color:#64748b; font-size:13px;">${contentPreview}</td>
         <td style="text-align:center;">${visibilityBadge}</td>
-        <td style="color:#64748b; font-size:13px;">${date}</td>
+        <td style="color:#64748b; font-size:12px; text-align:center;">${date}</td>
+        <td style="text-align:center;">
+          <button class="chip-btn chip-btn-danger btn-delete-announcement" data-id="${announcement.id}" style="padding:4px 8px; font-size:10px;">Delete</button>
+        </td>
       </tr>
     `;
   }).join('');
+}
+
+function openAnnouncementDetail(id) {
+  const ann = latestAnnouncementsList.find(a => a.id === id);
+  if (!ann) return;
+
+  const modal = document.getElementById('announcement-detail-modal');
+  const titleEl = document.getElementById('announcement-detail-title');
+  const dateEl = document.getElementById('announcement-detail-date');
+  const visEl = document.getElementById('announcement-detail-visibility');
+  const bodyEl = document.getElementById('announcement-detail-body');
+  const deleteBtn = document.getElementById('announcement-detail-delete-btn');
+
+  if (titleEl) titleEl.textContent = ann.title || 'Untitled';
+  if (dateEl) dateEl.textContent = formatDateTime(ann.created_at);
+  if (visEl) visEl.innerHTML = getVisibilityBadge(ann.visibility || 'all');
+  if (bodyEl) bodyEl.textContent = ann.content || '';
+  if (deleteBtn) deleteBtn.onclick = () => deleteAnnouncement(ann.id);
+
+  modal?.classList.remove('hidden');
+}
+
+async function deleteAnnouncement(id) {
+  if (!confirm('Are you sure you want to delete this announcement?')) return;
+  
+  try {
+    const { supabase } = await loadSupabaseModule();
+    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    
+    if (error) throw error;
+    
+    showToast('Announcement deleted.', 'success');
+    latestAnnouncementsList = latestAnnouncementsList.filter(a => a.id !== id);
+    renderAnnouncementsTable();
+  } catch (err) {
+    console.error('Error deleting announcement:', err);
+    showToast('Failed to delete announcement.', 'error');
+  }
 }
 
 function getVisibilityBadge(visibility) {
@@ -4294,13 +4427,21 @@ async function handleQRDecoded(decodedText) {
   }
 }
 
+let currentSelectionQueue = [];
+
 async function openQueueSelectionModal() {
   const modal = document.getElementById('queue-selection-modal');
   const closeBtn = document.getElementById('queue-selection-close');
   const cancelBtn = document.getElementById('queue-selection-cancel');
   const refreshBtn = document.getElementById('queue-selection-refresh');
+  const searchInput = document.getElementById('queue-selection-search');
 
   modal.classList.remove('hidden');
+
+  if (searchInput) {
+    searchInput.value = '';
+    searchInput.oninput = () => renderQueueSelectionList(searchInput.value.toLowerCase());
+  }
 
   const closeModal = () => modal.classList.add('hidden');
   closeBtn.onclick = closeModal;
@@ -4341,45 +4482,61 @@ async function loadQueueForSelection() {
 
     if (error) throw error;
 
-    if (!tickets || tickets.length === 0) {
-      listContainer.innerHTML = `
-        <div class="empty-queue-state">
-          <span class="empty-queue-icon">📋</span>
-          <p class="empty-queue-text">No patients currently in the queue for today.</p>
-        </div>
-      `;
-      return;
-    }
-
-    listContainer.innerHTML = '';
-    tickets.forEach(t => {
-      const citizen = t.citizens;
-      const fullName = `${citizen.firstname} ${citizen.surname}`.trim();
-      
-      const item = document.createElement('div');
-      item.className = 'queue-item';
-      item.innerHTML = `
-        <div class="queue-item-info">
-          <strong class="queue-item-name">#${String(t.queue_number).padStart(3, '0')} — ${fullName}</strong>
-          <div class="queue-item-meta">
-            <span class="queue-item-badge badge-${t.status}">${t.status.replace('_', ' ').toUpperCase()}</span>
-            <span>${t.service_label}</span>
-          </div>
-        </div>
-        <button class="chip-btn" style="background: #3b82f6; color: #fff; border: none; padding: 6px 12px; font-weight: 600;">Select</button>
-      `;
-
-      item.onclick = () => {
-        populateVitalsFormFromQueue(t);
-        document.getElementById('queue-selection-modal').classList.add('hidden');
-      };
-
-      listContainer.appendChild(item);
-    });
+    currentSelectionQueue = tickets || [];
+    renderQueueSelectionList();
   } catch (err) {
     console.error('Error loading queue for selection:', err);
     listContainer.innerHTML = '<p class="note" style="text-align: center; padding: 20px; color: #ef4444;">Failed to load queue.</p>';
   }
+}
+
+function renderQueueSelectionList(query = '') {
+  const listContainer = document.getElementById('queue-selection-list');
+  if (!listContainer) return;
+
+  const filtered = currentSelectionQueue.filter(t => {
+    if (!query) return true;
+    const citizen = t.citizens || {};
+    const fullName = `${citizen.firstname || ''} ${citizen.surname || ''}`.toLowerCase();
+    const service = (t.service_label || '').toLowerCase();
+    return fullName.includes(query) || service.includes(query);
+  });
+
+  if (filtered.length === 0) {
+    listContainer.innerHTML = `
+      <div class="empty-queue-state">
+        <span class="empty-queue-icon">📋</span>
+        <p class="empty-queue-text">${query ? 'No matching patients or services found.' : 'No patients currently in the queue for today.'}</p>
+      </div>
+    `;
+    return;
+  }
+
+  listContainer.innerHTML = '';
+  filtered.forEach(t => {
+    const citizen = t.citizens || {};
+    const fullName = `${citizen.firstname || 'Unknown'} ${citizen.surname || 'Patient'}`.trim();
+    
+    const item = document.createElement('div');
+    item.className = 'queue-item';
+    item.innerHTML = `
+      <div class="queue-item-info">
+        <strong class="queue-item-name">#${String(t.queue_number).padStart(3, '0')} — ${fullName}</strong>
+        <div class="queue-item-meta">
+          <span class="queue-item-badge badge-${t.status}">${t.status.replace('_', ' ').toUpperCase()}</span>
+          <span>${t.service_label}</span>
+        </div>
+      </div>
+      <button class="chip-btn" style="background: #3b82f6; color: #fff; border: none; padding: 6px 12px; font-weight: 600;">Select</button>
+    `;
+
+    item.onclick = () => {
+      populateVitalsFormFromQueue(t);
+      document.getElementById('queue-selection-modal').classList.add('hidden');
+    };
+
+    listContainer.appendChild(item);
+  });
 }
 
 function populateVitalsFormFromQueue(ticket) {
@@ -5288,6 +5445,7 @@ function openConsultationModal(prefill = {}) {
   // Store queue ticket id on form for later use
   if (consultationForm) {
     consultationForm.dataset.queueTicketId = prefill.queueTicketId ? String(prefill.queueTicketId) : '';
+    consultationForm.dataset.patientName = prefill.patientName || '';
   }
 
   // Pre-fill HPI from symptoms/reason
@@ -5428,6 +5586,41 @@ function loadFromStorage(key) {
 
 function saveToStorage(key, data) {
   try { localStorage.setItem(key, JSON.stringify(data)); } catch (err) { console.error('Storage save error', key, err); }
+}
+
+/**
+ * Marks a queue ticket as completed in the database and updates local state.
+ */
+async function completeQueueTicket(qId) {
+  if (!qId || isDemoMode || isApiMode) return;
+  
+  try {
+    const { supabase } = await loadSupabaseModule();
+    const { error: completeErr } = await supabase
+      .from('queue_tickets')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', Number(qId));
+    
+    if (completeErr) {
+      console.warn('Failure completing queue ticket:', completeErr);
+    }
+    
+    // Remove locally immediately for better responsiveness
+    if (typeof consultationQueueTickets !== 'undefined') {
+      consultationQueueTickets = consultationQueueTickets.filter(t => 
+        Number(t.queueTicketId || t.id?.replace('Q-','')) !== Number(qId)
+      );
+      renderServingQueue();
+    }
+
+    // Refresh queue and consultations to reflect completion in other areas
+    await refreshConsultationData();
+    if (typeof appointments !== 'undefined' && appointments.loadQueueTickets) {
+      appointments.loadQueueTickets();
+    }
+  } catch (err) {
+    console.error('Error in completeQueueTicket:', err);
+  }
 }
 
 function renderServingQueue() {
@@ -5794,6 +5987,7 @@ if (consultationForm) {
     
     const submitBtn = document.getElementById('consult-submit-btn');
     const patientId = document.getElementById('consult-patient-id')?.value || '';
+    const patientName = consultationForm.dataset.patientName || '';
     const diagnosis = document.getElementById('consult-diagnosis')?.value || '';
     
     if (!diagnosis) {
@@ -5830,10 +6024,16 @@ if (consultationForm) {
       };
 
       const result = await createConsultationEntry(payload);
+      if (result && !result.patientName) result.patientName = patientName;
       
       showToast('Consultation saved successfully.', 'success');
       closeConsultationModal();
       await refreshConsultationData();
+      
+      // Automatically complete queue ticket
+      if (payload.queueTicketId) {
+        completeQueueTicket(payload.queueTicketId);
+      }
       
       // Auto-open prescription modal for the next step, pass queueTicketId
       openPrescriptionModalForPatient(result.patientId, result.dbId, result.patientName, payload.queueTicketId);
@@ -5995,6 +6195,7 @@ async function createPrescriptionEntry({ patientId, consultationDbId, items }) {
           unit: String(it?.unit || '').trim(),
           dosage: String(it?.dosage || '').trim(),
           frequency: String(it?.frequency || '').trim(),
+          duration: String(it?.duration || '').trim(),
           instructions: String(it?.instructions || '').trim(),
           additionalInfo: String(it?.additionalInfo || '').trim()
         }))
@@ -6052,6 +6253,7 @@ async function createPrescriptionEntry({ patientId, consultationDbId, items }) {
     unit: it.unit || null,
     dosage: it.dosage || null,
     frequency: it.frequency || null,
+    duration: it.duration || null,
     instructions: it.instructions || null,
     additional_info: it.additionalInfo || null
   }));
@@ -6830,6 +7032,31 @@ function openPrescriptionModalForPatient(patientId = '', consultationDbId = null
   }
 }
 
+function calculatePrescriptionQty(freq, duration) {
+  let dosesPerDay = 1;
+  const f = freq.toLowerCase().trim();
+  if (f.includes('bid') || f.includes('twice') || f.includes('q12h')) dosesPerDay = 2;
+  else if (f.includes('tid') || f.includes('three') || f.includes('q8h')) dosesPerDay = 3;
+  else if (f.includes('qid') || f.includes('four') || f.includes('q6h')) dosesPerDay = 4;
+  else if (f.includes('q4h')) dosesPerDay = 6;
+  else if (f.includes('q2h')) dosesPerDay = 12;
+  else if (f.includes('stat')) dosesPerDay = 1;
+  // OD / OM / ON are already 1
+
+  let days = 0;
+  const d = duration.toLowerCase().trim();
+  const numMatch = d.match(/(\d+)/);
+  if (numMatch) {
+    days = parseInt(numMatch[1]);
+    if (d.includes('week')) days *= 7;
+    else if (d.includes('month')) days *= 30;
+  } else if (d.includes('maintenance')) {
+    days = 30; // Default to 30 days for maintenance if not specified
+  }
+  
+  return dosesPerDay * (days || 1);
+}
+
 function addPrescriptionLine() {
   if (!prescriptionLines) return;
   const line = document.createElement('div');
@@ -6841,7 +7068,7 @@ function addPrescriptionLine() {
   line.style.border = '1px solid #e2e8f0';
   line.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
   line.innerHTML = `
-    <div style="display: grid; grid-template-columns: 2.5fr 0.8fr 1.2fr 1.2fr auto; gap: 14px; align-items: end;">
+    <div style="display: grid; grid-template-columns: 2fr 0.6fr 1fr 1fr 1fr auto; gap: 10px; align-items: end;">
       <div class="field" style="margin: 0;">
         <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Medicine Name</label>
         <select class="pres-med" style="width: 100%; height: 38px; padding: 0 10px;" required>
@@ -6855,11 +7082,15 @@ function addPrescriptionLine() {
       </div>
       <div class="field" style="margin: 0;">
         <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Dosage</label>
-        <input type="text" class="pres-dosage" placeholder="e.g. 500mg" style="width: 100%; height: 38px; padding: 0 10px;" />
+        <input type="text" class="pres-dosage" list="dosage-list" placeholder="e.g. 500 mg" style="width: 100%; height: 38px; padding: 0 10px;" />
       </div>
       <div class="field" style="margin: 0;">
         <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Frequency</label>
-        <input type="text" class="pres-freq" placeholder="e.g. 3x a day" style="width: 100%; height: 38px; padding: 0 10px;" />
+        <input type="text" class="pres-freq" list="frequency-list" placeholder="e.g. BID" style="width: 100%; height: 38px; padding: 0 10px;" />
+      </div>
+      <div class="field" style="margin: 0;">
+        <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Duration</label>
+        <input type="text" class="pres-duration" list="duration-list" placeholder="e.g. 7 days" style="width: 100%; height: 38px; padding: 0 10px;" />
       </div>
       <button type="button" class="btn small btn-delete" data-action="remove-line" style="height: 38px; width: 38px; min-width: 38px; display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; padding: 0; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; margin: 0;">×</button>
     </div>
@@ -6869,6 +7100,25 @@ function addPrescriptionLine() {
     </div>
   `;
   prescriptionLines.appendChild(line);
+
+  const qtyInput = line.querySelector('.pres-qty');
+  const freqInput = line.querySelector('.pres-freq');
+  const durInput = line.querySelector('.pres-duration');
+
+  const updateQty = () => {
+    const freq = freqInput.value;
+    const dur = durInput.value;
+    if (freq || dur) {
+      const calculated = calculatePrescriptionQty(freq, dur);
+      if (calculated > 0) qtyInput.value = calculated;
+    }
+  };
+
+  freqInput.addEventListener('input', updateQty);
+  durInput.addEventListener('input', updateQty);
+  freqInput.addEventListener('change', updateQty);
+  durInput.addEventListener('change', updateQty);
+
   line.querySelector('[data-action="remove-line"]').addEventListener('click', () => line.remove());
 }
 
@@ -6907,6 +7157,7 @@ if (prescriptionForm) {
     const dosages  = prescriptionForm.querySelectorAll('.pres-dosage');
     const freqs    = prescriptionForm.querySelectorAll('.pres-freq');
     const notes    = prescriptionForm.querySelectorAll('.pres-instructions');
+    const durations = prescriptionForm.querySelectorAll('.pres-duration');
     const items = [];
     for (let i = 0; i < selects.length; i++) {
       const name = selects[i].value;
@@ -6915,9 +7166,10 @@ if (prescriptionForm) {
         items.push({
           name,
           qty,
-          dosage:       dosages[i]?.value || '',
-          frequency:    freqs[i]?.value   || '',
-          instructions: notes[i]?.value   || ''
+          dosage:       dosages[i]?.value   || '',
+          frequency:    freqs[i]?.value     || '',
+          duration:     durations[i]?.value || '',
+          instructions: notes[i]?.value     || ''
         });
       }
     }
@@ -6931,36 +7183,25 @@ if (prescriptionForm) {
         consultationDbId: Number(prescriptionForm.dataset.consultationDbId || '0') || null,
         items: items.map((it) => {
           const med = medicines.find((m) => String(m.name || '') === String(it.name || ''));
-          return { name: it.name, qty: it.qty, unit: med?.unit || '', dosage: it.dosage, frequency: it.frequency };
+          return { 
+            name: it.name, 
+            qty: it.qty, 
+            unit: med?.unit || '', 
+            dosage: it.dosage, 
+            frequency: it.frequency,
+            duration: it.duration 
+          };
         })
       });
+
+      showToast('Prescription created successfully!', 'success');
 
       if (prescriptionModal) prescriptionModal.classList.add('hidden');
       
       // Automatically complete queue ticket if applicable
       const qId = prescriptionForm.dataset.queueTicketId;
-      if (qId && !isDemoMode && !isApiMode) {
-        const { supabase } = await loadSupabaseModule();
-        const { error: completeErr } = await supabase
-          .from('queue_tickets')
-          .update({ status: 'completed', completed_at: new Date().toISOString() })
-          .eq('id', Number(qId));
-        
-        if (completeErr) {
-          console.warn('Silent failure completing queue ticket:', completeErr);
-        }
-        
-        // Remove locally immediately for better responsiveness
-        consultationQueueTickets = consultationQueueTickets.filter(t => 
-          Number(t.queueTicketId || t.id?.replace('Q-','')) !== Number(qId)
-        );
-        renderServingQueue();
-
-        // Refresh queue and consultations to reflect completion in other areas
-        await refreshConsultationData();
-        if (typeof appointments !== 'undefined' && appointments.loadQueueTickets) {
-          appointments.loadQueueTickets();
-        }
+      if (qId) {
+        completeQueueTicket(qId);
       }
 
       if (prescriptionForm) {
@@ -7045,6 +7286,44 @@ function initPharmacyModule() {
         }
       });
     });
+  }
+
+  const tbody = document.getElementById('pharmacy-medicines-tbody');
+  if (tbody) {
+    tbody.addEventListener('change', async (e) => {
+      if (e.target.classList.contains('pharmacy-available-checkbox') || 
+          e.target.classList.contains('pharmacy-given-checkbox')) {
+        const index = parseInt(e.target.dataset.index);
+        const item = currentMedicineItems[index];
+        const isAvailable = e.target.classList.contains('pharmacy-available-checkbox') 
+          ? e.target.checked 
+          : (item.is_available !== false);
+        const isDispensed = e.target.classList.contains('pharmacy-given-checkbox') 
+          ? e.target.checked 
+          : item.is_dispensed;
+        
+        await updatePrescriptionItemStatus(item.id, isAvailable, isDispensed);
+        item.is_available = isAvailable;
+        item.is_dispensed = isDispensed;
+      }
+    });
+  }
+}
+
+async function updatePrescriptionItemStatus(itemId, isAvailable, isDispensed) {
+  try {
+    const { supabase } = await loadSupabaseModule();
+    const { error } = await supabase
+      .from('prescription_items')
+      .update({ is_available: isAvailable, is_dispensed: isDispensed })
+      .eq('id', itemId);
+
+    if (error) {
+      console.error('Error updating item status:', error);
+      showToast('Error updating medication status', 'error');
+    }
+  } catch (error) {
+    console.error('Error updating item status:', error);
   }
 }
 
@@ -7222,16 +7501,35 @@ function displayPrescriptionData() {
       <td>${item.quantity} ${escapeHtml(item.unit || '')}</td>
       <td>
         <span style="color: ${hasStock ? '#16a34a' : '#dc2626'}; font-weight: 600;">
-          ${item.currentStock} ${escapeHtml(item.unit || '')}
+          ${item.currentStock}
         </span>
       </td>
-      <td style="max-width: 200px; font-size: 12px; color: #64748b;">
-        ${escapeHtml(item.instructions || '-')}
+      <td style="text-align: center;">
+        <input 
+          type="checkbox" 
+          class="pharmacy-available-checkbox" 
+          data-index="${index}"
+          ${item.is_available !== false ? 'checked' : ''}
+          ${isDispensed || isCancelled ? 'disabled' : ''}
+          style="width: 18px; height: 18px; cursor: pointer;">
+      </td>
+      <td style="text-align: center;">
+        <input 
+          type="checkbox" 
+          class="pharmacy-given-checkbox" 
+          data-index="${index}"
+          ${item.is_dispensed ? 'checked' : ''}
+          ${isDispensed || isCancelled ? 'disabled' : ''}
+          style="width: 18px; height: 18px; cursor: pointer;">
       </td>
       <td>
-        ${hasStock 
-          ? '<span style="color: #16a34a; font-weight: 600;">✓ Available</span>' 
-          : '<span style="color: #dc2626; font-weight: 600;">✗ Insufficient</span>'}
+        ${item.is_available === false
+          ? '<span style="color: #64748b; font-weight: 600;">✗ Out of Stock</span>'
+          : (item.is_dispensed 
+              ? '<span style="color: #16a34a; font-weight: 600;">✓ Given</span>'
+              : (hasStock 
+                  ? '<span style="color: #0891b2; font-weight: 600;">• Pending</span>' 
+                  : '<span style="color: #dc2626; font-weight: 600;">✗ Insufficient</span>'))}
       </td>
     `;
     tbody.appendChild(row);
@@ -7390,4 +7688,402 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initPharmacyModule);
 } else {
   initPharmacyModule();
+}
+
+// --- Vital Signs Assessment Modal ---
+const vaModal = document.getElementById('vital-assessment-modal');
+const vaForm = document.getElementById('vital-assessment-form');
+
+async function openVitalAssessmentModal(ticket) {
+  if (!vaModal || !ticket) return;
+  if (vaForm) vaForm.reset();
+  const ticketIdInput = document.getElementById('va-queue-ticket-id');
+  const citizenIdInput = document.getElementById('va-citizen-id');
+  if (ticketIdInput) ticketIdInput.value = ticket.id;
+  if (citizenIdInput) citizenIdInput.value = ticket.citizen?.id || '';
+  const bannerEl = document.getElementById('vital-modal-patient-banner');
+  const nameEl = document.getElementById('vital-modal-patient-name');
+  const metaEl = document.getElementById('vital-modal-patient-meta');
+  const badgeEl = document.getElementById('vital-modal-existing-badge');
+  if (bannerEl) bannerEl.style.display = 'block';
+  if (nameEl) nameEl.textContent = `${ticket.citizen?.firstname || ''} ${ticket.citizen?.surname || ''}`.trim() || 'Guest Patient';
+  if (metaEl) {
+    const age = ticket.citizen?.age ? `${ticket.citizen.age} yrs` : 'Age N/A';
+    const gender = ticket.citizen?.sex || 'Sex N/A';
+    metaEl.textContent = `${ticket.service_label} | ${age} | ${gender}`;
+  }
+  if (badgeEl) badgeEl.style.display = 'none';
+  try {
+    const { supabase } = await loadSupabaseModule();
+    const { data: existing } = await supabase
+      .from('vital_signs')
+      .select('*')
+      .eq('queue_ticket_id', ticket.id)
+      .maybeSingle();
+    if (existing) {
+      if (badgeEl) badgeEl.style.display = 'inline-flex';
+      if (document.getElementById('va-chief-complaint')) document.getElementById('va-chief-complaint').value = existing.chief_complaint || '';
+      if (document.getElementById('va-bp')) document.getElementById('va-bp').value = existing.blood_pressure || '';
+      if (document.getElementById('va-hr')) document.getElementById('va-hr').value = existing.heart_rate || '';
+      if (document.getElementById('va-rr')) document.getElementById('va-rr').value = existing.respiratory_rate || '';
+      if (document.getElementById('va-temp')) document.getElementById('va-temp').value = existing.temperature || '';
+      if (document.getElementById('va-spo2')) document.getElementById('va-spo2').value = existing.oxygen_saturation || '';
+      if (document.getElementById('va-meds')) document.getElementById('va-meds').value = existing.current_medications || '';
+      if (document.getElementById('va-notes')) document.getElementById('va-notes').value = existing.notes || '';
+    } else {
+      // New assessment: pre-fill chief complaint with citizen's reason for visit
+      if (document.getElementById('va-chief-complaint')) {
+        document.getElementById('va-chief-complaint').value = ticket.reason || '';
+      }
+    }
+  } catch (err) { console.warn('Error checking existing vitals:', err); }
+  vaModal.classList.remove('hidden');
+  vaModal.style.display = 'flex';
+}
+
+function closeVitalAssessmentModal() {
+  if (vaModal) { vaModal.classList.add('hidden'); vaModal.style.display = 'none'; }
+}
+
+if (vaForm) {
+  vaForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submitBtn = vaForm.querySelector('button[type="submit"]');
+    const ticketId = document.getElementById('va-queue-ticket-id')?.value;
+    const citizenId = document.getElementById('va-citizen-id')?.value;
+    const complaint = document.getElementById('va-chief-complaint')?.value;
+    if (!ticketId) { showToast('Missing queue ticket reference.', 'error'); return; }
+    if (!complaint) { showToast('Chief complaint is required.', 'error'); return; }
+    setLoading(submitBtn, true);
+    try {
+      const user = await ensureAuthenticatedSession();
+      const { supabase } = await loadSupabaseModule();
+      const payload = {
+        queue_ticket_id: Number(ticketId),
+        citizen_id: citizenId ? Number(citizenId) : null,
+        nurse_id: user?.id || null,
+        chief_complaint: complaint,
+        blood_pressure: document.getElementById('va-bp')?.value || null,
+        heart_rate: parseInt(document.getElementById('va-hr')?.value) || null,
+        respiratory_rate: parseInt(document.getElementById('va-rr')?.value) || null,
+        temperature: parseFloat(document.getElementById('va-temp')?.value) || null,
+        oxygen_saturation: parseInt(document.getElementById('va-spo2')?.value) || null,
+        current_medications: document.getElementById('va-meds')?.value || null,
+        notes: document.getElementById('va-notes')?.value || null
+      };
+      const { data: existing } = await supabase.from('vital_signs').select('id').eq('queue_ticket_id', Number(ticketId)).maybeSingle();
+      let error;
+      if (existing) {
+        const res = await supabase.from('vital_signs').update(payload).eq('id', existing.id);
+        error = res.error;
+      } else {
+        const res = await supabase.from('vital_signs').insert([payload]);
+        error = res.error;
+      }
+      if (error) throw error;
+      showToast('Vital signs saved successfully.', 'success');
+      closeVitalAssessmentModal();
+      if (typeof appointments !== 'undefined' && appointments.loadQueueTickets) {
+        await appointments.loadQueueTickets();
+      }
+    } catch (err) {
+      console.error('Vitals assessment submission error:', err);
+      showToast(err.message || 'Failed to save vital signs.', 'error');
+    } finally { setLoading(submitBtn, false); }
+  });
+}
+
+const vaCancelBtn = document.getElementById('va-cancel-btn');
+if (vaCancelBtn) { vaCancelBtn.addEventListener('click', closeVitalAssessmentModal); }
+if (vaModal) {
+  vaModal.addEventListener('click', (e) => {
+    if (e.target === vaModal) closeVitalAssessmentModal();
+  });
+}
+
+/**
+ * UNIFIED QUEUE MODULE (Rebuilt & Embedded)
+ */
+const appointments = (() => {
+  const state = { tickets: [], loading: false };
+
+  const init = async () => {
+    console.log('[Queue] Module init...');
+    setupUI();
+    setupRealtime();
+    await refresh();
+  };
+
+  const setupRealtime = async () => {
+    if (isDemoMode) return;
+    try {
+      const { supabase } = await loadSupabaseModule();
+      supabase
+        .channel('queue-board-updates')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'queue_tickets' }, (payload) => {
+          console.log('[Queue] Realtime update:', payload.eventType);
+          refresh();
+        })
+        .subscribe((status) => {
+          console.log('[Queue] Realtime status:', status);
+        });
+    } catch (err) {
+      console.error('[Queue] Failed to setup realtime:', err);
+    }
+  };
+
+  const setupUI = () => {
+    const refreshBtn = document.getElementById('queue-refresh-btn');
+    if (refreshBtn && !refreshBtn.dataset.bound) {
+      refreshBtn.addEventListener('click', refresh);
+      refreshBtn.dataset.bound = 'true';
+    }
+    const board = document.querySelector('.queue-board');
+    if (board && !board.dataset.bound) {
+      board.addEventListener('click', handleAction);
+      board.addEventListener('dragstart', handleDragStart);
+      board.addEventListener('dragover', handleDragOver);
+      board.addEventListener('dragleave', handleDragLeave);
+      board.addEventListener('drop', handleDrop);
+      board.dataset.bound = 'true';
+    }
+  };
+
+  const refresh = async () => {
+    if (state.loading) return;
+    state.loading = true;
+    try {
+      const { supabase } = await loadSupabaseModule();
+      const { data, error } = await supabase
+        .from('queue_tickets')
+        .select('*, citizen:citizens(*), vitals:vital_signs(id)')
+        .in('status', ['waiting', 'on_call', 'serving'])
+        .order('queue_number', { ascending: true });
+
+      if (error) throw error;
+      state.tickets = data || [];
+      console.log('[Queue] Synced tickets:', state.tickets.length);
+      render();
+    } catch (err) {
+      console.error('[Queue] Sync error:', err);
+    } finally {
+      state.loading = false;
+    }
+  };
+
+  const render = () => {
+    const getStatus = (t) => String(t.status || '').trim().toLowerCase();
+    const lanes = {
+      waiting: state.tickets.filter(t => getStatus(t) === 'waiting'),
+      on_call: state.tickets.filter(t => getStatus(t) === 'on_call'),
+      serving: state.tickets.filter(t => getStatus(t) === 'serving')
+    };
+
+    renderLane('queue-waiting-list', lanes.waiting);
+    renderLane('queue-oncall-list', lanes.on_call);
+    renderLane('queue-serving-list', lanes.serving);
+
+    const updateText = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+
+    updateText('queue-waiting-count', lanes.waiting.length);
+    updateText('queue-oncall-count', lanes.on_call.length);
+    updateText('queue-serving-count', lanes.serving.length);
+    updateText('queue-summary-badge', `Waiting: ${lanes.waiting.length} | On Call: ${lanes.on_call.length} | Serving: ${lanes.serving.length}`);
+    
+    // Support multiple serving tickets in the status badge
+    const servingNumbers = lanes.serving.map(t => `#${String(t.queue_number).padStart(3, '0')}`);
+    const servingBadge = document.getElementById('queue-current-serving-badge');
+    if (servingBadge) {
+      if (servingNumbers.length > 0) {
+        servingBadge.innerHTML = `
+          <span style="color:#0369a1; font-weight:800;">Currently Serving:</span> 
+          <span style="background:#0ea5e9; color:white; padding:1px 8px; border-radius:6px; font-family:monospace;">${servingNumbers.join(', ')}</span>
+        `;
+        servingBadge.style.display = 'inline-flex';
+      } else {
+        servingBadge.textContent = 'Current serving: none';
+      }
+    }
+  };
+
+  const renderLane = (id, list) => {
+    const container = document.getElementById(id);
+    if (!container) return;
+    if (list.length === 0) {
+      container.innerHTML = '<div class="queue-ticket-empty">No tickets.</div>';
+      return;
+    }
+    container.innerHTML = list.map(t => `
+      <div class="queue-ticket-card" data-id="${t.id}" draggable="true">
+        <div class="queue-ticket-top">
+          <span class="queue-ticket-queue">#${String(t.queue_number).padStart(3, '0')}</span>
+          ${(t.vitals && t.vitals.length > 0) ? '<span class="vitals-badge" title="Vital assessment completed">✓ Vitals</span>' : ''}
+          <span class="queue-ticket-code">${t.ticket_code}</span>
+        </div>
+        <div class="queue-ticket-name">${t.citizen?.firstname || ''} ${t.citizen?.surname || ''}</div>
+        <div class="queue-ticket-meta">${t.service_label}</div>
+        <div class="queue-ticket-actions">
+          ${getStatus(t) === 'waiting' ? '<button class="queue-ticket-btn" data-action="move" data-lane="on_call">On Call</button><button class="queue-ticket-btn" data-action="move" data-lane="serving">Serve</button>' : ''}
+          ${getStatus(t) === 'on_call' ? '<button class="queue-ticket-btn" data-action="move" data-lane="serving">Serve</button><button class="queue-ticket-btn btn-vital" data-action="vital">Vitals</button>' : ''}
+          ${getStatus(t) === 'serving' ? '<button class="queue-ticket-btn" data-action="complete">Complete</button>' : ''}
+        </div>
+      </div>`).join('');
+  };
+
+  const getStatus = (t) => String(t.status || '').trim().toLowerCase();
+
+  const handleAction = async (e) => {
+    const btn = e.target.closest('button');
+    const card = e.target.closest('.queue-ticket-card');
+    if (!card) return;
+
+    const id = card.dataset.id;
+
+    if (btn) {
+      const action = btn.dataset.action;
+      const lane = btn.dataset.lane;
+
+      try {
+        const { supabase } = await loadSupabaseModule();
+        if (action === 'move') {
+          await supabase.from('queue_tickets').update({ status: lane }).eq('id', id);
+        } else if (action === 'complete') {
+          await supabase.from('queue_tickets').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', id);
+        } else if (action === 'vital') {
+          const ticket = state.tickets.find(t => String(t.id) === String(id));
+          if (ticket) {
+            if (typeof openVitalAssessmentModal === 'function') {
+              await openVitalAssessmentModal(ticket);
+            }
+          }
+          return;
+        }
+        await refresh();
+      } catch (err) {
+        console.error('[Queue] Action error:', err);
+      }
+    } else {
+      // Clicked the card itself
+      openQueueTicketDetail(id);
+    }
+  };
+
+  const openQueueTicketDetail = (id) => {
+    const ticket = state.tickets.find(t => String(t.id) === String(id));
+    if (!ticket) return;
+
+    const modal = document.getElementById('queue-ticket-detail-modal');
+    const body = document.getElementById('queue-ticket-detail-body');
+    if (!modal || !body) return;
+
+    const citizen = ticket.citizen || {};
+    const fullName = `${citizen.firstname || ''} ${citizen.surname || ''}`.trim() || 'Guest Patient';
+    const age = citizen.age ? `${citizen.age} yrs` : 'Age N/A';
+    const gender = citizen.sex || 'Sex N/A';
+    const phone = citizen.contact_number || 'No phone';
+
+    body.innerHTML = `
+      <div style="background:#f8fafc; border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #e2e8f0;">
+        <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Patient Info</div>
+        <div style="font-size:18px; font-weight:800; color:#0f172a; margin-bottom:2px;">${fullName}</div>
+        <div style="font-size:13px; color:#475569; font-weight:500;">${age} | ${gender} | ${phone}</div>
+      </div>
+      
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
+          <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Queue Info</div>
+          <div style="font-size:16px; font-weight:700; color:#2563eb;">#${String(ticket.queue_number).padStart(3, '0')}</div>
+          <div style="font-size:12px; font-weight:600; color:#475569;">${ticket.ticket_code}</div>
+        </div>
+        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
+          <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Service</div>
+          <div style="font-size:14px; font-weight:700; color:#0f172a;">${ticket.service_label}</div>
+          <div style="font-size:12px; color:#64748b;">${new Date(ticket.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px; padding:12px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px;">
+        <div style="font-size:11px; color:#0369a1; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Status</div>
+        <div style="font-size:14px; font-weight:700; color:#0c4a6e; text-transform:capitalize;">${ticket.status?.replace('_', ' ') || 'Pending'}</div>
+      </div>
+    `;
+
+    modal.classList.remove('hidden');
+
+    const closeBtn = document.getElementById('queue-ticket-detail-close');
+    if (closeBtn) {
+      closeBtn.onclick = () => modal.classList.add('hidden');
+    }
+    
+    // Also handle delete if needed
+    const deleteBtn = document.getElementById('queue-ticket-delete-btn');
+    if (deleteBtn) {
+      deleteBtn.onclick = async () => {
+        if (!confirm('Are you sure you want to delete this queue ticket?')) return;
+        try {
+          const { supabase } = await loadSupabaseModule();
+          const { error } = await supabase.from('queue_tickets').delete().eq('id', id);
+          if (error) throw error;
+          showToast('Ticket deleted successfully.', 'success');
+          modal.classList.add('hidden');
+          refresh();
+        } catch (err) {
+          console.error('[Queue] Delete error:', err);
+          showToast('Failed to delete ticket.', 'error');
+        }
+      };
+    }
+
+    modal.onclick = (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    };
+  };
+
+  const handleDragStart = (e) => {
+    const card = e.target.closest('.queue-ticket-card');
+    if (!card) return;
+    card.classList.add('dragging');
+    e.dataTransfer.setData('text/plain', card.dataset.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    const lane = e.target.closest('.queue-card-list');
+    if (lane) lane.classList.add('drag-over');
+  };
+
+  const handleDragLeave = (e) => {
+    const lane = e.target.closest('.queue-card-list');
+    if (lane) lane.classList.remove('drag-over');
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    const lane = e.target.closest('.queue-card-list');
+    const ticketId = e.dataTransfer.getData('text/plain');
+    document.querySelectorAll('.queue-card-list').forEach(l => l.classList.remove('drag-over'));
+    document.querySelectorAll('.queue-ticket-card').forEach(c => c.classList.remove('dragging'));
+    if (!lane || !ticketId) return;
+    const targetStatus = lane.dataset.lane;
+    if (!targetStatus) return;
+    try {
+      const { supabase } = await loadSupabaseModule();
+      const { error } = await supabase.from('queue_tickets').update({ status: targetStatus }).eq('id', ticketId);
+      if (error) throw error;
+      await refresh();
+    } catch (err) {
+      console.error('[Queue] Drop error:', err);
+      showToast('Failed to update ticket status.', 'error');
+    }
+  };
+
+  return { init, loadQueueTickets: refresh };
+})();
+
+if (typeof appointments !== 'undefined') {
+  appointments.init().catch(console.error);
 }

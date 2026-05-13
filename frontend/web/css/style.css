@@ -199,8 +199,9 @@ select:focus {
 .actions {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-top: 6px;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 24px;
 }
 
 .btn {
@@ -387,20 +388,31 @@ select:focus {
 .modal-box {
     background: linear-gradient(145deg, #ffffff 0%, #fbfcff 100%);
     border-radius: var(--radius-lg);
-    padding: 36px 40px;
-    max-width: 420px;
-    width: 90%;
+    padding: 40px;
+    max-width: 520px;
+    width: 95%;
     box-shadow: 0 25px 65px rgba(15, 23, 42, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1);
     text-align: center;
     animation: modalSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-#announcement-detail-modal .modal-box {
-    position: relative;
-    text-align: left;
+@media (max-width: 640px) {
+    .modal-box {
+        padding: 24px 20px;
+        width: 100%;
+        border-radius: 0;
+        max-height: 100vh;
+        overflow-y: auto;
+    }
 }
 
-#announcement-detail-close.modal-close {
+.detail-modal .modal-box {
+    position: relative;
+    text-align: left;
+    max-width: 500px;
+}
+
+.detail-modal .modal-close {
     position: absolute;
     top: 10px;
     right: 12px;
@@ -418,27 +430,16 @@ select:focus {
     justify-content: center;
 }
 
-#announcement-detail-close.modal-close:hover {
+.detail-modal .modal-close:hover {
     background: rgba(148, 163, 184, 0.3);
 }
 
-#announcement-detail-title {
-    margin: 0 0 10px;
-    padding-right: 36px;
-}
-
-#announcement-detail-date,
-#announcement-detail-visibility {
-    margin: 0 0 6px;
-    color: #64748b;
-    font-size: 13px;
-}
-
-#announcement-detail-body {
+.detail-body {
     margin-top: 12px;
     color: #0f172a;
-    line-height: 1.5;
+    line-height: 1.6;
     white-space: pre-wrap;
+    font-size: 14px;
 }
 
 @keyframes modalSlideIn {
@@ -516,53 +517,133 @@ select:focus {
 
 .dialog-actions {
     justify-content: center;
-    gap: 10px;
+    gap: 16px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   VITAL SIGNS ASSESSMENT MODAL - MODERN UI
+   VITAL SIGNS ASSESSMENT MODAL - ENTERPRISE EMR UI
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .vital-assessment-modal {
-    max-width: 720px;
+    max-width: 920px;
     max-height: 90vh;
-    overflow-y: auto;
-    text-align: left;
-    padding: 0;
+    padding: 0 !important;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Modal Header */
 .vital-modal-header {
+    padding: 16px 24px;
+    background: #ffffff;
+    border-bottom: 1px solid #f1f5f9;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 24px 32px;
-    border-bottom: 2px solid #E8F5E9;
-    background: linear-gradient(135deg, #F8FAFB 0%, #F0F9FF 100%);
-    position: sticky;
-    top: 0;
-    z-index: 10;
+    flex-shrink: 0;
 }
 
 .vital-modal-title {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
 .vital-icon {
-    width: 28px;
-    height: 28px;
-    stroke: #28A745;
-    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    stroke: #0369a1;
 }
 
 .vital-modal-title h3 {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: #0F172A;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
     margin: 0;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.2px;
+}
+
+/* Patient Info Strip (Compact) */
+.vital-patient-banner {
+    background: #f8fafc;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-shrink: 0;
+}
+
+.patient-info-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.patient-avatar {
+    width: 32px;
+    height: 32px;
+    background: #e0f2fe;
+    color: #0369a1;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.patient-avatar svg {
+    width: 18px;
+    height: 18px;
+}
+
+.patient-details {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.patient-name {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.patient-meta {
+    font-size: 0.8125rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* Form Container with Custom Scrollbar */
+.vital-form {
+    padding: 24px 32px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.vital-form::-webkit-scrollbar {
+    width: 6px;
+}
+
+.vital-form::-webkit-scrollbar-track {
+    background: #ffffff;
+}
+
+.vital-form::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+
+.vital-form::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
 }
 
 .modal-close-btn {
@@ -570,7 +651,7 @@ select:focus {
     height: 36px;
     border-radius: 10px;
     border: none;
-    background: #F1F5F9;
+    background: #f1f5f9;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -579,29 +660,33 @@ select:focus {
 }
 
 .modal-close-btn:hover {
-    background: #E2E8F0;
+    background: #e2e8f0;
     transform: scale(1.05);
 }
 
 .modal-close-btn svg {
     width: 20px;
     height: 20px;
-    stroke: #64748B;
+    stroke: #64748b;
 }
 
 /* Patient Info Banner */
 .vital-patient-banner {
-    background: linear-gradient(135deg, #E0F2FE 0%, #DBEAFE 100%);
-    border: 2px solid #BAE6FD;
-    border-radius: 16px;
-    padding: 20px 24px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 20px;
     margin: 24px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .patient-info-row {
     display: flex;
     align-items: center;
     gap: 16px;
+    flex-wrap: wrap;
 }
 
 .patient-avatar {
@@ -666,96 +751,125 @@ select:focus {
     padding: 24px 32px 32px;
 }
 
-/* Section Styling */
+/* Section Headers */
 .vital-section {
-    margin-bottom: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .section-header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
-    border-bottom: 2px solid #E8F5E9;
+    gap: 8px;
+    margin-bottom: 4px;
 }
 
 .section-title {
-    font-size: 1.125rem;
+    font-size: 0.875rem;
     font-weight: 700;
-    color: #0F172A;
-    letter-spacing: -0.3px;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
-/* Labels */
+/* Inputs & Grid */
+.vital-signs-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+@media (max-width: 850px) {
+    .vital-signs-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .vital-signs-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.vital-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+}
+
 .vital-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #64748b;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #334155;
-    margin-bottom: 8px;
-    letter-spacing: 0.2px;
+    gap: 6px;
 }
 
-.vital-label.required::after {
-    content: '*';
-    color: #EF4444;
-    margin-left: 2px;
-    font-weight: 700;
+.label-svg, .vital-metric-svg {
+    width: 14px;
+    height: 14px;
+    stroke: #0ea5e9;
+    flex-shrink: 0;
 }
 
-.label-icon {
-    font-size: 1.125rem;
-    line-height: 1;
+.vitals-badge {
+    background: #DCFCE7;
+    color: #166534;
+    font-size: 0.6875rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid #BBF7D0;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    pointer-events: auto;
+    cursor: help;
 }
 
-.vital-metric-icon {
-    font-size: 1rem;
-    line-height: 1;
-}
-
-/* Input Fields */
 .vital-input {
-    width: 100%;
-    padding: 12px 16px;
-    border: 2px solid #E2E8F0;
-    border-radius: 12px;
-    font-size: 0.9375rem;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.875rem;
     font-weight: 500;
-    color: #0F172A;
-    background: #FFFFFF;
-    transition: all 0.2s ease;
-    font-family: inherit;
+    color: #0f172a;
+    background: #ffffff;
+    transition: all 0.1s ease;
 }
 
 .vital-input:focus {
     outline: none;
-    border-color: #28A745;
-    box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
-}
-
-.vital-input::placeholder {
-    color: #94A3B8;
-    font-weight: 400;
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
 }
 
 .vital-textarea {
-    resize: vertical;
+    height: auto;
     min-height: 80px;
-    line-height: 1.5;
+    padding: 10px 12px;
+    line-height: 1.4;
+    resize: none;
 }
 
-/* Vital Signs Grid */
-.vital-signs-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
+.vital-unit {
+    position: absolute;
+    right: 12px;
+    bottom: 11px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #94a3b8;
+    pointer-events: none;
 }
 
-.vital-field {
-    position: relative;
+.vital-field input {
+    padding-right: 50px;
 }
 
 .vital-unit {
@@ -774,14 +888,13 @@ select:focus {
 
 /* Error Message */
 .vital-error {
-    background: #FEE2E2;
-    border: 1.5px solid #FCA5A5;
-    border-radius: 10px;
-    padding: 12px 16px;
-    color: #991B1B;
-    font-size: 0.875rem;
+    background: #fef2f2;
+    border: 1px solid #fee2e2;
+    border-radius: 8px;
+    padding: 10px 16px;
+    color: #991b1b;
+    font-size: 0.8125rem;
     font-weight: 600;
-    margin-bottom: 20px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -795,35 +908,37 @@ select:focus {
 /* Action Buttons */
 .vital-actions {
     display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    padding-top: 24px;
-    border-top: 2px solid #F1F5F9;
+    justify-content: center;
+    padding: 20px 32px 24px;
+    border-top: 1px solid #f1f5f9;
+    background: #ffffff;
+    flex-shrink: 0;
 }
 
 .vital-btn {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 14px 28px;
-    border-radius: 12px;
-    font-size: 0.9375rem;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 24px;
+    border-radius: 10px;
+    font-size: 0.875rem;
     font-weight: 700;
     border: none;
     cursor: pointer;
     transition: all 0.2s ease;
-    letter-spacing: 0.3px;
 }
 
 .vital-btn-primary {
-    background: linear-gradient(135deg, #28A745 0%, #1B5E20 100%);
+    background: #0369a1;
     color: white;
-    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .vital-btn-primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+    background: #075985;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(3, 105, 161, 0.2);
 }
 
 .vital-btn-primary:active:not(:disabled) {
@@ -849,23 +964,6 @@ select:focus {
     display: inline-block;
 }
 
-/* Scrollbar Styling */
-.vital-assessment-modal::-webkit-scrollbar {
-    width: 10px;
-}
-
-.vital-assessment-modal::-webkit-scrollbar-track {
-    background: #F8FAFC;
-}
-
-.vital-assessment-modal::-webkit-scrollbar-thumb {
-    background: #CBD5E1;
-    border-radius: 5px;
-}
-
-.vital-assessment-modal::-webkit-scrollbar-thumb:hover {
-    background: #94A3B8;
-}
 
 /* Responsive Design */
 @media (max-width: 768px) {
@@ -923,6 +1021,7 @@ select:focus {
     box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
     background: #fff;
 }
+
 
 .queue-selection-modal .modal-box {
     max-width: 550px;

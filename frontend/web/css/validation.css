@@ -1,0 +1,211 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * INPUT VALIDATION STYLES - WEB APPLICATION
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Purpose: Visual styling for validation states and error messages
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* Input Error State */
+/* ───────────────────────────────────────────────────────────────────────── */
+
+.input-error {
+    border-color: #dc3545 !important;
+    background-color: #fff5f5 !important;
+}
+
+.input-error:focus {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* Field Error Message */
+/* ───────────────────────────────────────────────────────────────────────── */
+
+.field-error-message {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    animation: slideDown 0.2s ease-out;
+}
+
+.field-error-message::before {
+    content: '⚠';
+    margin-right: 0.25rem;
+    font-size: 1rem;
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* Form Error Message */
+/* ───────────────────────────────────────────────────────────────────────── */
+
+.form-error-message {
+    background-color: #f8d7da;
+    border: 1px solid #f5c2c7;
+    border-radius: 0.375rem;
+    color: #842029;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    animation: slideDown 0.3s ease-out;
+}
+
+.form-error-message::before {
+    content: '✕';
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: 0.75rem;
+    background-color: #dc3545;
+    color: white;
+    border-radius: 50%;
+    font-weight: bold;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* Input Success State (Optional) */
+/* ───────────────────────────────────────────────────────────────────────── */
+
+.input-success {
+    border-color: #28a745 !important;
+    background-color: #f0fdf4 !important;
+}
+
+.input-success:focus {
+    border-color: #28a745 !important;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25) !important;
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* Animations */
+/* ───────────────────────────────────────────────────────────────────────── */
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-5px);
+    }
+    20%, 40%, 60%, 80% {
+        transform: translateX(5px);
+    }
+}
+
+.input-error.shake {
+    animation: shake 0.5s ease-in-out;
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* Required Field Indicator */
+/* ───────────────────────────────────────────────────────────────────────── */
+
+.required-field::after {
+    content: '*';
+    color: #dc3545;
+    margin-left: 0.25rem;
+    font-weight: bold;
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* Validation Tooltip (Optional) */
+/* ───────────────────────────────────────────────────────────────────────── */
+
+.validation-tooltip {
+    position: absolute;
+    background-color: #dc3545;
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    z-index: 1000;
+    white-space: nowrap;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.validation-tooltip::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 5px solid #dc3545;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* Form Group Spacing */
+/* ───────────────────────────────────────────────────────────────────────── */
+
+.form-group {
+    margin-bottom: 1.5rem;
+    position: relative;
+}
+
+.form-group.has-error {
+    margin-bottom: 2rem; /* Extra space for error message */
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* Responsive Adjustments */
+/* ───────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 576px) {
+    .field-error-message {
+        font-size: 0.8125rem;
+    }
+
+    .form-error-message {
+        padding: 0.625rem 0.875rem;
+        font-size: 0.875rem;
+    }
+}
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* Dark Mode Support (Optional) */
+/* ───────────────────────────────────────────────────────────────────────── */
+
+@media (prefers-color-scheme: dark) {
+    .input-error {
+        background-color: #2d1517 !important;
+        border-color: #dc3545 !important;
+    }
+
+    .form-error-message {
+        background-color: #2d1517;
+        border-color: #dc3545;
+        color: #f8d7da;
+    }
+}

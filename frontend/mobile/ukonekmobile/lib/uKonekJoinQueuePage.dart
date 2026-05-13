@@ -43,6 +43,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
 
   late Future<QueueDashboardSnapshot> _dashboardFuture;
   late Future<List<QueueServiceOption>> _servicesFuture;
+  late Future<QueueLimiterStatus> _limiterStatusFuture;
   Timer? _refreshTimer;
   int _selectedTab = 2;
 
@@ -69,6 +70,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
   void _loadInitialData() {
     _dashboardFuture = ApiService.getMyQueueDashboard();
     _servicesFuture  = ApiService.listAvailableQueueServices();
+    _limiterStatusFuture = ApiService.getQueueLimiterStatus();
     
     // Check if citizen has active queue and start timer accordingly
     _dashboardFuture.then((snapshot) {
@@ -107,6 +109,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
     if (!mounted) return;
     setState(() { 
       _dashboardFuture = ApiService.getMyQueueDashboard();
+      _limiterStatusFuture = ApiService.getQueueLimiterStatus();
     });
     
     // Re-check if we should continue refreshing
@@ -127,6 +130,61 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
     _reasonController.dispose();
     _symptomsController.dispose();
     super.dispose();
+  }
+
+  void _showServiceSearchModal(List<QueueServiceOption> services) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return _ServiceSearchModal(
+          services: services,
+          onSelected: (service) {
+            setState(() => _selectedService = service);
+            Navigator.pop(context);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchableServicePicker(List<QueueServiceOption> services) {
+    return InkWell(
+      onTap: () => _showServiceSearchModal(services),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _C.fieldBorder),
+          boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 8, offset: Offset(0, 3))],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(color: _C.primaryLight, borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.medical_services_outlined, size: 16, color: _C.primaryMid),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _selectedService?.serviceLabel ?? 'Choose a healthcare service',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: _selectedService != null ? FontWeight.w600 : FontWeight.normal,
+                  color: _selectedService != null ? _C.textDark : _C.textMuted.withOpacity(0.6),
+                ),
+              ),
+            ),
+            const Icon(Icons.search_rounded, color: _C.primary, size: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _handleJoin() async {
@@ -314,34 +372,165 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
                 const Expanded(child: Text('Fill in your visit details below to get a queue number.', style: TextStyle(fontSize: 12, color: _C.primaryMid, height: 1.4))),
               ]),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
-            // ── Service selection ───────────────────────────────
+            // ── Queue Limiter Status ────────────────────────────
+            FutureBuilder<QueueLimiterStatus>(
+              future: _limiterStatusFuture,
+              builder: (context, limiterSnapshot) {
+                final limiterStatus = limiterSnapshot.data;
+                if (limiterStatus == null || !limiterStatus.enabled) {
+                  return const SizedBox.shrink();
+                }
+
+                // Show limit reached warning
+                if (limiterStatus.limitReached) {
+                  return Column(children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEE2E2),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFFCA5A5)),
+                      ),
+                      child: Column(children: [
+                        Row(children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.event_busy_rounded, color: Colors.white, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Consultations Full',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF991B1B),
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Daily limit reached',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF991B1B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ]),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'We\'ve reached our daily consultation limit of ${limiterStatus.dailyLimit} patients for today due to high demand.',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF991B1B),
+                                  height: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'What you can do:',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF991B1B),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              _buildLimiterTip(Icons.schedule_rounded, 'Try again tomorrow when slots reset'),
+                              _buildLimiterTip(Icons.phone_rounded, 'Call the clinic for scheduling assistance'),
+                              _buildLimiterTip(Icons.emergency_rounded, 'For emergencies, visit immediately'),
+                            ],
+                          ),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 16),
+                  ]);
+                }
+
+                // Show remaining slots info
+                if (limiterStatus.remainingSlots <= 5) {
+                  return Column(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF9C3),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFFDE047)),
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.warning_amber_rounded, color: Color(0xFF854D0E), size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Only ${limiterStatus.remainingSlots} consultation slots remaining today!',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF854D0E),
+                              fontWeight: FontWeight.w600,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 16),
+                  ]);
+                }
+
+                // Show available slots info
+                return Column(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF86EFAC)),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF166534), size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${limiterStatus.remainingSlots} of ${limiterStatus.dailyLimit} consultation slots available',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF166534),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(height: 16),
+                ]);
+              },
+            ),
+
             _sectionLabel('HEALTHCARE SERVICE', Icons.medical_services_outlined),
             const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(color: _C.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: _C.fieldBorder), boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 8, offset: Offset(0, 3))]),
-              child: DropdownButtonFormField<QueueServiceOption>(
-                value: services.contains(_selectedService) ? _selectedService : null,
-                dropdownColor: _C.surface,
-                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _C.primary),
-                decoration: InputDecoration(
-                  hintText: 'Choose a healthcare service',
-                  hintStyle: TextStyle(color: _C.textMuted.withOpacity(0.6), fontSize: 14),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                ),
-                items: services.map((s) => DropdownMenuItem(
-                  value: s,
-                  child: Row(children: [
-                    Container(width: 32, height: 32, decoration: BoxDecoration(color: _C.primaryLight, borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.medical_services_outlined, size: 16, color: _C.primaryMid)),
-                    const SizedBox(width: 12),
-                    Text(s.serviceLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _C.textDark)),
-                  ]),
-                )).toList(),
-                onChanged: (val) => setState(() => _selectedService = val),
-              ),
-            ),
+            _buildSearchableServicePicker(services),
             const SizedBox(height: 24),
 
             // ── Priority category ───────────────────────────────
@@ -359,26 +548,39 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
             const SizedBox(height: 32),
 
             // ── Submit button ───────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _handleJoin,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _C.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 4,
-                  shadowColor: _C.primary.withOpacity(0.35),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                ),
-                child: _isSubmitting
-                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                    : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(Icons.confirmation_number_rounded, size: 20),
-                  SizedBox(width: 10),
-                  Text('GET QUEUE NUMBER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5)),
-                ]),
-              ),
+            FutureBuilder<QueueLimiterStatus>(
+              future: _limiterStatusFuture,
+              builder: (context, limiterSnapshot) {
+                final limiterStatus = limiterSnapshot.data;
+                final isLimitReached = limiterStatus?.limitReached ?? false;
+                
+                return SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: (_isSubmitting || isLimitReached) ? null : _handleJoin,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isLimitReached ? Colors.grey : _C.primary,
+                      foregroundColor: Colors.white,
+                      elevation: isLimitReached ? 0 : 4,
+                      shadowColor: _C.primary.withOpacity(0.35),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      disabledForegroundColor: Colors.grey.shade600,
+                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                        : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(isLimitReached ? Icons.block_rounded : Icons.confirmation_number_rounded, size: 20),
+                      const SizedBox(width: 10),
+                      Text(
+                        isLimitReached ? 'LIMIT REACHED' : 'GET QUEUE NUMBER',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5),
+                      ),
+                    ]),
+                  ),
+                );
+              },
             ),
           ]),
         );
@@ -451,7 +653,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
     final isTurn      = ahead <= 0;
     final isOnCall    = queue.isOnCall;
     final Color statusColor = isOnCall ? _C.warning : (isTurn ? _C.success : _C.primaryMid);
-    final String statusMsg  = isOnCall ? 'You\'re being called!' : (isTurn ? 'Please proceed to clinic' : '$ahead ${ahead == 1 ? 'person' : 'people'} ahead of you');
+    final String statusMsg  = isOnCall ? 'You\'re being called!' : (isTurn ? 'Please proceed to the doctor\'s office for consultation' : '$ahead ${ahead == 1 ? 'person' : 'people'} ahead of you');
     final IconData statusIcon = isOnCall ? Icons.campaign_rounded : (isTurn ? Icons.check_circle_rounded : Icons.groups_rounded);
 
     return SingleChildScrollView(
@@ -473,7 +675,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
             Container(width: 42, height: 42, decoration: BoxDecoration(color: statusColor.withOpacity(0.15), shape: BoxShape.circle), child: Icon(statusIcon, color: statusColor, size: 22)),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Now Serving #${(queue.currentlyServingQueueNumber ?? 0).toString().padLeft(3, '0')}',
+              Text(isOnCall ? 'PLEASE PROCEED' : (isTurn && queue.status == 'serving' ? 'YOU ARE NOW SERVING' : 'NOW SERVING #${(queue.currentlyServingQueueNumber ?? 0).toString().padLeft(3, '0')}'),
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor, letterSpacing: 0.5)),
               const SizedBox(height: 2),
               Text(statusMsg, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.textDark)),
@@ -677,5 +879,149 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
       const SizedBox(width: 8),
       Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: _C.textMuted, letterSpacing: 1.1)),
     ]);
+  }
+
+  Widget _buildLimiterTip(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: const Color(0xFF991B1B)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF991B1B),
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceSearchModal extends StatefulWidget {
+  final List<QueueServiceOption> services;
+  final Function(QueueServiceOption) onSelected;
+
+  const _ServiceSearchModal({required this.services, required this.onSelected});
+
+  @override
+  State<_ServiceSearchModal> createState() => _ServiceSearchModalState();
+}
+
+class _ServiceSearchModalState extends State<_ServiceSearchModal> {
+  final TextEditingController _searchController = TextEditingController();
+  List<QueueServiceOption> _filteredServices = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredServices = widget.services;
+  }
+
+  void _filterServices(String query) {
+    setState(() {
+      _filteredServices = widget.services
+          .where((s) => s.serviceLabel.toLowerCase().contains(query.toLowerCase()))
+          .toList();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    return Container(
+      height: mq.size.height * 0.75,
+      decoration: const BoxDecoration(
+        color: _C.bg,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(children: [
+        Container(
+          margin: const EdgeInsets.symmetric(vertical: 12),
+          width: 40, height: 4,
+          decoration: BoxDecoration(color: _C.textMuted.withOpacity(0.2), borderRadius: BorderRadius.circular(2)),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(children: [
+            const Text('Select Healthcare Service', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _C.textDark)),
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: _C.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _C.fieldBorder),
+              ),
+              child: TextField(
+                controller: _searchController,
+                onChanged: _filterServices,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search healthcare service...',
+                  hintStyle: TextStyle(color: _C.textMuted.withOpacity(0.5), fontSize: 14),
+                  prefixIcon: const Icon(Icons.search_rounded, color: _C.primary),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 15),
+                ),
+              ),
+            ),
+          ]),
+        ),
+        Expanded(
+          child: _filteredServices.isEmpty
+              ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.search_off_rounded, size: 48, color: _C.textMuted.withOpacity(0.3)),
+                    const SizedBox(height: 12),
+                    Text('No services found', style: TextStyle(color: _C.textMuted.withOpacity(0.6), fontSize: 14)),
+                  ],
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                  itemCount: _filteredServices.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final s = _filteredServices[index];
+                    return InkWell(
+                      onTap: () => widget.onSelected(s),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: _C.surface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: _C.fieldBorder),
+                        ),
+                        child: Row(children: [
+                          Container(
+                            width: 36, height: 36,
+                            decoration: BoxDecoration(color: _C.primaryLight, borderRadius: BorderRadius.circular(10)),
+                            child: const Icon(Icons.medical_services_outlined, size: 18, color: _C.primaryMid),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(child: Text(s.serviceLabel, style: const TextStyle(fontWeight: FontWeight.w600, color: _C.textDark, fontSize: 14))),
+                          const Icon(Icons.chevron_right_rounded, color: _C.textMuted, size: 20),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ]),
+    );
   }
 }

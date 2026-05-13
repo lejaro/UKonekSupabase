@@ -3,14 +3,14 @@ import 'package:intl/intl.dart';
 import 'services/api_service.dart';
 
 class _C {
-  static const primary      = Color(0xFF0A2E6E);
-  static const primaryMid   = Color(0xFF1565C0);
-  static const primaryLight = Color(0xFF1976D2);
-  static const bg           = Color(0xFFF0F4FA);
+  static const primary      = Color(0xFF1B5E20);
+  static const primaryMid   = Color(0xFF28A745);
+  static const primaryLight = Color(0xFF48C76A);
+  static const bg           = Color(0xFFF8FCF9);
   static const surface      = Colors.white;
-  static const textDark     = Color(0xFF1A2740);
-  static const textMuted    = Color(0xFF8A93A0);
-  static const divider      = Color(0xFFEEF1F6);
+  static const textDark     = Color(0xFF1B2E1E);
+  static const textMuted    = Color(0xFF637367);
+  static const divider      = Color(0xFFE2E9E3);
   static const success      = Color(0xFF10B981);
   static const warning      = Color(0xFFF59E0B);
   static const shadow       = Color(0x0A000000);
@@ -319,7 +319,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                   const Icon(Icons.medication_rounded, size: 14, color: _C.primaryMid),
                   const SizedBox(width: 6),
                   Expanded(child: Text(
-                    '${item.medicineName}${item.dosage.isNotEmpty ? " ${item.dosage}" : ""}${item.frequency.isNotEmpty ? " — ${item.frequency}" : ""}',
+                    '${item.medicineName}${item.dosage.isNotEmpty ? " ${item.dosage}" : ""}${item.frequency.isNotEmpty ? " — ${item.frequency}" : ""}${item.duration.isNotEmpty ? " (${item.duration})" : ""}',
                     style: const TextStyle(fontSize: 13, color: _C.textDark),
                     maxLines: 1, overflow: TextOverflow.ellipsis,
                   )),
@@ -493,6 +493,10 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
         if (item.frequency.isNotEmpty) ...[
           const SizedBox(height: 10),
           _infoRow(Icons.schedule_rounded, 'Frequency', item.frequency),
+        ],
+        if (item.duration.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          _infoRow(Icons.timer_outlined, 'Duration', item.duration),
         ],
         if (item.instructions.isNotEmpty) ...[
           const SizedBox(height: 8),

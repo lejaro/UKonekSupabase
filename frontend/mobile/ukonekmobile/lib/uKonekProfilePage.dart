@@ -94,6 +94,51 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
     _emergencyName    = widget.emergencyName;
     _emergencyContact = widget.emergencyContact;
     _relation         = widget.relation;
+    _refreshProfile();
+  }
+
+  bool _loading = false;
+  Future<void> _refreshProfile() async {
+    setState(() => _loading = true);
+    try {
+      final p = await ApiService.fetchMyCitizenProfile();
+      setState(() {
+        _firstName        = p['firstname'] ?? '';
+        _surname          = p['surname'] ?? '';
+        _middleName       = p['middle_initial'] ?? '';
+        _dob              = p['date_of_birth'] ?? '';
+        _age              = (p['age'] ?? '').toString();
+        _sex              = p['sex'] ?? '';
+        _email            = p['email'] ?? '';
+        _phone            = p['contact_number'] ?? '';
+        _address          = p['complete_address'] ?? '';
+        _emergencyName    = p['emergency_contact_complete_name'] ?? '';
+        _emergencyContact = p['emergency_contact_contact_number'] ?? '';
+        _relation         = p['relation'] ?? '';
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() => _loading = false);
+      debugPrint('Error fetching profile: $e');
+    }
+  }
+
+  String? _mapLabelToDbKey(String label) {
+    switch (label) {
+      case 'First Name':     return 'firstname';
+      case 'Middle Name':    return 'middle_initial';
+      case 'Last Name':      return 'surname';
+      case 'Date of Birth':  return 'date_of_birth';
+      case 'Age':            return 'age';
+      case 'Sex':            return 'sex';
+      case 'Email':          return 'email';
+      case 'Phone':          return 'contact_number';
+      case 'Address':        return 'complete_address';
+      case 'Contact Name':   return 'emergency_contact_complete_name';
+      case 'Contact Number': return 'emergency_contact_contact_number';
+      case 'Relationship':   return 'relation';
+      default: return null;
+    }
   }
 
   String get _displayName {
@@ -141,7 +186,7 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
             const SizedBox(height: 24),
             const Text('Patient Digital ID', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _C.textDark)),
             const SizedBox(height: 8),
-            const Text('Present this QR code for dental clinic check-in', style: TextStyle(color: _C.textMuted, fontSize: 13)),
+            const Text('Present this QR code for medical clinic check-in', style: TextStyle(color: _C.textMuted, fontSize: 13)),
             const SizedBox(height: 24),
             Container(
               padding: const EdgeInsets.all(16),
@@ -566,13 +611,31 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
                 width: double.infinity, height: 52,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: _C.primary, foregroundColor: Colors.white, elevation: 4, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                  onPressed: () {
+                  onPressed: () async {
                     if (formKey.currentState!.validate()) {
-                      setState(() {
-                        for (final f in fields) { f.setter(controllers[f.label]!.text.trim()); }
-                      });
-                      Navigator.pop(context);
-                      _snack('✅ $title updated successfully!', _C.success);
+                      final updatedData = <String, dynamic>{};
+                      for (final f in fields) {
+                        final dbKey = _mapLabelToDbKey(f.label);
+                        if (dbKey != null) {
+                          var val = controllers[f.label]!.text.trim();
+                          if (dbKey == 'age') {
+                            updatedData[dbKey] = int.tryParse(val) ?? 0;
+                          } else {
+                            updatedData[dbKey] = val;
+                          }
+                        }
+                      }
+                      
+                      try {
+                        await ApiService.updateMyCitizenProfile(updatedData);
+                        setState(() {
+                          for (final f in fields) { f.setter(controllers[f.label]!.text.trim()); }
+                        });
+                        Navigator.pop(context);
+                        _snack('✅ $title updated successfully!', _C.success);
+                      } catch (e) {
+                        _snack('Error updating profile: $e', Colors.redAccent);
+                      }
                     }
                   },
                   child: const Row(
