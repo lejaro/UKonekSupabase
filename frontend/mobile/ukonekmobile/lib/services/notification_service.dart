@@ -9,6 +9,8 @@ class NotificationService {
 
   static Future<void> init() async {
     tz.initializeTimeZones();
+    // Set local location to Asia/Manila (Clinic Location)
+    tz.setLocalLocation(tz.getLocation('Asia/Manila'));
     
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');

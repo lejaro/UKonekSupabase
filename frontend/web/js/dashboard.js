@@ -783,6 +783,15 @@ function applyRoleAccess(user) {
   applyRoleLogos(user?.role || 'nurse');
   applyConsultationAccess();
 
+  // Update main dashboard titles based on role
+  const mainDashTitle = document.getElementById('main-dashboard-title');
+  const mainTopbarTitle = document.getElementById('main-topbar-title');
+  if (mainDashTitle || mainTopbarTitle) {
+    const roleText = (role === 'doctor' || role === 'admin') ? 'Doctor' : toTitleCase(role);
+    if (mainDashTitle) mainDashTitle.textContent = `${roleText} Dashboard`;
+    if (mainTopbarTitle) mainTopbarTitle.textContent = `${roleText} Systems Overview`;
+  }
+
   const nonAdminSection = document.getElementById('non-admin-section');
   if (adminAccess) {
     if (nonAdminSection) nonAdminSection.classList.add('hidden');

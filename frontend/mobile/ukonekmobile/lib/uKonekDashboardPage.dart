@@ -340,7 +340,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                           const Text('PHARMACY VERIFICATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF637367), letterSpacing: 1)),
                           const SizedBox(height: 12),
                           QrImageView(
-                            data: 'RX-$prescriptionCode-${widget.citizenId}',
+                            data: prescriptionCode,
                             version: QrVersions.auto,
                             size: 140.0,
                             eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF1B5E20)),
