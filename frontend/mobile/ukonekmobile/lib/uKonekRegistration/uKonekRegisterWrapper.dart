@@ -143,8 +143,7 @@ class _uKonekRegisterWrapperState
           contact:          '+63${contactController.text}',
           sex:              selectedSex,
           email:            emailController.text,
-          address:
-          '${houseNumberController.text} ${streetNameController.text}, Brgy. ${barangayController.text}',
+          address: 'Brgy. ${barangayController.text}',
           emergencyName:    emergencyNameController.text,
           emergencyContact: emergencyContactController.text.isEmpty
               ? ''
