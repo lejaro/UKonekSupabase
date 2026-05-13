@@ -843,7 +843,7 @@
 
               <div class="field">
                 <label class="inputLabel" for="vitals-complaint">Chief Complaint</label>
-                <textarea id="vitals-complaint" class="manual-entry-input" rows="2" style="width: 100%;" placeholder="What is the patient feeling?" required></textarea>
+                <textarea id="vitals-complaint" class="manual-entry-input" rows="2" style="width: 100%;" placeholder="What is the patient feeling?"></textarea>
               </div>
 
               <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
@@ -1542,7 +1542,7 @@
 
             <!-- Chief Complaint -->
             <div class="vital-section">
-              <label class="vital-label required" for="va-chief-complaint">
+              <label class="vital-label" for="va-chief-complaint">
                 <svg class="label-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
                 Chief Complaint
               </label>
@@ -1551,7 +1551,6 @@
                 class="vital-input vital-textarea" 
                 rows="2" 
                 placeholder="What is the patient's main concern or reason for visit?"
-                required
               ></textarea>
             </div>
 
@@ -1855,7 +1854,7 @@
             <div id="tab-diagnosis" class="tab-content">
               <div class="assessment-field-grid">
                 <div class="field">
-                  <label class="inputLabel">Primary Diagnosis</label>
+                  <label class="inputLabel required-label">Primary Diagnosis <span style="color: #ef4444;">*</span></label>
                   <input id="consult-diagnosis" class="manual-entry-input" required placeholder="Main clinical finding" />
                 </div>
                 <div class="field">

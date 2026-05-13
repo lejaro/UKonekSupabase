@@ -107,9 +107,9 @@ BEGIN
     -- Count tickets created today
     SELECT COUNT(*)
     INTO v_count
-    FROM public.queue_tickets
     WHERE created_at >= v_today_start
-      AND created_at < v_today_end;
+      AND created_at < v_today_end
+      AND status != 'cancelled';
     
     RETURN COALESCE(v_count, 0);
 END;

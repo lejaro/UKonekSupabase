@@ -37,6 +37,14 @@ const logoutBtn    = document.getElementById('ph-logout-btn');
 const userNameEl   = document.getElementById('ph-user-name');
 const listSubtitle = document.getElementById('ph-list-subtitle');
 
+// Delete modal DOM refs
+const deleteModal    = document.getElementById('ph-delete-modal');
+const deleteMedName  = document.getElementById('delete-med-name');
+const deleteConfirmBtn = document.getElementById('delete-confirm-btn');
+const deleteCancelBtn = document.getElementById('delete-cancel-btn');
+
+let pendingDeleteId = null;
+
 // Dispense prescription DOM refs
 const rxCodeInput       = document.getElementById('rx-code-input');
 const rxLookupBtn       = document.getElementById('rx-lookup-btn');
@@ -53,6 +61,16 @@ const rxConfirmBtn      = document.getElementById('rx-confirm-dispense-btn');
 const rxDispensedNotice = document.getElementById('rx-dispensed-notice');
 const rxDispensedBy     = document.getElementById('rx-dispensed-by');
 const rxCancelledNotice = document.getElementById('rx-cancelled-notice');
+
+// Confirmation modal DOM refs
+const confirmAddModal    = document.getElementById('ph-confirm-add-modal');
+const confirmAddName     = document.getElementById('confirm-add-name');
+const confirmAddQty      = document.getElementById('confirm-add-qty');
+const confirmAddExpiry   = document.getElementById('confirm-add-expiry');
+const confirmAddCancel   = document.getElementById('confirm-add-cancel-btn');
+const confirmAddSubmit   = document.getElementById('confirm-add-submit-btn');
+
+let pendingAddData = null;
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function showToast(message, type = 'info') {
@@ -249,7 +267,10 @@ function renderMedicines() {
       <td><span class="badge ${stock.cls}">${stock.label}</span></td>
       <td><span class="badge ${expiry.cls}">${expiry.label}</span></td>
       <td>
-        <button class="ph-btn ph-btn-edit ph-btn-sm" data-action="edit" data-id="${m.id}">Edit</button>
+        <div style="display:flex; gap:6px;">
+          <button class="ph-btn ph-btn-edit ph-btn-sm" data-action="edit" data-id="${m.id}">Edit</button>
+          <button class="ph-btn ph-btn-delete ph-btn-sm" data-action="delete" data-id="${m.id}">Delete</button>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
@@ -350,7 +371,7 @@ async function saveMedicine({ id = null, name, description, qty, unit, expiry_da
 
 // ── Add form ──────────────────────────────────────────────────────────────────
 if (addForm) {
-  addForm.addEventListener('submit', async (e) => {
+  addForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const name   = document.getElementById('add-name').value.trim();
     const qty    = Number(document.getElementById('add-qty').value);
@@ -361,17 +382,47 @@ if (addForm) {
     if (!name) { showToast('Medicine name is required.', 'warning'); return; }
     if (qty < 0) { showToast('Stock quantity cannot be negative.', 'warning'); return; }
 
-    setLoading(addSubmitBtn, true);
+    pendingAddData = { id: null, name, description: desc, qty, unit, expiry_date: expiry };
+    
+    // Show confirmation modal
+    if (confirmAddName) confirmAddName.textContent = name;
+    if (confirmAddQty) confirmAddQty.textContent = `${qty} ${unit || ''}`.trim();
+    if (confirmAddExpiry) confirmAddExpiry.textContent = expiry ? formatDate(expiry) : 'No expiration set';
+    
+    if (confirmAddModal) {
+      confirmAddModal.classList.remove('hidden');
+      confirmAddModal.style.display = 'flex';
+    }
+  });
+}
+
+if (confirmAddCancel) {
+  confirmAddCancel.addEventListener('click', () => {
+    confirmAddModal.classList.add('hidden');
+    confirmAddModal.style.display = 'none';
+    pendingAddData = null;
+  });
+}
+
+if (confirmAddSubmit) {
+  confirmAddSubmit.addEventListener('click', async () => {
+    if (!pendingAddData) return;
+    
+    setLoading(confirmAddSubmit, true);
     try {
-      await saveMedicine({ id: null, name, description: desc, qty, unit, expiry_date: expiry });
+      await saveMedicine(pendingAddData);
       await loadMedicines();
       renderMedicines();
       addForm.reset();
-      showToast(`"${name}" added to inventory.`, 'success');
+      showToast(`"${pendingAddData.name}" added to inventory.`, 'success');
+      
+      confirmAddModal.classList.add('hidden');
+      confirmAddModal.style.display = 'none';
+      pendingAddData = null;
     } catch (err) {
       showToast(err.message || 'Failed to add medicine.', 'error');
     } finally {
-      setLoading(addSubmitBtn, false);
+      setLoading(confirmAddSubmit, false);
     }
   });
 }
@@ -388,8 +439,69 @@ if (tbody) {
 
     if (action === 'edit') {
       openEditModal(med);
+    } else if (action === 'delete') {
+      openDeleteModal(med);
     }
   });
+}
+
+// ── Delete modal ──────────────────────────────────────────────────────────────
+function openDeleteModal(med) {
+  pendingDeleteId = med.id;
+  if (deleteMedName) deleteMedName.textContent = med.name;
+  if (deleteModal) {
+    deleteModal.classList.remove('hidden');
+    deleteModal.style.display = 'flex';
+  }
+}
+
+if (deleteCancelBtn) {
+  deleteCancelBtn.addEventListener('click', () => {
+    deleteModal.classList.add('hidden');
+    deleteModal.style.display = 'none';
+    pendingDeleteId = null;
+  });
+}
+
+if (deleteConfirmBtn) {
+  deleteConfirmBtn.addEventListener('click', async () => {
+    if (pendingDeleteId === null) return;
+    
+    setLoading(deleteConfirmBtn, true);
+    try {
+      await deleteMedicine(pendingDeleteId);
+      await loadMedicines();
+      renderMedicines();
+      showToast('Medicine successfully deleted.', 'success');
+      
+      deleteModal.classList.add('hidden');
+      deleteModal.style.display = 'none';
+      pendingDeleteId = null;
+    } catch (err) {
+      showToast(err.message || 'Failed to delete medicine.', 'error');
+    } finally {
+      setLoading(deleteConfirmBtn, false);
+    }
+  });
+}
+
+async function deleteMedicine(id) {
+  if (isDemoMode) {
+    const idx = medicines.findIndex(m => m.id === id);
+    if (idx !== -1) {
+      medicines.splice(idx, 1);
+      localStorage.setItem('ukonek_medicines', JSON.stringify(medicines));
+    }
+    return;
+  }
+
+  const sb = await getSupabase();
+  const { error } = await sb
+    .from('medicines')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
 }
 
 // ── Edit modal ────────────────────────────────────────────────────────────────
@@ -639,6 +751,63 @@ if (rxClearBtn) {
 if (rxConfirmBtn) {
   rxConfirmBtn.addEventListener('click', confirmDispense);
 }
+
+// ── QR Scanner Implementation ────────────────────────────────────────────────
+let html5QrCode = null;
+
+async function startQrScanner() {
+  const modal = document.getElementById('ph-scanner-modal');
+  if (!modal) return;
+  
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+
+  if (!html5QrCode) {
+    html5QrCode = new Html5Qrcode("qr-reader");
+  }
+
+  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+  try {
+    await html5QrCode.start(
+      { facingMode: "environment" }, 
+      config,
+      (decodedText) => {
+        // Success: handle the scanned code
+        stopQrScanner();
+        if (rxCodeInput) {
+          rxCodeInput.value = decodedText.trim().toUpperCase();
+          lookupPrescription();
+        }
+      }
+    ).catch(err => {
+      console.error("Scanner start error:", err);
+      showToast("Camera access denied or unavailable.", "error");
+      stopQrScanner();
+    });
+  } catch (err) {
+    console.error("Unable to start scanner:", err);
+    stopQrScanner();
+  }
+}
+
+function stopQrScanner() {
+  const modal = document.getElementById('ph-scanner-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+  if (html5QrCode && html5QrCode.isScanning) {
+    html5QrCode.stop().catch(err => console.warn("Scanner stop failed:", err));
+  }
+}
+
+// Attach scanner listeners
+const scanBtn = document.getElementById('rx-scan-btn');
+if (scanBtn) scanBtn.addEventListener('click', startQrScanner);
+
+const closeScannerBtn = document.getElementById('scanner-close-x');
+if (closeScannerBtn) closeScannerBtn.addEventListener('click', stopQrScanner);
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function reloadSchemaCache() {

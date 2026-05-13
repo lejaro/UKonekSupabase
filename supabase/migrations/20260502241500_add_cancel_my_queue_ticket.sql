@@ -24,7 +24,7 @@ begin
       updated_at = now()
   where citizen_id = v_citizen_id
     and queue_date = current_date
-    and lower(trim(coalesce(status, ''))) in ('waiting', 'on_call');
+    and lower(trim(coalesce(status, ''))) in ('waiting');
 
   return found;
 end;

@@ -7524,12 +7524,12 @@ function displayPrescriptionData() {
       </td>
       <td>
         ${item.is_available === false
-          ? '<span style="color: #64748b; font-weight: 600;">✗ Out of Stock</span>'
+          ? '<span style="color: #64748b; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Out of Stock</span>'
           : (item.is_dispensed 
-              ? '<span style="color: #16a34a; font-weight: 600;">✓ Given</span>'
+              ? '<span style="color: #16a34a; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Given</span>'
               : (hasStock 
-                  ? '<span style="color: #0891b2; font-weight: 600;">• Pending</span>' 
-                  : '<span style="color: #dc2626; font-weight: 600;">✗ Insufficient</span>'))}
+                  ? '<span style="color: #0891b2; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Pending</span>' 
+                  : '<span style="color: #dc2626; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Insufficient</span>'))}
       </td>
     `;
     tbody.appendChild(row);
@@ -7753,7 +7753,7 @@ if (vaForm) {
     const citizenId = document.getElementById('va-citizen-id')?.value;
     const complaint = document.getElementById('va-chief-complaint')?.value;
     if (!ticketId) { showToast('Missing queue ticket reference.', 'error'); return; }
-    if (!complaint) { showToast('Chief complaint is required.', 'error'); return; }
+    // Validation removed as per user request to allow saving without required values
     setLoading(submitBtn, true);
     try {
       const user = await ensureAuthenticatedSession();
@@ -7812,6 +7812,8 @@ const appointments = (() => {
     setupUI();
     setupRealtime();
     await refresh();
+    // Auto-refresh every 5 seconds to ensure sync even if realtime drops
+    setInterval(refresh, 5000);
   };
 
   const setupRealtime = async () => {
@@ -7851,6 +7853,8 @@ const appointments = (() => {
 
   const refresh = async () => {
     if (state.loading) return;
+    // Don't refresh if user is currently dragging a ticket to avoid breaking the interaction
+    if (document.querySelector('.queue-ticket-card.dragging')) return;
     state.loading = true;
     try {
       const { supabase } = await loadSupabaseModule();
@@ -7926,9 +7930,8 @@ const appointments = (() => {
         <div class="queue-ticket-name">${t.citizen?.firstname || ''} ${t.citizen?.surname || ''}</div>
         <div class="queue-ticket-meta">${t.service_label}</div>
         <div class="queue-ticket-actions">
-          ${getStatus(t) === 'waiting' ? '<button class="queue-ticket-btn" data-action="move" data-lane="on_call">On Call</button><button class="queue-ticket-btn" data-action="move" data-lane="serving">Serve</button>' : ''}
-          ${getStatus(t) === 'on_call' ? '<button class="queue-ticket-btn" data-action="move" data-lane="serving">Serve</button><button class="queue-ticket-btn btn-vital" data-action="vital">Vitals</button>' : ''}
-          ${getStatus(t) === 'serving' ? '<button class="queue-ticket-btn" data-action="complete">Complete</button>' : ''}
+          ${getStatus(t) === 'waiting' ? '<button class="queue-ticket-btn" data-action="move" data-lane="on_call">On Call</button>' : ''}
+          ${getStatus(t) === 'on_call' ? ((t.vitals && t.vitals.length > 0) ? '<button class="queue-ticket-btn" data-action="move" data-lane="serving">Serve</button>' : '') + '<button class="queue-ticket-btn btn-vital" data-action="vital">Vitals</button>' : ''}
         </div>
       </div>`).join('');
   };

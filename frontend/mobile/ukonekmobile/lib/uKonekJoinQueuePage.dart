@@ -291,7 +291,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
             child: FutureBuilder<QueueDashboardSnapshot>(
               future: _dashboardFuture,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator(color: _C.primary));
                 }
                 final data = snapshot.data;
@@ -770,7 +770,8 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
                 ]),
                 const SizedBox(height: 24),
 
-                // Cancel button
+                // Cancel button (Hidden when On Call or Serving)
+                if (!isOnCall && !isTurn)
                 SizedBox(
                   width: double.infinity,
                   height: 52,
