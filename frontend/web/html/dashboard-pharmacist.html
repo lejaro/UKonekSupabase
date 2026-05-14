@@ -422,12 +422,22 @@
       <div class="ph-panel-body" style="padding-bottom:10px;">
         <div class="ph-toolbar" style="margin-bottom:16px;">
           <input class="ph-search" type="search" id="ph-search" placeholder="Search medicine name…" />
+          <select id="ph-sort-select" class="ph-search" style="flex: 0 1 180px; cursor: pointer;">
+            <option value="name-asc">Name (A-Z)</option>
+            <option value="name-desc">Name (Z-A)</option>
+            <option value="stock-desc">Highest Stock</option>
+            <option value="stock-asc">Lowest Stock</option>
+            <option value="expiry-asc">Expiry (Soonest)</option>
+            <option value="expiry-desc">Expiry (Latest)</option>
+          </select>
           <div class="ph-filter-group">
             <button class="ph-filter-btn active" data-filter="all">All</button>
             <button class="ph-filter-btn amber" data-filter="low">Low Stock</button>
             <button class="ph-filter-btn red" data-filter="expired">Expired</button>
             <button class="ph-filter-btn amber" data-filter="expiring">Expiring Soon</button>
           </div>
+          <button id="ph-csv-export-btn" class="ph-btn ph-btn-outline ph-btn-sm">Export CSV</button>
+          <button id="ph-pdf-export-btn" class="ph-btn ph-btn-primary ph-btn-sm">Export PDF</button>
         </div>
       </div>
       <div class="ph-divider"></div>

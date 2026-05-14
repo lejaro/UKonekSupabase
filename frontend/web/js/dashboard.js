@@ -2567,6 +2567,7 @@ async function initializeDashboard() {
         renderClinicalStats();
       };
     }
+    initReportsSection();
     await Promise.all([
       refreshAnnouncementsData().catch((err) => console.warn('Announcements failed:', err)),
       refreshFeedbackData().catch((err) => console.warn('Feedback failed:', err))
@@ -2627,6 +2628,11 @@ function closeCitizenHealthModal() {
 }
 
 document.getElementById('chr-close-btn')?.addEventListener('click', closeCitizenHealthModal);
+document.getElementById('chr-export-btn')?.addEventListener('click', () => {
+  const dateSpan = document.getElementById('chr-print-date');
+  if (dateSpan) dateSpan.textContent = new Date().toLocaleString();
+  window.print();
+});
 citizenHealthModal?.addEventListener('click', (e) => {
   if (e.target === citizenHealthModal) closeCitizenHealthModal();
 });
@@ -2706,22 +2712,22 @@ async function openCitizenHealthModal(citizen) {
 
     const [consultRes, vitalsRes, rxRes, labRes] = await Promise.all([
       supabase.from('consultations')
-        .select('*, doctor:staff(firstname,surname)')
+        .select('*, doctor:staff!doctor_staff_id(first_name,last_name)')
         .or(`patient_citizen_id.eq.${citizenId},patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
         .order('consulted_at', { ascending: false })
         .limit(50),
       supabase.from('vital_signs')
-        .select('*, nurse:staff!nurse_id(firstname,surname)')
+        .select('*, nurse:staff!nurse_id(first_name,last_name)')
         .eq('citizen_id', citizenId)
         .order('created_at', { ascending: false })
         .limit(50),
       supabase.from('prescription_headers')
-        .select('id,issued_at,patient_identifier,doctor:staff(firstname,surname),items:prescription_items(*)')
+        .select('id,issued_at,patient_identifier,doctor:staff!doctor_staff_id(first_name,last_name),items:prescription_items(*)')
         .or(`patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
         .order('issued_at', { ascending: false })
         .limit(50),
       supabase.from('lab_orders')
-        .select('*, doctor:staff(firstname,surname)')
+        .select('*, doctor:staff!doctor_staff_id(first_name,last_name)')
         .or(`patient_citizen_id.eq.${citizenId},patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
         .order('created_at', { ascending: false })
         .limit(50),
@@ -2750,12 +2756,12 @@ async function openCitizenHealthModal(citizen) {
           tr.innerHTML = `
             <td class="table-cell" style="white-space:nowrap;">${r.consulted_at ? new Date(r.consulted_at).toLocaleDateString() : '—'}</td>
             <td class="table-cell"><strong>${r.diagnosis || '—'}</strong></td>
-            <td class="table-cell" style="white-space:nowrap;">${r.doctor ? `Dr. ${r.doctor.firstname} ${r.doctor.surname}` : '—'}</td>
+            <td class="table-cell" style="white-space:nowrap;">${r.doctor ? `Dr. ${r.doctor.first_name} ${r.doctor.last_name}` : '—'}</td>
           `;
           tr.addEventListener('click', () => {
             showDataDetail('Consultation Record', {
               'Date': r.consulted_at ? new Date(r.consulted_at).toLocaleString() : '—',
-              'Doctor': r.doctor ? `Dr. ${r.doctor.firstname} ${r.doctor.surname}` : '—',
+              'Doctor': r.doctor ? `Dr. ${r.doctor.first_name} ${r.doctor.last_name}` : '—',
               'Diagnosis': r.diagnosis || '—',
               'Symptoms': r.symptoms || '—',
               'HPI': r.hpi || '—',
@@ -2793,12 +2799,12 @@ async function openCitizenHealthModal(citizen) {
           tr.innerHTML = `
             <td class="table-cell" style="white-space:nowrap;">${r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}</td>
             <td class="table-cell">BP: ${r.blood_pressure || '—'} | Temp: ${r.temperature || '—'}°C</td>
-            <td class="table-cell" style="white-space:nowrap;">${r.nurse ? `${r.nurse.firstname} ${r.nurse.surname}` : '—'}</td>
+            <td class="table-cell" style="white-space:nowrap;">${r.nurse ? `${r.nurse.first_name} ${r.nurse.last_name}` : '—'}</td>
           `;
           tr.addEventListener('click', () => {
             showDataDetail('Vital Assessment', {
               'Date': r.created_at ? new Date(r.created_at).toLocaleString() : '—',
-              'Assessed By': r.nurse ? `${r.nurse.firstname} ${r.nurse.surname}` : '—',
+              'Assessed By': r.nurse ? `${r.nurse.first_name} ${r.nurse.last_name}` : '—',
               'Chief Complaint': r.chief_complaint || '—',
               'Blood Pressure': r.blood_pressure || '—',
               'Temperature': r.temperature ? `${r.temperature} °C` : '—',
@@ -2825,7 +2831,7 @@ async function openCitizenHealthModal(citizen) {
           const items = (rx.items || []).map(it =>
             `<li style="font-size:12px;color:#374151;">${it.medicine_name} — ${it.quantity} ${it.unit || ''} ${it.dosage ? `(${it.dosage})` : ''} ${it.frequency || ''} ${it.duration ? `for ${it.duration}` : ''}</li>`
           ).join('');
-          const doctor = rx.doctor ? `Dr. ${rx.doctor.firstname} ${rx.doctor.surname}` : '—';
+          const doctor = rx.doctor ? `Dr. ${rx.doctor.first_name} ${rx.doctor.last_name}` : '—';
           const date = rx.issued_at ? new Date(rx.issued_at).toLocaleDateString() : '—';
           return `
             <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
@@ -2860,7 +2866,7 @@ async function openCitizenHealthModal(citizen) {
                 <td class="table-cell" style="white-space:nowrap;">${r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}</td>
                 <td class="table-cell"><strong>${r.test_name || '—'}</strong></td>
                 <td class="table-cell"><span class="${statusClass}">${r.status || '—'}</span></td>
-                <td class="table-cell" style="white-space:nowrap;">${r.doctor ? `Dr. ${r.doctor.firstname} ${r.doctor.surname}` : '—'}</td>
+                <td class="table-cell" style="white-space:nowrap;">${r.doctor ? `Dr. ${r.doctor.first_name} ${r.doctor.last_name}` : '—'}</td>
               </tr>`;
             }).join('')}
             </tbody>
@@ -3533,10 +3539,10 @@ function renderFeedbackTable() {
 
     return `
       <tr class="clickable-row" data-id="${feedback.id}">
-        <td><strong>${escapeHtml(fromName)}</strong></td>
-        <td style="text-align:center;">${rating}</td>
-        <td style="color:#64748b; font-size:12px; text-align:center;">${date}</td>
-        <td style="text-align:center;">
+        <td class="table-cell"><strong>${escapeHtml(fromName)}</strong></td>
+        <td class="table-cell" style="text-align:center;">${rating}</td>
+        <td class="table-cell" style="color:#64748b; font-size:12px; text-align:center;">${date}</td>
+        <td class="table-cell" style="text-align:center;">
           <button class="chip-btn chip-btn-danger btn-delete-feedback" data-id="${feedback.id}" style="padding:4px 8px; font-size:10px;">Delete</button>
         </td>
       </tr>
@@ -3571,13 +3577,15 @@ async function deleteFeedback(id) {
   
   try {
     const { supabase } = await loadSupabaseModule();
-    const { error } = await supabase.from('feedback').delete().eq('id', id);
+    const { error } = await supabase.from('feedbacks').delete().eq('id', id);
     
     if (error) throw error;
     
     showToast('Feedback deleted.', 'success');
     latestFeedbackList = latestFeedbackList.filter(f => f.id !== id);
     renderFeedbackTable();
+    // Close the detail modal if open
+    document.getElementById('feedback-detail-modal')?.classList.add('hidden');
   } catch (err) {
     console.error('Error deleting feedback:', err);
     showToast('Failed to delete feedback.', 'error');
@@ -3588,6 +3596,69 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+let reportsInitialized = false;
+function initReportsSection() {
+  if (reportsInitialized) return;
+  reportsInitialized = true;
+
+  // Tab switching for Reports
+  const reportTabs = document.querySelectorAll('#reports-section .tab');
+  const panes = {
+    'tab-announcements': document.getElementById('announcements-pane'),
+    'tab-feedback': document.getElementById('feedback-pane'),
+    'tab-stats': document.getElementById('stats-pane')
+  };
+
+  reportTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      reportTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      Object.values(panes).forEach(p => p?.classList.add('hidden'));
+      if (panes[tab.id]) panes[tab.id].classList.remove('hidden');
+      // If stats chart exists
+      if (tab.id === 'tab-stats' && typeof initStatsCharts === 'function') initStatsCharts();
+    });
+  });
+
+  // Event delegation for row clicks and deletes
+  document.getElementById('announcements-tbody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-delete-announcement');
+    if (btn) {
+      e.stopPropagation();
+      deleteAnnouncement(Number(btn.dataset.id));
+      return;
+    }
+    const row = e.target.closest('.clickable-row');
+    if (row) openAnnouncementDetail(Number(row.dataset.id));
+  });
+
+  document.getElementById('feedback-tbody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-delete-feedback');
+    if (btn) {
+      e.stopPropagation();
+      deleteFeedback(Number(btn.dataset.id));
+      return;
+    }
+    const row = e.target.closest('.clickable-row');
+    if (row) openFeedbackDetail(Number(row.dataset.id));
+  });
+
+  // Close buttons for detail modals
+  document.getElementById('announcement-detail-close')?.addEventListener('click', () => {
+    document.getElementById('announcement-detail-modal')?.classList.add('hidden');
+  });
+  document.getElementById('feedback-detail-close')?.addEventListener('click', () => {
+    document.getElementById('feedback-detail-modal')?.classList.add('hidden');
+  });
+  
+  // Close on overlay click
+  [document.getElementById('announcement-detail-modal'), document.getElementById('feedback-detail-modal')].forEach(m => {
+    m?.addEventListener('click', (e) => {
+      if (e.target === m) m.classList.add('hidden');
+    });
+  });
 }
 
 async function refreshAnnouncementsData() {
@@ -3608,62 +3679,6 @@ async function refreshAnnouncementsData() {
         created_at: new Date(Date.now() - 86400000).toISOString()
       }
     ];
-    // Tab switching for Reports
-    const reportTabs = document.querySelectorAll('#reports-section .tab');
-    const panes = {
-      'tab-announcements': document.getElementById('announcements-pane'),
-      'tab-feedback': document.getElementById('feedback-pane'),
-      'tab-stats': document.getElementById('stats-pane')
-    };
-
-    reportTabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        reportTabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        Object.values(panes).forEach(p => p?.classList.add('hidden'));
-        if (panes[tab.id]) panes[tab.id].classList.remove('hidden');
-        if (tab.id === 'tab-stats') initStatsCharts();
-      });
-    });
-
-    // Event delegation for row clicks and deletes
-    document.getElementById('announcements-tbody')?.addEventListener('click', (e) => {
-      const btn = e.target.closest('.btn-delete-announcement');
-      if (btn) {
-        e.stopPropagation();
-        deleteAnnouncement(Number(btn.dataset.id));
-        return;
-      }
-      const row = e.target.closest('.clickable-row');
-      if (row) openAnnouncementDetail(Number(row.dataset.id));
-    });
-
-    document.getElementById('feedback-tbody')?.addEventListener('click', (e) => {
-      const btn = e.target.closest('.btn-delete-feedback');
-      if (btn) {
-        e.stopPropagation();
-        deleteFeedback(Number(btn.dataset.id));
-        return;
-      }
-      const row = e.target.closest('.clickable-row');
-      if (row) openFeedbackDetail(Number(row.dataset.id));
-    });
-
-    // Close buttons for detail modals
-    document.getElementById('announcement-detail-close')?.addEventListener('click', () => {
-      document.getElementById('announcement-detail-modal')?.classList.add('hidden');
-    });
-    document.getElementById('feedback-detail-close')?.addEventListener('click', () => {
-      document.getElementById('feedback-detail-modal')?.classList.add('hidden');
-    });
-    
-    // Close on overlay click
-    [document.getElementById('announcement-detail-modal'), document.getElementById('feedback-detail-modal')].forEach(m => {
-      m?.addEventListener('click', (e) => {
-        if (e.target === m) m.classList.add('hidden');
-      });
-    });
-
     renderAnnouncementsTable();
     return;
   }
@@ -3714,10 +3729,10 @@ function renderAnnouncementsTable() {
 
     return `
       <tr class="clickable-row" data-id="${announcement.id}">
-        <td><strong>${title}</strong></td>
-        <td style="text-align:center;">${visibilityBadge}</td>
-        <td style="color:#64748b; font-size:12px; text-align:center;">${date}</td>
-        <td style="text-align:center;">
+        <td class="table-cell"><strong>${title}</strong></td>
+        <td class="table-cell" style="text-align:center;">${visibilityBadge}</td>
+        <td class="table-cell" style="color:#64748b; font-size:12px; text-align:center;">${date}</td>
+        <td class="table-cell" style="text-align:center;">
           <button class="chip-btn chip-btn-danger btn-delete-announcement" data-id="${announcement.id}" style="padding:4px 8px; font-size:10px;">Delete</button>
         </td>
       </tr>
@@ -3757,6 +3772,8 @@ async function deleteAnnouncement(id) {
     showToast('Announcement deleted.', 'success');
     latestAnnouncementsList = latestAnnouncementsList.filter(a => a.id !== id);
     renderAnnouncementsTable();
+    // Close the detail modal if open
+    document.getElementById('announcement-detail-modal')?.classList.add('hidden');
   } catch (err) {
     console.error('Error deleting announcement:', err);
     showToast('Failed to delete announcement.', 'error');
@@ -5585,6 +5602,7 @@ if (consultationModal) {
 let consultations = [];
 let consultationQueueTickets = [];
 let medicines = [];
+let filteredMedicines = [];
 let archivedMedicines = [];
 let prescriptions = [];
 let isArchivedMedicinesVisible = false;
@@ -6179,7 +6197,7 @@ async function initLabSection() {
   data.forEach(order => {
     const tr = document.createElement('tr');
     tr.className = 'account-row';
-    const drName = order.doctor ? `Dr. ${order.doctor.firstname} ${order.doctor.surname}` : '—';
+    const drName = order.doctor ? `Dr. ${order.doctor.first_name} ${order.doctor.last_name}` : '—';
     const ptName = order.patient ? `${order.patient.firstname} ${order.patient.surname}` : '—';
     const statusClass = order.status === 'Completed' ? 'badge success' : 'badge warning';
     
@@ -6321,17 +6339,27 @@ function renderMedicines() {
   // Apply Sorting
   if (sortBy === 'name-asc') {
     filtered.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (sortBy === 'name-desc') {
+    filtered.sort((a, b) => b.name.localeCompare(a.name));
   } else if (sortBy === 'expiry-asc') {
     filtered.sort((a, b) => {
       const dateA = a.expiry_date ? new Date(a.expiry_date).getTime() : Infinity;
       const dateB = b.expiry_date ? new Date(b.expiry_date).getTime() : Infinity;
       return dateA - dateB;
     });
+  } else if (sortBy === 'expiry-desc') {
+    filtered.sort((a, b) => {
+      const dateA = a.expiry_date ? new Date(a.expiry_date).getTime() : -1;
+      const dateB = b.expiry_date ? new Date(b.expiry_date).getTime() : -1;
+      return dateB - dateA;
+    });
   } else if (sortBy === 'stock-desc') {
     filtered.sort((a, b) => (b.qty || 0) - (a.qty || 0));
   } else if (sortBy === 'stock-asc') {
     filtered.sort((a, b) => (a.qty || 0) - (b.qty || 0));
   }
+
+  filteredMedicines = filtered;
 
   const role = getSessionRole();
   const allowAdjust = canAdjustMedicineInventory(role);
@@ -7019,9 +7047,67 @@ if (consultReportBtn) {
 
 if (medicineReportBtn) {
   medicineReportBtn.addEventListener('click', () => {
-    const headers = ['Medicine', 'Quantity', 'Unit'];
-    const rows = medicines.map(m => [m.name, m.qty, m.unit || '']);
+    const listToExport = filteredMedicines.length > 0 ? filteredMedicines : medicines;
+    const headers = ['Medicine', 'Description', 'Quantity', 'Unit', 'Expiry Date', 'Status'];
+    const rows = listToExport.map(m => {
+      const isLowStock = m.qty <= 5 && m.qty > 0;
+      const isOutOfStock = m.qty <= 0;
+      const isExpired = m.expiry_date && new Date(m.expiry_date) < new Date();
+      let status = 'In Stock';
+      if (isExpired) status = 'Expired';
+      else if (isOutOfStock) status = 'Out of Stock';
+      else if (isLowStock) status = 'Low Stock';
+
+      return [
+        m.name,
+        m.description || '—',
+        m.qty,
+        m.unit || '—',
+        m.expiry_date ? new Date(m.expiry_date).toLocaleDateString() : '—',
+        status
+      ];
+    });
     generateReport('Medicine Inventory Report', headers, rows);
+  });
+}
+
+const medicineCSVExportBtn = document.getElementById('medicine-csv-export-btn');
+if (medicineCSVExportBtn) {
+  medicineCSVExportBtn.addEventListener('click', () => {
+    const listToExport = filteredMedicines.length > 0 ? filteredMedicines : medicines;
+    const headers = ['Medicine', 'Description', 'Quantity', 'Unit', 'Expiry Date', 'Status'];
+    
+    let csvContent = headers.join(',') + '\n';
+    
+    listToExport.forEach(m => {
+      const isLowStock = m.qty <= 5 && m.qty > 0;
+      const isOutOfStock = m.qty <= 0;
+      const isExpired = m.expiry_date && new Date(m.expiry_date) < new Date();
+      let status = 'In Stock';
+      if (isExpired) status = 'Expired';
+      else if (isOutOfStock) status = 'Out of Stock';
+      else if (isLowStock) status = 'Low Stock';
+
+      const row = [
+        `"${m.name}"`,
+        `"${m.description || ''}"`,
+        m.qty,
+        `"${m.unit || ''}"`,
+        `"${m.expiry_date || ''}"`,
+        `"${status}"`
+      ];
+      csvContent += row.join(',') + '\n';
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `medicine_inventory_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   });
 }
 
@@ -7455,7 +7541,7 @@ async function searchPrescription() {
       patientName,
       patientId,
       doctorName: prescriptionData.doctor 
-        ? `Dr. ${prescriptionData.doctor.firstname} ${prescriptionData.doctor.surname}`
+        ? `Dr. ${prescriptionData.doctor.first_name} ${prescriptionData.doctor.last_name}`
         : 'Unknown Doctor'
     };
 
@@ -7867,6 +7953,13 @@ const appointments = (() => {
     if (refreshBtn && !refreshBtn.dataset.bound) {
       refreshBtn.addEventListener('click', refresh);
       refreshBtn.dataset.bound = 'true';
+    }
+    const tvBtn = document.getElementById('open-tv-view-btn');
+    if (tvBtn && !tvBtn.dataset.bound) {
+      tvBtn.addEventListener('click', () => {
+        window.open('tv-view.html', '_blank', 'noopener,noreferrer');
+      });
+      tvBtn.dataset.bound = 'true';
     }
     const board = document.querySelector('.queue-board');
     if (board && !board.dataset.bound) {

@@ -38,11 +38,18 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   final Set<String> _takenDoses = {};
   final Map<String, String> _customDoseTimes = {};
   final List<Map<String, dynamic>> _manualIntakes = [];
+  bool _notificationsEnabled = true;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _checkPermissions();
+  }
+
+  Future<void> _checkPermissions() async {
+    final enabled = await NotificationService.areNotificationsEnabled();
+    if (mounted) setState(() => _notificationsEnabled = enabled);
   }
 
   final Set<int> _startedPrescriptions = {};
@@ -141,6 +148,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           body: 'It is time for your $timeStr intake:\n$bodyStr',
           hour: h,
           minute: m,
+          payload: '{"action":"medicine","username":"${widget.username}","citizenId":"${widget.citizenId}"}',
         );
       }
     } catch (e) {
@@ -221,6 +229,11 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                       const SizedBox(height: 32),
                     ],
                     
+                    if (!_notificationsEnabled) ...[
+                      _buildNotificationWarning(),
+                      const SizedBox(height: 24),
+                    ],
+                    
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -265,6 +278,51 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         ]),
       ),
       bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildNotificationWarning() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.notifications_off_rounded, color: Colors.orange.shade800, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Notifications are currently turned off. Please enable notifications to receive medicine reminders.',
+                  style: TextStyle(color: Colors.orange.shade900, fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please go to device Settings > Apps > Notifications and turn them on for uKonek+.')),
+                );
+              },
+              icon: Icon(Icons.settings_rounded, color: Colors.orange.shade800, size: 18),
+              label: Text('Open Settings', style: TextStyle(color: Colors.orange.shade800, fontWeight: FontWeight.bold)),
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.orange.shade100,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

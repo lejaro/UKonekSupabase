@@ -12,6 +12,7 @@ const EXPIRY_SOON_DAYS     = 30;
 
 // ── State ────────────────────────────────────────────────────────────────────
 let medicines       = [];
+let filteredMedicines = [];
 let activeFilter    = 'all';
 let searchQuery     = '';
 let cachedUser      = null;
@@ -230,6 +231,32 @@ function getFilteredMedicines() {
       break;
   }
 
+  // Apply Sorting
+  const sortSelect = document.getElementById('ph-sort-select');
+  const sortBy = sortSelect ? sortSelect.value : 'name-asc';
+
+  if (sortBy === 'name-asc') {
+    rows.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (sortBy === 'name-desc') {
+    rows.sort((a, b) => b.name.localeCompare(a.name));
+  } else if (sortBy === 'stock-desc') {
+    rows.sort((a, b) => (b.qty || 0) - (a.qty || 0));
+  } else if (sortBy === 'stock-asc') {
+    rows.sort((a, b) => (a.qty || 0) - (b.qty || 0));
+  } else if (sortBy === 'expiry-asc') {
+    rows.sort((a, b) => {
+      const dateA = a.expiry_date ? new Date(a.expiry_date).getTime() : Infinity;
+      const dateB = b.expiry_date ? new Date(b.expiry_date).getTime() : Infinity;
+      return dateA - dateB;
+    });
+  } else if (sortBy === 'expiry-desc') {
+    rows.sort((a, b) => {
+      const dateA = a.expiry_date ? new Date(a.expiry_date).getTime() : -1;
+      const dateB = b.expiry_date ? new Date(b.expiry_date).getTime() : -1;
+      return dateB - dateA;
+    });
+  }
+
   return rows;
 }
 
@@ -237,6 +264,7 @@ function getFilteredMedicines() {
 function renderMedicines() {
   if (!tbody) return;
   const rows = getFilteredMedicines();
+  filteredMedicines = rows; // Store for export
   updateStats();
   updateSubtitle(rows.length);
 
@@ -808,6 +836,89 @@ if (scanBtn) scanBtn.addEventListener('click', startQrScanner);
 
 const closeScannerBtn = document.getElementById('scanner-close-x');
 if (closeScannerBtn) closeScannerBtn.addEventListener('click', stopQrScanner);
+
+// ── Reports & Exports ────────────────────────────────────────────────────────
+function generateReport(title, headers, rows) {
+  const win = window.open('', '_blank');
+  if (!win) { showToast('Popup blocked. Allow popups for report generation.', 'error'); return; }
+  const html = [];
+  html.push('<html><head><title>' + title + '</title>');
+  html.push('<style>body{font-family:Arial,Helvetica,sans-serif;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f4f4f4}</style>');
+  html.push('</head><body>');
+  html.push('<h1>' + title + '</h1>');
+  html.push('<table><thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead>');
+  html.push('<tbody>');
+  rows.forEach(r => {
+    html.push('<tr>' + r.map(c => `<td>${String(c)}</td>`).join('') + '</tr>');
+  });
+  html.push('</tbody></table>');
+  html.push('</body></html>');
+  win.document.write(html.join(''));
+  win.document.close();
+  setTimeout(() => { win.print(); }, 500);
+}
+
+const sortSelect = document.getElementById('ph-sort-select');
+if (sortSelect) {
+  sortSelect.addEventListener('change', () => {
+    renderMedicines();
+  });
+}
+
+const pdfExportBtn = document.getElementById('ph-pdf-export-btn');
+if (pdfExportBtn) {
+  pdfExportBtn.addEventListener('click', () => {
+    const listToExport = filteredMedicines.length > 0 ? filteredMedicines : medicines;
+    const headers = ['Medicine', 'Description', 'Quantity', 'Unit', 'Expiry Date', 'Status'];
+    const rows = listToExport.map(m => {
+      const stock = computeStockStatus(m.qty);
+      const expiry = computeExpiryStatus(m.expiry_date);
+      return [
+        m.name,
+        m.description || '—',
+        m.qty,
+        m.unit || '—',
+        formatDate(m.expiry_date),
+        `${stock.label} / ${expiry.label}`
+      ];
+    });
+    generateReport('Pharmacy Inventory Report', headers, rows);
+  });
+}
+
+const csvExportBtn = document.getElementById('ph-csv-export-btn');
+if (csvExportBtn) {
+  csvExportBtn.addEventListener('click', () => {
+    const listToExport = filteredMedicines.length > 0 ? filteredMedicines : medicines;
+    const headers = ['Medicine', 'Description', 'Quantity', 'Unit', 'Expiry Date', 'Stock Status', 'Expiry Status'];
+    let csvContent = headers.join(',') + '\n';
+    
+    listToExport.forEach(m => {
+      const stock = computeStockStatus(m.qty);
+      const expiry = computeExpiryStatus(m.expiry_date);
+      const row = [
+        `"${m.name}"`,
+        `"${m.description || ''}"`,
+        m.qty,
+        `"${m.unit || ''}"`,
+        `"${m.expiry_date || ''}"`,
+        `"${stock.label}"`,
+        `"${expiry.label}"`
+      ];
+      csvContent += row.join(',') + '\n';
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `pharmacy_inventory_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function reloadSchemaCache() {

@@ -34,6 +34,7 @@ class UKonekApp extends StatelessWidget {
     final session = Supabase.instance.client.auth.currentSession;
 
     return MaterialApp(
+      navigatorKey: NotificationService.navigatorKey,
       title: 'uKonek Medical Clinic',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

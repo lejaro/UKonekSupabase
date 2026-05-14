@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum LoginFailureType {
   invalidCredentials,
@@ -1158,7 +1159,22 @@ class ApiService {
 
   /// Sign out the current user.
   static Future<void> signOut() async {
-    await _client.auth.signOut();
+    try {
+      await _client.auth.signOut();
+    } catch (e) {
+      debugPrint('Server signOut failed: $e, forcing local signout.');
+    } finally {
+      // Ensure local session is cleared regardless of network
+      try {
+        await _client.auth.signOut(scope: SignOutScope.local);
+      } catch (_) {}
+      
+      // Wipe SharedPreferences to fully clear remembered login states
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.clear();
+      } catch (_) {}
+    }
   }
 
   static Future<List<DoctorStatus>> listDoctorStatus() async {
