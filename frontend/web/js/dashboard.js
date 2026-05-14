@@ -2694,7 +2694,7 @@ async function openCitizenHealthModal(citizen) {
   `).join('');
 
   // Set loading state on all tab bodies
-  ['chr-consultations-body','chr-vitals-body','chr-prescriptions-body','chr-laborders-body','chr-appointments-body']
+  ['chr-consultations-body','chr-vitals-body','chr-prescriptions-body','chr-laborders-body']
     .forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = chrLoadingState(); });
 
   citizenHealthModal.classList.remove('hidden');
@@ -2704,31 +2704,26 @@ async function openCitizenHealthModal(citizen) {
     const { supabase } = await loadSupabaseModule();
     const citizenId = Number(citizen.id);
 
-    const [consultRes, vitalsRes, rxRes, labRes, apptRes] = await Promise.all([
+    const [consultRes, vitalsRes, rxRes, labRes] = await Promise.all([
       supabase.from('consultations')
-        .select('id,diagnosis,symptoms,notes,consulted_at,doctor:staff(firstname,surname)')
-        .eq('patient_citizen_id', citizenId)
+        .select('*, doctor:staff(firstname,surname)')
+        .or(`patient_citizen_id.eq.${citizenId},patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
         .order('consulted_at', { ascending: false })
         .limit(50),
       supabase.from('vital_signs')
-        .select('blood_pressure,respiratory_rate,temperature,oxygen_saturation,chief_complaint,current_medications,created_at,nurse:staff!nurse_id(firstname,surname)')
+        .select('*, nurse:staff!nurse_id(firstname,surname)')
         .eq('citizen_id', citizenId)
         .order('created_at', { ascending: false })
         .limit(50),
       supabase.from('prescription_headers')
-        .select('id,issued_at,patient_identifier,doctor:staff(firstname,surname),items:prescription_items(medicine_name,quantity,unit,dosage,frequency)')
-        .eq('patient_identifier', `CIT-${citizenId}`)
+        .select('id,issued_at,patient_identifier,doctor:staff(firstname,surname),items:prescription_items(*)')
+        .or(`patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
         .order('issued_at', { ascending: false })
         .limit(50),
       supabase.from('lab_orders')
-        .select('test_name,status,created_at,doctor:staff(firstname,surname)')
-        .eq('patient_citizen_id', citizenId)
+        .select('*, doctor:staff(firstname,surname)')
+        .or(`patient_citizen_id.eq.${citizenId},patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
         .order('created_at', { ascending: false })
-        .limit(50),
-      supabase.from('appointments')
-        .select('appointment_date,appointment_time,status,patient_notes,doctor_notes,doctor:staff(firstname,surname)')
-        .eq('citizen_id', citizenId)
-        .order('appointment_date', { ascending: false })
         .limit(50),
     ]);
 
@@ -2744,18 +2739,34 @@ async function openCitizenHealthModal(citizen) {
             <thead><tr class="table-header-row">
               <th class="table-header-cell">Date</th>
               <th class="table-header-cell">Diagnosis</th>
-              <th class="table-header-cell">Symptoms</th>
               <th class="table-header-cell">Doctor</th>
             </tr></thead>
-            <tbody>${rows.map(r => `
-              <tr>
-                <td class="table-cell" style="white-space:nowrap;">${r.consulted_at ? new Date(r.consulted_at).toLocaleDateString() : '—'}</td>
-                <td class="table-cell">${r.diagnosis || '—'}</td>
-                <td class="table-cell" style="color:#64748b;font-size:12px;">${(r.symptoms || '—').substring(0, 80)}</td>
-                <td class="table-cell" style="white-space:nowrap;">${r.doctor ? `Dr. ${r.doctor.firstname} ${r.doctor.surname}` : '—'}</td>
-              </tr>`).join('')}
-            </tbody>
+            <tbody id="chr-consults-list"></tbody>
           </table>`;
+        const tbody = document.getElementById('chr-consults-list');
+        rows.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.style.cursor = 'pointer';
+          tr.innerHTML = `
+            <td class="table-cell" style="white-space:nowrap;">${r.consulted_at ? new Date(r.consulted_at).toLocaleDateString() : '—'}</td>
+            <td class="table-cell"><strong>${r.diagnosis || '—'}</strong></td>
+            <td class="table-cell" style="white-space:nowrap;">${r.doctor ? `Dr. ${r.doctor.firstname} ${r.doctor.surname}` : '—'}</td>
+          `;
+          tr.addEventListener('click', () => {
+            showDataDetail('Consultation Record', {
+              'Date': r.consulted_at ? new Date(r.consulted_at).toLocaleString() : '—',
+              'Doctor': r.doctor ? `Dr. ${r.doctor.firstname} ${r.doctor.surname}` : '—',
+              'Diagnosis': r.diagnosis || '—',
+              'Symptoms': r.symptoms || '—',
+              'HPI': r.hpi || '—',
+              'PMH': r.pmh || '—',
+              'Allergies': r.allergies || '—',
+              'Physical Exam': r.physical_exam ? JSON.stringify(r.physical_exam, null, 2) : '—',
+              'Doctor Notes': r.notes || '—'
+            });
+          });
+          tbody.appendChild(tr);
+        });
       }
     }
 
@@ -2770,23 +2781,36 @@ async function openCitizenHealthModal(citizen) {
           <table class="accounts-table" style="width:100%;">
             <thead><tr class="table-header-row">
               <th class="table-header-cell">Date</th>
-              <th class="table-header-cell">BP</th>
-              <th class="table-header-cell">Temp</th>
-              <th class="table-header-cell">RR</th>
-              <th class="table-header-cell">SpO₂</th>
-              <th class="table-header-cell">Chief Complaint</th>
+              <th class="table-header-cell">Assessment</th>
+              <th class="table-header-cell">Nurse</th>
             </tr></thead>
-            <tbody>${rows.map(r => `
-              <tr>
-                <td class="table-cell" style="white-space:nowrap;">${r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}</td>
-                <td class="table-cell">${r.blood_pressure ? `${r.blood_pressure} mmHg` : '—'}</td>
-                <td class="table-cell">${r.temperature ? `${r.temperature} °C` : '—'}</td>
-                <td class="table-cell">${r.respiratory_rate ? `${r.respiratory_rate} bpm` : '—'}</td>
-                <td class="table-cell">${r.oxygen_saturation ? `${r.oxygen_saturation}%` : '—'}</td>
-                <td class="table-cell" style="color:#64748b;font-size:12px;">${(r.chief_complaint || '—').substring(0, 60)}</td>
-              </tr>`).join('')}
-            </tbody>
+            <tbody id="chr-vitals-list"></tbody>
           </table>`;
+        const tbody = document.getElementById('chr-vitals-list');
+        rows.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.style.cursor = 'pointer';
+          tr.innerHTML = `
+            <td class="table-cell" style="white-space:nowrap;">${r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}</td>
+            <td class="table-cell">BP: ${r.blood_pressure || '—'} | Temp: ${r.temperature || '—'}°C</td>
+            <td class="table-cell" style="white-space:nowrap;">${r.nurse ? `${r.nurse.firstname} ${r.nurse.surname}` : '—'}</td>
+          `;
+          tr.addEventListener('click', () => {
+            showDataDetail('Vital Assessment', {
+              'Date': r.created_at ? new Date(r.created_at).toLocaleString() : '—',
+              'Assessed By': r.nurse ? `${r.nurse.firstname} ${r.nurse.surname}` : '—',
+              'Chief Complaint': r.chief_complaint || '—',
+              'Blood Pressure': r.blood_pressure || '—',
+              'Temperature': r.temperature ? `${r.temperature} °C` : '—',
+              'Heart Rate': r.heart_rate ? `${r.heart_rate} bpm` : '—',
+              'Resp. Rate': r.respiratory_rate ? `${r.respiratory_rate} bpm` : '—',
+              'SpO2': r.oxygen_saturation ? `${r.oxygen_saturation}%` : '—',
+              'Current Meds': r.current_medications || '—',
+              'Notes': r.notes || '—'
+            });
+          });
+          tbody.appendChild(tr);
+        });
       }
     }
 
@@ -2799,7 +2823,7 @@ async function openCitizenHealthModal(citizen) {
       } else {
         rxEl.innerHTML = rows.map(rx => {
           const items = (rx.items || []).map(it =>
-            `<li style="font-size:12px;color:#374151;">${it.medicine_name} — ${it.quantity} ${it.unit || ''} ${it.dosage ? `(${it.dosage})` : ''} ${it.frequency || ''}</li>`
+            `<li style="font-size:12px;color:#374151;">${it.medicine_name} — ${it.quantity} ${it.unit || ''} ${it.dosage ? `(${it.dosage})` : ''} ${it.frequency || ''} ${it.duration ? `for ${it.duration}` : ''}</li>`
           ).join('');
           const doctor = rx.doctor ? `Dr. ${rx.doctor.firstname} ${rx.doctor.surname}` : '—';
           const date = rx.issued_at ? new Date(rx.issued_at).toLocaleDateString() : '—';
@@ -2844,37 +2868,6 @@ async function openCitizenHealthModal(citizen) {
       }
     }
 
-    // Render Appointments
-    const apptEl = document.getElementById('chr-appointments-body');
-    if (apptEl) {
-      const rows = apptRes.data || [];
-      if (!rows.length) {
-        apptEl.innerHTML = chrEmptyState('No appointments found.');
-      } else {
-        apptEl.innerHTML = `
-          <table class="accounts-table" style="width:100%;">
-            <thead><tr class="table-header-row">
-              <th class="table-header-cell">Date</th>
-              <th class="table-header-cell">Time</th>
-              <th class="table-header-cell">Doctor</th>
-              <th class="table-header-cell">Status</th>
-              <th class="table-header-cell">Notes</th>
-            </tr></thead>
-            <tbody>${rows.map(r => {
-              const statusColors = { confirmed:'#16a34a', pending:'#d97706', completed:'#0369a1', cancelled:'#dc2626', 'no-show':'#9333ea' };
-              const color = statusColors[r.status] || '#64748b';
-              return `<tr>
-                <td class="table-cell" style="white-space:nowrap;">${r.appointment_date ? new Date(r.appointment_date).toLocaleDateString() : '—'}</td>
-                <td class="table-cell" style="white-space:nowrap;">${r.appointment_time || '—'}</td>
-                <td class="table-cell" style="white-space:nowrap;">${r.doctor ? `Dr. ${r.doctor.firstname} ${r.doctor.surname}` : '—'}</td>
-                <td class="table-cell"><span style="font-size:12px;font-weight:600;color:${color};text-transform:capitalize;">${r.status || '—'}</span></td>
-                <td class="table-cell" style="color:#64748b;font-size:12px;">${(r.patient_notes || '—').substring(0, 60)}</td>
-              </tr>`;
-            }).join('')}
-            </tbody>
-          </table>`;
-      }
-    }
 
   } catch (err) {
     console.error('Failed to load citizen health records:', err);
@@ -2916,11 +2909,15 @@ function renderCitizensTable(filteredList) {
       const row = document.createElement('tr');
       row.className = 'citizen-row';
       row.style.cursor = 'pointer';
+      const fullName = [user.firstname, user.surname].filter(Boolean).join(' ') || user.username || '—';
       row.innerHTML = `
-        <td class="table-cell">${user.username || user.name || '—'}</td>
+        <td class="table-cell">${fullName}</td>
         <td class="table-cell">${user.email || '—'}</td>
         <td class="table-cell">${user.contact_number || '—'}</td>
         <td class="table-cell">${formatDateTime(user.created_at)}</td>
+        <td class="table-cell" style="text-align:center;">
+          <button class="chip-btn" style="margin:0; padding:4px 12px; font-size:11px; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd;">View Records</button>
+        </td>
       `;
       row.addEventListener('click', async () => {
         // Fetch full citizen profile (includes health-related fields not in the list query)
@@ -2946,12 +2943,11 @@ function applyCitizensFinder() {
   const query = String(citizensFinderInput?.value || '').trim().toLowerCase();
   const filtered = latestPatientsList.filter((citizen) => {
     if (!query) return true;
-    const username = String(citizen?.username || citizen?.name || '').toLowerCase();
+    const fullName = [citizen.firstname, citizen.surname].filter(Boolean).join(' ').toLowerCase();
+    const username = String(citizen?.username || '').toLowerCase();
     const email = String(citizen?.email || '').toLowerCase();
     const contact = String(citizen?.contact_number || '').toLowerCase();
-    return username.includes(query)
-      || email.includes(query)
-      || contact.includes(query)
+    return fullName.includes(query) || username.includes(query) || email.includes(query) || contact.includes(query);
   });
 
   renderCitizensTable(filtered);
@@ -2985,6 +2981,14 @@ function revealPane(paneId) {
   const paneEl = document.getElementById(paneId);
   if (!paneEl) return;
   paneEl.classList.remove('hidden');
+
+  // Update Users Section Title if applicable
+  const mgmtTitle = document.getElementById('user-mgmt-title');
+  if (mgmtTitle) {
+    if (paneId === 'registered-pane') mgmtTitle.textContent = 'Staff Management';
+    else if (paneId === 'citizens-pane') mgmtTitle.textContent = 'Citizen Management';
+  }
+
   const parent = paneEl.parentElement;
   if (!parent) return;
   Array.from(parent.children).forEach((sibling) => {
@@ -4234,7 +4238,9 @@ async function loadPatientData() {
   latestPatientsList = Array.isArray(list) ? [...list] : [];
 
   latestPatientsList.sort((a, b) => {
-    return String(a?.username || a?.name || '').localeCompare(String(b?.username || b?.name || ''));
+    const nameA = [a.firstname, a.surname].filter(Boolean).join(' ') || a.username || '';
+    const nameB = [b.firstname, b.surname].filter(Boolean).join(' ') || b.username || '';
+    return nameA.localeCompare(nameB);
   });
 
     applyCitizensFinder();
@@ -5807,15 +5813,31 @@ function mapNowServingQueueRow(item) {
 function resolveCitizenIdFromIdentifier(patientIdentifier) {
   const raw = String(patientIdentifier || '').trim();
   if (!raw) return null;
+
+  // Pattern: CIT-123
   const directMatch = /^CIT-(\d+)$/i.exec(raw);
   if (directMatch) {
     const parsed = Number(directMatch[1]);
     return Number.isFinite(parsed) ? parsed : null;
   }
+
+  // Pattern: 123
   const numeric = Number(raw);
   if (Number.isFinite(numeric) && numeric > 0) {
     return numeric;
   }
+
+  // Fallback: Search latestPatientsList for username or name match
+  if (typeof latestPatientsList !== 'undefined' && Array.isArray(latestPatientsList)) {
+    const query = raw.toLowerCase();
+    const citizen = latestPatientsList.find(c => 
+      String(c.username || '').toLowerCase() === query || 
+      String(c.name || '').toLowerCase() === query ||
+      ([c.firstname, c.surname].filter(Boolean).join(' ').toLowerCase() === query)
+    );
+    if (citizen) return Number(citizen.id);
+  }
+
   return null;
 }
 
@@ -6280,6 +6302,12 @@ async function createPrescriptionEntry({ patientId, consultationDbId, items }) {
 
 function renderMedicines() {
   if (!medicineTbody) return;
+
+  // Update searchable datalist for prescriptions
+  const medicineList = document.getElementById('medicine-list');
+  if (medicineList) {
+    medicineList.innerHTML = medicines.map(m => `<option value="${m.name}">${m.name} (${m.unit || ''})</option>`).join('');
+  }
 
   const searchQuery = (medicineSearchInput?.value || '').toLowerCase().trim();
   const sortSelect = document.getElementById('medicine-sort-select');
@@ -7080,10 +7108,7 @@ function addPrescriptionLine() {
     <div style="display: grid; grid-template-columns: 2fr 0.6fr 1fr 1fr 1fr auto; gap: 10px; align-items: end;">
       <div class="field" style="margin: 0;">
         <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Medicine Name</label>
-        <select class="pres-med" style="width: 100%; height: 38px; padding: 0 10px;" required>
-          <option value="">Select medicine...</option>
-          ${medicines.map(m => `<option value="${m.name}">${m.name} (${m.unit || ''})</option>`).join('')}
-        </select>
+        <input type="text" class="pres-med" list="medicine-list" placeholder="Search medicine..." style="width: 100%; height: 38px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 8px;" required />
       </div>
       <div class="field" style="margin: 0;">
         <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Qty</label>
@@ -7091,15 +7116,15 @@ function addPrescriptionLine() {
       </div>
       <div class="field" style="margin: 0;">
         <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Dosage</label>
-        <input type="text" class="pres-dosage" list="dosage-list" placeholder="e.g. 500 mg" style="width: 100%; height: 38px; padding: 0 10px;" />
+        <input type="text" class="pres-dosage" list="dosage-list" placeholder="e.g. 500 mg" style="width: 100%; height: 38px; padding: 0 10px;" required />
       </div>
       <div class="field" style="margin: 0;">
         <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Frequency</label>
-        <input type="text" class="pres-freq" list="frequency-list" placeholder="e.g. BID" style="width: 100%; height: 38px; padding: 0 10px;" />
+        <input type="text" class="pres-freq" list="frequency-list" placeholder="e.g. BID" style="width: 100%; height: 38px; padding: 0 10px;" required />
       </div>
       <div class="field" style="margin: 0;">
         <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Duration</label>
-        <input type="text" class="pres-duration" list="duration-list" placeholder="e.g. 7 days" style="width: 100%; height: 38px; padding: 0 10px;" />
+        <input type="text" class="pres-duration" list="duration-list" placeholder="e.g. 7 days" style="width: 100%; height: 38px; padding: 0 10px;" required />
       </div>
       <button type="button" class="btn small btn-delete" data-action="remove-line" style="height: 38px; width: 38px; min-width: 38px; display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; padding: 0; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; margin: 0;">×</button>
     </div>
@@ -7198,7 +7223,8 @@ if (prescriptionForm) {
             unit: med?.unit || '', 
             dosage: it.dosage, 
             frequency: it.frequency,
-            duration: it.duration 
+            duration: it.duration,
+            instructions: it.instructions
           };
         })
       });
@@ -7767,29 +7793,22 @@ if (vaForm) {
     try {
       const user = await ensureAuthenticatedSession();
       const { supabase } = await loadSupabaseModule();
-      const payload = {
-        queue_ticket_id: Number(ticketId),
-        citizen_id: citizenId ? Number(citizenId) : null,
-        nurse_id: user?.id || null,
-        chief_complaint: complaint,
-        blood_pressure: document.getElementById('va-bp')?.value || null,
-        heart_rate: parseInt(document.getElementById('va-hr')?.value) || null,
-        respiratory_rate: parseInt(document.getElementById('va-rr')?.value) || null,
-        temperature: parseFloat(document.getElementById('va-temp')?.value) || null,
-        oxygen_saturation: parseInt(document.getElementById('va-spo2')?.value) || null,
-        current_medications: document.getElementById('va-meds')?.value || null,
-        notes: document.getElementById('va-notes')?.value || null
+      const rpcPayload = {
+        p_queue_ticket_id: Number(ticketId),
+        p_citizen_id: citizenId ? Number(citizenId) : null,
+        p_chief_complaint: complaint || 'General Checkup',
+        p_blood_pressure: document.getElementById('va-bp')?.value || null,
+        p_heart_rate: parseInt(document.getElementById('va-hr')?.value) || null,
+        p_temperature: parseFloat(document.getElementById('va-temp')?.value) || null,
+        p_respiratory_rate: parseInt(document.getElementById('va-rr')?.value) || null,
+        p_oxygen_saturation: parseInt(document.getElementById('va-spo2')?.value) || null,
+        p_current_medications: document.getElementById('va-meds')?.value || null,
+        p_notes: document.getElementById('va-notes')?.value || null
       };
-      const { data: existing } = await supabase.from('vital_signs').select('id').eq('queue_ticket_id', Number(ticketId)).maybeSingle();
-      let error;
-      if (existing) {
-        const res = await supabase.from('vital_signs').update(payload).eq('id', existing.id);
-        error = res.error;
-      } else {
-        const res = await supabase.from('vital_signs').insert([payload]);
-        error = res.error;
-      }
-      if (error) throw error;
+
+      const { data: rpcRes, error: rpcError } = await supabase.rpc('upsert_vital_assessment', rpcPayload);
+      if (rpcError) throw rpcError;
+      if (rpcRes && rpcRes.error) throw new Error(rpcRes.error);
       showToast('Vital signs saved successfully.', 'success');
       closeVitalAssessmentModal();
       if (typeof appointments !== 'undefined' && appointments.loadQueueTickets) {

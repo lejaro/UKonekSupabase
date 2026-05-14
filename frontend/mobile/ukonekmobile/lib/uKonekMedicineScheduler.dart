@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -7,7 +9,6 @@ import 'services/api_service.dart';
 import 'services/notification_service.dart';
 
 class uKonekMedicineSchedulerPage extends StatefulWidget {
-  // Session data passed from the Dashboard to maintain user identity
   final String username;
   final String citizenId;
 
@@ -44,6 +45,8 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     _load();
   }
 
+  final Set<int> _startedPrescriptions = {};
+
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
@@ -55,10 +58,14 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       final logs = results[1] as List<Map<String, dynamic>>;
       
       setState(() {
-        _medicines = meds;
+        // ONLY show medicines that HAVE been dispensed by the pharmacy in the scheduler
+        _medicines = meds.where((m) => m.isDispensed || m.dispensingStatus == 'dispensed').toList();
         _takenDoses.clear();
+        _startedPrescriptions.clear();
         for (var log in logs) {
-          _takenDoses.add('${log['prescription_item_id']}_${log['dose_index']}');
+          final pid = (log['prescription_item_id'] as num).toInt();
+          _takenDoses.add('${pid}_${log['dose_index']}');
+          _startedPrescriptions.add(pid);
         }
         _loading = false;
       });
@@ -82,8 +89,8 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       
       setState(() {
         _takenDoses.add(key);
+        _startedPrescriptions.add(med.prescriptionItemId);
         
-        // DYNAMIC RESCHEDULING: Adjust succeeding doses based on ACTUAL click time
         final intervalMins = med.doseIntervalMinutes;
         if (intervalMins > 0) {
           int runningMins = now.hour * 60 + now.minute;
@@ -105,26 +112,33 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   Future<void> _scheduleNotifications() async {
     try {
       await NotificationService.cancelAll();
-      final doses = _todayDoses;
-      for (int i = 0; i < doses.length; i++) {
-        final d = doses[i];
-        final med = d['med'] as ScheduledMedicine;
-        final timeStr = d['time'] as String;
+      final grouped = _groupedTodayDoses;
+      int id = 0;
+      
+      for (var entry in grouped.entries) {
+        final timeStr = entry.key;
+        final items = entry.value;
+        if (timeStr == 'Setup Required') continue;
         
-        final parts = timeStr.split(' ');
-        final hm = parts[0].split(':');
-        int h = int.parse(hm[0]);
-        final m = int.parse(hm[1]);
-        if (parts.length > 1) {
-          final period = parts[1].toUpperCase();
-          if (period == 'PM' && h != 12) h += 12;
-          if (period == 'AM' && h == 12) h = 0;
-        }
+        // ONLY schedule if there's at least one untaken med in this group
+        final untaken = items.where((i) => 
+          !_takenDoses.contains('${(i['med'] as ScheduledMedicine).prescriptionItemId}_${i['doseIndex']}')
+        ).toList();
+        
+        if (untaken.isEmpty) continue;
+        
+        // Combine names of untaken meds
+        final medsStr = untaken.map((i) => (i['med'] as ScheduledMedicine).medicineName).join(', ');
+        final bodyStr = untaken.map((i) => '${(i['med'] as ScheduledMedicine).medicineName}: ${(i['med'] as ScheduledMedicine).dosage}').join('\n');
+        
+        final t = _parseTime(timeStr);
+        final h = t ~/ 60;
+        final m = t % 60;
 
         await NotificationService.scheduleMedicineReminder(
-          id: i,
-          title: 'Medication Reminder: ${med.medicineName}',
-          body: 'Time to take ${med.dosage}. ${med.instructions}',
+          id: id++,
+          title: 'Medication Session: $medsStr',
+          body: 'It is time for your $timeStr intake:\n$bodyStr',
           hour: h,
           minute: m,
         );
@@ -134,25 +148,33 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     }
   }
 
-  List<Map<String, dynamic>> get _todayDoses {
-    final now = DateTime.now();
-    final nowMins = now.hour * 60 + now.minute;
-    final doses = <Map<String, dynamic>>[];
+  Map<String, List<Map<String, dynamic>>> get _groupedTodayDoses {
+    final groups = <String, List<Map<String, dynamic>>>{};
     
     for (final med in _medicines) {
-      for (int i = 0; i < med.doseTimes.length; i++) {
-        final key = '${med.prescriptionItemId}_$i';
-        final timeStr = _customDoseTimes[key] ?? med.doseTimes[i];
-        final t = _parseTime(timeStr);
-        
-        // FILTER: Only show upcoming (next 24h) or pending/recent
-        if (!_takenDoses.contains(key) || t >= nowMins - 120) {
-           doses.add({'med': med, 'time': timeStr, 'doseIndex': i});
+      final isStarted = _startedPrescriptions.contains(med.prescriptionItemId) || 
+                       _customDoseTimes.containsKey('${med.prescriptionItemId}_0');
+      
+      if (!isStarted) {
+        final time = 'Setup Required';
+        groups.putIfAbsent(time, () => []);
+        groups[time]!.add({'med': med, 'time': time, 'doseIndex': -1});
+      } else {
+        for (int i = 0; i < med.doseTimes.length; i++) {
+          final time = _customDoseTimes['${med.prescriptionItemId}_$i'] ?? med.doseTimes[i];
+          groups.putIfAbsent(time, () => []);
+          groups[time]!.add({'med': med, 'time': time, 'doseIndex': i});
         }
       }
     }
-    doses.sort((a, b) => _parseTime(a['time'] as String).compareTo(_parseTime(b['time'] as String)));
-    return doses;
+    
+    // Sort keys by time
+    final sortedTimes = groups.keys.toList()..sort((a, b) => _parseTime(a).compareTo(_parseTime(b)));
+    final sortedGroups = <String, List<Map<String, dynamic>>>{};
+    for (var t in sortedTimes) {
+      sortedGroups[t] = groups[t]!;
+    }
+    return sortedGroups;
   }
 
   int _parseTime(String t) {
@@ -175,75 +197,554 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
 
   @override
   Widget build(BuildContext context) {
-    final doses = _todayDoses;
+    final grouped = _groupedTodayDoses;
+    final nextDose = _getNextDose(grouped);
+    final completion = _getCompletionRate(grouped);
+
     return Scaffold(
       backgroundColor: _bg,
-      body: Column(children: [
-        _buildHeader(),
-        Expanded(child: _loading
-          ? const Center(child: CircularProgressIndicator(color: _primary))
-          : _error != null ? _buildError()
-          : RefreshIndicator(
-              color: _primary,
-              onRefresh: _load,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      _sectionHeader("Today's Schedule"),
-                      const SizedBox(height: 4),
-                      Text(DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now()),
-                          style: const TextStyle(fontSize: 12, color: _textMuted)),
-                    ]),
-                    ElevatedButton.icon(
-                      onPressed: _showManualLogDialog,
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Log Intake', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primary, foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        elevation: 0,
-                      ),
-                    ),
-                  ]),
-                  const SizedBox(height: 16),
-                  if (doses.isEmpty && _manualIntakes.isEmpty) _buildEmptyState(
-                    Icons.event_available_rounded,
-                    'No medicines scheduled today',
-                    'Dispensed prescriptions will appear here',
-                  ) else ...[
-                    ...doses.map((d) => _scheduleCard(
-                      d['med'] as ScheduledMedicine,
-                      d['time'] as String,
-                      d['doseIndex'] as int,
-                    )),
-                    if (_manualIntakes.isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      _sectionHeader('Recent Manual Intakes'),
-                      const SizedBox(height: 12),
-                      ..._manualIntakes.reversed.map((m) => _manualIntakeCard(m)),
+      body: SafeArea(
+        child: Column(children: [
+          _buildHeader(),
+          Expanded(child: _loading
+            ? const Center(child: CircularProgressIndicator(color: _primary))
+            : _error != null ? _buildError()
+            : RefreshIndicator(
+                color: _primary,
+                onRefresh: _load,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    if (nextDose != null) ...[
+                      _buildNextDoseCard(nextDose),
+                      const SizedBox(height: 32),
                     ],
-                  ],
-                  const SizedBox(height: 28),
-                  _sectionHeader('My Prescriptions'),
-                  const SizedBox(height: 12),
-                  if (_medicines.isEmpty) _buildEmptyState(
-                    Icons.receipt_long_outlined,
-                    'No dispensed prescriptions',
-                    'Ask your pharmacist to dispense your prescription',
-                  ) else ..._medicines.map((m) => _prescriptionCard(m)),
-                  const SizedBox(height: 20),
-                ]),
+                    
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _sectionHeader("Today's schedule"),
+                        TextButton(
+                          onPressed: () {}, 
+                          child: const Text('View all', style: TextStyle(color: _primary, fontWeight: FontWeight.w600)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (grouped.isEmpty) _buildEmptyState(
+                      Icons.event_available_rounded,
+                      'No medicines scheduled today',
+                      'Dispensed prescriptions will appear here',
+                    ) else ...[
+                      ...grouped.entries.map((entry) => _scheduleCardItem(
+                        entry.key,
+                        entry.value,
+                      )),
+                    ],
+
+                    const SizedBox(height: 32),
+                    _buildProgressCard(completion),
+                    
+                    const SizedBox(height: 32),
+                    _buildTipCard(),
+                    
+                    const SizedBox(height: 32),
+                    _sectionHeader('My Prescriptions'),
+                    const SizedBox(height: 16),
+                    if (_medicines.isEmpty) _buildEmptyState(
+                      Icons.receipt_long_rounded,
+                      'No prescriptions found',
+                      'Active prescriptions will appear here',
+                    ) else ..._medicines.map((m) => _prescriptionCard(m)),
+                    const SizedBox(height: 40),
+                  ]),
+                ),
               ),
-            ),
-        ),
-      ]),
+          ),
+        ]),
+      ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
+
+  Map<String, dynamic>? _getNextDose(Map<String, List<Map<String, dynamic>>> grouped) {
+    for (var entry in grouped.entries) {
+      if (entry.key == 'Setup Required') continue;
+      final untaken = entry.value.where((d) => 
+        !_takenDoses.contains('${(d['med'] as ScheduledMedicine).prescriptionItemId}_${d['doseIndex']}')
+      ).toList();
+      
+      if (untaken.isNotEmpty) {
+        return {
+          'time': entry.key,
+          'items': entry.value,
+          'untaken': untaken,
+        };
+      }
+    }
+    return null;
+  }
+
+  double _getCompletionRate(Map<String, List<Map<String, dynamic>>> grouped) {
+    int total = 0;
+    int taken = 0;
+    for (var entry in grouped.entries) {
+      for (var d in entry.value) {
+        if (d['doseIndex'] == -1) continue;
+        total++;
+        if (_takenDoses.contains('${(d['med'] as ScheduledMedicine).prescriptionItemId}_${d['doseIndex']}')) {
+          taken++;
+        }
+      }
+    }
+    if (total == 0) return 1.0;
+    return taken / total;
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("${_getGreeting()}, ${widget.username.split(' ')[0]} 👋",
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: _textDark)),
+              const SizedBox(height: 4),
+              const Text("Let's stay on track with your health.",
+                  style: TextStyle(fontSize: 14, color: _textMuted)),
+            ],
+          ),
+          Stack(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: _textDark.withOpacity(0.05), blurRadius: 10)],
+                ),
+                child: const Icon(Icons.notifications_none_rounded, color: _textDark, size: 24),
+              ),
+              Positioned(
+                right: 0, top: 0,
+                child: Container(
+                  width: 10, height: 10,
+                  decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 2))),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNextDoseCard(Map<String, dynamic> next) {
+    final time = next['time'] as String;
+    final items = next['items'] as List<Map<String, dynamic>>;
+    final untaken = next['untaken'] as List<Map<String, dynamic>>;
+    
+    final medNames = items.map((i) => (i['med'] as ScheduledMedicine).medicineName).join(', ');
+    
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [const Color(0xFFEDFBF2), const Color(0xFFF7FFF9)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _primary.withOpacity(0.1)),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -20, bottom: -10,
+            child: Opacity(
+              opacity: 0.9,
+              child: kIsWeb 
+                ? Container(
+                    width: 160, height: 160,
+                    decoration: BoxDecoration(color: _primary.withOpacity(0.05), shape: BoxShape.circle),
+                    child: Icon(Icons.medication_liquid_rounded, size: 80, color: _primary.withOpacity(0.2)),
+                  )
+                : Image.file(
+                    File('C:\\Users\\Jose Lejaro\\.gemini\\antigravity\\brain\\8a5ad9a4-598c-4004-8718-6490394a1e44\\medicine_scheduler_header_illustration_1778691349074.png'),
+                    width: 160, height: 160, fit: BoxFit.contain,
+                  ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(color: _primary, shape: BoxShape.circle),
+                      child: const Icon(Icons.access_time_filled_rounded, color: Colors.white, size: 14),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('NEXT DOSE', style: TextStyle(color: _primary, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: 200,
+                  child: Text('Time to take your $medNames',
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _textDark, height: 1.2)),
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () {
+                    // Pick time for the first item, others will follow if they share the time
+                    final first = items.first;
+                    _pickTime(context, first['med'] as ScheduledMedicine, first['doseIndex'] as int, time);
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('$time • Today', style: const TextStyle(color: _textMuted, fontSize: 15, decoration: TextDecoration.underline, decorationStyle: TextDecorationStyle.dashed)),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.edit_calendar_rounded, size: 14, color: _textMuted),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        for (var item in untaken) {
+                          _markAsTaken(item['med'] as ScheduledMedicine, item['doseIndex'] as int, time);
+                        }
+                      },
+                      icon: const Icon(Icons.check_circle_rounded, size: 18),
+                      label: Text(untaken.length > 1 ? "Take all ${untaken.length} meds" : "I've taken it"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primary, foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _scheduleCardItem(String time, List<Map<String, dynamic>> items) {
+    if (time == 'Setup Required') {
+      return Column(
+        children: items.map((item) {
+          final med = item['med'] as ScheduledMedicine;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF9E6),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.orange.withOpacity(0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Container(padding: const EdgeInsets.all(8), decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle), child: const Icon(Icons.info_outline_rounded, color: Colors.white, size: 18)),
+                  const SizedBox(width: 12),
+                  const Text('First-time Setup Required', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF856404))),
+                ]),
+                const SizedBox(height: 16),
+                Text(
+                  'Please enter the time when you first took ${med.medicineName} today. This will be used to automatically organize your next medication schedules and reminders.',
+                  style: const TextStyle(fontSize: 14, color: Color(0xFF856404), height: 1.5),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          _applyTimeChange(med, 0, TimeOfDay.now());
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('First intake set to current time.'))
+                          );
+                        },
+                        icon: const Icon(Icons.history_rounded, size: 18),
+                        label: const Text('Current Time'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white, foregroundColor: Colors.orange,
+                          side: const BorderSide(color: Colors.orange, width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _pickTime(context, med, 0, '08:00 AM'),
+                        icon: const Icon(Icons.access_time_rounded, size: 18),
+                        label: const Text('Pick Time'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange, foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      );
+    }
+
+    final allTaken = items.every((i) => _takenDoses.contains('${(i['med'] as ScheduledMedicine).prescriptionItemId}_${i['doseIndex']}'));
+    final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
+    final tMins = _parseTime(time);
+    final isLocked = tMins > nowMins;
+    
+    String status = 'PENDING';
+    Color statusColor = _textMuted;
+    if (allTaken) {
+      status = 'TAKEN';
+      statusColor = _primary;
+    } else if (isLocked) {
+      status = 'UPCOMING';
+      statusColor = const Color(0xFF007BFF);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            GestureDetector(
+              onTap: (allTaken || isLocked) ? null : () {
+                final first = items.first;
+                _pickTime(context, first['med'] as ScheduledMedicine, first['doseIndex'] as int, time);
+              },
+              child: Container(
+                width: 70,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: allTaken ? _primary.withOpacity(0.05) : (isLocked ? _bg : Colors.white),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: allTaken ? _primary.withOpacity(0.1) : (isLocked ? _fieldBdr.withOpacity(0.3) : _fieldBdr.withOpacity(0.5))),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(time.split(' ')[0], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: allTaken ? _primary : (isLocked ? _textMuted : _textDark))),
+                    Text(time.split(' ')[1], style: TextStyle(fontSize: 10, color: allTaken ? _primary : _textMuted)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [BoxShadow(color: _textDark.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+                ),
+                child: Column(
+                  children: [
+                    ...items.map((item) {
+                      final med = item['med'] as ScheduledMedicine;
+                      final key = '${med.prescriptionItemId}_${item['doseIndex']}';
+                      final taken = _takenDoses.contains(key);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Icon(Icons.medication_rounded, color: taken ? _primary : (isLocked ? _textMuted.withOpacity(0.2) : _textMuted.withOpacity(0.4)), size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(med.medicineName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: taken ? _primary.withOpacity(0.6) : (isLocked ? _textMuted : _textDark))),
+                                  if (med.dosage.isNotEmpty)
+                                    Text(med.dosage, style: const TextStyle(fontSize: 11, color: _textMuted)),
+                                  if (!taken && med.duration.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text('Duration: ${med.duration}', style: TextStyle(fontSize: 10, color: isLocked ? _textMuted.withOpacity(0.4) : _primary.withOpacity(0.7), fontWeight: FontWeight.w500)),
+                                    ),
+                                  if (!taken && med.instructions.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(med.instructions, style: TextStyle(fontSize: 10, color: _textMuted.withOpacity(0.8), fontStyle: FontStyle.italic)),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (!taken) IconButton(
+                              onPressed: isLocked ? null : () => _markAsTaken(med, item['doseIndex'] as int, time),
+                              icon: Icon(Icons.check_circle_outline_rounded, color: isLocked ? _textMuted.withOpacity(0.2) : _primary, size: 22),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ) else const Icon(Icons.check_circle_rounded, color: _primary, size: 20),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    if (!allTaken && items.length > 1) ...[
+                      const Divider(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton(
+                          onPressed: isLocked ? null : () {
+                            for (var item in items) {
+                              _markAsTaken(item['med'] as ScheduledMedicine, item['doseIndex'] as int, time);
+                            }
+                          },
+                          child: Text('Mark all as taken', style: TextStyle(color: isLocked ? _textMuted.withOpacity(0.3) : _primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressCard(double completion) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F6FF),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: const BoxDecoration(color: Color(0xFF007BFF), shape: BoxShape.circle),
+            child: const Icon(Icons.show_chart_rounded, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Your progress', style: TextStyle(color: Color(0xFF0056B3), fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 8),
+                Text(completion >= 1.0 ? "Fantastic! You've taken all your meds." : completion >= 0.5 ? "Great job! You're doing amazing." : "Keep it up! Let's hit 100%.",
+                    style: const TextStyle(fontSize: 14, color: _textDark, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Column(
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 60, height: 60,
+                    child: CircularProgressIndicator(
+                      value: completion,
+                      strokeWidth: 8,
+                      backgroundColor: Colors.white,
+                      color: const Color(0xFF007BFF),
+                    ),
+                  ),
+                  Text('${(completion * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _textDark)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text('This day', style: TextStyle(fontSize: 10, color: _textMuted, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTipCard() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F1FF),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF7B3AF5), size: 20),
+                    const SizedBox(width: 8),
+                    const Text('Tip of the day', style: TextStyle(color: Color(0xFF5A16D1), fontWeight: FontWeight.bold, fontSize: 14)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text('Try setting reminders a few minutes early to stay on track.',
+                    style: TextStyle(fontSize: 14, color: _textDark, height: 1.4)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Image.network(
+            'https://cdn-icons-png.flaticon.com/512/2838/2838634.png', 
+            width: 60, height: 60,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(IconData icon, String title, String sub) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(32),
+    decoration: BoxDecoration(
+      color: Colors.white, borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: _fieldBdr.withOpacity(0.5)),
+    ),
+    child: Column(children: [
+      Icon(icon, size: 48, color: _primary.withOpacity(0.2)),
+      const SizedBox(height: 12),
+      Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: _textDark, fontSize: 15)),
+      const SizedBox(height: 4),
+      Text(sub, style: const TextStyle(fontSize: 13, color: _textMuted), textAlign: TextAlign.center),
+    ]),
+  );
 
   Widget _buildError() => Center(child: Padding(
     padding: const EdgeInsets.all(32),
@@ -263,6 +764,27 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     ]),
   ));
 
+  void _applyTimeChange(ScheduledMedicine med, int doseIndex, TimeOfDay picked) {
+    final key = '${med.prescriptionItemId}_$doseIndex';
+    setState(() {
+      _customDoseTimes[key] = picked.format(context);
+
+      final intervalMins = med.doseIntervalMinutes;
+      if (intervalMins > 0) {
+        int runningMins = picked.hour * 60 + picked.minute;
+        for (int i = doseIndex + 1; i < med.doseTimes.length; i++) {
+          final nextKey = '${med.prescriptionItemId}_$i';
+          runningMins += intervalMins;
+
+          final nextH = (runningMins ~/ 60) % 24;
+          final nextM = runningMins % 60;
+          _customDoseTimes[nextKey] = TimeOfDay(hour: nextH, minute: nextM).format(context);
+        }
+      }
+      _scheduleNotifications();
+    });
+  }
+
   Future<void> _pickTime(BuildContext context, ScheduledMedicine med, int doseIndex, String currentTime) async {
     final parts = currentTime.split(' ');
     final hm = parts[0].split(':');
@@ -279,126 +801,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     );
 
     if (picked != null) {
-      final key = '${med.prescriptionItemId}_$doseIndex';
-      setState(() {
-        _customDoseTimes[key] = picked.format(context);
-
-        // Dynamic recalculation for all SUCCEEDING doses based on frequency interval
-        final intervalMins = med.doseIntervalMinutes;
-        if (intervalMins > 0) {
-          int runningMins = picked.hour * 60 + picked.minute;
-          for (int i = doseIndex + 1; i < med.doseTimes.length; i++) {
-            final nextKey = '${med.prescriptionItemId}_$i';
-            runningMins += intervalMins;
-            
-            final nextH = (runningMins ~/ 60) % 24;
-            final nextM = runningMins % 60;
-            _customDoseTimes[nextKey] = TimeOfDay(hour: nextH, minute: nextM).format(context);
-          }
-        }
-        _scheduleNotifications();
-      });
+      _applyTimeChange(med, doseIndex, picked);
     }
   }
-
-  void _showManualLogDialog() {
-    if (_medicines.isEmpty) return;
-    
-    ScheduledMedicine? selectedMed = _medicines.first;
-    TimeOfDay selectedTime = TimeOfDay.now();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Text('Log Manual Intake', style: TextStyle(fontWeight: FontWeight.bold, color: _textDark)),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Record a medication intake that wasn\'t on your fixed schedule or is taken as needed (PRN).', style: TextStyle(fontSize: 12, color: _textMuted)),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(12), border: Border.all(color: _fieldBdr)),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<ScheduledMedicine>(
-                        value: selectedMed,
-                        isExpanded: true,
-                        items: _medicines.map((m) => DropdownMenuItem(
-                          value: m,
-                          child: Text(m.medicineName, style: const TextStyle(fontSize: 14)),
-                        )).toList(),
-                        onChanged: (val) => setDialogState(() => selectedMed = val),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showTimePicker(context: context, initialTime: selectedTime);
-                      if (picked != null) setDialogState(() => selectedTime = picked);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(12), border: Border.all(color: _fieldBdr)),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Time Taken', style: TextStyle(fontSize: 14, color: _textDark)),
-                          Row(children: [
-                            Text(selectedTime.format(context), style: const TextStyle(fontWeight: FontWeight.bold, color: _primary)),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.access_time, size: 18, color: _primary),
-                          ]),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL', style: TextStyle(color: _textMuted))),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _manualIntakes.add({
-                        'med': selectedMed,
-                        'time': selectedTime.format(context),
-                        'timestamp': DateTime.now(),
-                      });
-                    });
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white),
-                  child: const Text('LOG INTAKE'),
-                ),
-              ],
-            );
-          }
-        );
-      }
-    );
-  }
-
-  Widget _buildEmptyState(IconData icon, String title, String sub) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(28),
-    decoration: BoxDecoration(
-      color: Colors.white, borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: _fieldBdr),
-    ),
-    child: Column(children: [
-      Icon(icon, size: 48, color: _primary.withOpacity(0.22)),
-      const SizedBox(height: 10),
-      Text(title, style: const TextStyle(fontWeight: FontWeight.w600, color: _textDark, fontSize: 14)),
-      const SizedBox(height: 4),
-      Text(sub, style: const TextStyle(fontSize: 12, color: _textMuted), textAlign: TextAlign.center),
-    ]),
-  );
 
   void _showRxModal(ScheduledMedicine med) {
     showModalBottomSheet(
@@ -506,39 +911,6 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     ]),
   );
 
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 60, 20, 25),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_primary, _primaryMid],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(32), bottomRight: Radius.circular(32)),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-            onPressed: () => Navigator.pop(context),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Medicine Scheduler",
-                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-              Text("Hello, ${widget.username}", // Dynamically uses the passed username
-                  style: const TextStyle(color: Colors.white70, fontSize: 13)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildBottomNav() {
     final tabs = [
       {'icon': Icons.dashboard_rounded,           'label': 'Home'},
@@ -570,7 +942,6 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                       ),
                     ));
                   } else if (i == 1) {
-                    // Already on Medicine page
                     setState(() => _selectedTab = i);
                   } else if (i == 2) {
                     Navigator.push(context, MaterialPageRoute(
@@ -580,8 +951,6 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                       ),
                     ));
                   } else if (i == 3) {
-                    // ✅ Medicine page doesn't have profile data — pop back to Dashboard
-                    // which will then navigate to Profile with full data
                     Navigator.pop(context);
                   }
                 },
@@ -613,76 +982,8 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     );
   }
 
-
-  Widget _scheduleCard(ScheduledMedicine med, String time, int doseIndex) {
-    final key = '${med.prescriptionItemId}_$doseIndex';
-    final taken = _takenDoses.contains(key);
-    final timeParts = time.split(' ');
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: _textDark.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Row(children: [
-        GestureDetector(
-          onTap: () => _pickTime(context, med, doseIndex, time),
-          child: Container(
-            width: 52, height: 52,
-            decoration: BoxDecoration(
-              color: taken ? _primary.withOpacity(0.08) : _bg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: taken ? _primary.withOpacity(0.3) : _fieldBdr),
-            ),
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text(timeParts[0], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14,
-                  color: taken ? _primary : _textDark)),
-              Text(timeParts.length > 1 ? timeParts[1] : '',
-                  style: TextStyle(fontSize: 9, color: taken ? _primary : _textMuted)),
-            ]),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(med.medicineName,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _textDark)),
-          Text(
-            [if (med.dosage.isNotEmpty) med.dosage, if (med.frequency.isNotEmpty) med.frequency]
-                .join(' • '),
-            style: const TextStyle(fontSize: 12, color: _textMuted),
-          ),
-          if (med.instructions.isNotEmpty)
-            Text(med.instructions, style: const TextStyle(fontSize: 11, color: _textMuted),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-        ])),
-        IconButton(
-          onPressed: () => _showRxModal(med),
-          icon: const Icon(Icons.receipt_long_rounded, color: _primaryMid, size: 20),
-          tooltip: 'View Prescription',
-        ),
-        GestureDetector(
-          onTap: () => _markAsTaken(med, doseIndex, time),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: taken ? _primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: taken ? _primary : _fieldBdr, width: 1.5),
-            ),
-            child: Row(
-              children: [
-                if (taken) const Icon(Icons.check, color: Colors.white, size: 14),
-                if (taken) const SizedBox(width: 4),
-                Text(taken ? 'Taken' : 'Taken',
-                    style: TextStyle(color: taken ? Colors.white : _textMuted, fontSize: 11, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-        ),
-      ]),
-    );
-  }
+  Widget _sectionHeader(String title) => Text(title,
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _textDark));
 
   Widget _prescriptionCard(ScheduledMedicine med) {
     return GestureDetector(
@@ -726,36 +1027,6 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           const Icon(Icons.chevron_right_rounded, color: _fieldBdr),
         ]),
       ),
-    );
-  }
-
-  Widget _sectionHeader(String title) => Text(title,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _textDark));
-
-  Widget _manualIntakeCard(Map<String, dynamic> manual) {
-    final med = manual['med'] as ScheduledMedicine;
-    final time = manual['time'] as String;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _primary.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _primary.withOpacity(0.1)),
-      ),
-      child: Row(children: [
-        Container(
-          width: 40, height: 40,
-          decoration: BoxDecoration(color: _primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-          child: const Icon(Icons.history_rounded, color: _primary, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(med.medicineName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _textDark)),
-          Text('Logged at $time • Manual Record', style: const TextStyle(fontSize: 11, color: _textMuted)),
-        ])),
-        const Icon(Icons.check_circle_rounded, color: _primary, size: 20),
-      ]),
     );
   }
 }

@@ -360,136 +360,174 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Info strip ──────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _C.primaryLight,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _C.primary.withOpacity(0.15)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.info_outline_rounded, color: _C.primaryMid, size: 18),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Fill in your visit details below to get a queue number.',
+                      style: TextStyle(fontSize: 12, color: _C.primaryMid, height: 1.4),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 16),
 
-            // ── Info strip ──────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(color: _C.primaryLight, borderRadius: BorderRadius.circular(14), border: Border.all(color: _C.primary.withOpacity(0.15))),
-              child: Row(children: [
-                const Icon(Icons.info_outline_rounded, color: _C.primaryMid, size: 18),
-                const SizedBox(width: 10),
-                const Expanded(child: Text('Fill in your visit details below to get a queue number.', style: TextStyle(fontSize: 12, color: _C.primaryMid, height: 1.4))),
-              ]),
-            ),
-            const SizedBox(height: 16),
+              // ── Queue Limiter Status ────────────────────────────
+              FutureBuilder<QueueLimiterStatus>(
+                future: _limiterStatusFuture,
+                builder: (context, limiterSnapshot) {
+                  final limiterStatus = limiterSnapshot.data;
+                  if (limiterStatus == null) {
+                    return const SizedBox.shrink();
+                  }
 
-            // ── Queue Limiter Status ────────────────────────────
-            FutureBuilder<QueueLimiterStatus>(
-              future: _limiterStatusFuture,
-              builder: (context, limiterSnapshot) {
-                final limiterStatus = limiterSnapshot.data;
-                if (limiterStatus == null || !limiterStatus.enabled) {
-                  return const SizedBox.shrink();
-                }
-
-                // Show limit reached warning
-                if (limiterStatus.limitReached) {
-                  return Column(children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEE2E2),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFFCA5A5)),
-                      ),
-                      child: Column(children: [
-                        Row(children: [
+                  // Show limit reached warning
+                  if (limiterStatus.limitReached) {
+                    return Column(children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                        ),
+                        child: Column(children: [
+                          Row(children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDC2626),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.event_busy_rounded, color: Colors.white, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Consultations Full',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF991B1B),
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Daily limit reached',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF991B1B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ]),
+                          const SizedBox(height: 12),
                           Container(
-                            width: 40,
-                            height: 40,
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFDC2626),
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.event_busy_rounded, color: Colors.white, size: 22),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Consultations Full',
+                                  'We\'ve reached our daily consultation limit of ${limiterStatus.dailyLimit} patients for today due to high demand.',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF991B1B),
+                                    height: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'What you can do:',
                                   style: TextStyle(
-                                    fontSize: 15,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.bold,
                                     color: Color(0xFF991B1B),
                                   ),
                                 ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Daily limit reached',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF991B1B),
-                                  ),
-                                ),
+                                const SizedBox(height: 6),
+                                _buildLimiterTip(Icons.schedule_rounded, 'Try again tomorrow when slots reset'),
+                                _buildLimiterTip(Icons.phone_rounded, 'Call the clinic for scheduling assistance'),
+                                _buildLimiterTip(Icons.emergency_rounded, 'For emergencies, visit immediately'),
                               ],
                             ),
                           ),
                         ]),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'We\'ve reached our daily consultation limit of ${limiterStatus.dailyLimit} patients for today due to high demand.',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF991B1B),
-                                  height: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'What you can do:',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF991B1B),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              _buildLimiterTip(Icons.schedule_rounded, 'Try again tomorrow when slots reset'),
-                              _buildLimiterTip(Icons.phone_rounded, 'Call the clinic for scheduling assistance'),
-                              _buildLimiterTip(Icons.emergency_rounded, 'For emergencies, visit immediately'),
-                            ],
-                          ),
-                        ),
-                      ]),
-                    ),
-                    const SizedBox(height: 16),
-                  ]);
-                }
+                      ),
+                      const SizedBox(height: 16),
+                    ]);
+                  }
 
-                // Show remaining slots info
-                if (limiterStatus.remainingSlots <= 5) {
+                  // Show remaining slots info
+                  if (limiterStatus.remainingSlots <= 5) {
+                    return Column(children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF9C3),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFFDE047)),
+                        ),
+                        child: Row(children: [
+                          const Icon(Icons.warning_amber_rounded, color: Color(0xFF854D0E), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Only ${limiterStatus.remainingSlots} consultation slots remaining today!',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF854D0E),
+                                fontWeight: FontWeight.w600,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ]),
+                      ),
+                      const SizedBox(height: 16),
+                    ]);
+                  }
+
+                  // Show available slots info
                   return Column(children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF9C3),
+                        color: const Color(0xFFDCFCE7),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFFDE047)),
+                        border: Border.all(color: const Color(0xFF86EFAC)),
                       ),
                       child: Row(children: [
-                        const Icon(Icons.warning_amber_rounded, color: Color(0xFF854D0E), size: 20),
+                        const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF166534), size: 18),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Only ${limiterStatus.remainingSlots} consultation slots remaining today!',
+                            '${limiterStatus.remainingSlots} of ${limiterStatus.dailyLimit} consultation slots available',
                             style: const TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF854D0E),
+                              color: Color(0xFF166534),
                               fontWeight: FontWeight.w600,
-                              height: 1.4,
                             ),
                           ),
                         ),
@@ -497,92 +535,66 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
                     ),
                     const SizedBox(height: 16),
                   ]);
-                }
+                },
+              ),
 
-                // Show available slots info
-                return Column(children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFF86EFAC)),
-                    ),
-                    child: Row(children: [
-                      const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF166534), size: 18),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          '${limiterStatus.remainingSlots} of ${limiterStatus.dailyLimit} consultation slots available',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF166534),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+              _sectionLabel('HEALTHCARE SERVICE', Icons.medical_services_outlined),
+              const SizedBox(height: 12),
+              _buildSearchableServicePicker(services),
+              const SizedBox(height: 24),
+
+              // ── Priority category ───────────────────────────────
+              _sectionLabel('PRIORITY CATEGORY', Icons.accessibility_new_rounded),
+              const SizedBox(height: 12),
+              _buildTypeSelector(),
+              const SizedBox(height: 24),
+
+              // ── Medical details ─────────────────────────────────
+              _sectionLabel('MEDICAL DETAILS', Icons.description_outlined),
+              const SizedBox(height: 12),
+              _buildTextField(_reasonController, 'Reason for Visit *', 'e.g. Fever, headache, follow-up checkup...', 2, Icons.edit_note_rounded),
+              const SizedBox(height: 12),
+              _buildTextField(_symptomsController, 'Symptoms (Optional)', 'Describe your symptoms if any...', 3, Icons.sick_outlined),
+              const SizedBox(height: 32),
+
+              // ── Submit button ───────────────────────────────────
+              FutureBuilder<QueueLimiterStatus>(
+                future: _limiterStatusFuture,
+                builder: (context, limiterSnapshot) {
+                  final limiterStatus = limiterSnapshot.data;
+                  final isLimitReached = limiterStatus?.limitReached ?? false;
+                  final isDisabled = _isSubmitting || isLimitReached;
+
+                  return SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: isDisabled ? null : _handleJoin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDisabled ? Colors.grey : _C.primary,
+                        foregroundColor: Colors.white,
+                        elevation: isDisabled ? 0 : 4,
+                        shadowColor: _C.primary.withOpacity(0.35),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        disabledForegroundColor: Colors.grey.shade600,
                       ),
-                    ]),
-                  ),
-                  const SizedBox(height: 16),
-                ]);
-              },
-            ),
-
-            _sectionLabel('HEALTHCARE SERVICE', Icons.medical_services_outlined),
-            const SizedBox(height: 12),
-            _buildSearchableServicePicker(services),
-            const SizedBox(height: 24),
-
-            // ── Priority category ───────────────────────────────
-            _sectionLabel('PRIORITY CATEGORY', Icons.accessibility_new_rounded),
-            const SizedBox(height: 12),
-            _buildTypeSelector(),
-            const SizedBox(height: 24),
-
-            // ── Medical details ─────────────────────────────────
-            _sectionLabel('MEDICAL DETAILS', Icons.description_outlined),
-            const SizedBox(height: 12),
-            _buildTextField(_reasonController, 'Reason for Visit *', 'e.g. Fever, headache, follow-up checkup...', 2, Icons.edit_note_rounded),
-            const SizedBox(height: 12),
-            _buildTextField(_symptomsController, 'Symptoms (Optional)', 'Describe your symptoms if any...', 3, Icons.sick_outlined),
-            const SizedBox(height: 32),
-
-            // ── Submit button ───────────────────────────────────
-            FutureBuilder<QueueLimiterStatus>(
-              future: _limiterStatusFuture,
-              builder: (context, limiterSnapshot) {
-                final limiterStatus = limiterSnapshot.data;
-                final isLimitReached = limiterStatus?.limitReached ?? false;
-                
-                return SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: (_isSubmitting || isLimitReached) ? null : _handleJoin,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isLimitReached ? Colors.grey : _C.primary,
-                      foregroundColor: Colors.white,
-                      elevation: isLimitReached ? 0 : 4,
-                      shadowColor: _C.primary.withOpacity(0.35),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      disabledForegroundColor: Colors.grey.shade600,
+                      child: _isSubmitting
+                          ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                          : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              Icon(isLimitReached ? Icons.block_rounded : Icons.confirmation_number_rounded, size: 20),
+                              const SizedBox(width: 10),
+                              Text(
+                                isLimitReached ? 'LIMIT REACHED' : 'GET QUEUE NUMBER',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5),
+                              ),
+                            ]),
                     ),
-                    child: _isSubmitting
-                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                        : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Icon(isLimitReached ? Icons.block_rounded : Icons.confirmation_number_rounded, size: 20),
-                      const SizedBox(width: 10),
-                      Text(
-                        isLimitReached ? 'LIMIT REACHED' : 'GET QUEUE NUMBER',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5),
-                      ),
-                    ]),
-                  ),
-                );
-              },
-            ),
-          ]),
+                  );
+                },
+              ),
+            ],
+          ),
         );
       },
     );
@@ -1014,7 +1026,14 @@ class _ServiceSearchModalState extends State<_ServiceSearchModal> {
                             child: const Icon(Icons.medical_services_outlined, size: 18, color: _C.primaryMid),
                           ),
                           const SizedBox(width: 14),
-                          Expanded(child: Text(s.serviceLabel, style: const TextStyle(fontWeight: FontWeight.w600, color: _C.textDark, fontSize: 14))),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(s.serviceLabel, style: const TextStyle(fontWeight: FontWeight.w600, color: _C.textDark, fontSize: 14)),
+                              ],
+                            ),
+                          ),
                           const Icon(Icons.chevron_right_rounded, color: _C.textMuted, size: 20),
                         ]),
                       ),

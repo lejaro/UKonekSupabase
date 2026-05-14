@@ -241,8 +241,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     const Text('PRESCRIBED MEDICATIONS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF28A745), letterSpacing: 1.2)),
                     const SizedBox(height: 12),
                     
-                    // ── List all medicines in this prescription ──────────
-                    ...prescriptionItems.map((item) => Container(
+                    // ── List all medicines in this prescription (filtering out dispensed ones) ──────────
+                    ...prescriptionItems.where((item) => !item.isPrescriptionDispensed && !item.isDispensed).map((item) => Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -279,6 +279,16 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                                 const Icon(Icons.schedule, size: 16, color: Color(0xFF637367)),
                                 const SizedBox(width: 6),
                                 Text('Frequency: ${item.frequency}', style: const TextStyle(fontSize: 12, color: Color(0xFF637367))),
+                              ],
+                            ),
+                          ],
+                          if (item.duration.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(Icons.history_rounded, size: 16, color: Color(0xFF637367)),
+                                const SizedBox(width: 6),
+                                Text('Duration: ${item.duration}', style: const TextStyle(fontSize: 12, color: Color(0xFF637367))),
                               ],
                             ),
                           ],
@@ -650,7 +660,12 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   child: Row(children: [
                     Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
                     const SizedBox(width: 5),
-                    Text(hasQueue ? 'ACTIVE QUEUE' : 'LIVE QUEUE', style: TextStyle(color: statusColor, fontWeight: FontWeight.w800, fontSize: 10)),
+                    Text(
+                      hasQueue 
+                        ? (queue.status.toLowerCase() == 'on_call' ? 'ON CALL' : 'ACTIVE QUEUE') 
+                        : 'LIVE QUEUE', 
+                      style: TextStyle(color: statusColor, fontWeight: FontWeight.w800, fontSize: 10)
+                    ),
                   ]),
                 ),
                 const Spacer(),
@@ -751,10 +766,13 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         }),
         // NEW: View E-Prescription Button (Dynamic)
         _actionBtn('E-Prescription', Icons.receipt_long_rounded, const Color(0xFF6F42C1), () {
-          if (_prescribedMedicines.isNotEmpty) {
+          // Filter out dispensed items for the e-prescription view
+          final activeMeds = _prescribedMedicines.where((m) => !m.isPrescriptionDispensed && !m.isDispensed).toList();
+          
+          if (activeMeds.isNotEmpty) {
             // Group prescriptions by prescription_id and get the latest one
             final Map<int, List<PrescriptionRecord>> grouped = {};
-            for (var item in _prescribedMedicines) {
+            for (var item in activeMeds) {
               grouped.putIfAbsent(item.prescriptionId, () => []).add(item);
             }
             
@@ -790,7 +808,11 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   Widget _buildMedicineCard() {
-    final medicines = _prescribedMedicines.take(3).toList();
+    // Only show medicines that are not yet dispensed on the dashboard summary
+    final medicines = _prescribedMedicines
+        .where((m) => !m.isPrescriptionDispensed && !m.isDispensed)
+        .take(3)
+        .toList();
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: _C.surface, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 14, offset: Offset(0, 5))]),

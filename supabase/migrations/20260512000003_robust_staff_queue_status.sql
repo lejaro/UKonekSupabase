@@ -1,6 +1,9 @@
 -- Final robustness fix for staff queue listing.
 -- This ensures status is always trimmed and lowercase for frontend compatibility.
 
+-- 1. Update Staff Queue RPC (Table format is best for staff dashboard)
+DROP FUNCTION IF EXISTS public.list_queue_tickets_for_staff(date, integer);
+
 CREATE OR REPLACE FUNCTION public.list_queue_tickets_for_staff(
   p_date date DEFAULT NULL,
   p_limit integer DEFAULT 200

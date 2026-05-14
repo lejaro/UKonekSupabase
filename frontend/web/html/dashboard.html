@@ -281,19 +281,23 @@
 
     .queue-ticket-top {
       display: flex;
-      justify-content: space-between;
+      flex-wrap: wrap;
+      justify-content: flex-start;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
+      gap: 6px;
+      margin-bottom: 10px;
     }
 
     .queue-ticket-code {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
-      color: #475569;
+      color: #64748b;
       background: #f1f5f9;
-      border-radius: 999px;
-      padding: 2px 8px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-family: 'JetBrains Mono', monospace;
+      margin-left: auto;
     }
 
     .queue-ticket-queue {
@@ -394,17 +398,19 @@
       background: #d1fae5;
       border-color: #34d399;
     }
-    .queue-vital-done-badge {
+    .queue-vital-done-badge, .vitals-badge {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      font-size: 11px;
-      font-weight: 700;
+      font-size: 10px;
+      font-weight: 800;
       color: #065f46;
       background: #d1fae5;
       border: 1px solid #6ee7b7;
       border-radius: 6px;
-      padding: 2px 7px;
+      padding: 2px 6px;
+      text-transform: uppercase;
+      line-height: 1.2;
     }
   </style>
 </head>
@@ -968,7 +974,7 @@
       <section id="users-section" class="section-top hidden">
         <div class="panel" id="accounts-pane">
           <div class="panel-head">
-            <h3>User Management</h3>
+            <h3 id="user-mgmt-title">User Management</h3>
             <span class="panel-hint">Manage staff accounts and citizen profiles.</span>
             <div class="management-actions">
               <button id="refresh-accounts-btn" class="chip-btn">Refresh</button>
@@ -1002,16 +1008,17 @@
           </div>
           <div id="citizens-pane" class="hidden">
             <div class="management-actions" style="margin-bottom:10px;">
-              <input id="citizens-finder-input" class="search-input" type="search" placeholder="Find citizens by username, email, or contact number" aria-label="Find citizens" />
+              <input id="citizens-finder-input" class="search-input" type="search" placeholder="Find citizens by name, email, or contact number" aria-label="Find citizens" />
             </div>
             <div class="table-wrap">
               <table class="accounts-table">
                 <thead>
                   <tr class="table-header-row">
-                    <th class="table-header-cell">Username</th>
+                    <th class="table-header-cell">Name</th>
                     <th class="table-header-cell">Email</th>
                     <th class="table-header-cell">Contact Number</th>
                     <th class="table-header-cell">Registered</th>
+                    <th class="table-header-cell" style="text-align:center;">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="citizens-tbody"></tbody>
@@ -2021,7 +2028,6 @@
             <button class="chr-tab" data-chr-tab="chr-tab-vitals" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Vitals</button>
             <button class="chr-tab" data-chr-tab="chr-tab-prescriptions" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Prescriptions</button>
             <button class="chr-tab" data-chr-tab="chr-tab-laborders" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Lab Orders</button>
-            <button class="chr-tab" data-chr-tab="chr-tab-appointments" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Appointments</button>
           </div>
 
           <!-- Tab content -->
@@ -2041,10 +2047,6 @@
             <!-- Lab Orders -->
             <div id="chr-tab-laborders" class="chr-tab-content" style="display:none;">
               <div id="chr-laborders-body"></div>
-            </div>
-            <!-- Appointments -->
-            <div id="chr-tab-appointments" class="chr-tab-content" style="display:none;">
-              <div id="chr-appointments-body"></div>
             </div>
           </div>
         </div>
@@ -2169,6 +2171,8 @@
             </form>
 
             <!-- Predefined clinical suggestions -->
+            <datalist id="medicine-list"></datalist>
+            
             <datalist id="dosage-list">
               <option value="500 mg">
               <option value="250 mg">

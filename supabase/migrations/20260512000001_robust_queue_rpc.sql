@@ -2,6 +2,8 @@
 -- This migration simplifies the RPCs to ensure they always return active tickets when p_date is null.
 
 -- 1. Update Staff Queue RPC (Table format is best for staff dashboard)
+DROP FUNCTION IF EXISTS public.list_queue_tickets_for_staff(date, integer);
+
 CREATE OR REPLACE FUNCTION public.list_queue_tickets_for_staff(
   p_date date DEFAULT NULL,
   p_limit integer DEFAULT 200
@@ -65,6 +67,8 @@ $$;
 GRANT EXECUTE ON FUNCTION public.list_queue_tickets_for_staff(date, integer) TO authenticated;
 
 -- 2. Update TV View RPC (JSON Bucket format is best for TV Display JS)
+DROP FUNCTION IF EXISTS public.get_tv_queue_display(date);
+
 CREATE OR REPLACE FUNCTION public.get_tv_queue_display(
   p_date date DEFAULT NULL
 )

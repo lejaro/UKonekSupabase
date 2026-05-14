@@ -16,6 +16,8 @@ ALTER TABLE public.queue_tickets
   ALTER COLUMN queue_date SET DEFAULT (now() AT TIME ZONE 'Asia/Manila')::date;
 
 -- 3. Update create_queue_ticket (Citizen side)
+DROP FUNCTION IF EXISTS public.create_queue_ticket(text, text, text, text, text);
+
 CREATE OR REPLACE FUNCTION public.create_queue_ticket(
   p_service_key text,
   p_service_label text,
@@ -99,6 +101,8 @@ END;
 $$;
 
 -- 4. Update get_my_queue_dashboard (Citizen Mobile side)
+DROP FUNCTION IF EXISTS public.get_my_queue_dashboard();
+
 CREATE OR REPLACE FUNCTION public.get_my_queue_dashboard()
 RETURNS TABLE (
   queue_id bigint,
@@ -179,6 +183,8 @@ END;
 $$;
 
 -- 5. Update list_available_queue_services
+DROP FUNCTION IF EXISTS public.list_available_queue_services(date);
+
 CREATE OR REPLACE FUNCTION public.list_available_queue_services(
   p_date date DEFAULT NULL
 )

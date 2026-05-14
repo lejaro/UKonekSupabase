@@ -536,15 +536,15 @@ class QueueTicket {
 
   factory QueueTicket.fromMap(Map<String, dynamic> map) {
     return QueueTicket(
-      id: (map['id'] as num?)?.toInt() ?? 0,
-      queueNumber: (map['queue_number'] as num?)?.toInt() ?? 0,
-      ticketCode: (map['ticket_code'] ?? '').toString().trim(),
-      serviceKey: (map['service_key'] ?? '').toString().trim(),
-      serviceLabel: (map['service_label'] ?? '').toString().trim(),
-      citizenType: (map['citizen_type'] ?? '').toString().trim(),
-      status: (map['status'] ?? '').toString().trim(),
+      id: ((map['r_id'] ?? map['id']) as num?)?.toInt() ?? 0,
+      queueNumber: ((map['r_queue_number'] ?? map['queue_number']) as num?)?.toInt() ?? 0,
+      ticketCode: (map['r_ticket_code'] ?? map['ticket_code'] ?? '').toString().trim(),
+      serviceKey: (map['r_service_key'] ?? map['service_key'] ?? '').toString().trim(),
+      serviceLabel: (map['r_service_label'] ?? map['service_label'] ?? '').toString().trim(),
+      citizenType: (map['r_citizen_type'] ?? map['citizen_type'] ?? '').toString().trim(),
+      status: (map['r_status'] ?? map['status'] ?? '').toString().trim(),
       estimatedWaitMinutes:
-          (map['estimated_wait_minutes'] as num?)?.toInt() ?? 0,
+          ((map['r_estimated_wait_minutes'] ?? map['estimated_wait_minutes']) as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -589,22 +589,22 @@ class QueueDashboardSnapshot {
   bool get hasActiveQueue => queueId != null && myQueueNumber != null;
 
   factory QueueDashboardSnapshot.fromMap(Map<String, dynamic> map) {
-    final dateRaw = map['queue_date'];
+    final dateRaw = map['r_queue_date'] ?? map['queue_date'];
     DateTime? parsedDate;
     if (dateRaw is String && dateRaw.trim().isNotEmpty) {
       parsedDate = DateTime.tryParse(dateRaw.trim());
     }
     return QueueDashboardSnapshot(
-      queueId: (map['queue_id'] as num?)?.toInt(),
-      serviceKey: (map['service_key'] ?? '').toString().trim(),
-      serviceLabel: (map['service_label'] ?? '').toString().trim(),
-      ticketCode: (map['ticket_code'] ?? '').toString().trim(),
-      myQueueNumber: (map['my_queue_number'] as num?)?.toInt(),
+      queueId: ((map['r_queue_id'] ?? map['queue_id']) as num?)?.toInt(),
+      serviceKey: (map['r_service_key'] ?? map['service_key'] ?? '').toString().trim(),
+      serviceLabel: (map['r_service_label'] ?? map['service_label'] ?? '').toString().trim(),
+      ticketCode: (map['r_ticket_code'] ?? map['ticket_code'] ?? '').toString().trim(),
+      myQueueNumber: ((map['r_my_queue_number'] ?? map['my_queue_number']) as num?)?.toInt(),
       currentlyServingQueueNumber:
-          (map['currently_serving_queue_number'] as num?)?.toInt(),
+          ((map['r_currently_serving_queue_number'] ?? map['currently_serving_queue_number']) as num?)?.toInt(),
       estimatedWaitMinutes:
-          (map['estimated_wait_minutes'] as num?)?.toInt() ?? 0,
-      status: (map['status'] ?? '').toString().trim(),
+          ((map['r_estimated_wait_minutes'] ?? map['estimated_wait_minutes']) as num?)?.toInt() ?? 0,
+      status: (map['r_status'] ?? map['status'] ?? '').toString().trim(),
       queueDate: parsedDate,
       isOnCall: map['is_on_call'] == true,
       waitingCount: (map['waiting_count'] as num?)?.toInt() ?? 0,
@@ -641,6 +641,7 @@ class QueueLimiterStatus {
   final int todayCount;
   final bool limitReached;
   final int remainingSlots;
+  final bool doctorsAvailable;
 
   const QueueLimiterStatus({
     required this.enabled,
@@ -648,6 +649,7 @@ class QueueLimiterStatus {
     required this.todayCount,
     required this.limitReached,
     required this.remainingSlots,
+    required this.doctorsAvailable,
   });
 
   factory QueueLimiterStatus.fromMap(Map<String, dynamic> map) {
@@ -657,6 +659,7 @@ class QueueLimiterStatus {
       todayCount: (map['today_count'] as num?)?.toInt() ?? 0,
       limitReached: map['limit_reached'] == true,
       remainingSlots: (map['remaining_slots'] as num?)?.toInt() ?? 0,
+      doctorsAvailable: map['doctors_available'] as bool? ?? true,
     );
   }
 
@@ -667,6 +670,7 @@ class QueueLimiterStatus {
       todayCount: 0,
       limitReached: false,
       remainingSlots: 20,
+      doctorsAvailable: true,
     );
   }
 
@@ -1235,8 +1239,7 @@ class ApiService {
         .where(
           (entry) =>
               entry.serviceKey.isNotEmpty &&
-              entry.serviceLabel.isNotEmpty &&
-              entry.doctorCount > 0,
+              entry.serviceLabel.isNotEmpty,
         )
         .toList(growable: false);
   }
@@ -1463,7 +1466,7 @@ class ApiService {
       'scheduled_time': scheduledTime,
       'dose_index': doseIndex,
       'status': 'taken',
-      'actual_time': DateTime.now().toIso8601String(),
+      'actual_time': DateTime.now().toUtc().toIso8601String(),
     });
   }
 
@@ -1471,13 +1474,14 @@ class ApiService {
     final profile = await fetchMyCitizenProfile();
     final citizenId = profile['id'];
     
-    final startOfDay = DateTime.now().toUtc().copyWith(hour: 0, minute: 0, second: 0, millisecond: 0);
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
     
     final response = await _client
         .from('medicine_intake_logs')
         .select()
         .eq('citizen_id', citizenId)
-        .gte('created_at', startOfDay.toIso8601String());
+        .gte('created_at', startOfDay.toUtc().toIso8601String());
         
     return (response as List<dynamic>?)?.whereType<Map<String, dynamic>>().toList() ?? [];
   }
