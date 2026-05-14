@@ -16,35 +16,15 @@ class NotificationService {
     if (kIsWeb) return;
 
     tz.initializeTimeZones();
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-    // Set local location to Asia/Manila
->>>>>>> Stashed changes
-=======
-    // Set local location to Asia/Manila
->>>>>>> Stashed changes
     try {
       tz.setLocalLocation(tz.getLocation('Asia/Manila'));
     } catch (e) {
       debugPrint('Timezone error: $e');
     }
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 
     const AndroidInitializationSettings initializationSettingsAndroid =
     AndroidInitializationSettings('@mipmap/ic_launcher');
-=======
->>>>>>> Stashed changes
 
-=======
-
->>>>>>> Stashed changes
-    // Android Settings
-    const AndroidInitializationSettings initializationSettingsAndroid =
-    AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    // iOS/macOS Settings
     const DarwinInitializationSettings initializationSettingsIOS =
     DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -52,8 +32,6 @@ class NotificationService {
       requestSoundPermission: true,
     );
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
     const LinuxInitializationSettings initializationSettingsLinux =
     LinuxInitializationSettings(defaultActionName: 'Open notification');
 
@@ -84,38 +62,6 @@ class NotificationService {
         }
       },
     );
-=======
-    // Linux Settings (Required to fix your error)
-    const LinuxInitializationSettings initializationSettingsLinux =
-    LinuxInitializationSettings(
-      defaultActionName: 'Open Notification',
-    );
-=======
-    // Linux Settings (Required to fix your error)
-    const LinuxInitializationSettings initializationSettingsLinux =
-    LinuxInitializationSettings(
-      defaultActionName: 'Open Notification',
-    );
-
-    final InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsIOS,
-      linux: initializationSettingsLinux, // Added Linux initialization
-    );
-
-    // Note: Parameter name is 'initializationSettings'
-    await _notificationsPlugin.initialize(settings: initializationSettings);
->>>>>>> Stashed changes
-
-    final InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsIOS,
-      linux: initializationSettingsLinux, // Added Linux initialization
-    );
-
-    // Note: Parameter name is 'initializationSettings'
-    await _notificationsPlugin.initialize(settings: initializationSettings);
->>>>>>> Stashed changes
 
     // Request permissions for Android 13+
     final androidImplementation = _notificationsPlugin
@@ -145,13 +91,7 @@ class NotificationService {
     String? payload,
   }) async {
     if (kIsWeb) return;
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
     if (Platform.isLinux) return; // Linux has no real scheduling support
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
 
     final now = tz.TZDateTime.now(tz.local);
     var scheduledDate = tz.TZDateTime(
@@ -183,10 +123,6 @@ class NotificationService {
           styleInformation: BigTextStyleInformation(''),
         ),
         iOS: DarwinNotificationDetails(),
-        // Added Linux notification details
-        linux: LinuxNotificationDetails(
-          defaultActionName: 'Open',
-        ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
