@@ -17,6 +17,10 @@ class NotificationService {
 
     tz.initializeTimeZones();
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+    // Set local location to Asia/Manila
+>>>>>>> Stashed changes
 =======
     // Set local location to Asia/Manila
 >>>>>>> Stashed changes
@@ -26,12 +30,16 @@ class NotificationService {
       debugPrint('Timezone error: $e');
     }
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 
     const AndroidInitializationSettings initializationSettingsAndroid =
     AndroidInitializationSettings('@mipmap/ic_launcher');
 =======
 >>>>>>> Stashed changes
 
+=======
+
+>>>>>>> Stashed changes
     // Android Settings
     const AndroidInitializationSettings initializationSettingsAndroid =
     AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -44,6 +52,7 @@ class NotificationService {
       requestSoundPermission: true,
     );
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
     const LinuxInitializationSettings initializationSettingsLinux =
     LinuxInitializationSettings(defaultActionName: 'Open notification');
@@ -81,6 +90,22 @@ class NotificationService {
     LinuxInitializationSettings(
       defaultActionName: 'Open Notification',
     );
+=======
+    // Linux Settings (Required to fix your error)
+    const LinuxInitializationSettings initializationSettingsLinux =
+    LinuxInitializationSettings(
+      defaultActionName: 'Open Notification',
+    );
+
+    final InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsIOS,
+      linux: initializationSettingsLinux, // Added Linux initialization
+    );
+
+    // Note: Parameter name is 'initializationSettings'
+    await _notificationsPlugin.initialize(settings: initializationSettings);
+>>>>>>> Stashed changes
 
     final InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
@@ -121,7 +146,10 @@ class NotificationService {
   }) async {
     if (kIsWeb) return;
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     if (Platform.isLinux) return; // Linux has no real scheduling support
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 
