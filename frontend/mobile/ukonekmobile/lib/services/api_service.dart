@@ -1040,6 +1040,15 @@ class ApiService {
       );
     }
 
+    // Save session token for secondary persistence verification
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = authResponse.session?.accessToken ?? 'authenticated';
+      await prefs.setString('session_token', token);
+    } catch (e) {
+      debugPrint('ApiService: Failed to save session_token: $e');
+    }
+
     // Fetch the citizen profile.
     // If missing, try to auto-link a legacy citizen row by email.
     Map<String, dynamic>? profile = await _client

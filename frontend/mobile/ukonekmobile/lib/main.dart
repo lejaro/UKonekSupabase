@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'uKonekOnBoardingPage.dart';
 import 'uKonekMenuPage.dart';
 import 'uKonekDashboardPage.dart';
@@ -75,9 +76,18 @@ class _RootHandlerState extends State<RootHandler> {
     final authClient = Supabase.instance.client.auth;
     final session = authClient.currentSession;
     
-    debugPrint('RootHandler: Checking session... ${session != null ? "Session Found" : "No Session"}');
+    // Explicit session token check for forced login on logged-out state
+    final prefs = await SharedPreferences.getInstance();
+    final sessionToken = prefs.getString('session_token');
+    
+    debugPrint('RootHandler: Checking session... ${session != null ? "Supabase OK" : "No Supabase"} | Token: ${sessionToken != null ? "Present" : "Missing"}');
 
-    if (session == null) {
+    if (session == null || sessionToken == null) {
+      if (session != null) {
+        // Mismatch: Supabase has session but our custom token is gone (happens after signOut)
+        debugPrint('RootHandler: Session mismatch, clearing Supabase session.');
+        await ApiService.signOut();
+      }
       _navigate(const OnboardingPage());
       return;
     }

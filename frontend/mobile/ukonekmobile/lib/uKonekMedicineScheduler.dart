@@ -485,20 +485,32 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                 const SizedBox(height: 24),
                 Row(
                   children: [
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        for (var item in untaken) {
-                          _markAsTaken(item['med'] as ScheduledMedicine, item['doseIndex'] as int, time);
-                        }
-                      },
-                      icon: const Icon(Icons.check_circle_rounded, size: 18),
-                      label: Text(untaken.length > 1 ? "Take all ${untaken.length} meds" : "I've taken it"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primary, foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
+                        final tMins = _parseTime(time);
+                        // Allow 30 minutes early intake
+                        final isLocked = tMins > (nowMins + 30);
+
+                        return ElevatedButton.icon(
+                          onPressed: isLocked ? null : () {
+                            for (var item in untaken) {
+                              _markAsTaken(item['med'] as ScheduledMedicine, item['doseIndex'] as int, time);
+                            }
+                          },
+                          icon: Icon(isLocked ? Icons.lock_clock_rounded : Icons.check_circle_rounded, size: 18),
+                          label: Text(isLocked 
+                            ? "Upcoming" 
+                            : (untaken.length > 1 ? "Take all ${untaken.length} meds" : "I've taken it")),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isLocked ? _fieldBdr : _primary, 
+                            foregroundColor: isLocked ? _textMuted : Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                        );
+                      }
                     ),
                   ],
                 ),
@@ -584,7 +596,8 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     final allTaken = items.every((i) => _takenDoses.contains('${(i['med'] as ScheduledMedicine).prescriptionItemId}_${i['doseIndex']}'));
     final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
     final tMins = _parseTime(time);
-    final isLocked = tMins > nowMins;
+    // Allow 30 minutes early intake
+    final isLocked = tMins > (nowMins + 30);
     
     String status = 'PENDING';
     Color statusColor = _textMuted;
