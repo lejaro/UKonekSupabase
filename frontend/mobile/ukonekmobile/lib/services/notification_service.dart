@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -9,32 +10,35 @@ import '../uKonekMedicineScheduler.dart';
 class NotificationService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  FlutterLocalNotificationsPlugin();
 
   static Future<void> init() async {
     if (kIsWeb) return;
-    
+
     tz.initializeTimeZones();
-    // Set local location to Asia/Manila (Clinic Location)
     try {
       tz.setLocalLocation(tz.getLocation('Asia/Manila'));
     } catch (e) {
       debugPrint('Timezone error: $e');
     }
-    
+
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    AndroidInitializationSettings('@mipmap/ic_launcher');
 
     const DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings(
+    DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
 
-    const InitializationSettings initializationSettings = InitializationSettings(
+    const LinuxInitializationSettings initializationSettingsLinux =
+    LinuxInitializationSettings(defaultActionName: 'Open notification');
+
+    final InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsIOS,
+      linux: Platform.isLinux ? initializationSettingsLinux : null,
     );
 
     await _notificationsPlugin.initialize(
@@ -59,9 +63,9 @@ class NotificationService {
       },
     );
 
-    // Request permissions for Android (13+)
-    final androidImplementation = _notificationsPlugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    // Request permissions for Android 13+
+    final androidImplementation = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (androidImplementation != null) {
       await androidImplementation.requestNotificationsPermission();
       await androidImplementation.requestExactAlarmsPermission();
@@ -70,12 +74,11 @@ class NotificationService {
 
   static Future<bool> areNotificationsEnabled() async {
     if (kIsWeb) return false;
-    final androidImplementation = _notificationsPlugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final androidImplementation = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     if (androidImplementation != null) {
       return await androidImplementation.areNotificationsEnabled() ?? false;
     }
-    // For iOS, assume true or check via alternative method
     return true;
   }
 
@@ -88,7 +91,8 @@ class NotificationService {
     String? payload,
   }) async {
     if (kIsWeb) return;
-    
+    if (Platform.isLinux) return; // Linux has no real scheduling support
+
     final now = tz.TZDateTime.now(tz.local);
     var scheduledDate = tz.TZDateTime(
       tz.local,
@@ -99,7 +103,6 @@ class NotificationService {
       minute,
     );
 
-    // If the scheduled time is already passed today, schedule for tomorrow
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
