@@ -130,6 +130,31 @@ class NotificationService {
     );
   }
 
+  static Future<void> showImmediateNotification({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    if (kIsWeb) return;
+    await _notificationsPlugin.show(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'clinic_alerts',
+          'Clinic Alerts',
+          channelDescription: 'Notifications for immediate clinic updates',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      payload: payload,
+    );
+  }
+
   static Future<void> cancelAll() async {
     if (kIsWeb) return;
     await _notificationsPlugin.cancelAll();

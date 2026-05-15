@@ -525,11 +525,16 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
             actions: [
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
               TextButton(
-                onPressed: () => Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const uKonekMenuPage()),
+                onPressed: () async {
+                  await ApiService.signOut();
+                  if (context.mounted) {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const uKonekMenuPage()),
                       (route) => false,
-                ),
+                    );
+                  }
+                },
                 child: const Text('Log Out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
               ),
             ],
@@ -733,89 +738,6 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
     );
   }
 
-  // ── Logout dialog ─────────────────────────────────────────────
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24)),
-        contentPadding: const EdgeInsets.all(28),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 60, height: 60,
-              decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  shape: BoxShape.circle),
-              child: const Icon(Icons.logout_rounded,
-                  color: Colors.redAccent, size: 28),
-            ),
-            const SizedBox(height: 16),
-            const Text('Log Out Account?',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: _C.textDark,
-                )),
-            const SizedBox(height: 10),
-            const Text(
-                'Are you sure you want to log out? You will need to sign in again to access your records.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: _C.textMuted,
-                  fontSize: 13,
-                  height: 1.5,
-                )),
-            const SizedBox(height: 24),
-            Row(children: [
-              Expanded(child: OutlinedButton(
-                onPressed: () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 13),
-                  side: const BorderSide(color: _C.fieldBdr),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Cancel',
-                    style: TextStyle(
-                      color: _C.textMuted,
-                      fontWeight: FontWeight.bold,
-                    )),
-              )),
-              const SizedBox(width: 12),
-              Expanded(child: ElevatedButton(
-                onPressed: () async {
-                  await ApiService.signOut();
-                  if (!context.mounted) return;
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const uKonekMenuPage()),
-                        (route) => false,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 13),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Log Out',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold)),
-              )),
-            ]),
-          ],
-        ),
-      ),
-    );
-  }
 
   // ── About dialog ──────────────────────────────────────────────
   // ── About Dialog ─────────────────────────────────────────────

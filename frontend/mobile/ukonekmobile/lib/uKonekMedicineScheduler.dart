@@ -7,6 +7,8 @@ import 'uKonekDashboardPage.dart';
 import 'uKonekJoinQueuePage.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
+import 'uKonekNotificationPage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class uKonekMedicineSchedulerPage extends StatefulWidget {
   final String username;
@@ -39,6 +41,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   final Map<String, String> _customDoseTimes = {};
   final List<Map<String, dynamic>> _manualIntakes = [];
   bool _notificationsEnabled = true;
+  DateTime _selectedDate = DateTime.now();
+  final Map<int, String> _persistedStartTimes = {};
+  bool _hasUnseenNotifications = false;
 
   @override
   void initState() {
@@ -57,12 +62,33 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final results = await Future.wait([
+      final results = await Future.wait<dynamic>([
         ApiService.getMedicineSchedule(),
-        ApiService.getIntakeLogsForToday(),
+        ApiService.getIntakeLogsForDate(_selectedDate),
+        SharedPreferences.getInstance(),
       ]);
       final meds = results[0] as List<ScheduledMedicine>;
       final logs = results[1] as List<Map<String, dynamic>>;
+      final prefs = results[2] as SharedPreferences;
+
+      // Load persisted start times
+      _persistedStartTimes.clear();
+      for (var med in meds) {
+        final stored = prefs.getString('med_start_${med.prescriptionItemId}');
+        if (stored != null) {
+          _persistedStartTimes[med.prescriptionItemId] = stored;
+        }
+      }
+
+      // Check for unseen notifications
+      final lastViewedStr = prefs.getString('last_viewed_notifications');
+      if (lastViewedStr != null) {
+        final lastViewed = DateTime.parse(lastViewedStr);
+        final announcements = await ApiService.fetchAnnouncements();
+        _hasUnseenNotifications = announcements.any((a) => a.createdAt.isAfter(lastViewed));
+      } else {
+        _hasUnseenNotifications = true;
+      }
       
       setState(() {
         // ONLY show medicines that HAVE been dispensed by the pharmacy in the scheduler
@@ -88,6 +114,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     
     final now = DateTime.now();
     try {
+      // Use the selected date instead of strictly "now" for historical/future logging if needed,
+      // but usually intake logs are for when you actually take it. 
+      // For this app, we'll stick to actual_time = now.
       await ApiService.logMedicineIntake(
         prescriptionItemId: med.prescriptionItemId,
         scheduledTime: scheduledTime,
@@ -114,6 +143,11 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
+  }
+
+  Future<void> _setupAndMarkTaken(ScheduledMedicine med, int doseIndex, TimeOfDay picked) async {
+    _applyTimeChange(med, doseIndex, picked);
+    await _markAsTaken(med, doseIndex, picked.format(context));
   }
 
   Future<void> _scheduleNotifications() async {
@@ -159,21 +193,67 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   Map<String, List<Map<String, dynamic>>> get _groupedTodayDoses {
     final groups = <String, List<Map<String, dynamic>>>{};
     
-    for (final med in _medicines) {
-      final isStarted = _startedPrescriptions.contains(med.prescriptionItemId) || 
-                       _customDoseTimes.containsKey('${med.prescriptionItemId}_0');
+    final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
+    
+    // Filter to only active meds for this date
+    final activeMeds = _medicines.where((m) => m.isActiveOn(_selectedDate)).toList();
+
+    // Cluster doses that are within 10 minutes of each other
+    final allDoses = <Map<String, dynamic>>[];
+    for (final med in activeMeds) {
+      final persistedStart = _persistedStartTimes[med.prescriptionItemId];
+      final isStarted = persistedStart != null || _startedPrescriptions.contains(med.prescriptionItemId);
       
-      if (!isStarted) {
-        final time = 'Setup Required';
-        groups.putIfAbsent(time, () => []);
-        groups[time]!.add({'med': med, 'time': time, 'doseIndex': -1});
+      if (!isStarted && isToday) {
+        allDoses.add({'med': med, 'time': 'Setup Required', 'doseIndex': -1, 'mins': -1});
       } else {
+        final intervalMins = med.doseIntervalMinutes;
+        final baseTime = persistedStart ?? med.doseTimes.first;
+        
         for (int i = 0; i < med.doseTimes.length; i++) {
-          final time = _customDoseTimes['${med.prescriptionItemId}_$i'] ?? med.doseTimes[i];
-          groups.putIfAbsent(time, () => []);
-          groups[time]!.add({'med': med, 'time': time, 'doseIndex': i});
+          String time;
+          int mins;
+          if (i == 0) {
+            time = baseTime;
+            mins = _parseTime(baseTime);
+          } else {
+            final startMins = _parseTime(baseTime);
+            mins = (startMins + (i * intervalMins)) % (24 * 60);
+            final tod = TimeOfDay(hour: mins ~/ 60, minute: mins % 60);
+            time = tod.format(context);
+          }
+          allDoses.add({'med': med, 'time': time, 'doseIndex': i, 'mins': mins});
         }
       }
+    }
+
+    // Sort by minutes
+    allDoses.sort((a, b) => (a['mins'] as int).compareTo(b['mins'] as int));
+
+    // Grouping logic
+    for (var dose in allDoses) {
+      if (dose['time'] == 'Setup Required') {
+        groups.putIfAbsent('Setup Required', () => []);
+        groups['Setup Required']!.add(dose);
+        continue;
+      }
+
+      final mins = dose['mins'] as int;
+      String? targetGroup;
+      
+      // Look for an existing group within 10 minutes
+      for (var existingTime in groups.keys) {
+        if (existingTime == 'Setup Required') continue;
+        final groupMins = _parseTime(existingTime);
+        if ((mins - groupMins).abs() <= 10) {
+          targetGroup = existingTime;
+          break;
+        }
+      }
+
+      final finalGroup = targetGroup ?? dose['time'];
+      groups.putIfAbsent(finalGroup, () => []);
+      groups[finalGroup]!.add(dose);
     }
     
     // Sort keys by time
@@ -214,6 +294,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       body: SafeArea(
         child: Column(children: [
           _buildHeader(),
+          _buildDateStrip(),
           Expanded(child: _loading
             ? const Center(child: CircularProgressIndicator(color: _primary))
             : _error != null ? _buildError()
@@ -224,7 +305,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    if (nextDose != null) ...[
+                    if (nextDose != null && DateUtils.isSameDay(_selectedDate, DateTime.now())) ...[
                       _buildNextDoseCard(nextDose),
                       const SizedBox(height: 32),
                     ],
@@ -237,10 +318,18 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _sectionHeader("Today's schedule"),
+                        _sectionHeader(DateUtils.isSameDay(_selectedDate, DateTime.now()) 
+                          ? "Today's schedule" 
+                          : "Schedule for ${DateFormat('MMM d').format(_selectedDate)}"),
                         TextButton(
-                          onPressed: () {}, 
-                          child: const Text('View all', style: TextStyle(color: _primary, fontWeight: FontWeight.w600)),
+                          onPressed: () {
+                            setState(() {
+                              _selectedDate = DateTime.now();
+                              _load();
+                            });
+                          }, 
+                          child: Text(DateUtils.isSameDay(_selectedDate, DateTime.now()) ? 'Refresh' : 'Today', 
+                            style: const TextStyle(color: _primary, fontWeight: FontWeight.w600)),
                         ),
                       ],
                     ),
@@ -368,6 +457,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   }
 
   Widget _buildHeader() {
+    final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
       child: Row(
@@ -376,32 +466,50 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("${_getGreeting()}, ${widget.username.split(' ')[0]} 👋",
+              Text(isToday 
+                  ? "${_getGreeting()}, ${widget.username.split(' ')[0]} 👋"
+                  : "${DateFormat('MMMM yyyy').format(_selectedDate)}",
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: _textDark)),
               const SizedBox(height: 4),
-              const Text("Let's stay on track with your health.",
-                  style: TextStyle(fontSize: 14, color: _textMuted)),
+              Text(isToday 
+                  ? "Let's stay on track with your health."
+                  : "Daily medication summary.",
+                  style: const TextStyle(fontSize: 14, color: _textMuted)),
             ],
           ),
-          Stack(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(color: _textDark.withOpacity(0.05), blurRadius: 10)],
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => uKonekNotificationPage(
+                    username: widget.username,
+                    fullname: widget.username, // Fallback if fullname not in widget
+                  ),
                 ),
-                child: const Icon(Icons.notifications_none_rounded, color: _textDark, size: 24),
-              ),
-              Positioned(
-                right: 0, top: 0,
-                child: Container(
-                  width: 10, height: 10,
-                  decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 2))),
+              );
+            },
+            child: Stack(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: _textDark.withOpacity(0.05), blurRadius: 10)],
+                  ),
+                  child: const Icon(Icons.notifications_none_rounded, color: _textDark, size: 24),
                 ),
-              ),
-            ],
+                if (_hasUnseenNotifications)
+                  Positioned(
+                    right: 0, top: 0,
+                    child: Container(
+                      width: 10, height: 10,
+                      decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 2))),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
@@ -413,18 +521,24 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     final items = next['items'] as List<Map<String, dynamic>>;
     final untaken = next['untaken'] as List<Map<String, dynamic>>;
     
-    final medNames = items.map((i) => (i['med'] as ScheduledMedicine).medicineName).join(', ');
-    
+    final medNames = untaken.map((i) => (i['med'] as ScheduledMedicine).medicineName).join(', ');
+    final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
+    final tMins = _parseTime(time);
+    // Allow 30 minutes early intake
+    final isLocked = tMins > (nowMins + 30);
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [const Color(0xFFEDFBF2), const Color(0xFFF7FFF9)],
+          colors: isLocked 
+            ? [const Color(0xFFF1F6FF), const Color(0xFFF9FBFF)]
+            : [const Color(0xFFEDFBF2), const Color(0xFFF7FFF9)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _primary.withOpacity(0.1)),
+        border: Border.all(color: isLocked ? Colors.blue.withOpacity(0.1) : _primary.withOpacity(0.1)),
       ),
       child: Stack(
         children: [
@@ -435,8 +549,8 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
               child: kIsWeb 
                 ? Container(
                     width: 160, height: 160,
-                    decoration: BoxDecoration(color: _primary.withOpacity(0.05), shape: BoxShape.circle),
-                    child: Icon(Icons.medication_liquid_rounded, size: 80, color: _primary.withOpacity(0.2)),
+                    decoration: BoxDecoration(color: (isLocked ? Colors.blue : _primary).withOpacity(0.05), shape: BoxShape.circle),
+                    child: Icon(isLocked ? Icons.upcoming_rounded : Icons.medication_liquid_rounded, size: 80, color: (isLocked ? Colors.blue : _primary).withOpacity(0.2)),
                   )
                 : Image.file(
                     File('C:\\Users\\Jose Lejaro\\.gemini\\antigravity\\brain\\8a5ad9a4-598c-4004-8718-6490394a1e44\\medicine_scheduler_header_illustration_1778691349074.png'),
@@ -453,17 +567,17 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                   children: [
                     Container(
                       padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(color: _primary, shape: BoxShape.circle),
-                      child: const Icon(Icons.access_time_filled_rounded, color: Colors.white, size: 14),
+                      decoration: BoxDecoration(color: isLocked ? Colors.blue : _primary, shape: BoxShape.circle),
+                      child: Icon(isLocked ? Icons.calendar_today_rounded : Icons.access_time_filled_rounded, color: Colors.white, size: 14),
                     ),
                     const SizedBox(width: 8),
-                    const Text('NEXT DOSE', style: TextStyle(color: _primary, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5)),
+                    Text(isLocked ? 'UPCOMING DOSE' : 'NEXT DOSE', style: TextStyle(color: isLocked ? Colors.blue : _primary, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5)),
                   ],
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: 200,
-                  child: Text('Time to take your $medNames',
+                  child: Text(isLocked ? 'Upcoming: $medNames' : 'Time to take your $medNames',
                       style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _textDark, height: 1.2)),
                 ),
                 const SizedBox(height: 8),
@@ -485,32 +599,23 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                 const SizedBox(height: 24),
                 Row(
                   children: [
-                    Builder(
-                      builder: (context) {
-                        final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
-                        final tMins = _parseTime(time);
-                        // Allow 30 minutes early intake
-                        final isLocked = tMins > (nowMins + 30);
-
-                        return ElevatedButton.icon(
-                          onPressed: isLocked ? null : () {
-                            for (var item in untaken) {
-                              _markAsTaken(item['med'] as ScheduledMedicine, item['doseIndex'] as int, time);
-                            }
-                          },
-                          icon: Icon(isLocked ? Icons.lock_clock_rounded : Icons.check_circle_rounded, size: 18),
-                          label: Text(isLocked 
-                            ? "Upcoming" 
-                            : (untaken.length > 1 ? "Take all ${untaken.length} meds" : "I've taken it")),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isLocked ? _fieldBdr : _primary, 
-                            foregroundColor: isLocked ? _textMuted : Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            elevation: 0,
-                          ),
-                        );
-                      }
+                    ElevatedButton.icon(
+                      onPressed: isLocked ? null : () {
+                        for (var item in untaken) {
+                          _markAsTaken(item['med'] as ScheduledMedicine, item['doseIndex'] as int, time);
+                        }
+                      },
+                      icon: Icon(isLocked ? Icons.lock_clock_rounded : Icons.check_circle_rounded, size: 18),
+                      label: Text(isLocked 
+                        ? "Upcoming" 
+                        : (untaken.length > 1 ? "Take all ${untaken.length} meds" : "I've taken it")),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isLocked ? _fieldBdr : _primary, 
+                        foregroundColor: isLocked ? _textMuted : Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
                     ),
                   ],
                 ),
@@ -553,12 +658,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          _applyTimeChange(med, 0, TimeOfDay.now());
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('First intake set to current time.'))
-                          );
-                        },
+                        onPressed: () => _setupAndMarkTaken(med, 0, TimeOfDay.now()),
                         icon: const Icon(Icons.history_rounded, size: 18),
                         label: const Text('Current Time'),
                         style: ElevatedButton.styleFrom(
@@ -573,7 +673,15 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () => _pickTime(context, med, 0, '08:00 AM'),
+                        onPressed: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
+                          );
+                          if (picked != null) {
+                            _setupAndMarkTaken(med, 0, picked);
+                          }
+                        },
                         icon: const Icon(Icons.access_time_rounded, size: 18),
                         label: const Text('Pick Time'),
                         style: ElevatedButton.styleFrom(
@@ -596,8 +704,12 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     final allTaken = items.every((i) => _takenDoses.contains('${(i['med'] as ScheduledMedicine).prescriptionItemId}_${i['doseIndex']}'));
     final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
     final tMins = _parseTime(time);
-    // Allow 30 minutes early intake
-    final isLocked = tMins > (nowMins + 30);
+    final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
+    final isFuture = _selectedDate.isAfter(DateTime.now()) && !isToday;
+    
+    // Allow 30 minutes early intake ONLY if it is Today.
+    // Future days are always locked.
+    final isLocked = isFuture || (isToday && tMins > (nowMins + 30));
     
     String status = 'PENDING';
     Color statusColor = _textMuted;
@@ -765,6 +877,80 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     );
   }
 
+  Widget _buildDateStrip() {
+    final now = DateTime.now();
+    DateTime minDate = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 3)); // Show 3 days past by default
+    DateTime maxDate = DateTime(now.year, now.month, now.day).add(const Duration(days: 14));   // Show 14 days future by default
+
+    // Smart adjustment based on actual prescriptions
+    if (_medicines.isNotEmpty) {
+      for (var m in _medicines) {
+        final start = DateTime(m.startDate.year, m.startDate.month, m.startDate.day);
+        final end   = DateTime(m.endDate.year, m.endDate.month, m.endDate.day);
+        if (start.isBefore(minDate)) minDate = start;
+        if (end.isAfter(maxDate)) maxDate = end;
+      }
+    }
+
+    // Sanity check for range (max 60 days to prevent performance issues)
+    if (maxDate.difference(minDate).inDays > 60) {
+      maxDate = minDate.add(const Duration(days: 60));
+    }
+
+    final daysCount = maxDate.difference(minDate).inDays + 1;
+    final List<DateTime> dates = List.generate(daysCount, (index) => minDate.add(Duration(days: index)));
+
+    return Container(
+      height: 90,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: dates.length,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemBuilder: (context, index) {
+          final date = dates[index];
+          final isSelected = DateUtils.isSameDay(date, _selectedDate);
+          final isToday = DateUtils.isSameDay(date, now);
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedDate = date;
+                _load();
+              });
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 60,
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                color: isSelected ? _primary : (isToday ? _primary.withOpacity(0.08) : Colors.white),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: isSelected ? _primary : _fieldBdr.withOpacity(0.6)),
+                boxShadow: isSelected ? [BoxShadow(color: _primary.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))] : [],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(DateFormat('EEE').format(date).toUpperCase(), 
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, 
+                    color: isSelected ? Colors.white.withOpacity(0.8) : _textMuted, letterSpacing: 0.5)),
+                  const SizedBox(height: 6),
+                  Text(date.day.toString(), 
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, 
+                    color: isSelected ? Colors.white : _textDark)),
+                  if (isToday && !isSelected) 
+                    Container(margin: const EdgeInsets.only(top: 4), width: 4, height: 4, 
+                      decoration: const BoxDecoration(color: _primary, shape: BoxShape.circle)),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildTipCard() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -835,10 +1021,21 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     ]),
   ));
 
-  void _applyTimeChange(ScheduledMedicine med, int doseIndex, TimeOfDay picked) {
+  void _applyTimeChange(ScheduledMedicine med, int doseIndex, TimeOfDay picked) async {
+    final timeStr = picked.format(context);
+    
+    // If it is the first dose, persist it as the global start time for this medication
+    if (doseIndex == 0) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('med_start_${med.prescriptionItemId}', timeStr);
+      
+      setState(() {
+        _persistedStartTimes[med.prescriptionItemId] = timeStr;
+      });
+    }
     final key = '${med.prescriptionItemId}_$doseIndex';
     setState(() {
-      _customDoseTimes[key] = picked.format(context);
+      _customDoseTimes[key] = timeStr;
 
       final intervalMins = med.doseIntervalMinutes;
       if (intervalMins > 0) {

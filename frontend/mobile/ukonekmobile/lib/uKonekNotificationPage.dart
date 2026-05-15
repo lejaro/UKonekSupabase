@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'services/api_service.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _C {
   static const primary    = Color(0xFF1B5E20);
@@ -34,35 +37,88 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
   void initState() {
     super.initState();
     _loadNotifications();
+    _updateLastViewed();
+  }
+
+  Future<void> _updateLastViewed() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('last_viewed_notifications', DateTime.now().toIso8601String());
   }
 
   Future<void> _loadNotifications() async {
     setState(() => _isLoading = true);
     
     try {
-      final client = Supabase.instance.client;
-      
-      // Load announcements visible to citizens or all
-      final response = await client
-          .from('announcements')
-          .select('id, title, content, created_at, visibility')
-          .inFilter('visibility', ['all', 'citizen'])
-          .order('created_at', ascending: false)
-          .limit(50);
+      final results = await Future.wait([
+        ApiService.fetchAnnouncements(),
+        ApiService.getMyQueueDashboard(),
+        ApiService.getMedicineSchedule(),
+        ApiService.getIntakeLogsForDate(DateTime.now()),
+      ]);
+
+      final announcements = results[0] as List<Announcement>;
+      final queue = results[1] as QueueDashboardSnapshot;
+      final schedules = results[2] as List<ScheduledMedicine>;
+      final logs = results[3] as List<Map<String, dynamic>>;
 
       final List<Map<String, dynamic>> notifications = [];
       
-      for (var announcement in response) {
+      // 1. Announcements
+      for (var a in announcements) {
         notifications.add({
-          'id': announcement['id'],
-          'title': announcement['title'] ?? 'Announcement',
-          'body': announcement['content'] ?? '',
-          'time': _formatTime(announcement['created_at']),
+          'id': 'ann_${a.id}',
+          'title': a.title,
+          'body': a.content,
+          'time': _formatTime(a.createdAt.toIso8601String()),
           'type': 'announcement',
           'isRead': false,
-          'rawDate': announcement['created_at'],
+          'rawDate': a.createdAt,
         });
       }
+
+      // 2. Queue Notifications
+      if (queue.hasActiveQueue) {
+        String body = 'Your current position is #${queue.waitingCount}.';
+        if (queue.status.toLowerCase() == 'on_call') {
+          body = 'You are being called! Please proceed to the nurse station.';
+        }
+        notifications.add({
+          'id': 'queue_${queue.queueId}',
+          'title': 'Queue Status: ${queue.status.toUpperCase()}',
+          'body': body,
+          'time': 'Active Now',
+          'type': 'queue',
+          'isRead': false,
+          'rawDate': DateTime.now(),
+        });
+      }
+
+      // 3. Medicine Reminders (Missed doses from today)
+      final takenKeys = logs.map((l) => '${l['prescription_item_id']}_${l['dose_index']}').toSet();
+      final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
+
+      for (var med in schedules) {
+        for (int i = 0; i < med.doseTimes.length; i++) {
+          final key = '${med.prescriptionItemId}_$i';
+          if (!takenKeys.contains(key)) {
+            final tMins = _parseTime(med.doseTimes[i]);
+            if (nowMins > tMins + 15) { // 15 mins past due
+               notifications.add({
+                'id': 'med_${med.prescriptionItemId}_$i',
+                'title': 'Missed Dose: ${med.medicineName}',
+                'body': 'You missed your ${med.doseTimes[i]} intake. Please take it as soon as possible.',
+                'time': '${med.doseTimes[i]} Today',
+                'type': 'reminder',
+                'isRead': false,
+                'rawDate': DateTime.now().subtract(const Duration(minutes: 5)), // Recent
+              });
+            }
+          }
+        }
+      }
+
+      // Sort by date (newest first)
+      notifications.sort((a, b) => (b['rawDate'] as DateTime).compareTo(a['rawDate'] as DateTime));
 
       setState(() {
         _notifications = notifications;
@@ -72,6 +128,20 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
       debugPrint('Error loading notifications: $e');
       setState(() => _isLoading = false);
     }
+  }
+
+  int _parseTime(String t) {
+    try {
+      final parts = t.split(' ');
+      final hm = parts[0].split(':');
+      int h = int.parse(hm[0]);
+      int m = int.parse(hm[1]);
+      if (parts.length > 1) {
+        if (parts[1].toUpperCase() == 'PM' && h != 12) h += 12;
+        if (parts[1].toUpperCase() == 'AM' && h == 12) h = 0;
+      }
+      return h * 60 + m;
+    } catch (_) { return 0; }
   }
 
   String _formatTime(String? dateStr) {

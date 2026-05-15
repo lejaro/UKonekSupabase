@@ -663,9 +663,11 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
   Widget _buildActiveTicketView(QueueDashboardSnapshot queue) {
     final ahead       = (queue.myQueueNumber ?? 0) - (queue.currentlyServingQueueNumber ?? 0);
     final isTurn      = ahead <= 0;
-    final isOnCall    = queue.isOnCall;
+    final isOnCall    = queue.isOnCall || queue.status.toLowerCase() == 'on_call';
     final Color statusColor = isOnCall ? _C.warning : (isTurn ? _C.success : _C.primaryMid);
-    final String statusMsg  = isOnCall ? 'You\'re being called!' : (isTurn ? 'Please proceed to the doctor\'s office for consultation' : '$ahead ${ahead == 1 ? 'person' : 'people'} ahead of you');
+    final String statusMsg  = isOnCall 
+        ? 'Please proceed to the nurse for vital assessment' 
+        : (isTurn ? 'Please proceed to the doctor\'s office for consultation' : '$ahead ${ahead == 1 ? 'person' : 'people'} ahead of you');
     final IconData statusIcon = isOnCall ? Icons.campaign_rounded : (isTurn ? Icons.check_circle_rounded : Icons.groups_rounded);
 
     return SingleChildScrollView(
@@ -687,7 +689,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
             Container(width: 42, height: 42, decoration: BoxDecoration(color: statusColor.withOpacity(0.15), shape: BoxShape.circle), child: Icon(statusIcon, color: statusColor, size: 22)),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(isOnCall ? 'PLEASE PROCEED' : (isTurn && queue.status == 'serving' ? 'YOU ARE NOW SERVING' : 'NOW SERVING #${(queue.currentlyServingQueueNumber ?? 0).toString().padLeft(3, '0')}'),
+              Text(isOnCall ? 'YOU ARE ON CALL' : (isTurn && queue.status == 'serving' ? 'YOU ARE NOW SERVING' : 'NOW SERVING #${(queue.currentlyServingQueueNumber ?? 0).toString().padLeft(3, '0')}'),
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor, letterSpacing: 0.5)),
               const SizedBox(height: 2),
               Text(statusMsg, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.textDark)),

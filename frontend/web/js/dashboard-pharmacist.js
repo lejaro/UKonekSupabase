@@ -63,6 +63,12 @@ const rxDispensedNotice = document.getElementById('rx-dispensed-notice');
 const rxDispensedBy     = document.getElementById('rx-dispensed-by');
 const rxCancelledNotice = document.getElementById('rx-cancelled-notice');
 
+// Dispense confirmation modal refs
+const dispenseModal    = document.getElementById('ph-dispense-modal');
+const dispenseModalCode = document.getElementById('dispense-modal-rx-code');
+const dispenseCancelBtn = document.getElementById('dispense-modal-cancel-btn');
+const dispenseConfirmBtn = document.getElementById('dispense-modal-confirm-btn');
+
 // Confirmation modal DOM refs
 const confirmAddModal    = document.getElementById('ph-confirm-add-modal');
 const confirmAddName     = document.getElementById('confirm-add-name');
@@ -677,7 +683,7 @@ function renderRxItems(items) {
 
 function clearRxLookup() {
   currentRxData = null;
-  if (rxCodeInput) rxCodeInput.value = '';
+  if (rxCodeInput) rxCodeInput.value = 'RX-';
   rxHide(rxDetailCard);
   rxHide(rxClearBtn);
   rxHide(rxDispenseAction);
@@ -737,9 +743,18 @@ async function confirmDispense() {
   if (!currentRxData) return;
   const code = currentRxData.prescription_code;
 
-  if (!confirm(`Confirm dispensing prescription ${code}?\n\nThis will deduct stock for all prescribed medicines and cannot be undone.`)) return;
+  if (dispenseModalCode) dispenseModalCode.textContent = code;
+  if (dispenseModal) {
+    dispenseModal.classList.remove('hidden');
+    dispenseModal.style.display = 'flex';
+  }
+}
 
-  setLoading(rxConfirmBtn, true);
+async function handleActualDispense() {
+  if (!currentRxData) return;
+  const code = currentRxData.prescription_code;
+
+  setLoading(dispenseConfirmBtn, true);
   try {
     const sb = await getSupabase();
     const { data, error } = await sb.rpc('dispense_prescription', { p_prescription_code: code });
@@ -754,10 +769,16 @@ async function confirmDispense() {
 
     // Re-lookup to update the card status
     await lookupPrescription();
+    
+    // Close modal
+    if (dispenseModal) {
+      dispenseModal.classList.add('hidden');
+      dispenseModal.style.display = 'none';
+    }
   } catch (err) {
     showToast(err.message || 'Dispense failed.', 'error');
   } finally {
-    setLoading(rxConfirmBtn, false);
+    setLoading(dispenseConfirmBtn, false);
   }
 }
 
@@ -770,7 +791,16 @@ if (rxCodeInput) {
     if (e.key === 'Enter') { e.preventDefault(); lookupPrescription(); }
   });
   rxCodeInput.addEventListener('input', () => {
-    rxCodeInput.value = rxCodeInput.value.toUpperCase();
+    let val = rxCodeInput.value.toUpperCase();
+    if (!val.startsWith('RX-')) {
+      if (val.length < 3) {
+        val = 'RX-';
+      } else {
+        // If they pasted something like "000012", turn it into "RX-000012"
+        val = 'RX-' + val.replace(/^RX-?/i, '');
+      }
+    }
+    rxCodeInput.value = val;
   });
 }
 if (rxClearBtn) {
@@ -778,6 +808,15 @@ if (rxClearBtn) {
 }
 if (rxConfirmBtn) {
   rxConfirmBtn.addEventListener('click', confirmDispense);
+}
+if (dispenseCancelBtn) {
+  dispenseCancelBtn.addEventListener('click', () => {
+    dispenseModal.classList.add('hidden');
+    dispenseModal.style.display = 'none';
+  });
+}
+if (dispenseConfirmBtn) {
+  dispenseConfirmBtn.addEventListener('click', handleActualDispense);
 }
 
 // ── QR Scanner Implementation ────────────────────────────────────────────────

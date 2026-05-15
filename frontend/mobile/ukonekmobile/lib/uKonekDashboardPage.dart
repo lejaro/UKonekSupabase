@@ -11,7 +11,8 @@ import 'uKonekMedicineScheduler.dart';
 import 'uKonekNotificationPage.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'uKonekPrescriptionPage.dart';
-import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'services/notification_service.dart';
 
 
 class _C {
@@ -82,6 +83,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   List<PrescriptionRecord> _prescribedMedicines = [];
   List<Announcement> _announcements = [];
   bool _isInitialLoading = true;
+  bool _hasUnseenNotifications = false;
+  String? _lastQueueStatus;
   Timer? _refreshTimer;
 
   // ── Navigate to profile with ALL registration fields ──────────
@@ -146,18 +149,48 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     if (!mounted) return;
     if (isInitial) setState(() => _isInitialLoading = true);
     try {
-      final results = await Future.wait([
+      final results = await Future.wait<dynamic>([
         ApiService.listDoctorStatus(),
         ApiService.getMyQueueDashboard(),
         ApiService.fetchPrescriptions(limit: 10),
         ApiService.fetchAnnouncements(),
+        SharedPreferences.getInstance(),
       ]);
+      
       if (mounted) {
+        final newQueueSnapshot = results[1] as QueueDashboardSnapshot;
+        final announcements = results[3] as List<Announcement>;
+        final prefs = results[4] as SharedPreferences;
+
+        // Check for unseen notifications
+        final lastViewedStr = prefs.getString('last_viewed_notifications');
+        bool unseen = false;
+        if (lastViewedStr != null) {
+          final lastViewed = DateTime.parse(lastViewedStr);
+          unseen = announcements.any((a) => a.createdAt.isAfter(lastViewed));
+        } else if (announcements.isNotEmpty) {
+          unseen = true;
+        }
+
+        final newStatus = newQueueSnapshot.status.toLowerCase();
+
+        // Trigger notification if status changed to on_call
+        if (newStatus == 'on_call' && _lastQueueStatus != 'on_call' && newQueueSnapshot.hasActiveQueue) {
+          NotificationService.showImmediateNotification(
+            id: 888, // Unique ID for queue alerts
+            title: 'Your number is being called!',
+            body: 'Please proceed to the nurse for your vital assessment.',
+            payload: '{"action":"queue"}',
+          );
+        }
+        _lastQueueStatus = newStatus;
+
         setState(() {
           _doctors = results[0] as List<DoctorStatus>;
-          _queueDashboard = results[1] as QueueDashboardSnapshot;
+          _queueDashboard = newQueueSnapshot;
           _prescribedMedicines = results[2] as List<PrescriptionRecord>;
-          _announcements = results[3] as List<Announcement>;
+          _announcements = announcements;
+          _hasUnseenNotifications = unseen;
           _isInitialLoading = false;
         });
       }
@@ -543,7 +576,11 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
   Widget _buildNotificationBell() {
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('last_viewed_notifications', DateTime.now().toIso8601String());
+        setState(() => _hasUnseenNotifications = false);
+        
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -557,25 +594,26 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
       child: Stack(
         children: [
           Container(
-            width: 44, height: 44,
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withOpacity(0.25)),
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
             ),
-            child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 22),
+            child: const Icon(Icons.notifications_none_rounded, color: Color(0xFF1B2E1E), size: 24),
           ),
-          Positioned(
-            top: 9, right: 9,
-            child: Container(
-              width: 8, height: 8,
-              decoration: BoxDecoration(
-                  color: const Color(0xFFFF5252),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF1B5E20), width: 1.5)
+          if (_hasUnseenNotifications)
+            Positioned(
+              right: 0, top: 0,
+              child: Container(
+                width: 10, height: 10,
+                decoration: BoxDecoration(
+                  color: Colors.redAccent, 
+                  shape: BoxShape.circle, 
+                  border: Border.all(color: Colors.white, width: 2)
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -691,6 +729,30 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   ),
                 ]),
               ),
+              if (hasQueue && queue.status.toLowerCase() == 'on_call') ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF9E6),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFFFECB3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.notification_important_rounded, color: Color(0xFFFF9800), size: 24),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Your number is being called! Please proceed to the nurse for vital assessment.',
+                          style: TextStyle(color: Color(0xFF856404), fontWeight: FontWeight.bold, fontSize: 13, height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ]),
     );
   }

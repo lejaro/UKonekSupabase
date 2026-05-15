@@ -260,6 +260,30 @@ class ScheduledMedicine {
     return 1;
   }
 
+  int get durationDays {
+    final d = duration.toLowerCase();
+    final match = RegExp(r'(\d+)').firstMatch(d);
+    if (match != null) {
+      final val = int.tryParse(match.group(1)!);
+      if (val != null) {
+        if (d.contains('week')) return val * 7;
+        if (d.contains('month')) return val * 30;
+        return val; // Default to days
+      }
+    }
+    return 1;
+  }
+
+  DateTime get startDate => dispensedAt ?? issuedAt;
+  DateTime get endDate => DateTime(startDate.year, startDate.month, startDate.day).add(Duration(days: durationDays));
+
+  bool isActiveOn(DateTime date) {
+    final d = DateTime(date.year, date.month, date.day);
+    final s = DateTime(startDate.year, startDate.month, startDate.day);
+    final e = DateTime(endDate.year, endDate.month, endDate.day);
+    return (d.isAtSameMomentAs(s) || d.isAfter(s)) && (d.isAtSameMomentAs(e) || d.isBefore(e));
+  }
+
   int get doseIntervalMinutes {
     final count = dailyDoseCount;
     if (count <= 1) return 0;
@@ -290,7 +314,7 @@ class ScheduledMedicine {
     // Standard optimized schedule
     if (count == 1) return ['08:00 AM'];
     if (count == 2) return ['08:00 AM', '08:00 PM'];
-    if (count == 3) return ['08:00 AM', '02:00 PM', '08:00 PM'];
+    if (count == 3) return ['08:00 AM', '04:00 PM', '12:00 AM'];
     if (count == 4) return ['06:00 AM', '12:00 PM', '06:00 PM', '12:00 AM'];
     
     final intervalHours = 24 ~/ count;
@@ -1495,18 +1519,19 @@ class ApiService {
     });
   }
 
-  static Future<List<Map<String, dynamic>>> getIntakeLogsForToday() async {
+  static Future<List<Map<String, dynamic>>> getIntakeLogsForDate(DateTime date) async {
     final profile = await fetchMyCitizenProfile();
     final citizenId = profile['id'];
     
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
     
     final response = await _client
         .from('medicine_intake_logs')
         .select()
         .eq('citizen_id', citizenId)
-        .gte('created_at', startOfDay.toUtc().toIso8601String());
+        .gte('created_at', startOfDay.toUtc().toIso8601String())
+        .lt('created_at', endOfDay.toUtc().toIso8601String());
         
     return (response as List<dynamic>?)?.whereType<Map<String, dynamic>>().toList() ?? [];
   }
