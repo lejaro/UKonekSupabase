@@ -1116,6 +1116,7 @@
             <button id="tab-announcements" class="tab active">Announcements</button>
             <button id="tab-feedback" class="tab">Feedback</button>
             <button id="tab-stats" class="tab">Clinical Stats</button>
+            <button id="tab-exports" class="tab admin-only">CSV Exports</button>
           </div>
           <div id="announcements-pane">
             <div class="table-wrap">
@@ -1172,6 +1173,133 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- CSV Exports Tab -->
+          <div id="exports-pane" class="hidden admin-only" style="padding:24px;">
+            <h4 style="margin:0 0 8px 0;font-size:16px;color:#1e293b;">System Reports - CSV Export</h4>
+            <p style="margin:0 0 24px 0;font-size:13px;color:#64748b;">Export system data within a specified time period. Leave dates empty to export all data.</p>
+            
+            <!-- Date Range Filter -->
+            <div style="display:flex;gap:16px;margin-bottom:32px;padding:16px;background:#f8fafc;border-radius:8px;align-items:end;">
+              <div style="flex:1;">
+                <label style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:6px;">Start Date</label>
+                <input type="date" id="export-start-date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;" />
+              </div>
+              <div style="flex:1;">
+                <label style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:6px;">End Date</label>
+                <input type="date" id="export-end-date" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;" />
+              </div>
+              <button id="clear-date-range-btn" class="chip-btn chip-btn-outline" style="height:38px;">Clear Dates</button>
+            </div>
+
+            <!-- Export Buttons Grid -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">
+              
+              <!-- Patient Report -->
+              <div class="export-card" style="border:1px solid #e2e8f0;border-radius:10px;padding:20px;background:#ffffff;">
+                <div style="display:flex;align-items:start;gap:12px;margin-bottom:12px;">
+                  <div style="width:40px;height:40px;border-radius:8px;background:#dbeafe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg style="width:20px;height:20px;color:#2563eb;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                  </div>
+                  <div style="flex:1;">
+                    <h5 style="margin:0 0 4px 0;font-size:15px;font-weight:600;color:#1e293b;">Patient Report</h5>
+                    <p style="margin:0;font-size:12px;color:#64748b;line-height:1.5;">All registered patients with personal information</p>
+                  </div>
+                </div>
+                <button id="export-patient-report-btn" class="btn" style="width:100%;margin:0;font-size:13px;">
+                  <span class="btn-spinner"></span>
+                  <span class="btn-label">Export Patient Report</span>
+                </button>
+              </div>
+
+              <!-- Consultation Report -->
+              <div class="export-card" style="border:1px solid #e2e8f0;border-radius:10px;padding:20px;background:#ffffff;">
+                <div style="display:flex;align-items:start;gap:12px;margin-bottom:12px;">
+                  <div style="width:40px;height:40px;border-radius:8px;background:#dcfce7;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg style="width:20px;height:20px;color:#16a34a;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                  </div>
+                  <div style="flex:1;">
+                    <h5 style="margin:0 0 4px 0;font-size:15px;font-weight:600;color:#1e293b;">Consultation Report</h5>
+                    <p style="margin:0;font-size:12px;color:#64748b;line-height:1.5;">All consultations with diagnosis and doctor info</p>
+                  </div>
+                </div>
+                <button id="export-consultation-report-btn" class="btn" style="width:100%;margin:0;font-size:13px;">
+                  <span class="btn-spinner"></span>
+                  <span class="btn-label">Export Consultation Report</span>
+                </button>
+              </div>
+
+              <!-- Doctor Activity Report -->
+              <div class="export-card" style="border:1px solid #e2e8f0;border-radius:10px;padding:20px;background:#ffffff;">
+                <div style="display:flex;align-items:start;gap:12px;margin-bottom:12px;">
+                  <div style="width:40px;height:40px;border-radius:8px;background:#fef3c7;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg style="width:20px;height:20px;color:#d97706;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                    </svg>
+                  </div>
+                  <div style="flex:1;">
+                    <h5 style="margin:0 0 4px 0;font-size:15px;font-weight:600;color:#1e293b;">Doctor Activity Report</h5>
+                    <p style="margin:0;font-size:12px;color:#64748b;line-height:1.5;">Doctor activities and performance metrics</p>
+                  </div>
+                </div>
+                <button id="export-doctor-activity-report-btn" class="btn" style="width:100%;margin:0;font-size:13px;">
+                  <span class="btn-spinner"></span>
+                  <span class="btn-label">Export Doctor Activity</span>
+                </button>
+              </div>
+
+              <!-- Queue Report -->
+              <div class="export-card" style="border:1px solid #e2e8f0;border-radius:10px;padding:20px;background:#ffffff;">
+                <div style="display:flex;align-items:start;gap:12px;margin-bottom:12px;">
+                  <div style="width:40px;height:40px;border-radius:8px;background:#e0e7ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg style="width:20px;height:20px;color:#4f46e5;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                  </div>
+                  <div style="flex:1;">
+                    <h5 style="margin:0 0 4px 0;font-size:15px;font-weight:600;color:#1e293b;">Queue Report</h5>
+                    <p style="margin:0;font-size:12px;color:#64748b;line-height:1.5;">Queue tickets with wait and service times</p>
+                  </div>
+                </div>
+                <button id="export-queue-report-btn" class="btn" style="width:100%;margin:0;font-size:13px;">
+                  <span class="btn-spinner"></span>
+                  <span class="btn-label">Export Queue Report</span>
+                </button>
+              </div>
+
+              <!-- System Usage Report -->
+              <div class="export-card" style="border:1px solid #e2e8f0;border-radius:10px;padding:20px;background:#ffffff;">
+                <div style="display:flex;align-items:start;gap:12px;margin-bottom:12px;">
+                  <div style="width:40px;height:40px;border-radius:8px;background:#fce7f3;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg style="width:20px;height:20px;color:#db2777;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                  </div>
+                  <div style="flex:1;">
+                    <h5 style="margin:0 0 4px 0;font-size:15px;font-weight:600;color:#1e293b;">System Usage Report</h5>
+                    <p style="margin:0;font-size:12px;color:#64748b;line-height:1.5;">System statistics and resource usage</p>
+                  </div>
+                </div>
+                <button id="export-system-usage-report-btn" class="btn" style="width:100%;margin:0;font-size:13px;">
+                  <span class="btn-spinner"></span>
+                  <span class="btn-label">Export System Usage</span>
+                </button>
+              </div>
+
+            </div>
+
+            <!-- Export Status -->
+            <div id="export-status" class="hidden" style="margin-top:24px;padding:16px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;">
+              <p style="margin:0;font-size:13px;color:#166534;font-weight:500;">
+                <span id="export-status-message"></span>
+              </p>
+            </div>
+
           </div>
         </div>
       </section>
@@ -1501,7 +1629,10 @@
           <h3 class="modal-heading">Queue Ticket Details</h3>
           <div id="queue-ticket-detail-body" class="modal-group"></div>
           <div class="actions" style="justify-content:space-between; margin-top:14px;">
-            <button id="queue-ticket-delete-btn" type="button" class="btn" style="background:#ef4444; color:#fff; border:none;">Delete Ticket</button>
+            <button id="queue-ticket-delete-btn" type="button" class="btn" style="background:#ef4444; color:#fff; border:none;">
+              <span class="btn-spinner" aria-hidden="true"></span>
+              <span class="btn-label">Delete Ticket</span>
+            </button>
             <button id="queue-ticket-detail-close" type="button" class="btn btn-close">Close</button>
           </div>
         </div>
@@ -2388,24 +2519,6 @@
         </div>
       </div>
 
-      <!-- Announcement Detail Modal -->
-      <div id="announcement-detail-modal" class="modal-overlay hidden">
-        <div class="modal-box" style="max-width:500px;">
-          <h3 class="modal-heading" style="margin:0 0 16px 0;font-size:20px;color:#1e293b;">Announcement Details</h3>
-          <div style="margin-bottom:16px;">
-            <div style="font-size:18px;font-weight:700;color:#1e293b;" id="announcement-detail-title"></div>
-            <div style="font-size:13px;color:#64748b;margin-top:6px;display:flex;align-items:center;gap:8px;">
-              <span id="announcement-detail-date"></span> <span style="color:#cbd5e1;">|</span> <span id="announcement-detail-visibility"></span>
-            </div>
-          </div>
-          <div id="announcement-detail-body" style="font-size:14px;color:#334155;white-space:pre-wrap;line-height:1.6;margin-bottom:24px;max-height:300px;overflow-y:auto;padding-right:8px;padding-top:16px;border-top:1px solid #e2e8f0;"></div>
-          <div class="actions" style="display:flex;justify-content:flex-end;gap:12px;margin:0;">
-            <button id="announcement-detail-close" type="button" class="btn btn-close" style="width:auto;margin:0;">Close</button>
-            <button id="announcement-detail-delete-btn" type="button" class="btn" style="width:auto;background:#ef4444;margin:0;border:none;">Delete</button>
-          </div>
-        </div>
-      </div>
-
       <!-- Feedback Detail Modal -->
       <div id="feedback-detail-modal" class="modal-overlay hidden">
         <div class="modal-box" style="max-width:500px;">
@@ -2434,6 +2547,148 @@
   <script src="../js/dashboard.js?v=20260512n"></script>
   <script src="../js/appointments.js?v=20260503a"></script>
   <script src="../js/health-records.js"></script>
+  <script type="module" src="../js/reports.js"></script>
+  <script type="module">
+    // Wire up CSV export buttons
+    import * as Reports from '../js/reports.js';
+
+    // Helper to set button loading state
+    function setButtonLoading(btn, isLoading) {
+      if (!btn) return;
+      const spinner = btn.querySelector('.btn-spinner');
+      const label = btn.querySelector('.btn-label');
+      if (isLoading) {
+        btn.disabled = true;
+        if (spinner) spinner.style.display = 'inline-block';
+      } else {
+        btn.disabled = false;
+        if (spinner) spinner.style.display = 'none';
+      }
+    }
+
+    // Helper to show export status
+    function showExportStatus(message, isError = false) {
+      const status = document.getElementById('export-status');
+      const statusMessage = document.getElementById('export-status-message');
+      if (status && statusMessage) {
+        statusMessage.textContent = message;
+        status.className = isError 
+          ? 'export-status-error' 
+          : 'export-status-success';
+        status.style.display = 'block';
+        status.style.padding = '16px';
+        status.style.marginTop = '24px';
+        status.style.borderRadius = '8px';
+        status.style.background = isError ? '#fef2f2' : '#f0fdf4';
+        status.style.border = isError ? '1px solid #fecaca' : '1px solid #bbf7d0';
+        statusMessage.style.color = isError ? '#991b1b' : '#166534';
+        statusMessage.style.fontSize = '13px';
+        statusMessage.style.fontWeight = '500';
+        statusMessage.style.margin = '0';
+        
+        setTimeout(() => {
+          status.style.display = 'none';
+        }, 5000);
+      }
+    }
+
+    // Get date range
+    function getDateRange() {
+      const startDate = document.getElementById('export-start-date')?.value || null;
+      const endDate = document.getElementById('export-end-date')?.value || null;
+      return { startDate, endDate };
+    }
+
+    // Clear date range
+    document.getElementById('clear-date-range-btn')?.addEventListener('click', () => {
+      const startInput = document.getElementById('export-start-date');
+      const endInput = document.getElementById('export-end-date');
+      if (startInput) startInput.value = '';
+      if (endInput) endInput.value = '';
+    });
+
+    // Patient Report
+    document.getElementById('export-patient-report-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('export-patient-report-btn');
+      setButtonLoading(btn, true);
+      try {
+        const { startDate, endDate } = getDateRange();
+        const result = await Reports.exportPatientReport(startDate, endDate);
+        showExportStatus(`✓ Patient Report exported successfully! (${result.count} records)`);
+      } catch (error) {
+        console.error('Export error:', error);
+        showExportStatus(`✗ Failed to export: ${error.message}`, true);
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+
+    // Consultation Report
+    document.getElementById('export-consultation-report-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('export-consultation-report-btn');
+      setButtonLoading(btn, true);
+      try {
+        const { startDate, endDate } = getDateRange();
+        const result = await Reports.exportConsultationReport(startDate, endDate);
+        showExportStatus(`✓ Consultation Report exported successfully! (${result.count} records)`);
+      } catch (error) {
+        console.error('Export error:', error);
+        showExportStatus(`✗ Failed to export: ${error.message}`, true);
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+
+    // Doctor Activity Report
+    document.getElementById('export-doctor-activity-report-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('export-doctor-activity-report-btn');
+      setButtonLoading(btn, true);
+      try {
+        const { startDate, endDate } = getDateRange();
+        const result = await Reports.exportDoctorActivityReport(startDate, endDate);
+        showExportStatus(`✓ Doctor Activity Report exported successfully! (${result.count} doctors)`);
+      } catch (error) {
+        console.error('Export error:', error);
+        showExportStatus(`✗ Failed to export: ${error.message}`, true);
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+
+    // Queue Report
+    document.getElementById('export-queue-report-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('export-queue-report-btn');
+      setButtonLoading(btn, true);
+      try {
+        const { startDate, endDate } = getDateRange();
+        const result = await Reports.exportQueueReport(startDate, endDate);
+        showExportStatus(`✓ Queue Report exported successfully! (${result.count} tickets)`);
+      } catch (error) {
+        console.error('Export error:', error);
+        showExportStatus(`✗ Failed to export: ${error.message}`, true);
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+
+    // System Usage Report
+    document.getElementById('export-system-usage-report-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('export-system-usage-report-btn');
+      setButtonLoading(btn, true);
+      try {
+        const { startDate, endDate } = getDateRange();
+        const result = await Reports.exportSystemUsageReport(startDate, endDate);
+        showExportStatus(`✓ System Usage Report exported successfully! (${result.count} metrics)`);
+      } catch (error) {
+        console.error('Export error:', error);
+        showExportStatus(`✗ Failed to export: ${error.message}`, true);
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+
+    console.log('[Reports] CSV Export module loaded and wired');
+  </script>
 </body>
 
 </html>

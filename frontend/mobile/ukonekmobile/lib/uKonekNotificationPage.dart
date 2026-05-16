@@ -42,7 +42,17 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
 
   Future<void> _updateLastViewed() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('last_viewed_notifications', DateTime.now().toIso8601String());
+    final now = DateTime.now().toIso8601String();
+    await prefs.setString('last_viewed_notifications', now);
+  }
+
+  Future<void> _clearAllNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('notifications_cleared_at', DateTime.now().toIso8601String());
+    await _updateLastViewed();
+    setState(() {
+      _notifications.clear();
+    });
   }
 
   Future<void> _loadNotifications() async {
@@ -54,6 +64,7 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
         ApiService.getMyQueueDashboard(),
         ApiService.getMedicineSchedule(),
         ApiService.getIntakeLogsForDate(DateTime.now()),
+        SharedPreferences.getInstance(),
       ]);
 
       final announcements = results[0] as List<Announcement>;
@@ -115,6 +126,14 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
             }
           }
         }
+      }
+
+      // Filter out notifications cleared before this timestamp
+      final prefs = results[4] as SharedPreferences;
+      final clearedAtStr = prefs.getString('notifications_cleared_at');
+      if (clearedAtStr != null) {
+        final clearedAt = DateTime.parse(clearedAtStr);
+        notifications.removeWhere((n) => (n['rawDate'] as DateTime).isBefore(clearedAt));
       }
 
       // Sort by date (newest first)
@@ -187,9 +206,7 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
           ),
           TextButton(
             onPressed: () {
-              setState(() {
-                _notifications.clear();
-              });
+              _clearAllNotifications();
               Navigator.pop(context);
             },
             child: const Text('Clear All', style: TextStyle(color: Colors.red)),

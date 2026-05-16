@@ -82,13 +82,18 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
 
       // Check for unseen notifications
       final lastViewedStr = prefs.getString('last_viewed_notifications');
-      if (lastViewedStr != null) {
-        final lastViewed = DateTime.parse(lastViewedStr);
-        final announcements = await ApiService.fetchAnnouncements();
-        _hasUnseenNotifications = announcements.any((a) => a.createdAt.isAfter(lastViewed));
-      } else {
-        _hasUnseenNotifications = true;
+      final clearedAtStr = prefs.getString('notifications_cleared_at');
+      DateTime lastViewed = lastViewedStr != null ? DateTime.parse(lastViewedStr) : DateTime.fromMillisecondsSinceEpoch(0);
+      if (clearedAtStr != null) {
+        final clearedAt = DateTime.parse(clearedAtStr);
+        if (clearedAt.isAfter(lastViewed)) lastViewed = clearedAt;
       }
+
+      final announcements = await ApiService.fetchAnnouncements();
+      _hasUnseenNotifications = announcements.any((a) => a.createdAt.isAfter(lastViewed));
+      
+      // Also check for missed doses if needed (Request 5)
+
       
       setState(() {
         // ONLY show medicines that HAVE been dispensed by the pharmacy in the scheduler
@@ -477,43 +482,58 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                   style: const TextStyle(fontSize: 14, color: _textMuted)),
             ],
           ),
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => uKonekNotificationPage(
-                    username: widget.username,
-                    fullname: widget.username, // Fallback if fullname not in widget
-                  ),
-                ),
-              );
-            },
-            child: Stack(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [BoxShadow(color: _textDark.withOpacity(0.05), blurRadius: 10)],
-                  ),
-                  child: const Icon(Icons.notifications_none_rounded, color: _textDark, size: 24),
-                ),
-                if (_hasUnseenNotifications)
-                  Positioned(
-                    right: 0, top: 0,
-                    child: Container(
-                      width: 10, height: 10,
-                      decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 2))),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          _buildNotificationBell(),
         ],
       ),
     );
+  }
+
+  Widget _buildNotificationBell() {
+    return GestureDetector(
+      onTap: () async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('last_viewed_notifications', DateTime.now().toIso8601String());
+        if (mounted) setState(() => _hasUnseenNotifications = false);
+
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => uKonekNotificationPage(
+              username: widget.username,
+              fullname: widget.username, // Fallback if fullname not in widget
+            ),
+          ),
+        );
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: _textDark.withOpacity(0.05), blurRadius: 10)],
+            ),
+            child: const Icon(Icons.notifications_none_rounded, color: _textDark, size: 24),
+          ),
+          if (_hasUnseenNotifications)
+            Positioned(
+              right: 0, top: 0,
+              child: Container(
+                width: 10, height: 10,
+                decoration: const BoxDecoration(
+                  color: Colors.redAccent, 
+                  shape: BoxShape.circle, 
+                  border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 2))
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
   }
 
   Widget _buildNextDoseCard(Map<String, dynamic> next) {

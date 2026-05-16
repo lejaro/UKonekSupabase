@@ -164,13 +164,22 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
         // Check for unseen notifications
         final lastViewedStr = prefs.getString('last_viewed_notifications');
-        bool unseen = false;
-        if (lastViewedStr != null) {
-          final lastViewed = DateTime.parse(lastViewedStr);
-          unseen = announcements.any((a) => a.createdAt.isAfter(lastViewed));
-        } else if (announcements.isNotEmpty) {
+        final clearedAtStr = prefs.getString('notifications_cleared_at');
+        DateTime lastViewed = lastViewedStr != null ? DateTime.parse(lastViewedStr) : DateTime.fromMillisecondsSinceEpoch(0);
+        if (clearedAtStr != null) {
+          final clearedAt = DateTime.parse(clearedAtStr);
+          if (clearedAt.isAfter(lastViewed)) lastViewed = clearedAt;
+        }
+
+        bool unseen = announcements.any((a) => a.createdAt.isAfter(lastViewed));
+        
+        // Also check if queue status is "new" to the user
+        if (newQueueSnapshot.hasActiveQueue && lastViewedStr == null) {
           unseen = true;
         }
+        
+        // You could also check for medicine reminders here if needed
+
 
         final newStatus = newQueueSnapshot.status.toLowerCase();
 
@@ -575,12 +584,14 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   Widget _buildNotificationBell() {
+    const Color textDark = Color(0xFF1B2E1E);
     return GestureDetector(
       onTap: () async {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('last_viewed_notifications', DateTime.now().toIso8601String());
-        setState(() => _hasUnseenNotifications = false);
+        if (mounted) setState(() => _hasUnseenNotifications = false);
         
+        if (!mounted) return;
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -592,15 +603,16 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         );
       },
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+              boxShadow: [BoxShadow(color: textDark.withOpacity(0.05), blurRadius: 10)],
             ),
-            child: const Icon(Icons.notifications_none_rounded, color: Color(0xFF1B2E1E), size: 24),
+            child: const Icon(Icons.notifications_none_rounded, color: textDark, size: 24),
           ),
           if (_hasUnseenNotifications)
             Positioned(

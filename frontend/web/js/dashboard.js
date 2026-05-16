@@ -3045,21 +3045,61 @@ function navigateToSection(sectionId, options = {}) {
 // Reports tabs switching
 const tabFeedback = document.getElementById('tab-feedback');
 const tabAnnouncements = document.getElementById('tab-announcements');
+const tabStats = document.getElementById('tab-stats');
+const tabExports = document.getElementById('tab-exports');
 const feedbackPane = document.getElementById('feedback-pane');
 const announcementsPane = document.getElementById('announcements-pane');
+const statsPane = document.getElementById('stats-pane');
+const exportsPane = document.getElementById('exports-pane');
+
 if (tabFeedback && tabAnnouncements && feedbackPane && announcementsPane) {
   tabFeedback.addEventListener('click', () => {
     tabFeedback.classList.add('active');
     tabAnnouncements.classList.remove('active');
+    if (tabStats) tabStats.classList.remove('active');
+    if (tabExports) tabExports.classList.remove('active');
     feedbackPane.classList.remove('hidden');
     announcementsPane.classList.add('hidden');
+    if (statsPane) statsPane.classList.add('hidden');
+    if (exportsPane) exportsPane.classList.add('hidden');
   });
+  
   tabAnnouncements.addEventListener('click', () => {
     tabAnnouncements.classList.add('active');
     tabFeedback.classList.remove('active');
+    if (tabStats) tabStats.classList.remove('active');
+    if (tabExports) tabExports.classList.remove('active');
     announcementsPane.classList.remove('hidden');
     feedbackPane.classList.add('hidden');
+    if (statsPane) statsPane.classList.add('hidden');
+    if (exportsPane) exportsPane.classList.add('hidden');
   });
+  
+  if (tabStats && statsPane) {
+    tabStats.addEventListener('click', () => {
+      tabStats.classList.add('active');
+      tabAnnouncements.classList.remove('active');
+      tabFeedback.classList.remove('active');
+      if (tabExports) tabExports.classList.remove('active');
+      statsPane.classList.remove('hidden');
+      announcementsPane.classList.add('hidden');
+      feedbackPane.classList.add('hidden');
+      if (exportsPane) exportsPane.classList.add('hidden');
+    });
+  }
+  
+  if (tabExports && exportsPane) {
+    tabExports.addEventListener('click', () => {
+      tabExports.classList.add('active');
+      tabAnnouncements.classList.remove('active');
+      tabFeedback.classList.remove('active');
+      if (tabStats) tabStats.classList.remove('active');
+      exportsPane.classList.remove('hidden');
+      announcementsPane.classList.add('hidden');
+      feedbackPane.classList.add('hidden');
+      if (statsPane) statsPane.classList.add('hidden');
+    });
+  }
 }
 
 // Reports refresh button
@@ -8147,16 +8187,28 @@ const appointments = (() => {
     if (deleteBtn) {
       deleteBtn.onclick = async () => {
         if (!confirm('Are you sure you want to delete this queue ticket?')) return;
+        
         try {
+          setLoading(deleteBtn, true);
           const { supabase } = await loadSupabaseModule();
-          const { error } = await supabase.from('queue_tickets').delete().eq('id', id);
+          
+          // Use Number(id) if it's a numeric ID, or keep as string if it's a UUID. 
+          // Our state uses string IDs for consistency with dataset.
+          const { error } = await supabase
+            .from('queue_tickets')
+            .delete()
+            .eq('id', id);
+
           if (error) throw error;
+
           showToast('Ticket deleted successfully.', 'success');
           modal.classList.add('hidden');
-          refresh();
+          await refresh(); // Await refresh to ensure UI is updated before user interacts again
         } catch (err) {
           console.error('[Queue] Delete error:', err);
-          showToast('Failed to delete ticket.', 'error');
+          showToast(err.message || 'Failed to delete ticket.', 'error');
+        } finally {
+          setLoading(deleteBtn, false);
         }
       };
     }

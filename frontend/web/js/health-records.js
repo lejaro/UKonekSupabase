@@ -96,7 +96,7 @@ async function openCitizenHealthModal(citizen) {
       // Consultations
       supabase.from('consultations')
         .select('*, doctor:staff!doctor_staff_id(first_name,last_name,role)')
-        .or(`patient_citizen_id.eq.${citizenId},patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
+        .eq('patient_citizen_id', citizenId)
         .order('consulted_at', { ascending: false })
         .limit(100),
       
@@ -114,6 +114,7 @@ async function openCitizenHealthModal(citizen) {
           issued_at,
           patient_identifier,
           consultation_id,
+          patient_citizen_id,
           doctor:staff!doctor_staff_id(first_name,last_name,role),
           items:prescription_items(
             id,
@@ -126,7 +127,7 @@ async function openCitizenHealthModal(citizen) {
             instructions
           )
         `)
-        .or(`patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
+        .eq('patient_citizen_id', citizenId)
         .order('issued_at', { ascending: false })
         .limit(100),
       
@@ -276,8 +277,8 @@ function renderConsultationsTab(rows, error) {
         r.diagnosis,
         r.chief_complaint,
         r.symptoms,
-        r.doctor?.firstname,
-        r.doctor?.surname,
+        r.doctor?.first_name,
+        r.doctor?.last_name,
         r.notes
       ].filter(Boolean).join(' ').toLowerCase();
       return searchableText.includes(searchTerm);
@@ -415,8 +416,8 @@ function renderVitalsTab(rows, error) {
         r.chief_complaint,
         r.blood_pressure,
         r.notes,
-        r.nurse?.firstname,
-        r.nurse?.surname
+        r.nurse?.first_name,
+        r.nurse?.last_name
       ].filter(Boolean).join(' ').toLowerCase();
       return searchableText.includes(searchTerm);
     });
@@ -525,8 +526,8 @@ function renderPrescriptionsTab(rows, error) {
     let filtered = rows.filter(rx => {
       if (!searchTerm) return true;
       const searchableText = [
-        rx.doctor?.firstname,
-        rx.doctor?.surname,
+        rx.doctor?.first_name,
+        rx.doctor?.last_name,
         ...(rx.items || []).map(it => it.medicine_name)
       ].filter(Boolean).join(' ').toLowerCase();
       return searchableText.includes(searchTerm);
