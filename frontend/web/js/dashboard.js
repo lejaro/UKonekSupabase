@@ -545,18 +545,28 @@ function getSessionRole() {
 }
 
 
+// Role classification functions
 function isAdminUser(user) {
   const role = String(user?.role || '').trim().toLowerCase();
-  return role === 'admin' || role === 'doctor' || role === 'nurse' || role === 'staff';
+  return role === 'admin';
+}
+
+function isClinicalStaff(user) {
+  const role = String(user?.role || '').trim().toLowerCase();
+  return role === 'doctor' || role === 'nurse' || role === 'staff';
+}
+
+function isFullAccessUser(user) {
+  return isAdminUser(user) || isClinicalStaff(user);
 }
 
 const SECTION_ROLE_RULES = {
-  'dashboard-section': ['doctor', 'nurse', 'pharmacist'],
-  'users-section': ['doctor', 'nurse', 'pharmacist'],
-  'reports-section': ['doctor', 'nurse'],
+  'dashboard-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
+  'users-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
+  'reports-section': ['admin', 'doctor', 'nurse'],
   'medicine-section': ['doctor', 'nurse', 'pharmacist'],
   'consultation-section': ['doctor', 'nurse', 'pharmacist'],
-  'schedule-section': ['doctor', 'nurse', 'pharmacist'],
+  'schedule-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
   'vitals-section': ['doctor', 'nurse', 'pharmacist'],
   'queue-section': ['doctor', 'nurse', 'pharmacist'],
 
@@ -752,12 +762,39 @@ function updateNonAdminWorkspace(user) {
 }
 
 function applyRoleAccess(user) {
-  const adminAccess = isAdminUser(user);
   const role = String(user?.role || detectRoleFromTitle()).trim().toLowerCase();
+  const isAdmin = isAdminUser(user);
+  const isClinical = isClinicalStaff(user);
+  const hasFullAccess = isFullAccessUser(user);
+  
+  // Handle .admin-only elements (for true admins only)
   document.querySelectorAll('.admin-only').forEach((element) => {
     const isSectionContainer = element.classList.contains('section-top');
-    if (adminAccess) {
-      // Keep section visibility controlled by navigation helpers.
+    if (isAdmin) {
+      if (!isSectionContainer) {
+        element.classList.remove('hidden');
+      }
+    } else {
+      element.classList.add('hidden');
+    }
+  });
+
+  // Handle .clinical-only elements (for doctors and nurses)
+  document.querySelectorAll('.clinical-only').forEach((element) => {
+    const isSectionContainer = element.classList.contains('section-top');
+    if (isClinical) {
+      if (!isSectionContainer) {
+        element.classList.remove('hidden');
+      }
+    } else {
+      element.classList.add('hidden');
+    }
+  });
+
+  // Handle .full-access elements (for admin, doctor, nurse)
+  document.querySelectorAll('.full-access').forEach((element) => {
+    const isSectionContainer = element.classList.contains('section-top');
+    if (hasFullAccess) {
       if (!isSectionContainer) {
         element.classList.remove('hidden');
       }
@@ -787,17 +824,21 @@ function applyRoleAccess(user) {
   const mainDashTitle = document.getElementById('main-dashboard-title');
   const mainTopbarTitle = document.getElementById('main-topbar-title');
   if (mainDashTitle || mainTopbarTitle) {
-    const roleText = (role === 'doctor' || role === 'admin') ? 'Doctor' : toTitleCase(role);
+    let roleText = toTitleCase(role);
+    if (role === 'admin') roleText = 'Administrator';
     if (mainDashTitle) mainDashTitle.textContent = `${roleText} Dashboard`;
     if (mainTopbarTitle) mainTopbarTitle.textContent = `${roleText} Systems Overview`;
   }
 
   const nonAdminSection = document.getElementById('non-admin-section');
-  if (adminAccess) {
+  
+  // Admin and clinical staff get access to their respective sections
+  if (hasFullAccess) {
     if (nonAdminSection) nonAdminSection.classList.add('hidden');
     return;
   }
 
+  // Other roles (pharmacist, etc.)
   const registeredPane = document.getElementById('registered-pane');
   const patientsPane = document.getElementById('citizens-pane');
   const usersNavBtn = document.querySelector('.nav-btn[data-section="users-section"]');
@@ -2661,6 +2702,31 @@ function chrLoadingState() {
   return `<p style="color:#94a3b8;font-size:13px;padding:12px 0;">Loading…</p>`;
 }
 
+function buildStaffLookup(staffRows) {
+  const lookup = new Map();
+  if (!Array.isArray(staffRows)) return lookup;
+  staffRows.forEach((row) => {
+    const id = row?.id;
+    if (id !== null && id !== undefined) {
+      lookup.set(String(id), row);
+    }
+  });
+  return lookup;
+}
+
+function resolveStaffName({ staff, staffId, lookup, fallback = '—' }) {
+  if (staff?.first_name || staff?.last_name) {
+    return `Dr. ${staff.first_name || ''} ${staff.last_name || ''}`.trim();
+  }
+  if (lookup && staffId !== null && staffId !== undefined) {
+    const match = lookup.get(String(staffId));
+    if (match?.first_name || match?.last_name) {
+      return `Dr. ${match.first_name || ''} ${match.last_name || ''}`.trim();
+    }
+  }
+  return fallback;
+}
+
 async function openCitizenHealthModal(citizen) {
   if (!citizenHealthModal) return;
 
@@ -2710,7 +2776,7 @@ async function openCitizenHealthModal(citizen) {
     const { supabase } = await loadSupabaseModule();
     const citizenId = Number(citizen.id);
 
-    const [consultRes, vitalsRes, rxRes, labRes] = await Promise.all([
+    const [consultRes, vitalsRes, rxRes, labRes, staffRes] = await Promise.all([
       supabase.from('consultations')
         .select('*, doctor:staff!doctor_staff_id(first_name,last_name)')
         .or(`patient_citizen_id.eq.${citizenId},patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
@@ -2722,7 +2788,7 @@ async function openCitizenHealthModal(citizen) {
         .order('created_at', { ascending: false })
         .limit(50),
       supabase.from('prescription_headers')
-        .select('id,issued_at,patient_identifier,doctor:staff!doctor_staff_id(first_name,last_name),items:prescription_items(*)')
+        .select('id,issued_at,patient_identifier,doctor_staff_id,doctor:staff!doctor_staff_id(first_name,last_name),items:prescription_items(*)')
         .or(`patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
         .order('issued_at', { ascending: false })
         .limit(50),
@@ -2731,7 +2797,10 @@ async function openCitizenHealthModal(citizen) {
         .or(`patient_citizen_id.eq.${citizenId},patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
         .order('created_at', { ascending: false })
         .limit(50),
+      supabase.rpc('list_staff_accounts')
     ]);
+
+    const staffLookup = buildStaffLookup(staffRes?.data || []);
 
     // Render Consultations
     const consultEl = document.getElementById('chr-consultations-body');
@@ -2756,12 +2825,22 @@ async function openCitizenHealthModal(citizen) {
           tr.innerHTML = `
             <td class="table-cell" style="white-space:nowrap;">${r.consulted_at ? new Date(r.consulted_at).toLocaleDateString() : '—'}</td>
             <td class="table-cell"><strong>${r.diagnosis || '—'}</strong></td>
-            <td class="table-cell" style="white-space:nowrap;">${r.doctor ? `Dr. ${r.doctor.first_name} ${r.doctor.last_name}` : '—'}</td>
+            <td class="table-cell" style="white-space:nowrap;">${resolveStaffName({
+              staff: r.doctor,
+              staffId: r.doctor_staff_id,
+              lookup: staffLookup,
+              fallback: '—'
+            })}</td>
           `;
           tr.addEventListener('click', () => {
             showDataDetail('Consultation Record', {
               'Date': r.consulted_at ? new Date(r.consulted_at).toLocaleString() : '—',
-              'Doctor': r.doctor ? `Dr. ${r.doctor.first_name} ${r.doctor.last_name}` : '—',
+              'Doctor': resolveStaffName({
+                staff: r.doctor,
+                staffId: r.doctor_staff_id,
+                lookup: staffLookup,
+                fallback: '—'
+              }),
               'Diagnosis': r.diagnosis || '—',
               'Symptoms': r.symptoms || '—',
               'HPI': r.hpi || '—',
@@ -2799,12 +2878,34 @@ async function openCitizenHealthModal(citizen) {
           tr.innerHTML = `
             <td class="table-cell" style="white-space:nowrap;">${r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}</td>
             <td class="table-cell">BP: ${r.blood_pressure || '—'} | Temp: ${r.temperature || '—'}°C</td>
-            <td class="table-cell" style="white-space:nowrap;">${r.nurse ? `${r.nurse.first_name} ${r.nurse.last_name}` : '—'}</td>
+            <td class="table-cell" style="white-space:nowrap;">${(() => {
+              if (r.nurse?.first_name || r.nurse?.last_name) {
+                return `${r.nurse.first_name || ''} ${r.nurse.last_name || ''}`.trim();
+              }
+              if (staffLookup && r.nurse_id) {
+                const fallbackNurse = staffLookup.get(String(r.nurse_id));
+                if (fallbackNurse?.first_name || fallbackNurse?.last_name) {
+                  return `${fallbackNurse.first_name || ''} ${fallbackNurse.last_name || ''}`.trim();
+                }
+              }
+              return '—';
+            })()}</td>
           `;
           tr.addEventListener('click', () => {
             showDataDetail('Vital Assessment', {
               'Date': r.created_at ? new Date(r.created_at).toLocaleString() : '—',
-              'Assessed By': r.nurse ? `${r.nurse.first_name} ${r.nurse.last_name}` : '—',
+              'Assessed By': (() => {
+                if (r.nurse?.first_name || r.nurse?.last_name) {
+                  return `${r.nurse.first_name || ''} ${r.nurse.last_name || ''}`.trim();
+                }
+                if (staffLookup && r.nurse_id) {
+                  const fallbackNurse = staffLookup.get(String(r.nurse_id));
+                  if (fallbackNurse?.first_name || fallbackNurse?.last_name) {
+                    return `${fallbackNurse.first_name || ''} ${fallbackNurse.last_name || ''}`.trim();
+                  }
+                }
+                return '—';
+              })(),
               'Chief Complaint': r.chief_complaint || '—',
               'Blood Pressure': r.blood_pressure || '—',
               'Temperature': r.temperature ? `${r.temperature} °C` : '—',
@@ -2831,7 +2932,12 @@ async function openCitizenHealthModal(citizen) {
           const items = (rx.items || []).map(it =>
             `<li style="font-size:12px;color:#374151;">${it.medicine_name} — ${it.quantity} ${it.unit || ''} ${it.dosage ? `(${it.dosage})` : ''} ${it.frequency || ''} ${it.duration ? `for ${it.duration}` : ''}</li>`
           ).join('');
-          const doctor = rx.doctor ? `Dr. ${rx.doctor.first_name} ${rx.doctor.last_name}` : '—';
+          const doctor = resolveStaffName({
+            staff: rx.doctor,
+            staffId: rx.doctor_staff_id,
+            lookup: staffLookup,
+            fallback: '—'
+          });
           const date = rx.issued_at ? new Date(rx.issued_at).toLocaleDateString() : '—';
           return `
             <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
@@ -2866,7 +2972,12 @@ async function openCitizenHealthModal(citizen) {
                 <td class="table-cell" style="white-space:nowrap;">${r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}</td>
                 <td class="table-cell"><strong>${r.test_name || '—'}</strong></td>
                 <td class="table-cell"><span class="${statusClass}">${r.status || '—'}</span></td>
-                <td class="table-cell" style="white-space:nowrap;">${r.doctor ? `Dr. ${r.doctor.first_name} ${r.doctor.last_name}` : '—'}</td>
+                <td class="table-cell" style="white-space:nowrap;">${resolveStaffName({
+                  staff: r.doctor,
+                  staffId: r.doctor_staff_id,
+                  lookup: staffLookup,
+                  fallback: '—'
+                })}</td>
               </tr>`;
             }).join('')}
             </tbody>
@@ -7845,11 +7956,12 @@ function clearPharmacySearch() {
 }
 
 // Initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initPharmacyModule);
-} else {
-  initPharmacyModule();
-}
+// Pharmacy module disabled - pharmacists use dedicated dashboard
+// if (document.readyState === 'loading') {
+//   document.addEventListener('DOMContentLoaded', initPharmacyModule);
+// } else {
+//   initPharmacyModule();
+// }
 
 // --- Vital Signs Assessment Modal ---
 const vaModal = document.getElementById('vital-assessment-modal');

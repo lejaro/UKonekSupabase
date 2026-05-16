@@ -259,7 +259,7 @@ class uKonekContactStep extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
-        value: brgy.text.isEmpty ? null : brgy.text, // Defaults to hint if empty[cite: 1]
+        initialValue: brgy.text.isEmpty ? null : brgy.text, // Defaults to hint if empty[cite: 1]
         isExpanded: true,
         dropdownColor: Colors.white,
         style: const TextStyle(fontSize: 14, color: _textDark),
@@ -290,7 +290,7 @@ class uKonekContactStep extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
-        value: relation.text.isEmpty ? null : relation.text, // Defaults to hint if empty[cite: 1]
+        initialValue: relation.text.isEmpty ? null : relation.text, // Defaults to hint if empty[cite: 1]
         isExpanded: true,
         dropdownColor: Colors.white,
         style: const TextStyle(fontSize: 14, color: _textDark),

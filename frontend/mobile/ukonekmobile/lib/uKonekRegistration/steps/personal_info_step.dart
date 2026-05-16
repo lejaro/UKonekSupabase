@@ -206,7 +206,7 @@ class PersonalInfoStep extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
-        value: nameExtension.text.isEmpty ? null : nameExtension.text,
+        initialValue: nameExtension.text.isEmpty ? null : nameExtension.text,
         dropdownColor: Colors.white,
         style: const TextStyle(fontSize: 14, color: _textDark),
         decoration: InputDecoration(

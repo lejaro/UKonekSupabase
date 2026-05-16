@@ -23,6 +23,31 @@ function showDataDetail(title, details) {
   }
 }
 
+function buildStaffLookup(staffRows) {
+  const lookup = new Map();
+  if (!Array.isArray(staffRows)) return lookup;
+  staffRows.forEach((row) => {
+    const id = row?.id;
+    if (id !== null && id !== undefined) {
+      lookup.set(String(id), row);
+    }
+  });
+  return lookup;
+}
+
+function resolveStaffName({ staff, staffId, lookup, fallback = 'Unknown' }) {
+  if (staff?.first_name || staff?.last_name) {
+    return `Dr. ${staff.first_name || ''} ${staff.last_name || ''}`.trim();
+  }
+  if (lookup && staffId !== null && staffId !== undefined) {
+    const match = lookup.get(String(staffId));
+    if (match?.first_name || match?.last_name) {
+      return `Dr. ${match.first_name || ''} ${match.last_name || ''}`.trim();
+    }
+  }
+  return fallback;
+}
+
 async function openCitizenHealthModal(citizen) {
   if (!citizen || !citizen.id) {
     console.error('[Health Records] Invalid citizen data');
@@ -92,7 +117,7 @@ async function openCitizenHealthModal(citizen) {
 
     console.log('[Health Records] Loading data for citizen ID:', citizenId);
 
-    const [consultRes, vitalsRes, rxRes, labRes] = await Promise.all([
+    const [consultRes, vitalsRes, rxRes, labRes, staffRes] = await Promise.all([
       // Consultations
       supabase.from('consultations')
         .select('*, doctor:staff!doctor_staff_id(first_name,last_name,role)')
@@ -114,7 +139,7 @@ async function openCitizenHealthModal(citizen) {
           issued_at,
           patient_identifier,
           consultation_id,
-          patient_citizen_id,
+          doctor_staff_id,
           doctor:staff!doctor_staff_id(first_name,last_name,role),
           items:prescription_items(
             id,
@@ -127,7 +152,7 @@ async function openCitizenHealthModal(citizen) {
             instructions
           )
         `)
-        .eq('patient_citizen_id', citizenId)
+        .or(`patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
         .order('issued_at', { ascending: false })
         .limit(100),
       
@@ -137,6 +162,8 @@ async function openCitizenHealthModal(citizen) {
         .eq('patient_citizen_id', citizenId)
         .order('created_at', { ascending: false })
         .limit(100),
+
+      supabase.rpc('list_staff_accounts')
     ]);
 
     console.log('[Health Records] Consultations:', consultRes.data?.length || 0, consultRes.error);
@@ -144,11 +171,13 @@ async function openCitizenHealthModal(citizen) {
     console.log('[Health Records] Prescriptions:', rxRes.data?.length || 0, rxRes.error);
     console.log('[Health Records] Lab Orders:', labRes.data?.length || 0, labRes.error);
 
+    const staffLookup = buildStaffLookup(staffRes?.data || []);
+
     // Render each section
-    renderConsultationsTab(consultRes.data || [], consultRes.error);
-    renderVitalsTab(vitalsRes.data || [], vitalsRes.error);
-    renderPrescriptionsTab(rxRes.data || [], rxRes.error);
-    renderLabOrdersTab(labRes.data || [], labRes.error);
+    renderConsultationsTab(consultRes.data || [], consultRes.error, staffLookup);
+    renderVitalsTab(vitalsRes.data || [], vitalsRes.error, staffLookup);
+    renderPrescriptionsTab(rxRes.data || [], rxRes.error, staffLookup);
+    renderLabOrdersTab(labRes.data || [], labRes.error, staffLookup);
 
   } catch (err) {
     console.error('[Health Records] Failed to load:', err);
@@ -160,7 +189,7 @@ async function openCitizenHealthModal(citizen) {
   }
 }
 
-function renderConsultationsTab(rows, error) {
+function renderConsultationsTab(rows, error, staffLookup) {
   const consultEl = document.getElementById('chr-consultations-body');
   if (!consultEl) return;
 
@@ -215,7 +244,12 @@ function renderConsultationsTab(rows, error) {
       const date = r.consulted_at ? new Date(r.consulted_at) : null;
       const dateStr = date ? date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
       const timeStr = date ? date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
-      const doctor = r.doctor ? `Dr. ${r.doctor.first_name} ${r.doctor.last_name}` : 'Unknown';
+      const doctor = resolveStaffName({
+        staff: r.doctor,
+        staffId: r.doctor_staff_id,
+        lookup: staffLookup,
+        fallback: 'Unknown'
+      });
       const status = r.status || 'completed';
       const statusBadge = status === 'completed' ? 'badge badge-success' : 'badge badge-warning';
       
@@ -304,7 +338,7 @@ function renderConsultationsTab(rows, error) {
   sortSelect?.addEventListener('change', filterAndSort);
 }
 
-function renderVitalsTab(rows, error) {
+function renderVitalsTab(rows, error, staffLookup) {
   const vitalsEl = document.getElementById('chr-vitals-body');
   if (!vitalsEl) return;
 
@@ -360,7 +394,13 @@ function renderVitalsTab(rows, error) {
       const date = r.created_at ? new Date(r.created_at) : null;
       const dateStr = date ? date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
       const timeStr = date ? date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
-      const nurse = r.nurse ? `${r.nurse.first_name} ${r.nurse.last_name}` : 'Unknown';
+      let nurse = r.nurse ? `${r.nurse.first_name} ${r.nurse.last_name}` : 'Unknown';
+      if (nurse === 'Unknown' && staffLookup && r.nurse_id) {
+        const fallbackNurse = staffLookup.get(String(r.nurse_id));
+        if (fallbackNurse?.first_name || fallbackNurse?.last_name) {
+          nurse = `${fallbackNurse.first_name || ''} ${fallbackNurse.last_name || ''}`.trim();
+        }
+      }
       
       tr.innerHTML = `
         <td class="table-cell" style="white-space:nowrap;">
@@ -438,7 +478,7 @@ function renderVitalsTab(rows, error) {
   sortSelect?.addEventListener('change', filterAndSort);
 }
 
-function renderPrescriptionsTab(rows, error) {
+function renderPrescriptionsTab(rows, error, staffLookup) {
   const rxEl = document.getElementById('chr-prescriptions-body');
   if (!rxEl) return;
 
@@ -477,7 +517,12 @@ function renderPrescriptionsTab(rows, error) {
       const date = rx.issued_at ? new Date(rx.issued_at) : null;
       const dateStr = date ? date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
       const timeStr = date ? date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
-      const doctor = rx.doctor ? `Dr. ${rx.doctor.first_name} ${rx.doctor.last_name}` : 'Unknown Doctor';
+      const doctor = resolveStaffName({
+        staff: rx.doctor,
+        staffId: rx.doctor_staff_id,
+        lookup: staffLookup,
+        fallback: 'Unknown Doctor'
+      });
       const items = rx.items || [];
       
       const itemsHtml = items.length > 0 ? items.map(it => `
@@ -553,7 +598,7 @@ function renderPrescriptionsTab(rows, error) {
   sortSelect?.addEventListener('change', filterAndSort);
 }
 
-function renderLabOrdersTab(rows, error) {
+function renderLabOrdersTab(rows, error, staffLookup) {
   const labEl = document.getElementById('chr-laborders-body');
   if (!labEl) return;
 
@@ -580,7 +625,12 @@ function renderLabOrdersTab(rows, error) {
         <tbody>${rows.map(r => {
           const date = r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
           const statusClass = r.status === 'Completed' ? 'badge badge-success' : 'badge badge-warning';
-          const doctor = r.doctor ? `Dr. ${r.doctor.first_name} ${r.doctor.last_name}` : '—';
+          const doctor = resolveStaffName({
+            staff: r.doctor,
+            staffId: r.doctor_staff_id,
+            lookup: staffLookup,
+            fallback: '—'
+          });
           return `<tr class="account-row">
             <td class="table-cell" style="white-space:nowrap;">${date}</td>
             <td class="table-cell"><strong>${r.test_name || '—'}</strong></td>

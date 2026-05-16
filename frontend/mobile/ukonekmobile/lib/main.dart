@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'uKonekOnBoardingPage.dart';
-import 'uKonekMenuPage.dart';
 import 'uKonekDashboardPage.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';

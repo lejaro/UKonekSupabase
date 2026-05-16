@@ -32,7 +32,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   static const Color _textMuted  = Color(0xFF637367);
   static const Color _fieldBdr   = Color(0xFFE2E9E3);
 
-  int _selectedTab = 1;
+  final int _selectedTab = 1;
 
   bool _loading = true;
   String? _error;
@@ -473,7 +473,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
             children: [
               Text(isToday 
                   ? "${_getGreeting()}, ${widget.username.split(' ')[0]} 👋"
-                  : "${DateFormat('MMMM yyyy').format(_selectedDate)}",
+                  : DateFormat('MMMM yyyy').format(_selectedDate),
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: _textDark)),
               const SizedBox(height: 4),
               Text(isToday 
@@ -819,7 +819,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                           ],
                         ),
                       );
-                    }).toList(),
+                    }),
                     if (!allTaken && items.length > 1) ...[
                       const Divider(height: 24),
                       SizedBox(

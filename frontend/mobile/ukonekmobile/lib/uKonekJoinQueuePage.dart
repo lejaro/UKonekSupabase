@@ -1008,7 +1008,7 @@ class _ServiceSearchModalState extends State<_ServiceSearchModal> {
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
                   itemCount: _filteredServices.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final s = _filteredServices[index];
                     return InkWell(

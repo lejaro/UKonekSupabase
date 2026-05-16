@@ -88,7 +88,7 @@ class DoctorStatus {
   });
 
   String get displayName {
-    final full = '$firstName $lastName'.trim();
+    final full = '$lastName $firstName'.trim();
     if (full.toLowerCase().startsWith('dr.')) return full;
     return 'Dr. $full';
   }

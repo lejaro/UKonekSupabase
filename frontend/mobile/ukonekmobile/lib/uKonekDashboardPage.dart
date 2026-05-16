@@ -346,7 +346,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                           ],
                         ],
                       ),
-                    )).toList(),
+                    )),
 
                     const SizedBox(height: 24),
 

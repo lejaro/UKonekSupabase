@@ -9,6 +9,7 @@
 ///   - Validate email, phone, and other formats
 ///   - Return user-friendly error messages
 /// ═══════════════════════════════════════════════════════════════════════════
+library;
 
 class InputValidator {
   /// Sanitize text input by trimming and normalizing spaces
