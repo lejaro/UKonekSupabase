@@ -54,16 +54,7 @@ SELECT public.delete_old_pending_queue_tickets();
 
 ### What Gets Deleted
 
-The function deletes queue tickets that meet ALL these conditions:
-- Status is `waiting` OR `on_call`
-- Created date is before today (CURRENT_DATE)
-
-### What is NOT Deleted
-
-Queue tickets with these statuses are preserved:
-- `completed` - Already served
-- `cancelled` - Manually cancelled
-- `no_show` - Patient didn't show up
+The function deletes all queue tickets (regardless of status: waiting, serving, completed, cancelled, no_show, etc.) where the creation date is before today in the local Manila timezone (`Asia/Manila`, UTC+8). This ensures that the active daily queue starts perfectly clean and fresh every single day.
 
 ### Monitoring
 
@@ -98,7 +89,7 @@ SELECT cron.unschedule('delete-old-pending-queue-tickets');
 ```sql
 SELECT cron.schedule(
   'delete-old-pending-queue-tickets',
-  '0 0 * * *',
+  '0 16 * * *',  -- runs at 16:00 UTC (12:00 AM Asia/Manila)
   $$SELECT public.delete_old_pending_queue_tickets();$$
 );
 ```

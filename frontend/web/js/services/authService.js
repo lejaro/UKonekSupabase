@@ -47,6 +47,7 @@ export async function signInStaff({ identifier, password }) {
 
   try {
     await setStaffPresence(true);
+    await supabase.rpc('log_staff_action', { p_action: 'login' });
   } catch (presenceError) {
     console.warn('Presence update warning on sign in:', presenceError);
   }
@@ -77,6 +78,12 @@ export async function getAuthenticatedStaffProfile() {
 }
 
 export async function signOutStaff() {
+  try {
+    await supabase.rpc('log_staff_action', { p_action: 'logout' }).catch(() => {});
+  } catch (logError) {
+    console.warn('Logging update warning on sign out:', logError);
+  }
+
   try {
     await setStaffPresence(false);
   } catch (presenceError) {

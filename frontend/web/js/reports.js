@@ -60,7 +60,8 @@ function convertToCSV(data, headers) {
   // Add data rows
   for (const row of data) {
     const values = headers.map(header => {
-      const value = row[header] || '';
+      const rawVal = row[header];
+      const value = (rawVal !== undefined && rawVal !== null) ? rawVal : '';
       // Escape quotes and wrap in quotes if contains comma or newline
       const escaped = String(value).replace(/"/g, '""');
       return escaped.includes(',') || escaped.includes('\n') || escaped.includes('"') 
@@ -188,8 +189,8 @@ export async function exportConsultationReport(startDate = null, endDate = null)
       .from('consultations')
       .select(`
         *,
-        patient:citizens!patient_citizen_id(id, firstname, surname, email),
-        doctor:staff!doctor_staff_id(id, first_name, last_name, employee_id)
+        citizen:citizens(id, firstname, surname, email),
+        doctor:staff(id, first_name, last_name, employee_id)
       `)
       .order('consulted_at', { ascending: false });
     
@@ -213,9 +214,9 @@ export async function exportConsultationReport(startDate = null, endDate = null)
     const csvData = data.map(consult => ({
       'Consultation ID': consult.id,
       'Consultation Date': consult.consulted_at ? new Date(consult.consulted_at).toLocaleString() : '',
-      'Patient ID': consult.patient?.id || consult.patient_citizen_id || '',
-      'Patient Name': consult.patient ? `${consult.patient.firstname} ${consult.patient.surname}` : '',
-      'Patient Email': consult.patient?.email || '',
+      'Patient ID': consult.citizen?.id || consult.patient_citizen_id || '',
+      'Patient Name': consult.citizen ? `${consult.citizen.firstname} ${consult.citizen.surname}` : '',
+      'Patient Email': consult.citizen?.email || '',
       'Patient Identifier': consult.patient_identifier || '',
       'Doctor ID': consult.doctor?.id || consult.doctor_staff_id || '',
       'Doctor Name': consult.doctor ? `Dr. ${consult.doctor.first_name} ${consult.doctor.last_name}` : '',
@@ -226,7 +227,12 @@ export async function exportConsultationReport(startDate = null, endDate = null)
       'HPI': consult.hpi || '',
       'PMH': consult.pmh || '',
       'Allergies': consult.allergies || '',
+      'Immunization Status': consult.immunization_status || '',
+      'Social History': consult.social_history || '',
       'Physical Exam': formatPhysicalExam(consult.physical_exam),
+      'Differential Diagnosis': consult.differential_diagnosis || '',
+      'Lab Orders': consult.lab_orders || '',
+      'Follow Up Date': consult.follow_up_date || '',
       'Treatment Plan': consult.treatment_plan || '',
       'Chief Complaint': consult.chief_complaint || '',
       'Created At': consult.created_at ? new Date(consult.created_at).toLocaleString() : ''
@@ -235,7 +241,9 @@ export async function exportConsultationReport(startDate = null, endDate = null)
     const headers = [
       'Consultation ID', 'Consultation Date', 'Patient ID', 'Patient Name', 'Patient Email',
       'Patient Identifier', 'Doctor ID', 'Doctor Name', 'Doctor Employee ID',
-      'Symptoms', 'Diagnosis', 'Notes', 'HPI', 'PMH', 'Allergies', 'Physical Exam',
+      'Symptoms', 'Diagnosis', 'Notes', 'HPI', 'PMH', 'Allergies', 
+      'Immunization Status', 'Social History', 'Physical Exam', 
+      'Differential Diagnosis', 'Lab Orders', 'Follow Up Date', 
       'Treatment Plan', 'Chief Complaint', 'Created At'
     ];
     
@@ -317,13 +325,18 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
       // Calculate total hours scheduled
       const totalHours = (schedules || []).reduce((sum, sched) => {
         if (sched.start_time && sched.end_time) {
-          const start = new Date(`2000-01-01T${sched.start_time}`);
-          const end = new Date(`2000-01-01T${sched.end_time}`);
-          const hours = (end - start) / (1000 * 60 * 60);
-          return sum + hours;
+          const [startH, startM, startS] = sched.start_time.split(':').map(Number);
+          const [endH, endM, endS] = sched.end_time.split(':').map(Number);
+          const startMin = startH * 60 + (startM || 0);
+          const endMin = endH * 60 + (endM || 0);
+          const hours = (endMin - startMin) / 60;
+          return sum + (Number.isFinite(hours) && hours > 0 ? hours : 0);
         }
         return sum;
       }, 0);
+      
+      const sortedConsults = (consultations || []).slice().sort((a, b) => new Date(b.consulted_at) - new Date(a.consulted_at));
+      const sortedPrescriptions = (prescriptions || []).slice().sort((a, b) => new Date(b.issued_at) - new Date(a.issued_at));
       
       activityData.push({
         'Doctor ID': doctor.id,
@@ -336,10 +349,10 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
         'Total Prescriptions': prescriptions?.length || 0,
         'Total Scheduled Slots': schedules?.length || 0,
         'Total Scheduled Hours': totalHours.toFixed(2),
-        'Last Consultation': consultations?.[0]?.consulted_at ? new Date(consultations[0].consulted_at).toLocaleString() : 'None',
-        'Last Prescription': prescriptions?.[0]?.issued_at ? new Date(prescriptions[0].issued_at).toLocaleString() : 'None',
+        'Last Consultation': sortedConsults[0]?.consulted_at ? new Date(sortedConsults[0].consulted_at).toLocaleString() : 'None',
+        'Last Prescription': sortedPrescriptions[0]?.issued_at ? new Date(sortedPrescriptions[0].issued_at).toLocaleString() : 'None',
         'Is Online': doctor.is_online ? 'Yes' : 'No',
-        'Last Seen': doctor.last_seen ? new Date(doctor.last_seen).toLocaleString() : 'Never'
+        'Last Seen': (doctor.last_seen && !isNaN(new Date(doctor.last_seen).getTime())) ? new Date(doctor.last_seen).toLocaleString() : 'Never'
       });
     }
     
@@ -379,7 +392,7 @@ export async function exportQueueReport(startDate = null, endDate = null) {
       .from('queue_tickets')
       .select(`
         *,
-        citizen:citizens!citizen_id(id, firstname, surname, email, contact_number)
+        citizen:citizens(id, firstname, surname, email, contact_number)
       `)
       .order('created_at', { ascending: false });
     
@@ -697,6 +710,94 @@ export async function exportSystemUsageReport(startDate = null, endDate = null) 
   }
 }
 
+export async function fetchStaffLoginLogs(startDate = null, endDate = null, searchTerm = '') {
+  try {
+    const { supabase } = await loadSupabaseModule();
+    
+    let query = supabase
+      .from('staff_login_logs')
+      .select('*')
+      .order('logged_at', { ascending: false });
+      
+    if (startDate) {
+      query = query.gte('logged_at', `${startDate}T00:00:00Z`);
+    }
+    if (endDate) {
+      query = query.lte('logged_at', `${endDate}T23:59:59Z`);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    
+    let logs = data || [];
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase().trim();
+      logs = logs.filter(log => 
+        String(log.username || '').toLowerCase().includes(term) ||
+        String(log.email || '').toLowerCase().includes(term) ||
+        String(log.role || '').toLowerCase().includes(term) ||
+        String(log.action || '').toLowerCase().includes(term)
+      );
+    }
+    
+    return logs;
+  } catch (error) {
+    console.error('[Reports] Fetch Staff Login Logs error:', error);
+    throw error;
+  }
+}
+
+export async function exportStaffLoginLogsReport(startDate = null, endDate = null) {
+  try {
+    const { supabase } = await loadSupabaseModule();
+    console.log('[Reports] Generating Staff Login Logs Report...');
+    
+    let query = supabase
+      .from('staff_login_logs')
+      .select('*')
+      .order('logged_at', { ascending: false });
+      
+    if (startDate) {
+      query = query.gte('logged_at', `${startDate}T00:00:00Z`);
+    }
+    if (endDate) {
+      query = query.lte('logged_at', `${endDate}T23:59:59Z`);
+    }
+    
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Failed to fetch staff login logs data: ${error.message}`);
+    }
+    
+    console.log(`[Reports] Found ${data.length} login/logout log records`);
+    
+    const csvData = data.map(log => ({
+      'Log ID': log.id,
+      'Staff ID': log.staff_id || '',
+      'Username': log.username || '',
+      'Email': log.email || '',
+      'Role': log.role || '',
+      'Action': log.action || '',
+      'Logged At (Manila Time)': log.logged_at ? new Date(log.logged_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : ''
+    }));
+    
+    const headers = [
+      'Log ID', 'Staff ID', 'Username', 'Email', 'Role', 'Action', 'Logged At (Manila Time)'
+    ];
+    
+    const csv = convertToCSV(csvData, headers);
+    const dateRange = getDateRangeString(startDate, endDate);
+    const filename = `Staff_Login_Logs_${dateRange}_${Date.now()}.csv`;
+    
+    downloadCSV(csv, filename);
+    console.log(`[Reports] Staff Login Logs Report exported: ${filename}`);
+    return { success: true, count: data.length, filename };
+  } catch (error) {
+    console.error('[Reports] Staff Login Logs Report error:', error);
+    throw error;
+  }
+}
+
 /**
  * Helper function to load Supabase module
  */
@@ -711,5 +812,7 @@ export default {
   exportConsultationReport,
   exportDoctorActivityReport,
   exportQueueReport,
-  exportSystemUsageReport
+  exportSystemUsageReport,
+  fetchStaffLoginLogs,
+  exportStaffLoginLogsReport
 };
