@@ -1043,15 +1043,18 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
   Widget _buildBottomNav() {
     final tabs = [
-      {'icon': Icons.dashboard_rounded,          'label': 'Home'},
-      {'icon': Icons.event_note_rounded,         'label': 'Medicine'},
-      {'icon': Icons.confirmation_number_rounded,'label': 'Queue'},
-      {'icon': Icons.person_outline_rounded,     'label': 'Profile'},
+      {'icon': Icons.home_rounded,                'label': 'Home'},
+      {'icon': Icons.event_note_rounded,          'label': 'Medicine'},
+      {'icon': Icons.confirmation_number_rounded, 'label': 'Queue'},
+      {'icon': Icons.person_outline_rounded,      'label': 'Profile'},
     ];
     return Container(
       decoration: const BoxDecoration(
         color: _C.surface,
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+        borderRadius: BorderRadius.only(
+          topLeft:  Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
         boxShadow: [BoxShadow(color: _C.shadow, blurRadius: 20, offset: Offset(0, -4))],
       ),
       child: SafeArea(
@@ -1066,13 +1069,12 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                 onTap: () {
                   setState(() => _selectedTab = i);
                   if (i == 0) {
-                    // Already on Home — nothing to do
+                    // Already on Home
                   } else if (i == 1) {
                     Navigator.push(context, MaterialPageRoute(
                       builder: (_) => uKonekMedicineSchedulerPage(
                         username:  widget.username,
                         citizenId: widget.citizenId,
-                        // ✅ removed fullname — MedicineSchedulerPage only takes username + citizenId
                       ),
                     )).then((_) => setState(() => _selectedTab = 0));
                   } else if (i == 2) {
@@ -1099,18 +1101,27 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     color: isSelected ? _C.primaryMid.withOpacity(0.10) : Colors.transparent,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Row(children: [
-                    Icon(tabs[i]['icon'] as IconData,
-                      color: isSelected ? _C.primaryMid : Colors.grey.shade400,
-                      size: 22,
-                    ),
-                    if (isSelected) ...[
-                      const SizedBox(width: 6),
-                      Text(tabs[i]['label'] as String,
-                        style: const TextStyle(color: _C.primaryMid, fontSize: 12, fontWeight: FontWeight.bold),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        tabs[i]['icon'] as IconData,
+                        color: isSelected ? _C.primaryMid : Colors.grey.shade400,
+                        size: 22,
                       ),
+                      if (isSelected) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          tabs[i]['label'] as String,
+                          style: const TextStyle(
+                            color:      _C.primaryMid,
+                            fontSize:   10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ],
-                  ]),
+                  ),
                 ),
               );
             }),

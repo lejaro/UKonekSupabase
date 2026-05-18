@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:ukonekmobile/uKonekDashboardPage.dart';
 import 'services/api_service.dart';
 import 'uKonekMedicineScheduler.dart';
+import 'uKonekProfilePage.dart';
 
 // ── Design Tokens ─────────────────────────────────────────────
 class _C {
@@ -830,15 +831,18 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
   // ── Bottom Navigation ────────────────────────────────────────
   Widget _buildBottomNav() {
     final tabs = [
-      {'icon': Icons.dashboard_rounded,           'label': 'Home'},
-      {'icon': Icons.event_note_rounded,           'label': 'Medicine'},
-      {'icon': Icons.confirmation_number_rounded,  'label': 'Queue'},
-      {'icon': Icons.person_outline_rounded,       'label': 'Profile'},
+      {'icon': Icons.home_rounded,                'label': 'Home'},
+      {'icon': Icons.event_note_rounded,          'label': 'Medicine'},
+      {'icon': Icons.confirmation_number_rounded, 'label': 'Queue'},
+      {'icon': Icons.person_outline_rounded,      'label': 'Profile'},
     ];
     return Container(
       decoration: BoxDecoration(
         color: _C.surface,
-        borderRadius: const BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+        borderRadius: const BorderRadius.only(
+          topLeft:  Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
         boxShadow: [BoxShadow(color: _C.textDark.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -4))],
       ),
       child: SafeArea(
@@ -851,18 +855,37 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
               final isSelected = _selectedTab == i;
               return GestureDetector(
                 onTap: () {
+                  setState(() => _selectedTab = i);
                   if (i == 0) {
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => uKonekDashboardPage(username: widget.username, citizenId: widget.citizenId),
-                    ));
+                    Navigator.push(context, _pageRoute(
+                      uKonekDashboardPage(
+                        username:  widget.username,
+                        citizenId: widget.citizenId,
+                      ),
+                    )).then((_) {
+                      if (mounted) setState(() => _selectedTab = 2);
+                    });
                   } else if (i == 1) {
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => uKonekMedicineSchedulerPage(username: widget.username, citizenId: widget.citizenId),
-                    ));
+                    Navigator.push(context, _pageRoute(
+                      uKonekMedicineSchedulerPage(
+                        username:  widget.username,
+                        citizenId: widget.citizenId,
+                      ),
+                    )).then((_) {
+                      if (mounted) setState(() => _selectedTab = 2);
+                    });
                   } else if (i == 2) {
-                    setState(() => _selectedTab = 2);
+                    _refreshDashboard(); // Already here — soft refresh
                   } else if (i == 3) {
-                    Navigator.pop(context);
+                    Navigator.push(context, _pageRoute(
+                      uKonekProfilePage(
+                        username:  widget.username,
+                        citizenId: widget.citizenId,
+                        fullName:  widget.username,
+                      ),
+                    )).then((_) {
+                      if (mounted) setState(() => _selectedTab = 2);
+                    });
                   }
                 },
                 child: AnimatedContainer(
@@ -872,13 +895,27 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
                     color: isSelected ? _C.primaryMid.withOpacity(0.10) : Colors.transparent,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Row(children: [
-                    Icon(tabs[i]['icon'] as IconData, color: isSelected ? _C.primaryMid : Colors.grey.shade400, size: 22),
-                    if (isSelected) ...[
-                      const SizedBox(width: 6),
-                      Text(tabs[i]['label'] as String, style: const TextStyle(color: _C.primaryMid, fontSize: 12, fontWeight: FontWeight.bold)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        tabs[i]['icon'] as IconData,
+                        color: isSelected ? _C.primaryMid : Colors.grey.shade400,
+                        size: 22,
+                      ),
+                      if (isSelected) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          tabs[i]['label'] as String,
+                          style: const TextStyle(
+                            color:      _C.primaryMid,
+                            fontSize:   10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ],
-                  ]),
+                  ),
                 ),
               );
             }),
@@ -887,6 +924,9 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
       ),
     );
   }
+
+  MaterialPageRoute _pageRoute(Widget page) =>   // ← THIS TOO
+  MaterialPageRoute(builder: (_) => page);
 
   Widget _sectionLabel(String text, IconData icon) {
     return Row(children: [

@@ -74,11 +74,11 @@ class _RootHandlerState extends State<RootHandler> {
 
     final authClient = Supabase.instance.client.auth;
     final session = authClient.currentSession;
-    
+
     // Explicit session token check for forced login on logged-out state
     final prefs = await SharedPreferences.getInstance();
     final sessionToken = prefs.getString('session_token');
-    
+
     debugPrint('RootHandler: Checking session... ${session != null ? "Supabase OK" : "No Supabase"} | Token: ${sessionToken != null ? "Present" : "Missing"}');
 
     if (session == null || sessionToken == null) {
