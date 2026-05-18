@@ -115,6 +115,108 @@ function swapContainer(container, buildFn) {
   container.replaceChildren(fragment);
 }
 
+/**
+ * Render standard table row skeletons during data load.
+ * Prevents layout shift and provides clean shimmer animations.
+ */
+function renderTableSkeleton(tbody, columnCount, rowCount = 5) {
+  if (!tbody) return;
+  let rowsHtml = '';
+  for (let i = 0; i < rowCount; i++) {
+    rowsHtml += '<tr class="skeleton-row">';
+    for (let j = 0; j < columnCount; j++) {
+      const width = j === 0 ? 'width: 65%;' : (j === columnCount - 1 ? 'width: 40%;' : 'width: 85%;');
+      rowsHtml += `
+        <td class="table-cell" style="padding: 12px 14px; vertical-align: middle;">
+          <div class="skeleton-shimmer skeleton-text" style="${width} height: 12px; margin: 4px 0; border-radius: 4px; display: block;"></div>
+        </td>
+      `;
+    }
+    rowsHtml += '</tr>';
+  }
+  tbody.innerHTML = rowsHtml;
+}
+
+/**
+ * Render shimmery statistics placeholder inside text nodes.
+ */
+function toggleStatsSkeleton(isLoading) {
+  const statIds = [
+    'stat-total-staff', 'stat-doctors', 'stat-active-staff',
+    'stat-announcements', 'stat-reports', 'stat-citizens'
+  ];
+  statIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (isLoading) {
+      if (!el.dataset.originalText) {
+        el.dataset.originalText = el.textContent || '—';
+      }
+      el.innerHTML = `<span class="skeleton-shimmer" style="width: 50px; height: 28px; border-radius: 6px; display: inline-block;"></span>`;
+    } else {
+      if (el.dataset.originalText && el.querySelector('.skeleton-shimmer')) {
+        el.textContent = el.dataset.originalText;
+        delete el.dataset.originalText;
+      }
+    }
+  });
+}
+
+/**
+ * Render card-style skeletons for queue lanes.
+ */
+function renderQueueSkeleton(container) {
+  if (!container) return;
+  let cardsHtml = '';
+  for (let i = 0; i < 2; i++) {
+    cardsHtml += `
+      <div class="skeleton-stat-card skeleton-pulse" style="margin-bottom: 12px; gap: 8px; border-radius: 8px; border: 1px solid #e2e8f0; padding: 12px;">
+        <div class="skeleton-stat-card-header" style="display:flex; align-items:center; gap:8px;">
+          <div class="skeleton-shimmer skeleton-circle" style="width: 18px; height: 18px; flex-shrink: 0; border-radius:50%;"></div>
+          <div class="skeleton-shimmer skeleton-text short" style="height: 12px; margin: 0; width: 40%; border-radius:4px;"></div>
+        </div>
+        <div class="skeleton-shimmer skeleton-text medium" style="height: 12px; margin: 4px 0 0 0; width: 70%; border-radius:4px; display:block;"></div>
+        <div class="skeleton-shimmer skeleton-text long" style="height: 10px; margin: 4px 0 0 0; width: 90%; border-radius:4px; display:block;"></div>
+      </div>
+    `;
+  }
+  container.innerHTML = cardsHtml;
+}
+
+/**
+ * Render chart shimmer loading states.
+ */
+function toggleChartSkeleton(chartCanvasId, isLoading) {
+  const canvas = document.getElementById(chartCanvasId);
+  if (!canvas) return;
+  
+  let wrapper = canvas.parentElement.querySelector('.skeleton-chart-wrapper');
+  
+  if (isLoading) {
+    if (!wrapper) {
+      wrapper = document.createElement('div');
+      wrapper.className = 'skeleton-chart-wrapper';
+      wrapper.style.cssText = 'width:100%; height:200px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; position:relative; overflow:hidden;';
+      wrapper.innerHTML = `
+        <div style="display:flex;align-items:flex-end;gap:12px;height:120px;width:80%;justify-content:center;">
+          <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 40%; width: 24px; height: 40px; border-radius: 4px 4px 0 0;"></div>
+          <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 70%; width: 24px; height: 75px; border-radius: 4px 4px 0 0;"></div>
+          <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 50%; width: 24px; height: 55px; border-radius: 4px 4px 0 0;"></div>
+          <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 90%; width: 24px; height: 95px; border-radius: 4px 4px 0 0;"></div>
+          <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 60%; width: 24px; height: 65px; border-radius: 4px 4px 0 0;"></div>
+        </div>
+      `;
+      canvas.style.display = 'none';
+      canvas.parentElement.appendChild(wrapper);
+    }
+  } else {
+    if (wrapper) {
+      wrapper.remove();
+    }
+    canvas.style.display = '';
+  }
+}
+
 function setLoading(btn, isLoading) {
   if (!btn) return;
   const label = btn.querySelector('.btn-label');
@@ -2102,6 +2204,10 @@ function populateScheduleDoctorSelect(selectedDoctorId = null) {
 }
 
 async function loadSchedules(user) {
+  const doctorTbody = document.getElementById('schedule-doctors-tbody');
+  const nurseTbody = document.getElementById('schedule-nurses-tbody');
+  if (doctorTbody) renderTableSkeleton(doctorTbody, 4, 3);
+  if (nurseTbody) renderTableSkeleton(nurseTbody, 4, 3);
   let schedules = [];
   let staffRoster = [];
   let doctors = [];
@@ -2742,7 +2848,18 @@ function chrEmptyState(msg) {
 }
 
 function chrLoadingState() {
-  return `<p style="color:#94a3b8;font-size:13px;padding:12px 0;">Loading…</p>`;
+  return `
+    <div style="padding: 16px 0; display: flex; flex-direction: column; gap: 12px;">
+      <div class="skeleton-shimmer skeleton-title" style="width: 45%; height: 16px; border-radius: 4px;"></div>
+      <div class="skeleton-shimmer skeleton-text long" style="height: 12px; border-radius: 4px; width: 100%;"></div>
+      <div class="skeleton-shimmer skeleton-text medium" style="height: 12px; border-radius: 4px; width: 85%;"></div>
+      <div class="skeleton-shimmer skeleton-text short" style="height: 12px; border-radius: 4px; width: 60%;"></div>
+      <div style="margin-top: 12px; display: flex; gap: 12px;">
+        <div class="skeleton-shimmer skeleton-rect" style="width: 100px; height: 32px; border-radius: 6px;"></div>
+        <div class="skeleton-shimmer skeleton-rect" style="width: 120px; height: 32px; border-radius: 6px;"></div>
+      </div>
+    </div>
+  `;
 }
 
 function buildStaffLookup(staffRows) {
@@ -3646,6 +3763,8 @@ let latestFeedbackList = [];
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function refreshFeedbackData() {
+  const feedbackTbody = document.getElementById('feedback-tbody');
+  if (feedbackTbody) renderTableSkeleton(feedbackTbody, 4, 3);
   if (isDemoMode) {
     // Demo mode: use mock data
     latestFeedbackList = [
@@ -3857,6 +3976,8 @@ function initReportsSection() {
 }
 
 async function refreshAnnouncementsData() {
+  const announcementsTbody = document.getElementById('announcements-tbody');
+  if (announcementsTbody) renderTableSkeleton(announcementsTbody, 4, 3);
   if (isDemoMode) {
     latestAnnouncementsList = [
       {
@@ -4422,6 +4543,10 @@ async function listCitizensFromSupabase() {
 // Load citizens (mobile app users)
 async function loadPatientData() {
   console.log('loadPatientData called, isApiMode:', isApiMode);
+  const patientsTbody = document.getElementById('citizens-tbody');
+  if (patientsTbody) {
+    renderTableSkeleton(patientsTbody, 5, 5);
+  }
   let list = [];
 
   if (isDemoMode) {
@@ -4980,6 +5105,10 @@ async function listStaffFromSupabase() {
 }
 
 async function loadStaffData() {
+  const accountsTbody = document.getElementById('accounts-tbody');
+  if (accountsTbody) {
+    renderTableSkeleton(accountsTbody, 4, 5);
+  }
   let staffList = [];
 
   if (isDemoMode) {
@@ -5012,7 +5141,6 @@ async function loadStaffData() {
 
   latestStaffList = Array.isArray(staffList) ? [...staffList] : [];
 
-  const accountsTbody = document.getElementById('accounts-tbody');
   if (accountsTbody) {
     accountsTbody.innerHTML = '';
     if (latestStaffList.length === 0) {
@@ -5053,90 +5181,97 @@ let diagnosisChart = null;
 let consultsChart = null;
 
 async function renderClinicalStats() {
-  const { supabase } = await loadSupabaseModule();
-  
-  // 1. Fetch Data
-  const { data: consults } = await supabase.from('consultations').select('diagnosis, consulted_at');
-  const { data: vitals } = await supabase.from('vital_signs').select('temperature, blood_pressure');
+  toggleChartSkeleton('diagnoses-chart', true);
+  toggleChartSkeleton('consults-chart', true);
+  try {
+    const { supabase } = await loadSupabaseModule();
+    
+    // 1. Fetch Data
+    const { data: consults } = await supabase.from('consultations').select('diagnosis, consulted_at');
+    const { data: vitals } = await supabase.from('vital_signs').select('temperature, blood_pressure');
 
-  if (!consults || !vitals) return;
+    if (!consults || !vitals) return;
 
-  // 2. Aggregate Top Diagnoses
-  const diagMap = {};
-  consults.forEach(c => {
-    const d = (c.diagnosis || 'Unknown').trim();
-    diagMap[d] = (diagMap[d] || 0) + 1;
-  });
-  const sortedDiags = Object.entries(diagMap).sort((a,b) => b[1] - a[1]).slice(0, 5);
+    // 2. Aggregate Top Diagnoses
+    const diagMap = {};
+    consults.forEach(c => {
+      const d = (c.diagnosis || 'Unknown').trim();
+      diagMap[d] = (diagMap[d] || 0) + 1;
+    });
+    const sortedDiags = Object.entries(diagMap).sort((a,b) => b[1] - a[1]).slice(0, 5);
 
-  // 3. Aggregate Daily Consults (Last 7 days)
-  const dailyMap = {};
-  const last7Days = [...Array(7)].map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    return d.toISOString().split('T')[0];
-  }).reverse();
+    // 3. Aggregate Daily Consults (Last 7 days)
+    const dailyMap = {};
+    const last7Days = [...Array(7)].map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      return d.toISOString().split('T')[0];
+    }).reverse();
 
-  last7Days.forEach(day => dailyMap[day] = 0);
-  consults.forEach(c => {
-    const day = c.consulted_at.split('T')[0];
-    if (dailyMap.hasOwnProperty(day)) dailyMap[day]++;
-  });
+    last7Days.forEach(day => dailyMap[day] = 0);
+    consults.forEach(c => {
+      const day = c.consulted_at.split('T')[0];
+      if (dailyMap.hasOwnProperty(day)) dailyMap[day]++;
+    });
 
-  // 4. Vitals Metrics
-  const temps = vitals.map(v => v.temperature).filter(t => t > 0);
-  const avgTemp = temps.length ? (temps.reduce((a,b) => a+b, 0) / temps.length).toFixed(1) : '—';
-  
-  let hypertensionCount = 0;
-  vitals.forEach(v => {
-    if (v.blood_pressure) {
-      const parts = v.blood_pressure.split('/');
-      if (parts.length === 2) {
-        const sys = parseInt(parts[0]);
-        const dia = parseInt(parts[1]);
-        if (sys >= 140 || dia >= 90) hypertensionCount++;
+    // 4. Vitals Metrics
+    const temps = vitals.map(v => v.temperature).filter(t => t > 0);
+    const avgTemp = temps.length ? (temps.reduce((a,b) => a+b, 0) / temps.length).toFixed(1) : '—';
+    
+    let hypertensionCount = 0;
+    vitals.forEach(v => {
+      if (v.blood_pressure) {
+        const parts = v.blood_pressure.split('/');
+        if (parts.length === 2) {
+          const sys = parseInt(parts[0]);
+          const dia = parseInt(parts[1]);
+          if (sys >= 140 || dia >= 90) hypertensionCount++;
+        }
       }
+    });
+
+    document.getElementById('avg-temp').textContent = temps.length ? `${avgTemp}°C` : '—';
+    document.getElementById('hypertension-count').textContent = hypertensionCount;
+
+    // 5. Render Charts
+    const ctxDiag = document.getElementById('diagnoses-chart');
+    if (ctxDiag) {
+      if (diagnosisChart) diagnosisChart.destroy();
+      diagnosisChart = new Chart(ctxDiag, {
+        type: 'doughnut',
+        data: {
+          labels: sortedDiags.map(d => d[0]),
+          datasets: [{
+            data: sortedDiags.map(d => d[1]),
+            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+          }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
     }
-  });
 
-  document.getElementById('avg-temp').textContent = temps.length ? `${avgTemp}°C` : '—';
-  document.getElementById('hypertension-count').textContent = hypertensionCount;
-
-  // 5. Render Charts
-  const ctxDiag = document.getElementById('diagnoses-chart');
-  if (ctxDiag) {
-    if (diagnosisChart) diagnosisChart.destroy();
-    diagnosisChart = new Chart(ctxDiag, {
-      type: 'doughnut',
-      data: {
-        labels: sortedDiags.map(d => d[0]),
-        datasets: [{
-          data: sortedDiags.map(d => d[1]),
-          backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
-        }]
-      },
-      options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
-  }
-
-  const ctxCons = document.getElementById('consults-chart');
-  if (ctxCons) {
-    if (consultsChart) consultsChart.destroy();
-    consultsChart = new Chart(ctxCons, {
-      type: 'line',
-      data: {
-        labels: last7Days.map(d => d.split('-').slice(1).join('/')),
-        datasets: [{
-          label: 'Consultations',
-          data: last7Days.map(d => dailyMap[d]),
-          borderColor: '#3b82f6',
-          tension: 0.3,
-          fill: true,
-          backgroundColor: 'rgba(59, 130, 246, 0.1)'
-        }]
-      },
-      options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
-    });
+    const ctxCons = document.getElementById('consults-chart');
+    if (ctxCons) {
+      if (consultsChart) consultsChart.destroy();
+      consultsChart = new Chart(ctxCons, {
+        type: 'line',
+        data: {
+          labels: last7Days.map(d => d.split('-').slice(1).join('/')),
+          datasets: [{
+            label: 'Consultations',
+            data: last7Days.map(d => dailyMap[d]),
+            borderColor: '#3b82f6',
+            tension: 0.3,
+            fill: true,
+            backgroundColor: 'rgba(59, 130, 246, 0.1)'
+          }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+      });
+    }
+  } finally {
+    toggleChartSkeleton('diagnoses-chart', false);
+    toggleChartSkeleton('consults-chart', false);
   }
 }
 
@@ -6189,6 +6324,10 @@ async function listNowServingQueueForConsultation() {
 }
 
 async function refreshConsultationData() {
+  const servingTbody = document.getElementById('serving-queue-tbody');
+  const consultsTbody = document.getElementById('consultations-tbody');
+  if (servingTbody) renderTableSkeleton(servingTbody, 5, 2);
+  if (consultsTbody) renderTableSkeleton(consultsTbody, 5, 4);
   try {
     const [consultationRows, queueRows] = await Promise.all([
       listConsultationData().catch(() => []),
@@ -6524,6 +6663,59 @@ async function createPrescriptionEntry({ patientId, consultationDbId, items }) {
     throw new Error('Add at least one medicine.');
   }
 
+  // --- Start Drug Allergy Check Safeguard ---
+  const patientAllergies = [];
+
+  // Check the active document input for any newly typed/edited allergies
+  const currentAllergiesInput = document.getElementById('consult-allergies');
+  if (currentAllergiesInput && currentAllergiesInput.value.trim()) {
+    const parts = currentAllergiesInput.value.split(/[,;\n]+/).map(p => p.trim().toLowerCase()).filter(p => p);
+    patientAllergies.push(...parts);
+  }
+
+  // Fetch historic allergies from past consultations in the database
+  if (!isDemoMode && !isApiMode) {
+    try {
+      const { supabase } = await loadSupabaseModule();
+      const citizenId = resolveCitizenIdFromIdentifier(cleanPatientId);
+      if (citizenId) {
+        const { data: consults } = await supabase
+          .from('consultations')
+          .select('allergies')
+          .eq('patient_citizen_id', citizenId)
+          .not('allergies', 'is', null);
+
+        if (consults && consults.length > 0) {
+          consults.forEach(c => {
+            if (c.allergies) {
+              const parts = c.allergies.split(/[,;\n]+/).map(p => p.trim().toLowerCase()).filter(p => p);
+              patientAllergies.push(...parts);
+            }
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching patient allergies during prescription creation:', err);
+    }
+  }
+
+  // Remove duplicate entries
+  const uniqueAllergies = [...new Set(patientAllergies)];
+
+  // Cross-reference selected medicines against allergies
+  if (uniqueAllergies.length > 0) {
+    for (const item of normalizedItems) {
+      const medName = String(item.name || '').toLowerCase().trim();
+      for (const allergy of uniqueAllergies) {
+        const allergyTerm = allergy.trim();
+        if (allergyTerm && (medName.includes(allergyTerm) || allergyTerm.includes(medName))) {
+          throw new Error(`CRITICAL ALLERGY ALERT: The patient has a documented allergy to "${allergyTerm.toUpperCase()}"! You cannot prescribe "${item.name}".`);
+        }
+      }
+    }
+  }
+  // --- End Drug Allergy Check Safeguard ---
+
   if (isDemoMode || isApiMode) {
     const pres = {
       id: `P-${Date.now()}`,
@@ -6842,6 +7034,8 @@ function renderArchivedMedicines() {
 }
 
 async function refreshArchivedMedicineData() {
+  const archTbody = document.getElementById('medicine-archived-tbody');
+  if (archTbody) renderTableSkeleton(archTbody, 5, 3);
   try {
     archivedMedicines = await listArchivedMedicineData();
   } catch (error) {
@@ -6852,6 +7046,8 @@ async function refreshArchivedMedicineData() {
 }
 
 async function refreshMedicineData() {
+  const medTbody = document.getElementById('medicine-tbody');
+  if (medTbody) renderTableSkeleton(medTbody, 7, 5);
   try {
     medicines = await listMedicineData();
   } catch (error) {
@@ -7408,7 +7604,9 @@ if (citizensReportBtn) citizensReportBtn.addEventListener('click', generateCitiz
 
 // --- Prescription modal ---
 
-function openPrescriptionModalForPatient(patientId = '', consultationDbId = null, patientName = '', queueTicketId = null) {
+let activePatientAllergies = [];
+
+async function openPrescriptionModalForPatient(patientId = '', consultationDbId = null, patientName = '', queueTicketId = null) {
   if (!prescriptionModal) return;
   prescriptionModal.classList.remove('hidden');
   if (prescriptionPatient) prescriptionPatient.value = patientId || '';
@@ -7421,6 +7619,54 @@ function openPrescriptionModalForPatient(patientId = '', consultationDbId = null
     prescriptionForm.dataset.patientName = patientName || '';
     prescriptionForm.dataset.queueTicketId = queueTicketId ? String(queueTicketId) : '';
   }
+
+  // Load and cache allergies for dynamic client-side alerts
+  activePatientAllergies = [];
+  const currentAllergiesInput = document.getElementById('consult-allergies');
+  if (currentAllergiesInput && currentAllergiesInput.value.trim()) {
+    const parts = currentAllergiesInput.value.split(/[,;\n]+/).map(p => p.trim().toLowerCase()).filter(p => p);
+    activePatientAllergies.push(...parts);
+  }
+
+  const cleanPatientId = String(patientId || '').trim();
+  if (cleanPatientId && !isDemoMode && !isApiMode) {
+    try {
+      const { supabase } = await loadSupabaseModule();
+      const citizenId = resolveCitizenIdFromIdentifier(cleanPatientId);
+      if (citizenId) {
+        const { data: consults } = await supabase
+          .from('consultations')
+          .select('allergies')
+          .eq('patient_citizen_id', citizenId)
+          .not('allergies', 'is', null);
+
+        if (consults && consults.length > 0) {
+          consults.forEach(c => {
+            if (c.allergies) {
+              const parts = c.allergies.split(/[,;\n]+/).map(p => p.trim().toLowerCase()).filter(p => p);
+              activePatientAllergies.push(...parts);
+            }
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching patient allergies:', err);
+    }
+  }
+  activePatientAllergies = [...new Set(activePatientAllergies)];
+
+  // Display allergy banner in prescription modal if allergies exist
+  const prescAllergyBanner = document.getElementById('prescription-allergy-banner');
+  const prescAllergyText = document.getElementById('prescription-allergy-text');
+  if (prescAllergyBanner && prescAllergyText) {
+    if (activePatientAllergies.length > 0) {
+      prescAllergyBanner.style.display = 'block';
+      prescAllergyText.textContent = `Patient is allergic to: ${activePatientAllergies.map(a => a.toUpperCase()).join(', ')}`;
+    } else {
+      prescAllergyBanner.style.display = 'none';
+    }
+  }
+
   if (prescriptionLines) {
     prescriptionLines.innerHTML = '';
     addPrescriptionLine();
@@ -7496,6 +7742,49 @@ function addPrescriptionLine() {
   const qtyInput = line.querySelector('.pres-qty');
   const freqInput = line.querySelector('.pres-freq');
   const durInput = line.querySelector('.pres-duration');
+  const medInput = line.querySelector('.pres-med');
+
+  // Inline real-time allergy error message container
+  const errorContainer = document.createElement('div');
+  errorContainer.style.fontSize = '11px';
+  errorContainer.style.fontWeight = '600';
+  errorContainer.style.color = '#ef4444';
+  errorContainer.style.marginTop = '4px';
+  errorContainer.style.display = 'none';
+  medInput.parentNode.appendChild(errorContainer);
+
+  const checkAllergy = () => {
+    const medName = medInput.value.toLowerCase().trim();
+    if (!medName || activePatientAllergies.length === 0) {
+      medInput.style.borderColor = '#cbd5e1';
+      medInput.style.background = '#ffffff';
+      errorContainer.style.display = 'none';
+      return;
+    }
+
+    let foundAllergy = null;
+    for (const allergy of activePatientAllergies) {
+      const allergyTerm = allergy.trim();
+      if (allergyTerm && (medName.includes(allergyTerm) || allergyTerm.includes(medName))) {
+        foundAllergy = allergyTerm;
+        break;
+      }
+    }
+
+    if (foundAllergy) {
+      medInput.style.borderColor = '#ef4444';
+      medInput.style.background = '#fef2f2';
+      errorContainer.textContent = `⚠️ ALLERGY DETECTED: Patient is allergic to "${foundAllergy.toUpperCase()}"!`;
+      errorContainer.style.display = 'block';
+    } else {
+      medInput.style.borderColor = '#cbd5e1';
+      medInput.style.background = '#ffffff';
+      errorContainer.style.display = 'none';
+    }
+  };
+
+  medInput.addEventListener('input', checkAllergy);
+  medInput.addEventListener('change', checkAllergy);
 
   const updateQty = () => {
     const freq = freqInput.value;
@@ -8377,6 +8666,12 @@ const appointments = (() => {
     if (state.loading) return;
     // Don't refresh if user is currently dragging a ticket to avoid breaking the interaction
     if (document.querySelector('.queue-ticket-card.dragging')) return;
+
+    // Render shimmery queue cards skeletons while loading
+    renderQueueSkeleton(document.getElementById('queue-waiting-list'));
+    renderQueueSkeleton(document.getElementById('queue-oncall-list'));
+    renderQueueSkeleton(document.getElementById('queue-serving-list'));
+
     state.loading = true;
     try {
       const { supabase } = await loadSupabaseModule();

@@ -688,3 +688,20 @@ function renderLabOrdersTab(rows, error, staffLookup) {
 if (typeof window !== 'undefined') {
   console.log('[Health Records] Enhanced module loaded - openCitizenHealthModal is ready');
 }
+
+if (typeof window.chrLoadingState !== 'function') {
+  window.chrLoadingState = function() {
+    return `
+      <div style="padding: 16px 0; display: flex; flex-direction: column; gap: 12px;">
+        <div class="skeleton-shimmer skeleton-title" style="width: 45%; height: 16px; border-radius: 4px;"></div>
+        <div class="skeleton-shimmer skeleton-text long" style="height: 12px; border-radius: 4px; width: 100%;"></div>
+        <div class="skeleton-shimmer skeleton-text medium" style="height: 12px; border-radius: 4px; width: 85%;"></div>
+        <div class="skeleton-shimmer skeleton-text short" style="height: 12px; border-radius: 4px; width: 60%;"></div>
+        <div style="margin-top: 12px; display: flex; gap: 12px;">
+          <div class="skeleton-shimmer skeleton-rect" style="width: 100px; height: 32px; border-radius: 6px;"></div>
+          <div class="skeleton-shimmer skeleton-rect" style="width: 120px; height: 32px; border-radius: 6px;"></div>
+        </div>
+      </div>
+    `;
+  };
+}

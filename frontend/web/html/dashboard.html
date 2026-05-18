@@ -1281,6 +1281,25 @@
                 </button>
               </div>
 
+              <!-- Staff Session Logs Report -->
+              <div class="export-card" style="border:1px solid #e2e8f0;border-radius:10px;padding:20px;background:#ffffff;">
+                <div style="display:flex;align-items:start;gap:12px;margin-bottom:12px;">
+                  <div style="width:40px;height:40px;border-radius:8px;background:#f3e8ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg style="width:20px;height:20px;color:#7c3aed;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                  </div>
+                  <div style="flex:1;">
+                    <h5 style="margin:0 0 4px 0;font-size:15px;font-weight:600;color:#1e293b;">Staff Session Logs</h5>
+                    <p style="margin:0;font-size:12px;color:#64748b;line-height:1.5;">Audit trail of all login and logout events</p>
+                  </div>
+                </div>
+                <button id="export-staff-logs-report-btn" class="btn" style="width:100%;margin:0;font-size:13px;">
+                  <span class="btn-spinner"></span>
+                  <span class="btn-label">Export Session Logs</span>
+                </button>
+              </div>
+
             </div>
 
             <!-- Export Status -->
@@ -1288,6 +1307,40 @@
               <p style="margin:0;font-size:13px;color:#166534;font-weight:500;">
                 <span id="export-status-message"></span>
               </p>
+            </div>
+
+            <!-- Staff Session Logs Visual Log Viewer -->
+            <div style="margin-top:40px;border-top:1px solid #e2e8f0;padding-top:32px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+                <div>
+                  <h4 style="margin:0 0 4px 0;font-size:16px;color:#1e293b;">Staff Authentication Logs</h4>
+                  <p style="margin:0;font-size:13px;color:#64748b;">Review real-time login and logout activity across all staff members.</p>
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <input type="text" id="staff-logs-search" placeholder="Search by name, email, or role..." style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;width:240px;height:38px;box-sizing:border-box;" />
+                  <button id="staff-logs-refresh-btn" class="chip-btn" style="height:38px;box-sizing:border-box;">Refresh Logs</button>
+                </div>
+              </div>
+              
+              <div class="table-wrap" style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
+                <table class="accounts-table" style="width: 100%; border-collapse: collapse;">
+                  <thead>
+                    <tr class="table-header-row">
+                      <th class="table-header-cell" style="text-align:left;padding:12px;background:#f8fafc;font-weight:600;font-size:12px;color:#475569;border-bottom:2px solid #e2e8f0;">Staff ID</th>
+                      <th class="table-header-cell" style="text-align:left;padding:12px;background:#f8fafc;font-weight:600;font-size:12px;color:#475569;border-bottom:2px solid #e2e8f0;">Username</th>
+                      <th class="table-header-cell" style="text-align:left;padding:12px;background:#f8fafc;font-weight:600;font-size:12px;color:#475569;border-bottom:2px solid #e2e8f0;">Email</th>
+                      <th class="table-header-cell" style="text-align:left;padding:12px;background:#f8fafc;font-weight:600;font-size:12px;color:#475569;border-bottom:2px solid #e2e8f0;">Role</th>
+                      <th class="table-header-cell" style="text-align:center;padding:12px;background:#f8fafc;font-weight:600;font-size:12px;color:#475569;border-bottom:2px solid #e2e8f0;">Action</th>
+                      <th class="table-header-cell" style="text-align:right;padding:12px;background:#f8fafc;font-weight:600;font-size:12px;color:#475569;border-bottom:2px solid #e2e8f0;">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody id="staff-logs-tbody">
+                    <tr>
+                      <td colspan="6" style="text-align:center;padding:24px;color:#64748b;font-size:13px;">No authentication log data available. Click Refresh Logs or adjust search.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
 
           </div>
@@ -2251,6 +2304,14 @@
               <span style="font-size:12px; color:#64748b; display:block; margin-bottom:2px;">Prescribing for</span>
               <strong id="prescription-patient-display" style="font-size:15px; color:#166534;">—</strong>
             </div>
+            <!-- Prescription Allergy Banner -->
+            <div id="prescription-allergy-banner" class="field" style="display:none; margin-bottom:16px; padding:12px 16px; background:#fff1f2; border-radius:8px; border:1px solid #fecdd3;">
+              <span style="font-size:12px; font-weight:700; color:#9f1239; display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                CRITICAL ALLERGY ALERT
+              </span>
+              <strong id="prescription-allergy-text" style="font-size:13px; color:#9f1239;">—</strong>
+            </div>
             <form id="prescription-form">
             <input type="hidden" id="prescription-patient" />
             <div id="prescription-lines"></div>
@@ -2549,6 +2610,80 @@
       } finally {
         setButtonLoading(btn, false);
       }
+    });
+
+    // Staff Session Logs Report Export
+    document.getElementById('export-staff-logs-report-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('export-staff-logs-report-btn');
+      setButtonLoading(btn, true);
+      try {
+        const { startDate, endDate } = getDateRange();
+        const result = await Reports.exportStaffLoginLogsReport(startDate, endDate);
+        showExportStatus(`✓ Staff Session Logs exported successfully! (${result.count} logs)`);
+      } catch (error) {
+        console.error('Export error:', error);
+        showExportStatus(`✗ Failed to export: ${error.message}`, true);
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+
+    // Visual Log Viewer Logic
+    async function loadStaffLogsVisual() {
+      const tbody = document.getElementById('staff-logs-tbody');
+      if (!tbody) return;
+
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#475569;font-size:13px;">Loading authentication logs...</td></tr>`;
+
+      try {
+        const { startDate, endDate } = getDateRange();
+        const searchTerm = document.getElementById('staff-logs-search')?.value || '';
+        const logs = await Reports.fetchStaffLoginLogs(startDate, endDate, searchTerm);
+
+        if (logs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#64748b;font-size:13px;">No authentication log data matched the criteria.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = logs.map(log => {
+          const formattedDate = log.logged_at ? new Date(log.logged_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : '—';
+          const actionStyle = log.action === 'login' 
+            ? 'background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:700;display:inline-block;'
+            : 'background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:700;display:inline-block;';
+          
+          return `
+            <tr style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:12px;font-size:13px;color:#0f172a;text-align:left;">${log.staff_id || '—'}</td>
+              <td style="padding:12px;font-size:13px;color:#334155;font-weight:600;text-align:left;">${log.username || '—'}</td>
+              <td style="padding:12px;font-size:13px;color:#475569;text-align:left;">${log.email || '—'}</td>
+              <td style="padding:12px;font-size:13px;color:#475569;text-align:left;text-transform:capitalize;">${log.role || '—'}</td>
+              <td style="padding:12px;font-size:13px;text-align:center;"><span style="${actionStyle}">${log.action}</span></td>
+              <td style="padding:12px;font-size:13px;color:#64748b;text-align:right;">${formattedDate}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (error) {
+        console.error('Visual log load error:', error);
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#b91c1c;font-size:13px;font-weight:600;">Error: ${error.message || 'Failed to load logs.'}</td></tr>`;
+      }
+    }
+
+    // Bind log viewer events
+    document.getElementById('staff-logs-refresh-btn')?.addEventListener('click', loadStaffLogsVisual);
+    document.getElementById('staff-logs-search')?.addEventListener('input', debounceLogViewer(loadStaffLogsVisual, 350));
+
+    // Debouncer helper
+    function debounceLogViewer(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    // Auto-load logs on click of exports tab
+    document.getElementById('tab-exports')?.addEventListener('click', () => {
+      setTimeout(loadStaffLogsVisual, 100);
     });
 
     console.log('[Reports] CSV Export module loaded and wired');

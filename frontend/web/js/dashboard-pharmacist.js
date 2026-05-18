@@ -18,6 +18,136 @@ let searchQuery     = '';
 let cachedUser      = null;
 let supabaseClient  = null;
 
+// ── Presence Heartbeat State & Helpers ────────────────────────────────────────
+const STAFF_PRESENCE_HEARTBEAT_MS = 60 * 1000;
+let presenceHeartbeatTimer = null;
+
+async function pushPresenceHeartbeat() {
+  if (isDemoMode) return;
+
+  try {
+    const authService = await loadAuthServiceModule();
+    await authService.setStaffPresence(true);
+  } catch (error) {
+    console.warn('Presence heartbeat warning:', error);
+  }
+}
+
+function startPresenceHeartbeat() {
+  if (isDemoMode || presenceHeartbeatTimer) return;
+
+  pushPresenceHeartbeat();
+  presenceHeartbeatTimer = setInterval(pushPresenceHeartbeat, STAFF_PRESENCE_HEARTBEAT_MS);
+}
+
+function stopPresenceHeartbeat() {
+  if (!presenceHeartbeatTimer) return;
+  clearInterval(presenceHeartbeatTimer);
+  presenceHeartbeatTimer = null;
+}
+
+async function markStaffOfflineBestEffort() {
+  if (isDemoMode) return;
+
+  try {
+    const authService = await loadAuthServiceModule();
+    await authService.setStaffPresence(false);
+  } catch (_) {
+    // best effort on page close/navigation
+  }
+}
+
+function sendOfflinePresenceOnUnload() {
+  if (isDemoMode) return;
+
+  try {
+    const config = window.UKONEK_CONFIG || {};
+    const supabaseUrl = String(config.SUPABASE_URL || '').trim();
+    const supabaseAnonKey = String(config.SUPABASE_ANON_KEY || '').trim();
+    if (!supabaseUrl || !supabaseAnonKey) return;
+
+    const keys = Object.keys(window.sessionStorage || {});
+    const authKey = keys.find((key) => key.startsWith('sb-') && key.includes('-auth-tab-'));
+    if (!authKey) return;
+
+    const raw = sessionStorage.getItem(authKey);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    const accessToken = String(parsed?.access_token || '').trim();
+    if (!accessToken) return;
+
+    const url = `${supabaseUrl}/rest/v1/rpc/set_staff_presence`;
+    const body = JSON.stringify({ p_is_online: false });
+
+    // Prefer keepalive fetch; unload-safe on modern browsers.
+    fetch(url, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body
+    }).catch(() => {
+      // Ignore unload path failures.
+    });
+  } catch (_) {
+    // Ignore unload path failures.
+  }
+}
+
+function handleAutoLogoutOnClose() {
+  stopPresenceHeartbeat();
+  sendOfflinePresenceOnUnload();
+  markStaffOfflineBestEffort();
+}
+
+/**
+ * Render standard table row skeletons during data load.
+ * Prevents layout shift and provides clean shimmer animations.
+ */
+function renderTableSkeleton(tbody, columnCount, rowCount = 5) {
+  if (!tbody) return;
+  let rowsHtml = '';
+  for (let i = 0; i < rowCount; i++) {
+    rowsHtml += '<tr class="skeleton-row">';
+    for (let j = 0; j < columnCount; j++) {
+      const width = j === 0 ? 'width: 65%;' : (j === columnCount - 1 ? 'width: 40%;' : 'width: 85%;');
+      rowsHtml += `
+        <td class="table-cell" style="padding: 12px 14px; vertical-align: middle;">
+          <div class="skeleton-shimmer skeleton-text" style="${width} height: 12px; margin: 4px 0; border-radius: 4px; display: block;"></div>
+        </td>
+      `;
+    }
+    rowsHtml += '</tr>';
+  }
+  tbody.innerHTML = rowsHtml;
+}
+
+/**
+ * Render shimmery statistics placeholder inside text nodes.
+ */
+function togglePharmacistStatsSkeleton(isLoading) {
+  const statIds = ['stat-total', 'stat-in-stock', 'stat-low', 'stat-expiry'];
+  statIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (isLoading) {
+      if (!el.dataset.originalText) {
+        el.dataset.originalText = el.textContent || '0';
+      }
+      el.innerHTML = `<span class="skeleton-shimmer" style="width: 50px; height: 28px; border-radius: 6px; display: inline-block;"></span>`;
+    } else {
+      if (el.dataset.originalText && el.querySelector('.skeleton-shimmer')) {
+        el.textContent = el.dataset.originalText;
+        delete el.dataset.originalText;
+      }
+    }
+  });
+}
+
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const tbody        = document.getElementById('ph-medicines-tbody');
 const searchInput  = document.getElementById('ph-search');
@@ -177,9 +307,14 @@ function formatDate(val) {
 
 // ── Load medicines ─────────────────────────────────────────────────────────────
 async function loadMedicines() {
+  const medicinesTbody = document.getElementById('ph-medicines-tbody');
+  if (medicinesTbody) renderTableSkeleton(medicinesTbody, 8, 6);
+  togglePharmacistStatsSkeleton(true);
+
   if (isDemoMode) {
     const raw = localStorage.getItem('ukonek_medicines');
     try { medicines = raw ? JSON.parse(raw) : []; } catch { medicines = []; }
+    togglePharmacistStatsSkeleton(false);
     return;
   }
   try {
@@ -204,6 +339,8 @@ async function loadMedicines() {
     console.error('Failed to load medicines:', err);
     showToast('Failed to load medicines. ' + (err.message || ''), 'error');
     medicines = [];
+  } finally {
+    togglePharmacistStatsSkeleton(false);
   }
 }
 
@@ -1033,6 +1170,14 @@ async function reloadSchemaCache() {
   } catch (_) {}
 }
 
+window.addEventListener('pagehide', () => {
+  handleAutoLogoutOnClose();
+});
+
+window.addEventListener('beforeunload', () => {
+  handleAutoLogoutOnClose();
+});
+
 async function init() {
   const allowed = await guardAccess();
   if (!allowed) return;
@@ -1044,6 +1189,9 @@ async function init() {
   } catch (_) {
     return;
   }
+
+  // Start presence tracking so the pharmacist is seen as Active in Recent Staff lists
+  startPresenceHeartbeat();
 
   await reloadSchemaCache();
   await loadMedicines();
