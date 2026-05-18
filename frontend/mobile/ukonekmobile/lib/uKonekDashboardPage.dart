@@ -86,6 +86,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   bool _hasUnseenNotifications = false;
   String? _lastQueueStatus;
   Timer? _refreshTimer;
+  Map<String, dynamic> _tvQueueDisplay = {};
 
   // ── Navigate to profile with ALL registration fields ──────────
   void _navigateToProfile() {
@@ -155,6 +156,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         ApiService.fetchPrescriptions(limit: 10),
         ApiService.fetchAnnouncements(),
         SharedPreferences.getInstance(),
+        ApiService.getTvQueueDisplay(),
       ]);
       
       if (mounted) {
@@ -182,9 +184,20 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
 
         final newStatus = newQueueSnapshot.status.toLowerCase();
+        final ticketId = newQueueSnapshot.queueId;
 
-        // Trigger notification if status changed to on_call
-        if (newStatus == 'on_call' && _lastQueueStatus != 'on_call' && newQueueSnapshot.hasActiveQueue) {
+        // Retrieve last notified ID and status to prevent duplicate notifications
+        final lastNotifiedId = prefs.getInt('last_notified_ticket_id');
+        final lastNotifiedStatus = prefs.getString('last_notified_status');
+
+        // Trigger notification if status changed to on_call and we haven't notified for this ticket/status yet
+        if (newStatus == 'on_call' && 
+            (lastNotifiedId != ticketId || lastNotifiedStatus != 'on_call') && 
+            newQueueSnapshot.hasActiveQueue) {
+          
+          await prefs.setInt('last_notified_ticket_id', ticketId ?? 0);
+          await prefs.setString('last_notified_status', 'on_call');
+
           NotificationService.showImmediateNotification(
             id: 888, // Unique ID for queue alerts
             title: 'Your number is being called!',
@@ -200,6 +213,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
           _prescribedMedicines = results[2] as List<PrescriptionRecord>;
           _announcements = announcements;
           _hasUnseenNotifications = unseen;
+          _tvQueueDisplay = (results[5] as Map<String, dynamic>?) ?? {};
           _isInitialLoading = false;
         });
       }
@@ -736,11 +750,32 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   const Icon(Icons.timer_outlined, size: 16, color: _C.primaryMid),
                   const SizedBox(width: 8),
                   Text(
-                    hasQueue ? 'Est. Wait: ${_formatWaitTime(queue.estimatedWaitMinutes)}' : 'Join queue to view waiting time',
+                    hasQueue 
+                      ? (queue.status.toLowerCase() == 'serving'
+                          ? 'You are currently being served'
+                          : (queue.status.toLowerCase() == 'on_call'
+                              ? 'Please proceed to vital assessment'
+                              : 'Est. Wait: ${_formatWaitTime(queue.estimatedWaitMinutes)}   •   Patients Ahead: ${queue.waitingCount > 0 ? queue.waitingCount : "0 (You\'re next!)"}'))
+                      : 'Join queue to view waiting time',
                     style: const TextStyle(color: _C.primaryMid, fontWeight: FontWeight.bold, fontSize: 12),
                   ),
                 ]),
               ),
+              const SizedBox(height: 18),
+              const Divider(color: _C.divider, height: 1),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Container(
+                    width: 4, height: 14,
+                    decoration: BoxDecoration(color: const Color(0xFF1976D2), borderRadius: BorderRadius.circular(2)),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('CURRENTLY SERVING TICKETS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _C.textMuted, letterSpacing: 0.5)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _buildCurrentlyServingTicketsList(),
               if (hasQueue && queue.status.toLowerCase() == 'on_call') ...[
                 const SizedBox(height: 16),
                 Container(
@@ -766,6 +801,66 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                 ),
               ],
             ]),
+    );
+  }
+
+  Widget _buildCurrentlyServingTicketsList() {
+    final List<dynamic> servingList = _tvQueueDisplay['serving'] ?? [];
+    if (servingList.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle_outline_rounded, size: 14, color: _C.textMuted),
+            SizedBox(width: 6),
+            Text(
+              'No active clinic consultations at the moment.',
+              style: TextStyle(color: _C.textMuted, fontSize: 11, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 38,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: servingList.length,
+        itemBuilder: (context, index) {
+          final t = servingList[index] as Map<String, dynamic>;
+          final num = t['queue_number'] ?? 0;
+          final numStr = '#${num.toString().padLeft(3, '0')}';
+          return Container(
+            margin: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1976D2),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1976D2).withOpacity(0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                )
+              ],
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              numStr,
+              style: const TextStyle(
+                color: Colors.white, 
+                fontSize: 14, 
+                fontWeight: FontWeight.w900, 
+                fontFamily: 'monospace',
+                letterSpacing: 1.0,
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -871,12 +966,39 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        decoration: BoxDecoration(color: _C.surface, borderRadius: BorderRadius.circular(18), boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 10, offset: Offset(0, 4))]),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Container(width: 34, height: 34, decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: color, size: 18)),
-          const SizedBox(width: 10),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _C.textDark)),
-        ]),
+        decoration: BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 10, offset: Offset(0, 4))],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: _C.textDark,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

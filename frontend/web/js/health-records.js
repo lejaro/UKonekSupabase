@@ -1,6 +1,49 @@
 // Enhanced Health Records Module
 // Dynamically fetches and displays patient data from Consultations, Vitals, and Prescriptions
 
+function formatPhysicalExam(physicalExam) {
+  if (!physicalExam) return '—';
+  
+  let examObj = physicalExam;
+  if (typeof physicalExam === 'string') {
+    const trimmed = physicalExam.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        examObj = JSON.parse(trimmed);
+      } catch (e) {
+        return physicalExam;
+      }
+    } else {
+      return physicalExam;
+    }
+  }
+  
+  if (typeof examObj === 'object' && examObj !== null) {
+    const keyLabels = {
+      heent: 'HEENT',
+      chest: 'Chest & Lungs',
+      heart: 'Heart',
+      abdomen: 'Abdomen',
+      extremities: 'Extremities',
+      neurological: 'Neurological',
+      others: 'Other Physical Findings',
+      other: 'Other Physical Findings'
+    };
+    
+    const lines = [];
+    for (const [key, value] of Object.entries(examObj)) {
+      if (value && String(value).trim() !== '') {
+        const label = keyLabels[key.toLowerCase()] || (key.charAt(0).toUpperCase() + key.slice(1));
+        lines.push(`${label}: ${String(value).trim()}`);
+      }
+    }
+    
+    return lines.length > 0 ? lines.join('\n') : '—';
+  }
+  
+  return String(physicalExam);
+}
+
 // Helper function to show detailed record information
 function showDataDetail(title, details) {
   const modal = document.getElementById('data-detail-modal');
@@ -277,15 +320,13 @@ function renderConsultationsTab(rows, error, staffLookup) {
           'Consultation Date': date ? date.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' }) : '—',
           'Attending Doctor': doctor,
           'Status': status.toUpperCase(),
-          'Chief Complaint': r.chief_complaint || '—',
-          'Symptoms': r.symptoms || '—',
+          'Chief Complaint / Symptoms': r.chief_complaint || r.symptoms || '—',
           'Diagnosis': r.diagnosis || '—',
           'History of Present Illness (HPI)': r.hpi || '—',
           'Past Medical History (PMH)': r.pmh || '—',
           'Allergies': r.allergies || '—',
-          'Physical Examination': r.physical_exam ? (typeof r.physical_exam === 'object' ? JSON.stringify(r.physical_exam, null, 2) : r.physical_exam) : '—',
-          'Doctor Notes': r.notes || '—',
-          'Treatment Plan': r.treatment_plan || '—'
+          'Physical Examination': formatPhysicalExam(r.physical_exam),
+          'Clinical Notes / Plan': r.notes || '—'
         };
         showDataDetail('Consultation Record', details);
       });

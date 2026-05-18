@@ -436,6 +436,7 @@
             <button class="ph-filter-btn red" data-filter="expired">Expired</button>
             <button class="ph-filter-btn amber" data-filter="expiring">Expiring Soon</button>
           </div>
+          <button id="ph-csv-import-btn" class="ph-btn ph-btn-outline ph-btn-sm" style="border-color:#16a34a;color:#16a34a;">Import CSV</button>
           <button id="ph-csv-export-btn" class="ph-btn ph-btn-outline ph-btn-sm">Export CSV</button>
           <button id="ph-pdf-export-btn" class="ph-btn ph-btn-primary ph-btn-sm">Export PDF</button>
         </div>
@@ -571,6 +572,23 @@
     </div>
   </div>
 
+  <!-- Logout Confirmation Modal -->
+  <div id="ph-logout-modal" class="ph-modal-overlay hidden">
+    <div class="ph-modal-box" style="max-width: 400px;">
+      <h3 style="display: flex; align-items: center; gap: 10px; color: #dc2626;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Confirm Sign Out
+      </h3>
+      <p style="font-size: 14px; color: #64748b; margin-bottom: 24px;">
+        Are you sure you want to sign out of your session? You will need to log back in to manage pharmacy inventory and dispensing.
+      </p>
+      <div class="ph-modal-actions">
+        <button type="button" class="ph-btn ph-btn-outline" id="ph-logout-cancel-btn">Cancel</button>
+        <button type="button" class="ph-btn ph-btn-primary" id="ph-logout-confirm-btn" style="background: #dc2626;">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast container -->
   <div id="ph-toast"></div>
 
@@ -589,6 +607,7 @@
   </div>
 
   <script src="../js/runtime-config.js"></script>
+  <script src="../js/csv-import.js"></script>
   <script src="../js/dashboard-pharmacist.js?v=20260503g"></script>
 </body>
 </html>

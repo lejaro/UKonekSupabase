@@ -7,7 +7,6 @@ import 'uKonekDashboardPage.dart';
 import 'uKonekJoinQueuePage.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
-import 'uKonekNotificationPage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class uKonekMedicineSchedulerPage extends StatefulWidget {
@@ -32,18 +31,18 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   static const Color _textMuted  = Color(0xFF637367);
   static const Color _fieldBdr   = Color(0xFFE2E9E3);
 
-  final int _selectedTab = 1;
+  int _selectedTab = 1;
 
   bool _loading = true;
   String? _error;
   List<ScheduledMedicine> _medicines = [];
+  List<Consultation> _consultations = [];
   final Set<String> _takenDoses = {};
   final Map<String, String> _customDoseTimes = {};
   final List<Map<String, dynamic>> _manualIntakes = [];
   bool _notificationsEnabled = true;
   DateTime _selectedDate = DateTime.now();
   final Map<int, String> _persistedStartTimes = {};
-  bool _hasUnseenNotifications = false;
 
   @override
   void initState() {
@@ -66,10 +65,12 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         ApiService.getMedicineSchedule(),
         ApiService.getIntakeLogsForDate(_selectedDate),
         SharedPreferences.getInstance(),
+        ApiService.fetchConsultations(),
       ]);
       final meds = results[0] as List<ScheduledMedicine>;
       final logs = results[1] as List<Map<String, dynamic>>;
       final prefs = results[2] as SharedPreferences;
+      final consultations = results[3] as List<Consultation>;
 
       // Load persisted start times
       _persistedStartTimes.clear();
@@ -79,25 +80,11 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           _persistedStartTimes[med.prescriptionItemId] = stored;
         }
       }
-
-      // Check for unseen notifications
-      final lastViewedStr = prefs.getString('last_viewed_notifications');
-      final clearedAtStr = prefs.getString('notifications_cleared_at');
-      DateTime lastViewed = lastViewedStr != null ? DateTime.parse(lastViewedStr) : DateTime.fromMillisecondsSinceEpoch(0);
-      if (clearedAtStr != null) {
-        final clearedAt = DateTime.parse(clearedAtStr);
-        if (clearedAt.isAfter(lastViewed)) lastViewed = clearedAt;
-      }
-
-      final announcements = await ApiService.fetchAnnouncements();
-      _hasUnseenNotifications = announcements.any((a) => a.createdAt.isAfter(lastViewed));
-      
-      // Also check for missed doses if needed (Request 5)
-
       
       setState(() {
         // ONLY show medicines that HAVE been dispensed by the pharmacy in the scheduler
         _medicines = meds.where((m) => m.isDispensed || m.dispensingStatus == 'dispensed').toList();
+        _consultations = consultations;
         _takenDoses.clear();
         _startedPrescriptions.clear();
         for (var log in logs) {
@@ -178,15 +165,31 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         final bodyStr = untaken.map((i) => '${(i['med'] as ScheduledMedicine).medicineName}: ${(i['med'] as ScheduledMedicine).dosage}').join('\n');
         
         final t = _parseTime(timeStr);
-        final h = t ~/ 60;
-        final m = t % 60;
+        final targetMins = t - 30;
+        final adjustedMins = targetMins < 0 ? targetMins + (24 * 60) : targetMins;
+        final h30 = (adjustedMins ~/ 60) % 24;
+        final m30 = adjustedMins % 60;
 
+        // 1. 30-Minute Heads-up Reminder
         await NotificationService.scheduleMedicineReminder(
           id: id++,
-          title: 'Medication Session: $medsStr',
-          body: 'It is time for your $timeStr intake:\n$bodyStr',
-          hour: h,
-          minute: m,
+          title: 'Upcoming Meds: $medsStr',
+          body: 'Heads up! Your $timeStr intake is in 30 minutes:\n$bodyStr',
+          hour: h30,
+          minute: m30,
+          payload: '{"action":"medicine","username":"${widget.username}","citizenId":"${widget.citizenId}"}',
+        );
+
+        // 2. Exact Intake Time Reminder
+        final hExact = t ~/ 60;
+        final mExact = t % 60;
+        
+        await NotificationService.scheduleMedicineReminder(
+          id: id++,
+          title: 'Medication Time: $medsStr',
+          body: 'It is time for your $timeStr intake right now:\n$bodyStr',
+          hour: hExact,
+          minute: mExact,
           payload: '{"action":"medicine","username":"${widget.username}","citizenId":"${widget.citizenId}"}',
         );
       }
@@ -293,6 +296,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     final grouped = _groupedTodayDoses;
     final nextDose = _getNextDose(grouped);
     final completion = _getCompletionRate(grouped);
+    final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
+    final isPast = _selectedDate.isBefore(DateTime.now()) && !isToday;
+    final showProgress = completion >= 1.0 && (isToday || isPast);
 
     return Scaffold(
       backgroundColor: _bg,
@@ -339,7 +345,12 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                       ],
                     ),
                     const SizedBox(height: 16),
-                    if (grouped.isEmpty) _buildEmptyState(
+                    // ── Follow-up Checkups for selectedDate ─────────────────────
+                    ..._consultations
+                        .where((c) => c.followupDate != null && DateUtils.isSameDay(c.followupDate!, _selectedDate))
+                        .map((c) => _buildFollowupCheckupCard(c)),
+
+                    if (grouped.isEmpty && !_consultations.any((c) => c.followupDate != null && DateUtils.isSameDay(c.followupDate!, _selectedDate))) _buildEmptyState(
                       Icons.event_available_rounded,
                       'No medicines scheduled today',
                       'Dispensed prescriptions will appear here',
@@ -350,11 +361,12 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                       )),
                     ],
 
-                    const SizedBox(height: 32),
-                    _buildProgressCard(completion),
-                    
-                    const SizedBox(height: 32),
-                    _buildTipCard(),
+                    if (showProgress) ...[
+                      const SizedBox(height: 32),
+                      _buildProgressCard(completion),
+                      const SizedBox(height: 32),
+                      _buildTipCard(),
+                    ],
                     
                     const SizedBox(height: 32),
                     _sectionHeader('My Prescriptions'),
@@ -482,58 +494,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                   style: const TextStyle(fontSize: 14, color: _textMuted)),
             ],
           ),
-          _buildNotificationBell(),
         ],
       ),
     );
-  }
-
-  Widget _buildNotificationBell() {
-    return GestureDetector(
-      onTap: () async {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('last_viewed_notifications', DateTime.now().toIso8601String());
-        if (mounted) setState(() => _hasUnseenNotifications = false);
-
-        if (!mounted) return;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => uKonekNotificationPage(
-              username: widget.username,
-              fullname: widget.username, // Fallback if fullname not in widget
-            ),
-          ),
-        );
-      },
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: _textDark.withOpacity(0.05), blurRadius: 10)],
-            ),
-            child: const Icon(Icons.notifications_none_rounded, color: _textDark, size: 24),
-          ),
-          if (_hasUnseenNotifications)
-            Positioned(
-              right: 0, top: 0,
-              child: Container(
-                width: 10, height: 10,
-                decoration: const BoxDecoration(
-                  color: Colors.redAccent, 
-                  shape: BoxShape.circle, 
-                  border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 2))
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
   }
 
   Widget _buildNextDoseCard(Map<String, dynamic> next) {
@@ -544,8 +507,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     final medNames = untaken.map((i) => (i['med'] as ScheduledMedicine).medicineName).join(', ');
     final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
     final tMins = _parseTime(time);
-    // Allow 30 minutes early intake
-    final isLocked = tMins > (nowMins + 30);
+    final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
+    // Time window: strictly today, no earlier than 30 mins before, no later than 4 hours after
+    final isLocked = !isToday || nowMins < tMins - 30 || nowMins > tMins + 240;
 
     return Container(
       width: double.infinity,
@@ -726,19 +690,23 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     final tMins = _parseTime(time);
     final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
     final isFuture = _selectedDate.isAfter(DateTime.now()) && !isToday;
+    final isPast = _selectedDate.isBefore(DateTime.now()) && !isToday;
     
-    // Allow 30 minutes early intake ONLY if it is Today.
-    // Future days are always locked.
-    final isLocked = isFuture || (isToday && tMins > (nowMins + 30));
-    
+    bool isLocked = true;
     String status = 'PENDING';
     Color statusColor = _textMuted;
+
     if (allTaken) {
       status = 'TAKEN';
       statusColor = _primary;
-    } else if (isLocked) {
+    } else if (isFuture || (isToday && nowMins < tMins - 30)) {
       status = 'UPCOMING';
       statusColor = const Color(0xFF007BFF);
+    } else if (isPast || (isToday && nowMins > tMins + 240)) {
+      status = 'MISSED';
+      statusColor = Colors.red;
+    } else {
+      isLocked = false;
     }
 
     return Container(
@@ -932,6 +900,25 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           final isSelected = DateUtils.isSameDay(date, _selectedDate);
           final isToday = DateUtils.isSameDay(date, now);
 
+          bool isStart = false;
+          bool isFinal = false;
+          bool isOngoing = false;
+          for (var m in _medicines) {
+            final start = DateTime(m.startDate.year, m.startDate.month, m.startDate.day);
+            final end   = DateTime(m.endDate.year, m.endDate.month, m.endDate.day);
+            if (DateUtils.isSameDay(date, start)) isStart = true;
+            else if (DateUtils.isSameDay(date, end)) isFinal = true;
+            else if (date.isAfter(start) && date.isBefore(end)) isOngoing = true;
+          }
+
+          bool hasFollowup = false;
+          for (var c in _consultations) {
+            if (c.followupDate != null && DateUtils.isSameDay(date, c.followupDate!)) {
+              hasFollowup = true;
+              break;
+            }
+          }
+
           return GestureDetector(
             onTap: () {
               setState(() {
@@ -955,13 +942,49 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                   Text(DateFormat('EEE').format(date).toUpperCase(), 
                     style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, 
                     color: isSelected ? Colors.white.withOpacity(0.8) : _textMuted, letterSpacing: 0.5)),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(date.day.toString(), 
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, 
                     color: isSelected ? Colors.white : _textDark)),
-                  if (isToday && !isSelected) 
+                  if (isToday && !isSelected && !isStart && !isFinal && !isOngoing && !hasFollowup) 
                     Container(margin: const EdgeInsets.only(top: 4), width: 4, height: 4, 
                       decoration: const BoxDecoration(color: _primary, shape: BoxShape.circle)),
+                  if (hasFollowup)
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.white24 : Colors.teal.shade100,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'FOLLOW UP',
+                        style: TextStyle(
+                          fontSize: 7, 
+                          fontWeight: FontWeight.bold,
+                          color: isSelected ? Colors.white : Colors.teal.shade800,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                    )
+                  else if (isStart || isFinal || isOngoing)
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.white24 : (isStart ? Colors.green.shade100 : (isFinal ? Colors.red.shade100 : Colors.blue.shade50)),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        isStart ? 'START' : (isFinal ? 'FINAL' : 'MEDS'),
+                        style: TextStyle(
+                          fontSize: 8, 
+                          fontWeight: FontWeight.bold,
+                          color: isSelected ? Colors.white : (isStart ? Colors.green.shade800 : (isFinal ? Colors.red.shade800 : Colors.blue.shade800)),
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1001,6 +1024,108 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           Image.network(
             'https://cdn-icons-png.flaticon.com/512/2838/2838634.png', 
             width: 60, height: 60,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFollowupCheckupCard(Consultation c) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.teal.shade50, Colors.teal.shade50.withOpacity(0.5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.teal.withOpacity(0.2), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.teal.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.teal.shade600,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.event_note_rounded, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'FOLLOW UP',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.teal.shade900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'All Day',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.teal.shade800,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Follow-up Checkup',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF00302C),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  c.doctorName != null ? 'With ${c.doctorName}' : 'With your consulting doctor',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.teal.shade800,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (c.diagnosis.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Reason: ${c.diagnosis}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.teal.shade900.withOpacity(0.8),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -1249,18 +1374,21 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                     color: isSelected ? _primary.withOpacity(0.10) : Colors.transparent,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Row(children: [
-                    Icon(tabs[i]['icon'] as IconData,
-                      color: isSelected ? _primary : _textMuted.withOpacity(0.5),
-                      size: 22,
-                    ),
-                    if (isSelected) ...[
-                      const SizedBox(width: 6),
-                      Text(tabs[i]['label'] as String,
-                        style: const TextStyle(color: _primary, fontSize: 12, fontWeight: FontWeight.bold),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(tabs[i]['icon'] as IconData,
+                        color: isSelected ? _primary : _textMuted.withOpacity(0.5),
+                        size: 22,
                       ),
+                      if (isSelected) ...[
+                        const SizedBox(height: 4),
+                        Text(tabs[i]['label'] as String,
+                          style: const TextStyle(color: _primary, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ],
                     ],
-                  ]),
+                  ),
                 ),
               );
             }),

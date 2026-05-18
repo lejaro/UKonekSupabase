@@ -1,6 +1,49 @@
 // CSV Export Reports Module
 // Implements all 5 required reports: Patient, Consultation, Doctor Activity, Queue, System Usage
 
+function formatPhysicalExam(physicalExam) {
+  if (!physicalExam) return '';
+  
+  let examObj = physicalExam;
+  if (typeof physicalExam === 'string') {
+    const trimmed = physicalExam.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        examObj = JSON.parse(trimmed);
+      } catch (e) {
+        return physicalExam;
+      }
+    } else {
+      return physicalExam;
+    }
+  }
+  
+  if (typeof examObj === 'object' && examObj !== null) {
+    const keyLabels = {
+      heent: 'HEENT',
+      chest: 'Chest & Lungs',
+      heart: 'Heart',
+      abdomen: 'Abdomen',
+      extremities: 'Extremities',
+      neurological: 'Neurological',
+      others: 'Other Physical Findings',
+      other: 'Other Physical Findings'
+    };
+    
+    const lines = [];
+    for (const [key, value] of Object.entries(examObj)) {
+      if (value && String(value).trim() !== '') {
+        const label = keyLabels[key.toLowerCase()] || (key.charAt(0).toUpperCase() + key.slice(1));
+        lines.push(`${label}: ${String(value).trim()}`);
+      }
+    }
+    
+    return lines.length > 0 ? lines.join('; ') : '';
+  }
+  
+  return String(physicalExam);
+}
+
 /**
  * Utility function to convert data to CSV format
  */
@@ -183,7 +226,7 @@ export async function exportConsultationReport(startDate = null, endDate = null)
       'HPI': consult.hpi || '',
       'PMH': consult.pmh || '',
       'Allergies': consult.allergies || '',
-      'Physical Exam': typeof consult.physical_exam === 'object' ? JSON.stringify(consult.physical_exam) : (consult.physical_exam || ''),
+      'Physical Exam': formatPhysicalExam(consult.physical_exam),
       'Treatment Plan': consult.treatment_plan || '',
       'Chief Complaint': consult.chief_complaint || '',
       'Created At': consult.created_at ? new Date(consult.created_at).toLocaleString() : ''

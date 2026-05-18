@@ -619,9 +619,31 @@ if (refreshBtn) {
 }
 
 // ── Logout ────────────────────────────────────────────────────────────────────
+const logoutModal = document.getElementById('ph-logout-modal');
+const logoutCancelBtn = document.getElementById('ph-logout-cancel-btn');
+const logoutConfirmBtn = document.getElementById('ph-logout-confirm-btn');
+
 if (logoutBtn) {
-  logoutBtn.addEventListener('click', async () => {
-    setLoading(logoutBtn, true);
+  logoutBtn.addEventListener('click', () => {
+    if (logoutModal) {
+      logoutModal.classList.remove('hidden');
+      logoutModal.style.display = 'flex';
+    }
+  });
+}
+
+if (logoutCancelBtn) {
+  logoutCancelBtn.addEventListener('click', () => {
+    if (logoutModal) {
+      logoutModal.classList.add('hidden');
+      logoutModal.style.display = 'none';
+    }
+  });
+}
+
+if (logoutConfirmBtn) {
+  logoutConfirmBtn.addEventListener('click', async () => {
+    setLoading(logoutConfirmBtn, true);
     try {
       const authService = await loadAuthServiceModule();
       const fn = authService.signOutStaff || authService.signOut || authService.default?.signOutStaff;
@@ -956,6 +978,44 @@ if (csvExportBtn) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  });
+}
+
+const csvImportBtn = document.getElementById('ph-csv-import-btn');
+if (csvImportBtn && window.openCsvImport) {
+  csvImportBtn.addEventListener('click', () => {
+    openCsvImport({
+      title: 'Import Medicine Inventory',
+      templateHeaders: ['name', 'description', 'qty', 'unit', 'expiry_date'],
+      requiredFields: ['name', 'qty'],
+      fieldLabels: { 
+        name: 'Medicine Name', 
+        description: 'Description', 
+        qty: 'Quantity', 
+        unit: 'Unit', 
+        expiry_date: 'Expiry Date' 
+      },
+      fieldTypes: { 
+        qty: 'number', 
+        expiry_date: 'date' 
+      },
+      onImport: async (rows) => {
+        for (const row of rows) {
+          await saveMedicine({
+            id: null,
+            name: row.name,
+            description: row.description,
+            qty: row.qty,
+            unit: row.unit,
+            expiry_date: row.expiry_date
+          });
+        }
+      },
+      onSuccess: async () => {
+        await loadMedicines();
+        renderMedicines();
+      }
+    });
   });
 }
 

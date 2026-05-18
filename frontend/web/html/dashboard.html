@@ -1541,6 +1541,15 @@
             <input type="hidden" id="va-queue-ticket-id" />
             <input type="hidden" id="va-citizen-id" />
 
+            <!-- Submitted Symptoms Display (from mobile app queue registration) -->
+            <div id="va-patient-symptoms-section" class="vital-section" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; padding:14px; border-radius:12px; margin-bottom:16px;">
+              <label class="vital-label" style="color:#1b5e20; font-weight:700; display:flex; align-items:center; gap:6px; margin-bottom: 6px;">
+                <svg class="label-svg" viewBox="0 0 24 24" fill="none" stroke="#1b5e20" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                Patient Symptoms & Reason for Visit
+              </label>
+              <div id="va-patient-symptoms-display" style="font-size:13px; color:#1b2e1e; font-weight:500; line-height:1.5; white-space:pre-wrap;">—</div>
+            </div>
+
             <!-- Chief Complaint -->
             <div class="vital-section">
               <label class="vital-label" for="va-chief-complaint">
@@ -1986,7 +1995,7 @@
         </div>
       </div>
 
-      <div id="data-detail-modal" class="modal-overlay hidden">
+      <div id="data-detail-modal" class="modal-overlay hidden" style="z-index: 2000;">
         <div class="modal-box" style="max-width: 600px; text-align: left; padding: 0; overflow: hidden; border-radius: 16px;">
           <div style="padding: 24px 32px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
             <p id="data-detail-tag" style="display:none; font-size:11px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#64748b; margin-bottom:6px;"></p>
@@ -2334,7 +2343,7 @@
         </div>
       </div>
 
-      <div id="dialog-modal" class="modal-overlay hidden">
+      <div id="dialog-modal" class="modal-overlay hidden" style="z-index: 3000;">
         <div class="modal-box dialog-modal-box">
           <h3 id="dialog-title" class="modal-heading">Confirm</h3>
           <p id="dialog-message" class="note dialog-message"></p>
@@ -2358,14 +2367,12 @@
         <div class="modal-box">
           <div class="queue-modal-header">
             <h3>Select Patient from Queue</h3>
-            <button id="queue-selection-close" class="icon-btn" style="color: #64748b; border: none; font-size: 20px;">✕</button>
           </div>
           <div style="padding: 10px 20px; border-bottom: 1px solid #e2e8f0;">
             <input type="text" id="queue-selection-search" class="search-input" placeholder="Search by name or service..." style="width: 100%; box-sizing: border-box;">
           </div>
           <div id="queue-selection-list" class="queue-list-container">
             <div class="empty-queue-state">
-              <span class="empty-queue-icon">📋</span>
               <p class="empty-queue-text">Fetching active queue...</p>
             </div>
           </div>

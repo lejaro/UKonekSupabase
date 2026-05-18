@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 class _C {
   static const primary    = Color(0xFF1B5E20);
@@ -63,12 +64,15 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
         ApiService.getMedicineSchedule(),
         ApiService.getIntakeLogsForDate(DateTime.now()),
         SharedPreferences.getInstance(),
+        ApiService.fetchConsultations(),
       ]);
 
       final announcements = results[0] as List<Announcement>;
       final queue = results[1] as QueueDashboardSnapshot;
       final schedules = results[2] as List<ScheduledMedicine>;
       final logs = results[3] as List<Map<String, dynamic>>;
+      final prefs = results[4] as SharedPreferences;
+      final consultations = results[5] as List<Consultation>;
 
       final List<Map<String, dynamic>> notifications = [];
       
@@ -126,8 +130,55 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
         }
       }
 
+      // 4. Follow-up Checkup Date Notifications
+      final now = DateTime.now();
+      final todayDate = DateTime(now.year, now.month, now.day);
+      final tomorrowDate = todayDate.add(const Duration(days: 1));
+
+      for (var con in consultations) {
+        if (con.followupDate != null) {
+          final followDate = DateTime(con.followupDate!.year, con.followupDate!.month, con.followupDate!.day);
+
+          // A. Standard Notification (scheduled date information)
+          notifications.add({
+            'id': 'followup_sched_${con.id}',
+            'title': 'Follow-up Checkup Scheduled',
+            'body': 'You have a follow-up checkup scheduled with ${con.doctorName ?? 'your doctor'} on ${DateFormat('MMMM d, yyyy').format(con.followupDate!)}.',
+            'time': 'Consulted on ${DateFormat('MM/dd/yyyy').format(con.consultedAt)}',
+            'type': 'followup',
+            'isRead': false,
+            'rawDate': con.consultedAt,
+          });
+
+          // B. Tomorrow's Reminder (1 day before)
+          if (followDate.isAtSameMomentAs(tomorrowDate)) {
+            notifications.add({
+              'id': 'followup_tomorrow_${con.id}',
+              'title': 'Follow-up Consultation Tomorrow',
+              'body': 'Friendly reminder: Your follow-up consultation with ${con.doctorName ?? 'your doctor'} is scheduled for tomorrow, ${DateFormat('MMMM d, yyyy').format(con.followupDate!)}.',
+              'time': 'Reminder',
+              'type': 'followup',
+              'isRead': false,
+              'rawDate': now.subtract(const Duration(seconds: 1)),
+            });
+          }
+
+          // C. Today's Reminder (Same day)
+          if (followDate.isAtSameMomentAs(todayDate)) {
+            notifications.add({
+              'id': 'followup_today_${con.id}',
+              'title': 'Follow-up Consultation Today',
+              'body': 'Your follow-up consultation with ${con.doctorName ?? 'your doctor'} is scheduled for today! You can join the queue today.',
+              'time': 'Active Now',
+              'type': 'followup',
+              'isRead': false,
+              'rawDate': now,
+            });
+          }
+        }
+      }
+
       // Filter out notifications cleared before this timestamp
-      final prefs = results[4] as SharedPreferences;
       final clearedAtStr = prefs.getString('notifications_cleared_at');
       if (clearedAtStr != null) {
         final clearedAt = DateTime.parse(clearedAtStr);
@@ -417,6 +468,7 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
       case 'reminder': return Icons.alarm_on_rounded;
       case 'queue': return Icons.confirmation_number_rounded;
       case 'record': return Icons.assignment_turned_in_rounded;
+      case 'followup': return Icons.event_note_rounded;
       default: return Icons.notifications_rounded;
     }
   }
@@ -427,6 +479,7 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
       case 'reminder': return const Color(0xFFF59E0B);
       case 'queue': return _C.primaryMid;
       case 'record': return const Color(0xFF17A2B8);
+      case 'followup': return Colors.teal;
       default: return _C.textMuted;
     }
   }

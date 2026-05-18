@@ -50,6 +50,13 @@ class DoctorSchedule {
     final name = doctorName.trim();
     if (name.isEmpty) return 'Doctor';
     if (name.toLowerCase().startsWith('dr.')) return name;
+    // Reorder to Surname, Firstname format
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      final surname = parts.last;
+      final firstname = parts.sublist(0, parts.length - 1).join(' ');
+      return 'Dr. $surname, $firstname';
+    }
     return 'Dr. $name';
   }
 
@@ -431,7 +438,9 @@ class Consultation {
 
   factory Consultation.fromMap(Map<String, dynamic> map) {
     final doctor = map['doctor'] as Map<String, dynamic>?;
-    final drName = doctor != null ? '${doctor['firstname'] ?? ''} ${doctor['surname'] ?? ''}'.trim() : null;
+    final drName = doctor != null
+        ? '${doctor['last_name'] ?? ''} ${doctor['first_name'] ?? ''}'.trim()
+        : null;
 
     return Consultation(
       id: (map['id'] as num?)?.toInt() ?? 0,
@@ -1465,7 +1474,7 @@ class ApiService {
 
       final response = await _client
           .from('consultations')
-          .select('*, doctor:staff(firstname, surname)')
+          .select('*, doctor:staff!doctor_staff_id(first_name, last_name)')
           .eq('patient_citizen_id', citizenId)
           .order('consulted_at', ascending: false);
 
@@ -1544,5 +1553,18 @@ class ApiService {
         .from('citizens')
         .update(data)
         .eq('auth_user_id', user.id);
+  }
+
+  static Future<Map<String, dynamic>> getTvQueueDisplay() async {
+    try {
+      final response = await _client.rpc('get_tv_queue_display');
+      if (response is Map) {
+        return Map<String, dynamic>.from(response);
+      }
+      return {};
+    } catch (e) {
+      debugPrint('Error fetching TV display: $e');
+      return {};
+    }
   }
 }

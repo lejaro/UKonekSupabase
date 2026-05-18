@@ -25,6 +25,49 @@ let adminDashboardRefreshTimer = null;
 let adminDashboardRefreshInFlight = false;
 const DASHBOARD_REQUEST_TIMEOUT_MS = 15000;
 
+function formatPhysicalExam(physicalExam) {
+  if (!physicalExam) return '—';
+  
+  let examObj = physicalExam;
+  if (typeof physicalExam === 'string') {
+    const trimmed = physicalExam.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        examObj = JSON.parse(trimmed);
+      } catch (e) {
+        return physicalExam;
+      }
+    } else {
+      return physicalExam;
+    }
+  }
+  
+  if (typeof examObj === 'object' && examObj !== null) {
+    const keyLabels = {
+      heent: 'HEENT',
+      chest: 'Chest & Lungs',
+      heart: 'Heart',
+      abdomen: 'Abdomen',
+      extremities: 'Extremities',
+      neurological: 'Neurological',
+      others: 'Other Physical Findings',
+      other: 'Other Physical Findings'
+    };
+    
+    const lines = [];
+    for (const [key, value] of Object.entries(examObj)) {
+      if (value && String(value).trim() !== '') {
+        const label = keyLabels[key.toLowerCase()] || (key.charAt(0).toUpperCase() + key.slice(1));
+        lines.push(`${label}: ${String(value).trim()}`);
+      }
+    }
+    
+    return lines.length > 0 ? lines.join('\n') : '—';
+  }
+  
+  return String(physicalExam);
+}
+
 function withTimeout(promise, timeoutMs, timeoutMessage) {
   return Promise.race([
     promise,
@@ -1874,7 +1917,7 @@ function renderScheduleDoctors(staffList, user) {
       const actionsCell = tr.querySelector('td:last-child');
       if (!actionsCell) return;
 
-      const canEditAvailability = isAdminUser(user);
+      const canEditAvailability = isFullAccessUser(user);
       const toggleGroup = document.createElement('div');
       toggleGroup.className = 'availability-toggle-group';
       toggleGroup.dataset.staffId = String(staff.id || '');
@@ -1990,7 +2033,7 @@ async function updateStaffAvailabilityById(staffId, status) {
 
 async function handleAvailabilityToggle(staff, nextStatus, toggleGroup) {
   if (!staff || !toggleGroup) return;
-  if (!isAdminUser(cachedSessionUser)) return;
+  if (!isFullAccessUser(cachedSessionUser)) return;
 
   const staffId = staff.id;
   const prevStatus = normalizeAvailabilityStatus(staff?.availability_status);
@@ -2834,20 +2877,21 @@ async function openCitizenHealthModal(citizen) {
           `;
           tr.addEventListener('click', () => {
             showDataDetail('Consultation Record', {
-              'Date': r.consulted_at ? new Date(r.consulted_at).toLocaleString() : '—',
-              'Doctor': resolveStaffName({
+              'Consultation Date': r.consulted_at ? new Date(r.consulted_at).toLocaleString() : '—',
+              'Attending Doctor': resolveStaffName({
                 staff: r.doctor,
                 staffId: r.doctor_staff_id,
                 lookup: staffLookup,
                 fallback: '—'
               }),
+              'Chief Complaint / Symptoms': r.chief_complaint || r.symptoms || '—',
               'Diagnosis': r.diagnosis || '—',
-              'Symptoms': r.symptoms || '—',
-              'HPI': r.hpi || '—',
-              'PMH': r.pmh || '—',
+              'History of Present Illness (HPI)': r.hpi || '—',
+              'Past Medical History (PMH)': r.pmh || '—',
               'Allergies': r.allergies || '—',
-              'Physical Exam': r.physical_exam ? JSON.stringify(r.physical_exam, null, 2) : '—',
-              'Doctor Notes': r.notes || '—'
+              'Physical Examination': formatPhysicalExam(r.physical_exam),
+              'Clinical Notes / Plan': r.notes || '—',
+              'Follow-up Checkup Date': r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString() : 'None Scheduled'
             });
           });
           tbody.appendChild(tr);
@@ -4416,6 +4460,8 @@ async function loadPatientData() {
 
 // --- Vitals Assessment (QR Scanning & Recording) ---
 let html5QrcodeScanner = null;
+let vitalsInitialized = false;
+let activeVitalsQueueTicketId = null;
 
 function initVitalsSection() {
   const startBtn = document.getElementById('start-scanner-btn');
@@ -4425,6 +4471,17 @@ function initVitalsSection() {
   const vitalsForm = document.getElementById('vitals-form');
 
   if (!startBtn || !stopBtn) return;
+
+  if (vitalsInitialized) {
+    if (vitalsForm && formContainer.classList.contains('hidden') && !html5QrcodeScanner) {
+      statusText.textContent = 'Scanner ready.';
+      statusText.style.color = '';
+      startBtn.classList.remove('hidden');
+      stopBtn.classList.add('hidden');
+    }
+    return;
+  }
+  vitalsInitialized = true;
 
   // Cleanup any previous scanner instance
   if (html5QrcodeScanner) {
@@ -4482,6 +4539,7 @@ function initVitalsSection() {
       formContainer.classList.remove('hidden');
       vitalsForm.reset();
       document.getElementById('vitals-citizen-id').value = '';
+      activeVitalsQueueTicketId = null; // Clear on manual walk-in
     });
   }
 
@@ -4525,6 +4583,7 @@ function initVitalsSection() {
       vitalsForm.reset();
       formContainer.classList.add('hidden');
       statusText.textContent = 'Scanner ready.';
+      activeVitalsQueueTicketId = null; // Clear on reset
     });
   }
 }
@@ -4545,8 +4604,61 @@ async function handleQRDecoded(decodedText) {
   try {
     const { supabase } = await loadSupabaseModule();
 
-    // Check if it's our new rich data format
-    if (decodedText.includes('NAME:') && decodedText.includes('TICKET:')) {
+    // Check if it's a queue ticket QR code
+    if (decodedText.trim().startsWith('Q-')) {
+      statusText.textContent = 'Queue ticket detected. Looking up patient...';
+      const { data: ticket, error } = await supabase
+        .from('queue_tickets')
+        .select(`
+          id,
+          citizen_id,
+          status,
+          reason,
+          symptoms,
+          citizens (
+            id,
+            username,
+            firstname,
+            surname,
+            age,
+            complete_address,
+            contact_number
+          )
+        `)
+        .eq('ticket_code', decodedText.trim())
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!ticket || !ticket.citizens) {
+        statusText.textContent = 'Queue ticket or patient profile not found.';
+        statusText.style.color = '#b91c1c';
+        return;
+      }
+
+      if (ticket.status !== 'on_call') {
+        statusText.textContent = 'Patient is not yet on call.';
+        statusText.style.color = '#ef4444';
+        return;
+      }
+
+      const citizen = ticket.citizens;
+      nameInput.value = `${citizen.firstname || ''} ${citizen.surname || ''}`.trim();
+      ageInput.value = citizen.age || '';
+      addressInput.value = citizen.complete_address || '';
+      contactInput.value = citizen.contact_number || '';
+      citizenIdInput.value = citizen.id;
+
+      // Populate complaint/reason from ticket
+      const complaintParts = [];
+      if (ticket.reason) complaintParts.push(ticket.reason);
+      if (ticket.symptoms) complaintParts.push(ticket.symptoms);
+      complaintInput.value = complaintParts.join(' - ');
+
+      activeVitalsQueueTicketId = ticket.id; // Store ticket ID!
+
+    } else if (decodedText.includes('NAME:') && decodedText.includes('TICKET:')) {
+      // Check if it's our new rich data format
       const data = {};
       decodedText.split('\n').forEach(line => {
         const parts = line.split(': ');
@@ -4567,12 +4679,13 @@ async function handleQRDecoded(decodedText) {
       if (data.TICKET) {
         const { data: ticketData } = await supabase
           .from('queue_tickets')
-          .select('citizen_id')
+          .select('id, citizen_id')
           .eq('ticket_code', data.TICKET)
           .maybeSingle();
         
         if (ticketData) {
           citizenIdInput.value = ticketData.citizen_id;
+          activeVitalsQueueTicketId = ticketData.id; // Store ticket ID!
         }
       }
     } else {
@@ -4627,9 +4740,9 @@ async function openQueueSelectionModal() {
   }
 
   const closeModal = () => modal.classList.add('hidden');
-  closeBtn.onclick = closeModal;
-  cancelBtn.onclick = closeModal;
-  refreshBtn.onclick = loadQueueForSelection;
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (cancelBtn) cancelBtn.onclick = closeModal;
+  if (refreshBtn) refreshBtn.onclick = loadQueueForSelection;
 
   loadQueueForSelection();
 }
@@ -4659,7 +4772,7 @@ async function loadQueueForSelection() {
           contact_number
         )
       `)
-      .eq('queue_date', new Date().toISOString().split('T')[0])
+      .eq('queue_date', new Intl.DateTimeFormat('fr-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()))
       .in('status', ['waiting', 'on_call'])
       .order('queue_number', { ascending: true });
 
@@ -4688,7 +4801,6 @@ function renderQueueSelectionList(query = '') {
   if (filtered.length === 0) {
     listContainer.innerHTML = `
       <div class="empty-queue-state">
-        <span class="empty-queue-icon">📋</span>
         <p class="empty-queue-text">${query ? 'No matching patients or services found.' : 'No patients currently in the queue for today.'}</p>
       </div>
     `;
@@ -4744,16 +4856,10 @@ function populateVitalsFormFromQueue(ticket) {
   citizenIdInput.value = ticket.citizen_id;
   complaintInput.value = `${ticket.reason}${ticket.symptoms ? ': ' + ticket.symptoms : ''}`;
 
-  formContainer.classList.remove('hidden');
-    const waitTime = (index * 15);
-    const timeLabel = waitTime === 0 ? 'Next' : `~${waitTime}m`;
+  activeVitalsQueueTicketId = ticket.id; // Store ticket ID!
 
-    card.innerHTML = `
-      <div class="ticket-header">
-        <span class="ticket-id">#${String(ticket.queue_number).padStart(3, '0')}</span>
-        <span class="ticket-wait">${timeLabel}</span>
-      </div>
-atient: #${String(ticket.queue_number).padStart(3, '0')}`;
+  formContainer.classList.remove('hidden');
+  statusText.textContent = `Patient: #${String(ticket.queue_number).padStart(3, '0')}`;
   statusText.style.color = '#3b82f6';
   formContainer.scrollIntoView({ behavior: 'smooth' });
 }
@@ -4832,6 +4938,10 @@ async function handleVitalsSubmission() {
       current_medications: meds || null
     };
 
+    if (activeVitalsQueueTicketId) {
+      payload.queue_ticket_id = Number(activeVitalsQueueTicketId);
+    }
+
     const { error } = await supabase
       .from('vital_signs')
       .insert([payload]);
@@ -4839,10 +4949,15 @@ async function handleVitalsSubmission() {
     if (error) throw error;
 
     showToast('Vital signs recorded successfully.', 'success');
+    activeVitalsQueueTicketId = null;
     document.getElementById('vitals-form').reset();
     document.getElementById('vitals-form-container').classList.add('hidden');
     document.getElementById('qr-status').textContent = 'Scanner ready.';
     document.getElementById('qr-status').style.color = '';
+
+    if (typeof appointments !== 'undefined' && appointments.loadQueueTickets) {
+      await appointments.loadQueueTickets();
+    }
   } catch (err) {
     console.error('Vitals submission error:', err);
     showToast('Failed to record vital signs. Please check database table.', 'error');
@@ -5924,6 +6039,7 @@ function renderConsultations() {
           { label: 'Symptoms', value: c.symptoms || '—' },
           { label: 'Diagnosis', value: c.diagnosis || '—' },
           { label: 'Notes', value: c.notes || '—' },
+          { label: 'Follow-up Checkup Date', value: c.follow_up_date ? new Date(c.follow_up_date).toLocaleDateString() : 'None Scheduled' },
           { label: 'Recorded', value: new Date(c.created_at) }
         ]
       }));
@@ -5941,6 +6057,7 @@ function mapConsultationRow(item) {
     symptoms: String(item?.symptoms || '').trim(),
     diagnosis: String(item?.diagnosis || '').trim(),
     notes: String(item?.notes || '').trim(),
+    follow_up_date: item?.follow_up_date || null,
     patientName: item?.citizen ? `${item.citizen.firstname} ${item.citizen.surname}`.trim() : (item?.patientName || ''),
     created_at: item?.consulted_at || item?.created_at || new Date().toISOString(),
     doctor_staff_id: Number(item?.doctor_staff_id) || null
@@ -6019,7 +6136,7 @@ async function listConsultationData() {
   const { supabase } = await loadSupabaseModule();
   const { data, error } = await supabase
     .from('consultations')
-    .select('id,patient_identifier,symptoms,diagnosis,notes,consulted_at,created_at,doctor_staff_id, citizen:citizens(firstname, surname)')
+    .select('id,patient_identifier,symptoms,diagnosis,notes,follow_up_date,consulted_at,created_at,doctor_staff_id, citizen:citizens(firstname, surname)')
     .order('consulted_at', { ascending: false });
 
   if (error) {
@@ -6211,12 +6328,13 @@ if (consultationForm) {
         immunization: document.getElementById('consult-immunization')?.value || '',
         social: document.getElementById('consult-social')?.value || '',
         physical_exam: {
-          heent: document.getElementById('consult-heent')?.value || '',
-          chest: document.getElementById('consult-chest')?.value || '',
-          heart: document.getElementById('consult-heart')?.value || '',
-          abdomen: document.getElementById('consult-abdomen')?.value || '',
-          extremities: document.getElementById('consult-extremities')?.value || '',
-          neurological: document.getElementById('consult-neurological')?.value || ''
+          heent: (document.getElementById('exam-heent')?.value || document.getElementById('consult-heent')?.value || '').trim(),
+          chest: (document.getElementById('exam-chest')?.value || document.getElementById('consult-chest')?.value || '').trim(),
+          heart: (document.getElementById('consult-heart')?.value || '').trim(),
+          abdomen: (document.getElementById('exam-abdomen')?.value || document.getElementById('consult-abdomen')?.value || '').trim(),
+          extremities: (document.getElementById('exam-extremities')?.value || document.getElementById('consult-extremities')?.value || '').trim(),
+          neurological: (document.getElementById('consult-neurological')?.value || '').trim(),
+          others: (document.getElementById('exam-others')?.value || '').trim()
         },
         differential: document.getElementById('consult-differential')?.value || '',
         lab_orders: document.getElementById('consult-lab-orders')?.value || '',
@@ -6619,8 +6737,10 @@ function mapMedicineRow(item) {
   return {
     id: Number(item?.id) || null,
     name: String(item?.name || '').trim(),
+    description: String(item?.description || '').trim(),
     qty: Math.max(0, Number(item?.qty) || 0),
     unit: String(item?.unit || '').trim(),
+    expiry_date: item?.expiry_date || null,
     archived_at: item?.archived_at || null,
     created_at: item?.created_at || null,
     updated_at: item?.updated_at || null
@@ -6635,7 +6755,7 @@ async function listMedicineData() {
   const { supabase } = await loadSupabaseModule();
   const { data, error } = await supabase
     .from('medicines')
-    .select('id,name,qty,unit,archived_at,created_at,updated_at')
+    .select('id,name,description,qty,unit,expiry_date,archived_at,created_at,updated_at')
     .is('archived_at', null)
     .order('name', { ascending: true });
 
@@ -6654,7 +6774,7 @@ async function listArchivedMedicineData() {
   const { supabase } = await loadSupabaseModule();
   const { data, error } = await supabase
     .from('medicines')
-    .select('id,name,qty,unit,archived_at,created_at,updated_at')
+    .select('id,name,description,qty,unit,expiry_date,archived_at,created_at,updated_at')
     .not('archived_at', 'is', null)
     .order('archived_at', { ascending: false });
 
@@ -7125,6 +7245,7 @@ if (consultationsTbody) {
           { label: 'Symptoms', value: entry.symptoms || '—' },
           { label: 'Diagnosis', value: entry.diagnosis || '—' },
           { label: 'Notes', value: entry.notes || '—' },
+          { label: 'Follow-up Checkup Date', value: entry.follow_up_date ? new Date(entry.follow_up_date).toLocaleDateString() : 'None Scheduled' },
           { label: 'Recorded', value: new Date(entry.created_at) }
         ]
       });
@@ -7986,6 +8107,26 @@ async function openVitalAssessmentModal(ticket) {
     metaEl.textContent = `${ticket.service_label} | ${age} | ${gender}`;
   }
   if (badgeEl) badgeEl.style.display = 'none';
+
+  // Load and display patient symptoms & reason submitted during queue entry
+  const symptomsSection = document.getElementById('va-patient-symptoms-section');
+  const symptomsDisplay = document.getElementById('va-patient-symptoms-display');
+  if (symptomsSection && symptomsDisplay) {
+    let detailHtml = '';
+    if (ticket.reason) {
+      detailHtml += `<div style="margin-bottom:6px;"><strong>Reason for Visit:</strong><br/><span style="color:#2d3748;">${ticket.reason}</span></div>`;
+    }
+    if (ticket.symptoms) {
+      detailHtml += `<div><strong>Symptom Description:</strong><br/><span style="color:#2d3748;">${ticket.symptoms}</span></div>`;
+    }
+    if (detailHtml) {
+      symptomsDisplay.innerHTML = detailHtml;
+      symptomsSection.style.display = 'block';
+    } else {
+      symptomsSection.style.display = 'none';
+    }
+  }
+
   try {
     const { supabase } = await loadSupabaseModule();
     const { data: existing } = await supabase
@@ -8004,9 +8145,15 @@ async function openVitalAssessmentModal(ticket) {
       if (document.getElementById('va-meds')) document.getElementById('va-meds').value = existing.current_medications || '';
       if (document.getElementById('va-notes')) document.getElementById('va-notes').value = existing.notes || '';
     } else {
-      // New assessment: pre-fill chief complaint with citizen's reason for visit
+      // New assessment: pre-fill chief complaint with reason + symptoms
       if (document.getElementById('va-chief-complaint')) {
-        document.getElementById('va-chief-complaint').value = ticket.reason || '';
+        let combined = '';
+        if (ticket.reason) combined += ticket.reason;
+        if (ticket.symptoms) {
+          if (combined) combined += ': ';
+          combined += ticket.symptoms;
+        }
+        document.getElementById('va-chief-complaint').value = combined || '';
       }
     }
   } catch (err) { console.warn('Error checking existing vitals:', err); }
@@ -8019,6 +8166,16 @@ function closeVitalAssessmentModal() {
 }
 
 if (vaForm) {
+  // Prevent typing minus or plus signs in numeric vital inputs to block negative numbers
+  const numericVitals = vaForm.querySelectorAll('input[type="number"]');
+  numericVitals.forEach(input => {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === '-' || e.key === '+') {
+        e.preventDefault();
+      }
+    });
+  });
+
   vaForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const submitBtn = vaForm.querySelector('button[type="submit"]');
@@ -8026,7 +8183,99 @@ if (vaForm) {
     const citizenId = document.getElementById('va-citizen-id')?.value;
     const complaint = document.getElementById('va-chief-complaint')?.value;
     if (!ticketId) { showToast('Missing queue ticket reference.', 'error'); return; }
-    // Validation removed as per user request to allow saving without required values
+
+    // Retrieve input values for validation
+    const bp = document.getElementById('va-bp')?.value?.trim();
+    const hrVal = document.getElementById('va-hr')?.value?.trim();
+    const rrVal = document.getElementById('va-rr')?.value?.trim();
+    const tempVal = document.getElementById('va-temp')?.value?.trim();
+    const spo2Val = document.getElementById('va-spo2')?.value?.trim();
+
+    // 1. Temperature Validation (No under 30, no negative, valid clinical range)
+    if (tempVal !== undefined && tempVal !== null && tempVal !== '') {
+      const temp = parseFloat(tempVal);
+      if (isNaN(temp)) {
+        showToast('Temperature must be a valid number.', 'warning');
+        return;
+      }
+      if (temp < 0) {
+        showToast('Temperature cannot be negative.', 'warning');
+        return;
+      }
+      if (temp < 30.0) {
+        showToast('Temperature cannot be under 30.0°C.', 'warning');
+        return;
+      }
+      if (temp > 45.0) {
+        showToast('Temperature cannot exceed 45.0°C.', 'warning');
+        return;
+      }
+    }
+
+    // 2. Heart Rate Validation (No negative, positive clinical limit)
+    if (hrVal !== undefined && hrVal !== null && hrVal !== '') {
+      const hr = parseInt(hrVal, 10);
+      if (isNaN(hr)) {
+        showToast('Heart Rate must be a valid number.', 'warning');
+        return;
+      }
+      if (hr < 0) {
+        showToast('Heart Rate cannot be negative.', 'warning');
+        return;
+      }
+      if (hr > 300) {
+        showToast('Heart Rate cannot exceed 300 bpm.', 'warning');
+        return;
+      }
+    }
+
+    // 3. Respiratory Rate Validation (No negative, positive clinical limit)
+    if (rrVal !== undefined && rrVal !== null && rrVal !== '') {
+      const rr = parseInt(rrVal, 10);
+      if (isNaN(rr)) {
+        showToast('Respiratory Rate must be a valid number.', 'warning');
+        return;
+      }
+      if (rr < 0) {
+        showToast('Respiratory Rate cannot be negative.', 'warning');
+        return;
+      }
+      if (rr > 100) {
+        showToast('Respiratory Rate cannot exceed 100 bpm.', 'warning');
+        return;
+      }
+    }
+
+    // 4. Oxygen Saturation (SpO2) Validation (No negative, 0-100%)
+    if (spo2Val !== undefined && spo2Val !== null && spo2Val !== '') {
+      const spo2 = parseInt(spo2Val, 10);
+      if (isNaN(spo2)) {
+        showToast('Oxygen Saturation must be a valid number.', 'warning');
+        return;
+      }
+      if (spo2 < 0) {
+        showToast('Oxygen Saturation cannot be negative.', 'warning');
+        return;
+      }
+      if (spo2 > 100) {
+        showToast('Oxygen Saturation cannot exceed 100%.', 'warning');
+        return;
+      }
+    }
+
+    // 5. Blood Pressure Validation (No negative, Systolic/Diastolic format)
+    if (bp !== undefined && bp !== null && bp !== '') {
+      if (bp.includes('-')) {
+        showToast('Blood Pressure values cannot be negative.', 'warning');
+        return;
+      }
+      const bpPattern = /^\d{2,3}\/\d{2,3}$/;
+      if (!bpPattern.test(bp)) {
+        showToast('Blood Pressure must be in format Systolic/Diastolic (e.g. 120/80).', 'warning');
+        return;
+      }
+    }
+
     setLoading(submitBtn, true);
     try {
       const user = await ensureAuthenticatedSession();
@@ -8035,11 +8284,11 @@ if (vaForm) {
         p_queue_ticket_id: Number(ticketId),
         p_citizen_id: citizenId ? Number(citizenId) : null,
         p_chief_complaint: complaint || 'General Checkup',
-        p_blood_pressure: document.getElementById('va-bp')?.value || null,
-        p_heart_rate: parseInt(document.getElementById('va-hr')?.value) || null,
-        p_temperature: parseFloat(document.getElementById('va-temp')?.value) || null,
-        p_respiratory_rate: parseInt(document.getElementById('va-rr')?.value) || null,
-        p_oxygen_saturation: parseInt(document.getElementById('va-spo2')?.value) || null,
+        p_blood_pressure: bp || null,
+        p_heart_rate: hrVal ? parseInt(hrVal, 10) : null,
+        p_temperature: tempVal ? parseFloat(tempVal) : null,
+        p_respiratory_rate: rrVal ? parseInt(rrVal, 10) : null,
+        p_oxygen_saturation: spo2Val ? parseInt(spo2Val, 10) : null,
         p_current_medications: document.getElementById('va-meds')?.value || null,
         p_notes: document.getElementById('va-notes')?.value || null
       };
@@ -8131,9 +8380,18 @@ const appointments = (() => {
     state.loading = true;
     try {
       const { supabase } = await loadSupabaseModule();
+      
+      const manilaToday = new Intl.DateTimeFormat('fr-CA', {
+        timeZone: 'Asia/Manila',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(new Date());
+
       const { data, error } = await supabase
         .from('queue_tickets')
         .select('*, citizen:citizens(*), vitals:vital_signs(id)')
+        .eq('queue_date', manilaToday)
         .in('status', ['waiting', 'on_call', 'serving'])
         .order('queue_number', { ascending: true });
 
@@ -8193,6 +8451,23 @@ const appointments = (() => {
       container.innerHTML = '<div class="queue-ticket-empty">No tickets.</div>';
       return;
     }
+
+    const getIndicatorHtml = (type) => {
+      if (type === 'pwd') {
+        return `<span style="background:#fef08a;color:#854d0e;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px;margin-left:6px;" title="PWD">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2"/><path d="M12 7v5h3"/><path d="M15 19l2-3"/><path d="M7 16a5 5 0 1 0 5-8"/></svg>
+          PWD
+        </span>`;
+      }
+      if (type === 'pregnant') {
+        return `<span style="background:#fbcfe8;color:#be185d;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px;margin-left:6px;" title="Pregnant">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+          Pregnant
+        </span>`;
+      }
+      return '';
+    };
+
     container.innerHTML = list.map(t => `
       <div class="queue-ticket-card" data-id="${t.id}" draggable="true">
         <div class="queue-ticket-top">
@@ -8200,7 +8475,10 @@ const appointments = (() => {
           ${(t.vitals && t.vitals.length > 0) ? '<span class="vitals-badge" title="Vital assessment completed">✓ Vitals</span>' : ''}
           <span class="queue-ticket-code">${t.ticket_code}</span>
         </div>
-        <div class="queue-ticket-name">${t.citizen?.firstname || ''} ${t.citizen?.surname || ''}</div>
+        <div class="queue-ticket-name" style="display:flex;align-items:center;">
+          ${t.citizen?.firstname || ''} ${t.citizen?.surname || ''}
+          ${getIndicatorHtml(t.citizen_type)}
+        </div>
         <div class="queue-ticket-meta">${t.service_label}</div>
         <div class="queue-ticket-actions">
           ${getStatus(t) === 'waiting' ? '<button class="queue-ticket-btn" data-action="move" data-lane="on_call">On Call</button>' : ''}
@@ -8298,7 +8576,13 @@ const appointments = (() => {
     const deleteBtn = document.getElementById('queue-ticket-delete-btn');
     if (deleteBtn) {
       deleteBtn.onclick = async () => {
-        if (!confirm('Are you sure you want to delete this queue ticket?')) return;
+        const confirmation = await openDialogModal({
+          title: 'Delete Queue Ticket',
+          message: 'Are you sure you want to delete this queue ticket? This action cannot be undone.',
+          confirmText: 'Delete',
+          cancelText: 'Cancel'
+        });
+        if (!confirmation.confirmed) return;
         
         try {
           setLoading(deleteBtn, true);
@@ -8309,7 +8593,7 @@ const appointments = (() => {
           const { error } = await supabase
             .from('queue_tickets')
             .delete()
-            .eq('id', id);
+            .eq('id', Number(id));
 
           if (error) throw error;
 

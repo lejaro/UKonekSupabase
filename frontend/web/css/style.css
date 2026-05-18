@@ -2340,7 +2340,7 @@ select:focus {
 .sidebar .logo {
     width: 40px;
     height: 40px;
-    background: radial-gradient(circle at 30% 30%, #b7ceff 0%, #5f8df9 35%, #2a5fd8 100%);
+    background: #ffffff;
     border-radius: 8px
 }
 

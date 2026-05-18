@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'uKonekOnBoardingPage.dart';
+import 'uKonekMenuPage.dart';
 import 'uKonekDashboardPage.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
@@ -87,7 +87,7 @@ class _RootHandlerState extends State<RootHandler> {
         debugPrint('RootHandler: Session mismatch, clearing Supabase session.');
         await ApiService.signOut();
       }
-      _navigate(const OnboardingPage());
+      _navigate(const uKonekMenuPage());
       return;
     }
 
@@ -114,7 +114,7 @@ class _RootHandlerState extends State<RootHandler> {
       } catch (signOutError) {
         debugPrint('RootHandler: SignOut error: $signOutError');
       }
-      _navigate(const OnboardingPage());
+      _navigate(const uKonekMenuPage());
     }
   }
 
