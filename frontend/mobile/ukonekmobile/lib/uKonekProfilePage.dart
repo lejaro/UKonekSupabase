@@ -4,7 +4,8 @@ import 'uKonekMenuPage.dart';
 import 'services/api_service.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'uKonekMedicineScheduler.dart';  // ✅ added
-import 'uKonekJoinQueuePage.dart';      // ✅ added
+import 'uKonekJoinQueuePage.dart';// ✅ added
+import 'uKonekDashboardPage.dart';
 
 // ── Design tokens ──────────────────────────────────────────────
 class _C {
@@ -270,10 +271,10 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
   // ── Bottom Navigation ────────────────────────────────────────
   Widget _buildBottomNav() {
     final tabs = [
-      {'icon': Icons.dashboard_rounded,           'label': 'Home'},
-      {'icon': Icons.event_note_rounded,           'label': 'Medicine'},
-      {'icon': Icons.confirmation_number_rounded,  'label': 'Queue'},
-      {'icon': Icons.person_outline_rounded,       'label': 'Profile'},
+      {'icon': Icons.home_rounded,                'label': 'Home'},
+      {'icon': Icons.event_note_rounded,          'label': 'Medicine'},
+      {'icon': Icons.confirmation_number_rounded, 'label': 'Queue'},
+      {'icon': Icons.person_outline_rounded,      'label': 'Profile'},
     ];
     return Container(
       decoration: BoxDecoration(
@@ -282,9 +283,7 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
           topLeft:  Radius.circular(24),
           topRight: Radius.circular(24),
         ),
-        boxShadow: [
-          BoxShadow(color: _C.textDark.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -4)),
-        ],
+        boxShadow: [BoxShadow(color: _C.textDark.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -4))],
       ),
       child: SafeArea(
         top: false,
@@ -296,26 +295,29 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
               final isSelected = _selectedTab == i;
               return GestureDetector(
                 onTap: () {
+                  setState(() => _selectedTab = i);
                   if (i == 0) {
-                    // ✅ Pop back to Dashboard — it still holds all registration data
-                    Navigator.pop(context);
+                    Navigator.pop(context); // Pop back to Dashboard
                   } else if (i == 1) {
                     Navigator.push(context, MaterialPageRoute(
                       builder: (_) => uKonekMedicineSchedulerPage(
                         username:  widget.username,
                         citizenId: widget.citizenId,
                       ),
-                    ));
+                    )).then((_) {
+                      if (mounted) setState(() => _selectedTab = 3);
+                    });
                   } else if (i == 2) {
                     Navigator.push(context, MaterialPageRoute(
                       builder: (_) => uKonekJoinQueuePage(
                         username:  widget.username,
                         citizenId: widget.citizenId,
                       ),
-                    ));
+                    )).then((_) {
+                      if (mounted) setState(() => _selectedTab = 3);
+                    });
                   } else if (i == 3) {
                     // Already on Profile
-                    setState(() => _selectedTab = 3);
                   }
                 },
                 child: AnimatedContainer(
@@ -325,20 +327,27 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
                     color: isSelected ? _C.primaryMid.withOpacity(0.10) : Colors.transparent,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Row(children: [
-                    Icon(
-                      tabs[i]['icon'] as IconData,
-                      color: isSelected ? _C.primaryMid : Colors.grey.shade400,
-                      size: 22,
-                    ),
-                    if (isSelected) ...[
-                      const SizedBox(width: 6),
-                      Text(
-                        tabs[i]['label'] as String,
-                        style: const TextStyle(color: _C.primaryMid, fontSize: 12, fontWeight: FontWeight.bold),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        tabs[i]['icon'] as IconData,
+                        color: isSelected ? _C.primaryMid : Colors.grey.shade400,
+                        size: 22,
                       ),
+                      if (isSelected) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          tabs[i]['label'] as String,
+                          style: const TextStyle(
+                            color:      _C.primaryMid,
+                            fontSize:   10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ],
-                  ]),
+                  ),
                 ),
               );
             }),
@@ -347,7 +356,6 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
       ),
     );
   }
-
   // ── Header ───────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context) {
     return Container(
@@ -442,9 +450,12 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
           _EditField('Middle Name',    _middleName,    (v) => _middleName    = v, required: false),
           _EditField('Last Name',      _surname,       (v) => _surname       = v),
           _EditField('Name Extension', _nameExtension, (v) => _nameExtension = v, required: false),
-          _EditField('Date of Birth',  _dob,           (v) => _dob           = v, hint: 'MM/DD/YYYY'),
-          _EditField('Age',            _age,           (v) => _age           = v, numeric: true),
-          _EditField('Sex',            _sex,           (v) => _sex           = v),
+          _EditField('Date of Birth',  _dob,           (v) => _dob           = v, type: FieldType.date),
+          _EditField('Age',            _age,           (v) => _age           = v, type: FieldType.numeric),
+          _EditField('Sex',            _sex,           (v) => _sex           = v,
+            type: FieldType.dropdown,
+            options: ['Male', 'Female'],
+          ),
         ],
       ),
       children: [
@@ -466,9 +477,9 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         title: 'Contact & Address',
         icon: Icons.contact_mail_outlined,
         fields: [
-          _EditField('Email',   _email,   (v) => _email   = v),
-          _EditField('Phone',   _phone,   (v) => _phone   = v),
-          _EditField('Address', _address, (v) => _address = v),
+          _EditField('Email',   _email,   (v) => _email   = v, type: FieldType.email),
+          _EditField('Phone',   _phone,   (v) => _phone   = v, type: FieldType.phone),
+          _EditField('Address', _address, (v) => _address = v, type: FieldType.multiline),
         ],
       ),
       children: [
@@ -489,8 +500,11 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         icon: Icons.emergency_outlined,
         fields: [
           _EditField('Contact Name',   _emergencyName,    (v) => _emergencyName    = v),
-          _EditField('Contact Number', _emergencyContact, (v) => _emergencyContact = v),
-          _EditField('Relationship',   _relation,         (v) => _relation         = v),
+          _EditField('Contact Number', _emergencyContact, (v) => _emergencyContact = v, type: FieldType.phone),
+          _EditField('Relationship',   _relation,         (v) => _relation         = v,
+            type: FieldType.dropdown,
+            options: ['Parent', 'Spouse', 'Sibling', 'Child', 'Relative', 'Friend', 'Guardian', 'Other'],
+          ),
         ],
       ),
       children: [
@@ -551,110 +565,140 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
   }
 
   // ── Edit Sheet ───────────────────────────────────────────────
-  void _showEditSheet({required String title, required IconData icon, required List<_EditField> fields}) {
-    final controllers = {for (final f in fields) f.label: TextEditingController(text: f.value)};
+  void _showEditSheet({
+    required String title,
+    required IconData icon,
+    required List<_EditField> fields,
+  }) {
+    final controllers = {
+      for (final f in fields) f.label: TextEditingController(text: f.value)
+    };
+    // Separate state map for dropdown values
+    final dropdownValues = {
+      for (final f in fields)
+        if (f.type == FieldType.dropdown) f.label: f.value
+    };
     final formKey = GlobalKey<FormState>();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
-        maxChildSize: 0.95,
-        minChildSize: 0.5,
-        builder: (_, sc) => Container(
-          decoration: const BoxDecoration(color: _C.surface, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-          child: Column(children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Container(width: 36, height: 4, decoration: BoxDecoration(color: _C.divider, borderRadius: BorderRadius.circular(2))),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setLocal) => DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          maxChildSize: 0.95,
+          minChildSize: 0.5,
+          builder: (_, sc) => Container(
+            decoration: const BoxDecoration(
+              color: _C.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Row(children: [
-                Container(width: 38, height: 38, decoration: BoxDecoration(color: _C.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(11)), child: Icon(icon, color: _C.primary, size: 20)),
-                const SizedBox(width: 12),
-                Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _C.textDark)),
-              ]),
-            ),
-            const SizedBox(height: 4),
-            Divider(indent: 20, endIndent: 20, color: _C.divider),
-            Expanded(
-              child: Form(
-                key: formKey,
-                child: ListView(
-                  controller: sc,
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                  children: fields.map((f) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: TextFormField(
-                      controller: controllers[f.label],
-                      keyboardType: f.numeric ? TextInputType.number : TextInputType.text,
-                      inputFormatters: f.numeric ? [FilteringTextInputFormatter.digitsOnly] : null,
-                      style: const TextStyle(fontSize: 14, color: _C.textDark),
-                      decoration: InputDecoration(
-                        labelText: f.label,
-                        hintText:  f.hint,
-                        labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-                        filled: true,
-                        fillColor: _C.fieldBg,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        border:        OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _C.fieldBdr)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _C.fieldBdr)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _C.primaryMid, width: 1.8)),
-                      ),
-                      validator: f.required ? (v) => (v == null || v.trim().isEmpty) ? '${f.label} is required' : null : null,
-                    ),
-                  )).toList(),
+            child: Column(children: [
+              // ── Handle ──────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(color: _C.divider, borderRadius: BorderRadius.circular(2)),
                 ),
               ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
-              child: SizedBox(
-                width: double.infinity, height: 52,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: _C.primary, foregroundColor: Colors.white, elevation: 4, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                  onPressed: () async {
-                    if (formKey.currentState!.validate()) {
-                      final updatedData = <String, dynamic>{};
-                      for (final f in fields) {
-                        final dbKey = _mapLabelToDbKey(f.label);
-                        if (dbKey != null) {
-                          var val = controllers[f.label]!.text.trim();
-                          if (dbKey == 'age') {
-                            updatedData[dbKey] = int.tryParse(val) ?? 0;
-                          } else {
-                            updatedData[dbKey] = val;
-                          }
-                        }
-                      }
-                      
-                      try {
-                        await ApiService.updateMyCitizenProfile(updatedData);
-                        setState(() {
-                          for (final f in fields) { f.setter(controllers[f.label]!.text.trim()); }
-                        });
-                        Navigator.pop(context);
-                        _snack('✅ $title updated successfully!', _C.success);
-                      } catch (e) {
-                        _snack('Error updating profile: $e', Colors.redAccent);
-                      }
-                    }
-                  },
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('SAVE CHANGES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8, fontSize: 15)),
-                      SizedBox(width: 8),
-                      Icon(Icons.check_rounded, size: 18),
-                    ],
+              // ── Title ───────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: Row(children: [
+                  Container(
+                    width: 38, height: 38,
+                    decoration: BoxDecoration(
+                      color: _C.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(icon, color: _C.primary, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _C.textDark)),
+                ]),
+              ),
+              const SizedBox(height: 4),
+              Divider(indent: 20, endIndent: 20, color: _C.divider),
+
+              // ── Fields ──────────────────────────────────
+              Expanded(
+                child: Form(
+                  key: formKey,
+                  child: ListView(
+                    controller: sc,
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                    children: fields.map((f) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: _buildFieldWidget(
+                          f, controllers[f.label]!, dropdownValues, setLocal, ctx,
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
               ),
-            ),
-          ]),
+
+              // ── Save Button ─────────────────────────────
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _C.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () async {
+                      // Sync dropdown values back into controllers
+                      for (final f in fields) {
+                        if (f.type == FieldType.dropdown) {
+                          controllers[f.label]!.text = dropdownValues[f.label] ?? '';
+                        }
+                      }
+                      if (formKey.currentState!.validate()) {
+                        final updatedData = <String, dynamic>{};
+                        for (final f in fields) {
+                          final dbKey = _mapLabelToDbKey(f.label);
+                          if (dbKey != null) {
+                            final val = controllers[f.label]!.text.trim();
+                            updatedData[dbKey] = dbKey == 'age'
+                                ? (int.tryParse(val) ?? 0)
+                                : val;
+                          }
+                        }
+                        try {
+                          await ApiService.updateMyCitizenProfile(updatedData);
+                          setState(() {
+                            for (final f in fields) {
+                              f.setter(controllers[f.label]!.text.trim());
+                            }
+                          });
+                          Navigator.pop(context);
+                          _snack('✅ $title updated successfully!', _C.success);
+                        } catch (e) {
+                          _snack('Error updating profile: $e', Colors.redAccent);
+                        }
+                      }
+                    },
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('SAVE CHANGES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8, fontSize: 15)),
+                        SizedBox(width: 8),
+                        Icon(Icons.check_rounded, size: 18),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+          ),
         ),
       ),
     );
@@ -715,6 +759,186 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         ),
       ),
     );
+  }
+
+  Widget _buildFieldWidget(
+      _EditField f,
+      TextEditingController ctrl,
+      Map<String, String> dropdownValues,
+      StateSetter setLocal,
+      BuildContext ctx,
+      ) {
+    final inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: _C.fieldBdr),
+    );
+    final focusedBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: _C.primaryMid, width: 1.8),
+    );
+    final baseDecoration = InputDecoration(
+      labelText: f.label,
+      hintText:  f.hint,
+      labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+      filled: true,
+      fillColor: _C.fieldBg,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border:        inputBorder,
+      enabledBorder: inputBorder,
+      focusedBorder: focusedBorder,
+    );
+
+    switch (f.type) {
+
+    // ── Date picker ─────────────────────────────
+      case FieldType.date:
+        return TextFormField(
+          controller: ctrl,
+          readOnly: true,
+          style: const TextStyle(fontSize: 14, color: _C.textDark),
+          decoration: baseDecoration.copyWith(
+            hintText: 'Select date',
+            suffixIcon: const Icon(Icons.calendar_today_rounded, color: _C.primary, size: 18),
+          ),
+          onTap: () async {
+            // Parse existing value if any
+            DateTime initial = DateTime.now().subtract(const Duration(days: 365 * 18));
+            if (ctrl.text.isNotEmpty) {
+              final parsed = DateTime.tryParse(ctrl.text);
+              if (parsed != null) initial = parsed;
+            }
+            final picked = await showDatePicker(
+              context: ctx,
+              initialDate: initial,
+              firstDate: DateTime(1900),
+              lastDate: DateTime.now(),
+              builder: (context, child) => Theme(
+                data: Theme.of(context).copyWith(
+                  colorScheme: const ColorScheme.light(
+                    primary:   _C.primary,
+                    onPrimary: Colors.white,
+                    surface:   Colors.white,
+                    onSurface: _C.textDark,
+                  ),
+                ),
+                child: child!,
+              ),
+            );
+            if (picked != null) {
+              // Store as ISO (YYYY-MM-DD) for the DB
+              ctrl.text = '${picked.year.toString().padLeft(4, '0')}-'
+                  '${picked.month.toString().padLeft(2, '0')}-'
+                  '${picked.day.toString().padLeft(2, '0')}';
+            }
+          },
+          validator: f.required
+              ? (v) => (v == null || v.trim().isEmpty) ? '${f.label} is required' : null
+              : null,
+        );
+
+    // ── Dropdown ────────────────────────────────
+      case FieldType.dropdown:
+        final current = dropdownValues[f.label] ?? '';
+        return DropdownButtonFormField<String>(
+          value: current.isNotEmpty ? current : null,
+          decoration: baseDecoration,
+          style: const TextStyle(fontSize: 14, color: _C.textDark),
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _C.primary),
+          items: (f.options ?? []).map((opt) => DropdownMenuItem(
+            value: opt,
+            child: Text(opt, style: const TextStyle(fontSize: 14, color: _C.textDark)),
+          )).toList(),
+          onChanged: (val) {
+            if (val != null) {
+              setLocal(() => dropdownValues[f.label] = val);
+              ctrl.text = val;
+            }
+          },
+          validator: f.required
+              ? (v) => (v == null || v.isEmpty) ? '${f.label} is required' : null
+              : null,
+        );
+
+    // ── Phone ───────────────────────────────────
+      case FieldType.phone:
+        return TextFormField(
+          controller: ctrl,
+          keyboardType: TextInputType.phone,
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s]'))],
+          style: const TextStyle(fontSize: 14, color: _C.textDark),
+          decoration: baseDecoration.copyWith(
+            prefixIcon: const Icon(Icons.phone_outlined, color: _C.primary, size: 18),
+          ),
+          validator: f.required
+              ? (v) => (v == null || v.trim().isEmpty) ? '${f.label} is required' : null
+              : null,
+        );
+
+    // ── Email ───────────────────────────────────
+      case FieldType.email:
+        return TextFormField(
+          controller: ctrl,
+          keyboardType: TextInputType.emailAddress,
+          style: const TextStyle(fontSize: 14, color: _C.textDark),
+          decoration: baseDecoration.copyWith(
+            prefixIcon: const Icon(Icons.email_outlined, color: _C.primary, size: 18),
+          ),
+          validator: f.required
+              ? (v) {
+            if (v == null || v.trim().isEmpty) return '${f.label} is required';
+            if (!v.contains('@')) return 'Enter a valid email';
+            return null;
+          }
+              : null,
+        );
+
+    // ── Numeric ─────────────────────────────────
+      case FieldType.numeric:
+        return TextFormField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          style: const TextStyle(fontSize: 14, color: _C.textDark),
+          decoration: baseDecoration,
+          validator: f.required
+              ? (v) => (v == null || v.trim().isEmpty) ? '${f.label} is required' : null
+              : null,
+        );
+
+    // ── Multiline ───────────────────────────────
+      case FieldType.multiline:
+        return TextFormField(
+          controller: ctrl,
+          keyboardType: TextInputType.multiline,
+          maxLines: 3,
+          style: const TextStyle(fontSize: 14, color: _C.textDark),
+          decoration: baseDecoration.copyWith(
+            alignLabelWithHint: true,
+            prefixIcon: const Padding(
+              padding: EdgeInsets.only(bottom: 40),
+              child: Icon(Icons.location_on_outlined, color: _C.primary, size: 18),
+            ),
+          ),
+          validator: f.required
+              ? (v) => (v == null || v.trim().isEmpty) ? '${f.label} is required' : null
+              : null,
+        );
+
+    // ── Plain text (default) ────────────────────
+      case FieldType.text:
+      default:
+        return TextFormField(
+          controller: ctrl,
+          keyboardType: TextInputType.text,
+          style: const TextStyle(fontSize: 14, color: _C.textDark),
+          decoration: baseDecoration,
+          validator: f.required
+              ? (v) => (v == null || v.trim().isEmpty) ? '${f.label} is required' : null
+              : null,
+        );
+    }
   }
 
   Widget _pwField(TextEditingController ctrl, String label, bool show, VoidCallback toggle) {
@@ -861,13 +1085,24 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
 }
 
 // ── Edit field model ──────────────────────────────────────────
+enum FieldType { text, numeric, email, phone, date, dropdown, multiline }
+
 class _EditField {
   final String label;
   final String value;
   final void Function(String) setter;
   final bool required;
-  final bool numeric;
   final String? hint;
+  final FieldType type;
+  final List<String>? options; // for dropdown
 
-  const _EditField(this.label, this.value, this.setter, {this.required = true, this.numeric = false, this.hint});
+  const _EditField(
+      this.label,
+      this.value,
+      this.setter, {
+        this.required = true,
+        this.hint,
+        this.type = FieldType.text,
+        this.options,
+      });
 }

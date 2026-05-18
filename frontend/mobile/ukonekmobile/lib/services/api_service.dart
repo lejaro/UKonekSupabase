@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
@@ -50,7 +52,6 @@ class DoctorSchedule {
     final name = doctorName.trim();
     if (name.isEmpty) return 'Doctor';
     if (name.toLowerCase().startsWith('dr.')) return name;
-    // Reorder to Surname, Firstname format
     final parts = name.split(' ');
     if (parts.length >= 2) {
       final surname = parts.last;
@@ -71,9 +72,7 @@ class DoctorSchedule {
       scheduleDate: DateTime.parse(map['schedule_date'] as String),
       startTime: (map['start_time'] as String?) ?? '',
       endTime: (map['end_time'] as String?) ?? '',
-      notes: (map['notes'] as String?)?.trim().isEmpty == true
-          ? null
-          : (map['notes'] as String?),
+      notes: (map['notes'] as String?)?.trim().isEmpty == true ? null : (map['notes'] as String?),
       availabilityStatus: (map['availability_status'] ?? '').toString().toLowerCase(),
     );
   }
@@ -161,9 +160,7 @@ class PrescriptionRecord {
 
   String get quantityLabel {
     final normalizedUnit = unit.trim();
-    if (normalizedUnit.isEmpty) {
-      return quantity.toString();
-    }
+    if (normalizedUnit.isEmpty) return quantity.toString();
     return '$quantity $normalizedUnit';
   }
 
@@ -248,11 +245,9 @@ class ScheduledMedicine {
     if (f.contains('q4h')) return 6;
     if (f.contains('q2h')) return 12;
 
-    // Fallbacks for regex "Nx a day"
     final xday = RegExp(r'(\d+)\s*x').firstMatch(f);
     if (xday != null) return int.tryParse(xday.group(1)!) ?? 1;
 
-    // "Every N hours" or "qNh"
     final hrs = RegExp(r'every\s+(\d+)\s+h').firstMatch(f);
     if (hrs != null) {
       final h = int.tryParse(hrs.group(1)!) ?? 8;
@@ -275,7 +270,7 @@ class ScheduledMedicine {
       if (val != null) {
         if (d.contains('week')) return val * 7;
         if (d.contains('month')) return val * 30;
-        return val; // Default to days
+        return val;
       }
     }
     return 1;
@@ -297,11 +292,9 @@ class ScheduledMedicine {
     return (24 * 60) ~/ count;
   }
 
-  // Generate dose times starting at 08:00 spaced by 24/count hours.
   List<String> get doseTimes {
     final f = frequency.toLowerCase().trim();
-    
-    // Immediate / STAT doses show current time (or issued time)
+
     if (f.contains('stat')) {
       try {
         return [DateFormat('hh:mm a').format(issuedAt)];
@@ -309,21 +302,19 @@ class ScheduledMedicine {
         return ['08:00 AM'];
       }
     }
-    
-    // Fixed daily timings
+
     if (f.contains('om')) return ['08:00 AM'];
     if (f.contains('on')) return ['08:00 PM'];
     if (f.contains('hs')) return ['09:00 PM'];
-    
+
     final count = dailyDoseCount;
     if (count <= 0) return [];
-    
-    // Standard optimized schedule
+
     if (count == 1) return ['08:00 AM'];
     if (count == 2) return ['08:00 AM', '08:00 PM'];
     if (count == 3) return ['08:00 AM', '04:00 PM', '12:00 AM'];
     if (count == 4) return ['06:00 AM', '12:00 PM', '06:00 PM', '12:00 AM'];
-    
+
     final intervalHours = 24 ~/ count;
     return List.generate(count, (i) {
       final totalMins = 8 * 60 + i * intervalHours * 60;
@@ -438,9 +429,7 @@ class Consultation {
 
   factory Consultation.fromMap(Map<String, dynamic> map) {
     final doctor = map['doctor'] as Map<String, dynamic>?;
-    final drName = doctor != null
-        ? '${doctor['last_name'] ?? ''} ${doctor['first_name'] ?? ''}'.trim()
-        : null;
+    final drName = doctor != null ? '${doctor['last_name'] ?? ''} ${doctor['first_name'] ?? ''}'.trim() : null;
 
     return Consultation(
       id: (map['id'] as num?)?.toInt() ?? 0,
@@ -523,9 +512,7 @@ class QueueServiceOption {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is QueueServiceOption &&
-          runtimeType == other.runtimeType &&
-          serviceKey == other.serviceKey;
+          other is QueueServiceOption && runtimeType == other.runtimeType && serviceKey == other.serviceKey;
 
   @override
   int get hashCode => serviceKey.hashCode;
@@ -577,8 +564,7 @@ class QueueTicket {
       serviceLabel: (map['r_service_label'] ?? map['service_label'] ?? '').toString().trim(),
       citizenType: (map['r_citizen_type'] ?? map['citizen_type'] ?? '').toString().trim(),
       status: (map['r_status'] ?? map['status'] ?? '').toString().trim(),
-      estimatedWaitMinutes:
-          ((map['r_estimated_wait_minutes'] ?? map['estimated_wait_minutes']) as num?)?.toInt() ?? 0,
+      estimatedWaitMinutes: ((map['r_estimated_wait_minutes'] ?? map['estimated_wait_minutes']) as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -634,10 +620,8 @@ class QueueDashboardSnapshot {
       serviceLabel: (map['r_service_label'] ?? map['service_label'] ?? '').toString().trim(),
       ticketCode: (map['r_ticket_code'] ?? map['ticket_code'] ?? '').toString().trim(),
       myQueueNumber: ((map['r_my_queue_number'] ?? map['my_queue_number']) as num?)?.toInt(),
-      currentlyServingQueueNumber:
-          ((map['r_currently_serving_queue_number'] ?? map['currently_serving_queue_number']) as num?)?.toInt(),
-      estimatedWaitMinutes:
-          ((map['r_estimated_wait_minutes'] ?? map['estimated_wait_minutes']) as num?)?.toInt() ?? 0,
+      currentlyServingQueueNumber: ((map['r_currently_serving_queue_number'] ?? map['currently_serving_queue_number']) as num?)?.toInt(),
+      estimatedWaitMinutes: ((map['r_estimated_wait_minutes'] ?? map['estimated_wait_minutes']) as num?)?.toInt() ?? 0,
       status: (map['r_status'] ?? map['status'] ?? '').toString().trim(),
       queueDate: parsedDate,
       isOnCall: map['is_on_call'] == true,
@@ -664,10 +648,6 @@ class QueueDashboardSnapshot {
     waitingCount: 0,
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Queue Limiter Status Model
-// ═══════════════════════════════════════════════════════════════════════════
 
 class QueueLimiterStatus {
   final bool enabled;
@@ -710,12 +690,8 @@ class QueueLimiterStatus {
 
   String get statusMessage {
     if (!enabled) return '';
-    if (limitReached) {
-      return 'Daily consultation limit reached ($dailyLimit/$dailyLimit). Please try again tomorrow.';
-    }
-    if (remainingSlots <= 5) {
-      return 'Only $remainingSlots consultation slots remaining today.';
-    }
+    if (limitReached) return 'Daily consultation limit reached ($dailyLimit/$dailyLimit). Please try again tomorrow.';
+    if (remainingSlots <= 5) return 'Only $remainingSlots consultation slots remaining today.';
     return '$remainingSlots consultation slots available today.';
   }
 }
@@ -737,9 +713,7 @@ class PrescribedMedicine {
 
   String get quantityLabel {
     final normalizedUnit = unit.trim();
-    if (normalizedUnit.isEmpty) {
-      return quantity.toString();
-    }
+    if (normalizedUnit.isEmpty) return quantity.toString();
     return '$quantity $normalizedUnit';
   }
 
@@ -755,161 +729,96 @@ class PrescribedMedicine {
   }
 }
 
+// ── BACKEND WEB WORKER SUBSYSTEM ENGINE (API SERVICE INTERFACE) ───────
 class ApiService {
   static SupabaseClient get _client => Supabase.instance.client;
 
   static String? _resolveEmailRedirectUrl() {
     const configured = String.fromEnvironment('APP_REDIRECT_URL');
-    if (configured.isNotEmpty) {
-      return configured;
-    }
-    if (kIsWeb) {
-      return Uri.base.origin;
-    }
+    if (configured.isNotEmpty) return configured;
+    if (kIsWeb) return Uri.base.origin;
     return null;
   }
 
-  static Future<void> requestCitizenPreAuthOtp({
-    required Map<String, dynamic> payload,
-  }) async {
-    final response = await _client.functions.invoke(
-      'citizen-request-otp',
-      body: payload,
-    );
-
+  static Future<void> requestCitizenPreAuthOtp({required Map<String, dynamic> payload}) async {
+    final response = await _client.functions.invoke('citizen-request-otp', body: payload);
     if (response.status != 200) {
       final data = response.data;
-      final message = data is Map<String, dynamic>
-          ? (data['error']?.toString() ?? 'Unable to send OTP.')
-          : 'Unable to send OTP.';
+      final message = data is Map<String, dynamic> ? (data['error']?.toString() ?? 'Unable to send OTP.') : 'Unable to send OTP.';
       throw Exception(message);
     }
   }
 
-  static Future<void> verifyCitizenPreAuthOtp({
-    required String email,
-    required String otp,
-  }) async {
-    final response = await _client.functions.invoke(
-      'citizen-verify-otp',
-      body: {
-        'email': email.trim().toLowerCase(),
-        'otp': otp.trim(),
-      },
-    );
-
+  static Future<void> verifyCitizenPreAuthOtp({required String email, required String otp}) async {
+    final response = await _client.functions.invoke('citizen-verify-otp', body: {
+      'email': email.trim().toLowerCase(),
+      'otp': otp.trim(),
+    });
     if (response.status != 200) {
       final data = response.data;
-      final message = data is Map<String, dynamic>
-          ? (data['error']?.toString() ?? 'OTP verification failed.')
-          : 'OTP verification failed.';
+      final message = data is Map<String, dynamic> ? (data['error']?.toString() ?? 'OTP verification failed.') : 'OTP verification failed.';
       throw Exception(message);
     }
   }
 
-  static Future<void> completeCitizenPreAuthSignup({
-    required String email,
-    required String username,
-    required String password,
-  }) async {
-    final response = await _client.functions.invoke(
-      'citizen-complete-signup',
-      body: {
-        'email': email.trim().toLowerCase(),
-        'username': username.trim(),
-        'password': password,
-      },
-    );
-
+  static Future<void> completeCitizenPreAuthSignup({required String email, required String username, required String password}) async {
+    final response = await _client.functions.invoke('citizen-complete-signup', body: {
+      'email': email.trim().toLowerCase(),
+      'username': username.trim(),
+      'password': password,
+    });
     if (response.status != 200) {
       final data = response.data;
-      final message = data is Map<String, dynamic>
-          ? (data['error']?.toString() ?? 'Unable to complete signup.')
-          : 'Unable to complete signup.';
+      final message = data is Map<String, dynamic> ? (data['error']?.toString() ?? 'Unable to complete signup.') : 'Unable to complete signup.';
       throw Exception(message);
     }
   }
 
-  /// Compatibility method: OTP flow was removed in backendless mode.
-  /// Sends a magic link email using Supabase OTP endpoint.
-  static Future<void> requestCitizenOtp({
-    required String email,
-    required String purpose,
-  }) async {
+  static Future<void> requestCitizenOtp({required String email, required String purpose}) async {
     final normalizedEmail = email.trim().toLowerCase();
     final emailRedirectTo = _resolveEmailRedirectUrl();
 
     try {
-      await _client.auth.signInWithOtp(
-        email: normalizedEmail,
-        emailRedirectTo: emailRedirectTo,
-        shouldCreateUser: false,
-      );
+      await _client.auth.signInWithOtp(email: normalizedEmail, emailRedirectTo: emailRedirectTo, shouldCreateUser: false);
     } on AuthException catch (error) {
       final code = (error.statusCode ?? '').toString();
       final message = error.message.toLowerCase();
-      if (message.contains('otp_expired') ||
-          message.contains('token has expired') ||
-          message.contains('token has expired or is invalid')) {
-        throw Exception(
-          'Verification link expired. Please request a new verification email and open the latest link only.',
-        );
+      if (message.contains('otp_expired') || message.contains('token has expired') || message.contains('token has expired or is invalid')) {
+        throw Exception('Verification link expired. Please request a new verification email and open the latest link only.');
       }
       if (message.contains('rate limit') || message.contains('too many')) {
-        throw Exception(
-          'Please wait a minute before requesting another email.',
-        );
+        throw Exception('Please wait a minute before requesting another email.');
       }
       if (message.contains('security purposes') || code == '429') {
-        throw Exception(
-          'Please wait about 55 seconds before requesting another verification email.',
-        );
+        throw Exception('Please wait about 55 seconds before requesting another verification email.');
       }
       if (message.contains('not authorized')) {
-        throw Exception(
-          'Email sending is restricted by Supabase SMTP settings. Configure custom SMTP in Supabase Auth settings.',
-        );
+        throw Exception('Email sending is restricted by Supabase SMTP settings. Configure custom SMTP in Supabase Auth settings.');
       }
       rethrow;
     }
   }
 
-  static Future<void> verifyCitizenEmailOtp({
-    required String email,
-    required String otp,
-  }) async {
+  static Future<void> verifyCitizenEmailOtp({required String email, required String otp}) async {
     final normalizedEmail = email.trim().toLowerCase();
     final normalizedOtp = otp.trim();
 
-    if (normalizedOtp.isEmpty) {
-      throw Exception('Please enter the OTP code from your email.');
-    }
+    if (normalizedOtp.isEmpty) throw Exception('Please enter the OTP code from your email.');
 
     try {
-      await _client.auth.verifyOTP(
-        email: normalizedEmail,
-        token: normalizedOtp,
-        type: OtpType.email,
-      );
+      await _client.auth.verifyOTP(email: normalizedEmail, token: normalizedOtp, type: OtpType.email);
     } on AuthException catch (_) {
-      await _client.auth.verifyOTP(
-        email: normalizedEmail,
-        token: normalizedOtp,
-        type: OtpType.signup,
-      );
+      await _client.auth.verifyOTP(email: normalizedEmail, token: normalizedOtp, type: OtpType.signup);
     }
   }
 
   static bool hasVerifiedSessionForEmail(String email) {
     final user = _client.auth.currentUser;
     if (user == null) return false;
-    return (user.email ?? '').trim().toLowerCase() ==
-        email.trim().toLowerCase();
+    return (user.email ?? '').trim().toLowerCase() == email.trim().toLowerCase();
   }
 
-  static Future<void> startCitizenEmailVerification({
-    required Map<String, dynamic> payload,
-  }) async {
+  static Future<void> startCitizenEmailVerification({required Map<String, dynamic> payload}) async {
     final email = (payload['email'] as String).trim().toLowerCase();
     final emailRedirectTo = _resolveEmailRedirectUrl();
 
@@ -928,54 +837,36 @@ class ApiService {
           'contact_number': payload['contact_number'] ?? '',
           'sex': payload['sex'] ?? '',
           'complete_address': payload['complete_address'] ?? '',
-          'emergency_contact_complete_name':
-              payload['emergency_contact_complete_name'] ?? '',
-          'emergency_contact_contact_number':
-              payload['emergency_contact_contact_number'] ?? '',
+          'emergency_contact_complete_name': payload['emergency_contact_complete_name'] ?? '',
+          'emergency_contact_contact_number': payload['emergency_contact_contact_number'] ?? '',
           'relation': payload['relation'] ?? '',
         },
       );
     } on AuthException catch (error) {
       final code = (error.statusCode ?? '').toString();
       final message = error.message.toLowerCase();
-      if (message.contains('otp_expired') ||
-          message.contains('token has expired') ||
-          message.contains('token has expired or is invalid')) {
-        throw Exception(
-          'Verification link expired. Please request a new verification email and open the latest link only.',
-        );
+      if (message.contains('otp_expired') || message.contains('token has expired') || message.contains('token has expired or is invalid')) {
+        throw Exception('Verification link expired. Please request a new verification email and open the latest link only.');
       }
-      if (message.contains('already registered')) {
-        throw Exception('Email already used, please use other email.');
-      }
-      if (message.contains('security purposes') ||
-          message.contains('rate limit') ||
-          code == '429') {
-        throw Exception(
-          'Please wait about 55 seconds before requesting another verification email.',
-        );
+      if (message.contains('already registered')) throw Exception('Email already used, please use other email.');
+      if (message.contains('security purposes') || message.contains('rate limit') || code == '429') {
+        throw Exception('Please wait about 55 seconds before requesting another verification email.');
       }
       rethrow;
     }
   }
 
-  static Future<void> completeCitizenRegistration({
-    required Map<String, dynamic> payload,
-  }) async {
+  static Future<void> completeCitizenRegistration({required Map<String, dynamic> payload}) async {
     final email = (payload['email'] as String).trim().toLowerCase();
     final username = (payload['username'] as String).trim();
     final password = payload['password'] as String;
 
     final user = _client.auth.currentUser;
-    if (user == null) {
-      throw Exception('Please verify your email first using the OTP magic link.');
-    }
+    if (user == null) throw Exception('Please verify your email first using the OTP magic link.');
 
     final sessionEmail = (user.email ?? '').trim().toLowerCase();
     if (sessionEmail != email) {
-      throw Exception(
-        'Verified session email does not match registration email. Please verify the same email you entered.',
-      );
+      throw Exception('Verified session email does not match registration email. Please verify the same email you entered.');
     }
 
     try {
@@ -995,85 +886,48 @@ class ApiService {
         'p_contact_number': payload['contact_number'] ?? '',
         'p_sex': payload['sex'] ?? '',
         'p_complete_address': payload['complete_address'] ?? '',
-        'p_emergency_contact_complete_name':
-            payload['emergency_contact_complete_name'] ?? '',
-        'p_emergency_contact_contact_number':
-            payload['emergency_contact_contact_number'] ?? '',
+        'p_emergency_contact_complete_name': payload['emergency_contact_complete_name'] ?? '',
+        'p_emergency_contact_contact_number': payload['emergency_contact_contact_number'] ?? '',
         'p_relation': payload['relation'] ?? '',
         'p_username': username,
       },
     );
 
     if (response is Map<String, dynamic> && response['ok'] == false) {
-      final message = (response['error'] ?? 'Unable to complete registration.')
-          .toString();
+      final message = (response['error'] ?? 'Unable to complete registration.').toString();
       throw Exception(message);
     }
   }
 
-  /// Sign in a citizen using email + password.
-  static Future<Map<String, dynamic>> loginCitizen({
-    required String identifier,
-    required String password,
-  }) async {
+  static Future<Map<String, dynamic>> loginCitizen({required String identifier, required String password}) async {
     final loginEmail = identifier.trim().toLowerCase();
     if (!loginEmail.contains('@')) {
-      throw const LoginFailureException(
-        type: LoginFailureType.validation,
-        message: 'Please enter your email address',
-      );
+      throw const LoginFailureException(type: LoginFailureType.validation, message: 'Please enter your email address');
     }
 
     AuthResponse authResponse;
     try {
-      authResponse = await _client.auth.signInWithPassword(
-        email: loginEmail.toLowerCase(),
-        password: password,
-      );
+      authResponse = await _client.auth.signInWithPassword(email: loginEmail.toLowerCase(), password: password);
     } on AuthException catch (error) {
       final code = (error.statusCode ?? '').toString();
       final message = error.message.toLowerCase();
 
-      if (message.contains('invalid login credentials') ||
-          message.contains('invalid credentials') ||
-          message.contains('incorrect password') ||
-          code == '400') {
-        throw const LoginFailureException(
-          type: LoginFailureType.invalidCredentials,
-          message: 'Wrong password or email. Please try again.',
-        );
+      if (message.contains('invalid login credentials') || message.contains('invalid credentials') || message.contains('incorrect password') || code == '400') {
+        throw const LoginFailureException(type: LoginFailureType.invalidCredentials, message: 'Wrong password or email. Please try again.');
       }
-
       if (message.contains('email not confirmed')) {
-        throw const LoginFailureException(
-          type: LoginFailureType.unverifiedEmail,
-          message: 'Please verify your email using the OTP magic link before signing in.',
-        );
+        throw const LoginFailureException(type: LoginFailureType.unverifiedEmail, message: 'Please verify your email using the OTP magic link before signing in.');
       }
-
-      if (message.contains('network') ||
-          message.contains('timeout') ||
-          message.contains('failed to fetch')) {
-        throw const LoginFailureException(
-          type: LoginFailureType.network,
-          message: 'Network issue. Please check your internet and try again.',
-        );
+      if (message.contains('network') || message.contains('timeout') || message.contains('failed to fetch')) {
+        throw const LoginFailureException(type: LoginFailureType.network, message: 'Network issue. Please check your internet and try again.');
       }
-
-      throw const LoginFailureException(
-        type: LoginFailureType.unknown,
-        message: 'Unable to sign in right now. Please try again.',
-      );
+      throw const LoginFailureException(type: LoginFailureType.unknown, message: 'Unable to sign in right now. Please try again.');
     }
 
     if (authResponse.user == null) {
-      throw const LoginFailureException(
-        type: LoginFailureType.invalidCredentials,
-        message: 'Wrong password or email. Please try again.',
-      );
+      throw const LoginFailureException(type: LoginFailureType.invalidCredentials, message: 'Wrong password or email. Please try again.');
     }
 
-    // Save session token for secondary persistence verification
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = authResponse.session?.accessToken ?? 'authenticated';
@@ -1082,34 +936,17 @@ class ApiService {
       debugPrint('ApiService: Failed to save session_token: $e');
     }
 
-    // Fetch the citizen profile.
-    // If missing, try to auto-link a legacy citizen row by email.
-    Map<String, dynamic>? profile = await _client
-        .from('citizens')
-        .select()
-        .eq('auth_user_id', authResponse.user!.id)
-        .maybeSingle();
+    Map<String, dynamic>? profile = await _client.from('citizens').select().eq('auth_user_id', authResponse.user!.id).maybeSingle();
 
     if (profile == null) {
       try {
         await _client.rpc('link_my_citizen_auth_by_email');
-      } catch (_) {
-        // Ignore relink failures and keep original UX fallback below.
-      }
-
-      profile = await _client
-          .from('citizens')
-          .select()
-          .eq('auth_user_id', authResponse.user!.id)
-          .maybeSingle();
+      } catch (_) {}
+      profile = await _client.from('citizens').select().eq('auth_user_id', authResponse.user!.id).maybeSingle();
     }
 
     if (profile == null) {
-      throw const LoginFailureException(
-        type: LoginFailureType.validation,
-        message:
-            'Your account is missing a citizen profile. Please contact the health center admin for account setup.',
-      );
+      throw const LoginFailureException(type: LoginFailureType.validation, message: 'Your account is missing a citizen profile. Please contact the health center admin for account setup.');
     }
 
     return {
@@ -1118,11 +955,7 @@ class ApiService {
     };
   }
 
-  /// Register a new citizen via Supabase Auth signUp.
-  /// The handle_new_user trigger will auto-create the citizens row.
-  static Future<void> registerCitizen({
-    required Map<String, dynamic> payload,
-  }) async {
+  static Future<void> registerCitizen({required Map<String, dynamic> payload}) async {
     final email = (payload['email'] as String).trim().toLowerCase();
     final password = payload['password'] as String;
     final username = payload['username'] as String;
@@ -1144,10 +977,8 @@ class ApiService {
           'contact_number': payload['contact_number'] ?? '',
           'sex': payload['sex'] ?? '',
           'complete_address': payload['complete_address'] ?? '',
-          'emergency_contact_complete_name':
-              payload['emergency_contact_complete_name'] ?? '',
-          'emergency_contact_contact_number':
-              payload['emergency_contact_contact_number'] ?? '',
+          'emergency_contact_complete_name': payload['emergency_contact_complete_name'] ?? '',
+          'emergency_contact_contact_number': payload['emergency_contact_contact_number'] ?? '',
           'relation': payload['relation'] ?? '',
           'username': username,
         },
@@ -1155,63 +986,38 @@ class ApiService {
     } on AuthException catch (error) {
       final code = (error.statusCode ?? '').toString();
       final message = error.message.toLowerCase();
-      if (message.contains('already registered')) {
-        throw Exception(
-          'Email already used, please use other email.',
-        );
-      }
-      if (message.contains('security purposes') ||
-          message.contains('rate limit') ||
-          code == '429') {
-        throw Exception(
-          'Please wait about 55 seconds before trying again.',
-        );
+      if (message.contains('already registered')) throw Exception('Email already used, please use other email.');
+      if (message.contains('security purposes') || message.contains('rate limit') || code == '429') {
+        throw Exception('Please wait about 55 seconds before trying again.');
       }
       rethrow;
     }
 
-    if (authResponse.user == null) {
-      throw Exception('Registration failed. Please try again.');
-    }
+    if (authResponse.user == null) throw Exception('Registration failed. Please try again.');
 
     if (authResponse.session == null) {
-      // Covers new unconfirmed users and obfuscated repeated-signup responses.
       await requestCitizenOtp(email: email, purpose: 'registration');
       return;
     }
   }
 
-  /// Request a password reset email via Supabase Auth.
   static Future<void> requestPasswordReset({required String email}) async {
     await _client.auth.resetPasswordForEmail(email.trim().toLowerCase());
   }
 
-  /// Compatibility method for old OTP password reset screen.
-  /// In backendless mode, use email recovery link + updateUser session flow.
-  static Future<void> resetCitizenPassword({
-    required String email,
-    required String otp,
-    required String password,
-    required String confirmPassword,
-  }) async {
-    throw Exception(
-      'OTP reset is no longer supported. Use the Supabase recovery email link to reset password.',
-    );
+  static Future<void> resetCitizenPassword({required String email, required String otp, required String password, required String confirmPassword}) async {
+    throw Exception('OTP reset is no longer supported. Use the Supabase recovery email link to reset password.');
   }
 
-  /// Sign out the current user.
   static Future<void> signOut() async {
     try {
       await _client.auth.signOut();
     } catch (e) {
       debugPrint('Server signOut failed: $e, forcing local signout.');
     } finally {
-      // Ensure local session is cleared regardless of network
       try {
         await _client.auth.signOut(scope: SignOutScope.local);
       } catch (_) {}
-      
-      // Wipe SharedPreferences to fully clear remembered login states
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.clear();
@@ -1229,11 +1035,7 @@ class ApiService {
         .toList(growable: false);
   }
 
-  /// Returns available doctor schedules for citizens.
-  static Future<List<DoctorSchedule>> listAvailableDoctorSchedules({
-    DateTime? from,
-    DateTime? to,
-  }) async {
+  static Future<List<DoctorSchedule>> listAvailableDoctorSchedules({DateTime? from, DateTime? to}) async {
     final now = DateTime.now();
     final dateFrom = DateTime(now.year, now.month, now.day);
     final dateTo = to ?? dateFrom.add(const Duration(days: 30));
@@ -1247,30 +1049,19 @@ class ApiService {
     );
 
     final rows = (response as List<dynamic>?) ?? const [];
-    return rows
-        .whereType<Map<String, dynamic>>()
-        .map(DoctorSchedule.fromMap)
-        .toList(growable: false);
+    return rows.whereType<Map<String, dynamic>>().map(DoctorSchedule.fromMap).toList(growable: false);
   }
 
   static Future<void> submitCitizenFeedback(FeedbackSubmission feedback) async {
     final user = _client.auth.currentUser;
-    if (user == null) {
-      throw Exception('Please sign in before sending feedback.');
-    }
+    if (user == null) throw Exception('Please sign in before sending feedback.');
 
-    final citizen = await _client
-        .from('citizens')
-        .select('id, email')
-        .eq('auth_user_id', user.id)
-        .maybeSingle();
+    final citizen = await _client.from('citizens').select('id, email').eq('auth_user_id', user.id).maybeSingle();
 
     final citizenId = (citizen?['id'] as num?)?.toInt();
     final citizenEmail = (citizen?['email'] as String?)?.trim();
     final fallbackEmail = user.email?.trim();
-    final fromEmail =
-        (citizenEmail?.isNotEmpty == true ? citizenEmail : fallbackEmail) ??
-        'unknown@ukonek.local';
+    final fromEmail = (citizenEmail?.isNotEmpty == true ? citizenEmail : fallbackEmail) ?? 'unknown@ukonek.local';
 
     await _client.from('feedbacks').insert({
       'citizen_id': citizenId,
@@ -1281,31 +1072,21 @@ class ApiService {
     });
   }
 
-  static Future<List<QueueServiceOption>> listAvailableQueueServices({
-    DateTime? date,
-  }) async {
+  static Future<List<QueueServiceOption>> listAvailableQueueServices({DateTime? date}) async {
     final normalizedDate = date ?? DateTime.now();
-    final response = await _client.rpc(
-      'list_available_queue_services',
-      params: {'p_date': _asDate(normalizedDate)},
-    );
+    final response = await _client.rpc('list_available_queue_services', params: {'p_date': _asDate(normalizedDate)});
 
     final rows = (response as List<dynamic>?) ?? const [];
     return rows
         .whereType<Map<String, dynamic>>()
         .map(QueueServiceOption.fromMap)
-        .where(
-          (entry) =>
-              entry.serviceKey.isNotEmpty &&
-              entry.serviceLabel.isNotEmpty,
-        )
+        .where((entry) => entry.serviceKey.isNotEmpty && entry.serviceLabel.isNotEmpty)
         .toList(growable: false);
   }
 
   static Future<QueueTicket> joinQueue(QueueJoinRequest request) async {
     final citizenType = request.citizenType.trim().toLowerCase();
-    if (request.serviceKey.trim().isEmpty ||
-        request.serviceLabel.trim().isEmpty) {
+    if (request.serviceKey.trim().isEmpty || request.serviceLabel.trim().isEmpty) {
       throw Exception('Please select a healthcare service.');
     }
     if (!const {'regular', 'pwd', 'pregnant'}.contains(citizenType)) {
@@ -1327,9 +1108,7 @@ class ApiService {
     } on PostgrestException catch (error) {
       final rawMessage = error.message.toLowerCase();
       if (rawMessage.contains('citizen profile not found')) {
-        throw Exception(
-          'Your account is missing a citizen profile. Please contact the health center admin for account setup.',
-        );
+        throw Exception('Your account is missing a citizen profile. Please contact the health center admin for account setup.');
       }
       rethrow;
     }
@@ -1345,30 +1124,21 @@ class ApiService {
   static Future<QueueDashboardSnapshot> getMyQueueDashboard() async {
     final response = await _client.rpc('get_my_queue_dashboard');
     final rows = (response as List<dynamic>?) ?? const [];
-    if (rows.isEmpty || rows.first is! Map<String, dynamic>) {
-      return QueueDashboardSnapshot.empty;
-    }
+    if (rows.isEmpty || rows.first is! Map<String, dynamic>) return QueueDashboardSnapshot.empty;
     return QueueDashboardSnapshot.fromMap(rows.first as Map<String, dynamic>);
   }
 
-  /// Get queue limiter status (daily limit info)
   static Future<QueueLimiterStatus> getQueueLimiterStatus() async {
     final response = await _client.rpc('get_queue_limiter_status');
     final rows = (response as List<dynamic>?) ?? const [];
-    if (rows.isEmpty || rows.first is! Map<String, dynamic>) {
-      return QueueLimiterStatus.disabled();
-    }
+    if (rows.isEmpty || rows.first is! Map<String, dynamic>) return QueueLimiterStatus.disabled();
     return QueueLimiterStatus.fromMap(rows.first as Map<String, dynamic>);
   }
 
   static Future<List<PrescribedMedicine>> getMyPrescribedMedicines() async {
     final response = await _client.rpc('get_my_prescribed_medicines');
     final rows = (response as List<dynamic>?) ?? const [];
-    return rows
-        .whereType<Map<String, dynamic>>()
-        .map(PrescribedMedicine.fromMap)
-        .where((item) => item.medicineName.isNotEmpty)
-        .toList(growable: false);
+    return rows.whereType<Map<String, dynamic>>().map(PrescribedMedicine.fromMap).where((item) => item.medicineName.isNotEmpty).toList(growable: false);
   }
 
   static Future<bool> cancelMyQueue() async {
@@ -1376,20 +1146,12 @@ class ApiService {
     return response == true;
   }
 
-  /// Fetches the logged-in citizen's profile data.
   static Future<Map<String, dynamic>> fetchMyCitizenProfile() async {
     final user = _client.auth.currentUser;
     if (user == null) throw Exception('Not authenticated');
 
-    final response = await _client
-        .from('citizens')
-        .select('*')
-        .eq('auth_user_id', user.id)
-        .maybeSingle();
-
-    if (response == null) {
-      throw Exception('Citizen profile not found');
-    }
+    final response = await _client.from('citizens').select('*').eq('auth_user_id', user.id).maybeSingle();
+    if (response == null) throw Exception('Citizen profile not found');
     return response;
   }
 
@@ -1408,24 +1170,14 @@ class ApiService {
       final profile = await fetchMyCitizenProfile();
       final citizenId = profile['id'];
 
-      final response = await _client
-          .from('vital_signs')
-          .select()
-          .eq('citizen_id', citizenId)
-          .order('created_at', ascending: false);
-
+      final response = await _client.from('vital_signs').select().eq('citizen_id', citizenId).order('created_at', ascending: false);
       final rows = (response as List<dynamic>?) ?? const [];
-      return rows
-          .whereType<Map<String, dynamic>>()
-          .map(VitalSigns.fromMap)
-          .toList();
+      return rows.whereType<Map<String, dynamic>>().map(VitalSigns.fromMap).toList();
     } catch (e) {
       debugPrint('Error fetching vital signs: $e');
       return [];
     }
   }
-
-  // ── Medicine Schedule ─────────────────────────────────────────────────────────
 
   static Future<List<ScheduledMedicine>> getMedicineSchedule() async {
     final user = _client.auth.currentUser;
@@ -1434,30 +1186,21 @@ class ApiService {
     try {
       final response = await _client.rpc('get_my_medicine_schedule');
       final rows = (response as List<dynamic>?) ?? const <dynamic>[];
-      return rows
-          .whereType<Map<String, dynamic>>()
-          .map(ScheduledMedicine.fromMap)
-          .toList();
+      return rows.whereType<Map<String, dynamic>>().map(ScheduledMedicine.fromMap).toList();
     } catch (e) {
       debugPrint('Error fetching medicine schedule: $e');
       return [];
     }
   }
 
-  // ── Prescriptions ────────────────────────────────────────────────────────────
-
   static Future<List<PrescriptionRecord>> fetchPrescriptions({int limit = 50}) async {
     final user = _client.auth.currentUser;
     if (user == null) return [];
 
     try {
-      final response = await _client
-          .rpc('get_my_prescribed_medicines', params: {'p_limit': limit});
+      final response = await _client.rpc('get_my_prescribed_medicines', params: {'p_limit': limit});
       final rows = (response as List<dynamic>?) ?? const [];
-      return rows
-          .whereType<Map<String, dynamic>>()
-          .map(PrescriptionRecord.fromMap)
-          .toList();
+      return rows.whereType<Map<String, dynamic>>().map(PrescriptionRecord.fromMap).toList();
     } catch (e) {
       debugPrint('Error fetching prescriptions: $e');
       return [];
@@ -1472,49 +1215,27 @@ class ApiService {
       final profile = await fetchMyCitizenProfile();
       final citizenId = profile['id'];
 
-      final response = await _client
-          .from('consultations')
-          .select('*, doctor:staff!doctor_staff_id(first_name, last_name)')
-          .eq('patient_citizen_id', citizenId)
-          .order('consulted_at', ascending: false);
-
+      final response = await _client.from('consultations').select('*, doctor:staff!doctor_staff_id(first_name, last_name)').eq('patient_citizen_id', citizenId).order('consulted_at', ascending: false);
       final rows = (response as List<dynamic>?) ?? const [];
-      return rows
-          .whereType<Map<String, dynamic>>()
-          .map(Consultation.fromMap)
-          .toList();
+      return rows.whereType<Map<String, dynamic>>().map(Consultation.fromMap).toList();
     } catch (e) {
       debugPrint('Error fetching consultations: $e');
       return [];
     }
   }
 
-  // ── Announcements ─────────────────────────────────────────────────────────────
-
   static Future<List<Announcement>> fetchAnnouncements() async {
     try {
-      final response = await _client
-          .from('announcements')
-          .select('id,title,content,visibility,created_at')
-          .inFilter('visibility', ['all', 'citizen'])
-          .order('created_at', ascending: false)
-          .limit(10);
-
+      final response = await _client.from('announcements').select('id,title,content,visibility,created_at').inFilter('visibility', ['all', 'citizen']).order('created_at', ascending: false).limit(10);
       final rows = (response as List<dynamic>?) ?? const [];
-      return rows
-          .whereType<Map<String, dynamic>>()
-          .map(Announcement.fromMap)
-          .toList();
+      return rows.whereType<Map<String, dynamic>>().map(Announcement.fromMap).toList();
     } catch (e) {
       debugPrint('Error fetching announcements: $e');
       return [];
     }
   }
-  static Future<void> logMedicineIntake({
-    required int prescriptionItemId,
-    required String scheduledTime,
-    required int doseIndex,
-  }) async {
+
+  static Future<void> logMedicineIntake({required int prescriptionItemId, required String scheduledTime, required int doseIndex}) async {
     final profile = await fetchMyCitizenProfile();
     final citizenId = profile['id'];
 
@@ -1531,30 +1252,28 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getIntakeLogsForDate(DateTime date) async {
     final profile = await fetchMyCitizenProfile();
     final citizenId = profile['id'];
-    
+
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    
+
     final response = await _client
         .from('medicine_intake_logs')
         .select()
         .eq('citizen_id', citizenId)
         .gte('created_at', startOfDay.toUtc().toIso8601String())
         .lt('created_at', endOfDay.toUtc().toIso8601String());
-        
+
     return (response as List<dynamic>?)?.whereType<Map<String, dynamic>>().toList() ?? [];
   }
 
   static Future<void> updateMyCitizenProfile(Map<String, dynamic> data) async {
     final user = _client.auth.currentUser;
     if (user == null) throw Exception('Not authenticated');
-    
-    await _client
-        .from('citizens')
-        .update(data)
-        .eq('auth_user_id', user.id);
+
+    await _client.from('citizens').update(data).eq('auth_user_id', user.id);
   }
 
+  // ── 💡 FIXED: Missing function definition completely integrated ──
   static Future<Map<String, dynamic>> getTvQueueDisplay() async {
     try {
       final response = await _client.rpc('get_tv_queue_display');

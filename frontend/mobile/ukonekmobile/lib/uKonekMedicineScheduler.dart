@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'uKonekDashboardPage.dart';
 import 'uKonekJoinQueuePage.dart';
+import 'uKonekProfilePage.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1324,17 +1325,24 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     ]),
   );
 
+// ═══════════════════════════════════════════════════════════════
+// 2. MEDICINE SCHEDULER PAGE — uKonekMedicineScheduler.dart
+// ═══════════════════════════════════════════════════════════════
+
   Widget _buildBottomNav() {
     final tabs = [
-      {'icon': Icons.dashboard_rounded,           'label': 'Home'},
-      {'icon': Icons.event_note_rounded,           'label': 'Medicine'},
-      {'icon': Icons.confirmation_number_rounded,  'label': 'Queue'},
-      {'icon': Icons.person_outline_rounded,       'label': 'Profile'},
+      {'icon': Icons.home_rounded,                'label': 'Home'},
+      {'icon': Icons.event_note_rounded,          'label': 'Medicine'},
+      {'icon': Icons.confirmation_number_rounded, 'label': 'Queue'},
+      {'icon': Icons.person_outline_rounded,      'label': 'Profile'},
     ];
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+        color: Colors.white,                              // was _C.surface
+        borderRadius: const BorderRadius.only(
+          topLeft:  Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
         boxShadow: [BoxShadow(color: _textDark.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -4))],
       ),
       child: SafeArea(
@@ -1347,44 +1355,64 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
               final isSelected = _selectedTab == i;
               return GestureDetector(
                 onTap: () {
+                  setState(() => _selectedTab = i);
                   if (i == 0) {
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => uKonekDashboardPage(
+                    Navigator.push(context, _pageRoute(
+                      uKonekDashboardPage(
                         username:  widget.username,
                         citizenId: widget.citizenId,
                       ),
-                    ));
+                    )).then((_) {
+                      if (mounted) setState(() => _selectedTab = 1);
+                    });
                   } else if (i == 1) {
-                    setState(() => _selectedTab = i);
+                    _load(); // Already here — just refresh
                   } else if (i == 2) {
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => uKonekJoinQueuePage(
+                    Navigator.push(context, _pageRoute(
+                      uKonekJoinQueuePage(
                         username:  widget.username,
                         citizenId: widget.citizenId,
                       ),
-                    ));
+                    )).then((_) {
+                      _load();
+                      if (mounted) setState(() => _selectedTab = 1);
+                    });
                   } else if (i == 3) {
-                    Navigator.pop(context);
+                    Navigator.push(context, _pageRoute(
+                      uKonekProfilePage(
+                        username:  widget.username,
+                        citizenId: widget.citizenId,
+                        fullName:  widget.username,
+                      ),
+                    )).then((_) {
+                      if (mounted) setState(() => _selectedTab = 1);
+                    });
                   }
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
                   padding: EdgeInsets.symmetric(horizontal: isSelected ? 16 : 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected ? _primary.withOpacity(0.10) : Colors.transparent,
+                    color: isSelected ? _primaryMid.withOpacity(0.10) : Colors.transparent,  // was _C.primaryMid
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(tabs[i]['icon'] as IconData,
-                        color: isSelected ? _primary : _textMuted.withOpacity(0.5),
+                      Icon(
+                        tabs[i]['icon'] as IconData,
+                        color: isSelected ? _primaryMid : Colors.grey.shade400,              // was _C.primaryMid
                         size: 22,
                       ),
                       if (isSelected) ...[
                         const SizedBox(height: 4),
-                        Text(tabs[i]['label'] as String,
-                          style: const TextStyle(color: _primary, fontSize: 10, fontWeight: FontWeight.bold),
+                        Text(
+                          tabs[i]['label'] as String,
+                          style: const TextStyle(
+                            color:      _primaryMid,                                          // was _C.primaryMid
+                            fontSize:   10,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ],
@@ -1396,7 +1424,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         ),
       ),
     );
-  }
+  }  MaterialPageRoute _pageRoute(Widget page) =>   // ← THIS TOO
+  MaterialPageRoute(builder: (_) => page);
+
 
   Widget _sectionHeader(String title) => Text(title,
       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _textDark));
