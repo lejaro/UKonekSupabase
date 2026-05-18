@@ -1,7 +1,0 @@
-flutter_native_splash:
-  color: "#FFFFFF"
-  image: assets/logo/uKonekLogo.jpg
-
-  android_12:
-    color: "#FFFFFF"
-    image: assets/logo/uKonekLogo.jpg
