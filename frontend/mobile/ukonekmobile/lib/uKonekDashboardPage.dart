@@ -973,7 +973,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               width: 34,
@@ -985,7 +985,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               child: Icon(icon, color: color, size: 18),
             ),
             const SizedBox(width: 12),
-            Expanded(
+            Flexible(
               child: Text(
                 label,
                 style: const TextStyle(

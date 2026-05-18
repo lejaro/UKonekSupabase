@@ -5276,6 +5276,8 @@ async function renderClinicalStats() {
 }
 
 async function initDashboardData() {
+  toggleStatsSkeleton(true);
+  toggleChartSkeleton('dashboard-chart', true);
   try {
     const sessionUser = await ensureAuthenticatedSession();
     if (!sessionUser) return;
