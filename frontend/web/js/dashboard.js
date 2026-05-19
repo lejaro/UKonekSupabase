@@ -162,26 +162,6 @@ function toggleStatsSkeleton(isLoading) {
   });
 }
 
-/**
- * Render card-style skeletons for queue lanes.
- */
-function renderQueueSkeleton(container) {
-  if (!container) return;
-  let cardsHtml = '';
-  for (let i = 0; i < 2; i++) {
-    cardsHtml += `
-      <div class="skeleton-stat-card" style="margin-bottom: 12px; gap: 8px; border-radius: 8px; border: 1px solid #e2e8f0; padding: 12px; background: #ffffff;">
-        <div class="skeleton-stat-card-header" style="display:flex; align-items:center; gap:8px;">
-          <div class="skeleton-circle" style="width: 18px; height: 18px; flex-shrink: 0; border-radius:50%; background: #e2e8f0;"></div>
-          <div class="skeleton-text short" style="height: 12px; margin: 0; width: 40%; border-radius:4px; background: #e2e8f0;"></div>
-        </div>
-        <div class="skeleton-text medium" style="height: 12px; margin: 4px 0 0 0; width: 70%; border-radius:4px; display:block; background: #e2e8f0;"></div>
-        <div class="skeleton-text long" style="height: 10px; margin: 4px 0 0 0; width: 90%; border-radius:4px; display:block; background: #e2e8f0;"></div>
-      </div>
-    `;
-  }
-  container.innerHTML = cardsHtml;
-}
 
 /**
  * Render chart shimmer loading states.
@@ -8709,11 +8689,6 @@ const appointments = (() => {
     if (state.loading) return;
     // Don't refresh if user is currently dragging a ticket to avoid breaking the interaction
     if (document.querySelector('.queue-ticket-card.dragging')) return;
-
-    // Render shimmery queue cards skeletons while loading
-    renderQueueSkeleton(document.getElementById('queue-waiting-list'));
-    renderQueueSkeleton(document.getElementById('queue-oncall-list'));
-    renderQueueSkeleton(document.getElementById('queue-serving-list'));
 
     state.loading = true;
     try {

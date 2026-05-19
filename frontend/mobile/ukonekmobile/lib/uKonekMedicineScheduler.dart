@@ -299,7 +299,16 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     final completion = _getCompletionRate(grouped);
     final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
     final isPast = _selectedDate.isBefore(DateTime.now()) && !isToday;
-    final showProgress = completion >= 1.0 && (isToday || isPast);
+    
+    int totalDoses = 0;
+    for (var entry in grouped.entries) {
+      for (var d in entry.value) {
+        if (d['doseIndex'] != -1) {
+          totalDoses++;
+        }
+      }
+    }
+    final showProgress = totalDoses > 0 && completion >= 1.0 && (isToday || isPast);
 
     return Scaffold(
       backgroundColor: _bg,
