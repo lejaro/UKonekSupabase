@@ -2033,7 +2033,10 @@ function renderScheduleDoctors(staffList, user) {
       const actionsCell = tr.querySelector('td:last-child');
       if (!actionsCell) return;
 
-      const canEditAvailability = isFullAccessUser(user);
+      const canEditAvailability = user && (
+        String(staff.id) === String(user.id) || 
+        (staff.email && user.email && String(staff.email).toLowerCase() === String(user.email).toLowerCase())
+      );
       const toggleGroup = document.createElement('div');
       toggleGroup.className = 'availability-toggle-group';
       toggleGroup.dataset.staffId = String(staff.id || '');
@@ -2152,6 +2155,14 @@ async function handleAvailabilityToggle(staff, nextStatus, toggleGroup) {
   if (!isFullAccessUser(cachedSessionUser)) return;
 
   const staffId = staff.id;
+  const isSelf = cachedSessionUser && (
+    String(staffId) === String(cachedSessionUser.id) || 
+    (staff.email && cachedSessionUser.email && String(staff.email).toLowerCase() === String(cachedSessionUser.email).toLowerCase())
+  );
+  if (!isSelf) {
+    showToast('You can only update your own availability.', 'error');
+    return;
+  }
   const prevStatus = normalizeAvailabilityStatus(staff?.availability_status);
   const normalizedNext = normalizeAvailabilityStatus(nextStatus);
   if (prevStatus === normalizedNext) return;
