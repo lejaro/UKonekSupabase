@@ -736,9 +736,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                 Text(hasQueue ? queue.serviceLabel : 'Not in queue', style: const TextStyle(color: _C.textMuted, fontSize: 11)),
               ]),
               const SizedBox(height: 20),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                _queueInfo('CURRENTLY SERVING', _queueNumberText(queue.currentlyServingQueueNumber), _C.textMuted),
-                Container(width: 1, height: 44, color: _C.divider),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 _queueInfo('YOUR NUMBER', _queueNumberText(queue.myQueueNumber), hasQueue ? _C.primaryMid : _C.textMuted),
               ]),
               const SizedBox(height: 20),
@@ -755,7 +753,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                           ? 'You are currently being served'
                           : (queue.status.toLowerCase() == 'on_call'
                               ? 'Please proceed to vital assessment'
-                              : 'Est. Wait: ${_formatWaitTime(queue.estimatedWaitMinutes)}   •   Patients Ahead: ${queue.waitingCount > 0 ? queue.waitingCount : "0 (You\'re next!)"}'))
+                              : 'Est. Wait: ${_formatWaitTime(queue.estimatedWaitMinutes)}   •   Patients Ahead: ${queue.waitingCount > 0 ? queue.waitingCount : "0"}'))
                       : 'Join queue to view waiting time',
                     style: const TextStyle(color: _C.primaryMid, fontWeight: FontWeight.bold, fontSize: 12),
                   ),
@@ -825,41 +823,46 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
     return SizedBox(
       height: 38,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: servingList.length,
-        itemBuilder: (context, index) {
-          final t = servingList[index] as Map<String, dynamic>;
-          final num = t['queue_number'] ?? 0;
-          final numStr = '#${num.toString().padLeft(3, '0')}';
-          return Container(
-            margin: const EdgeInsets.only(right: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1976D2),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF1976D2).withOpacity(0.3),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                )
-              ],
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              numStr,
-              style: const TextStyle(
-                color: Colors.white, 
-                fontSize: 14, 
-                fontWeight: FontWeight.w900, 
-                fontFamily: 'monospace',
-                letterSpacing: 1.0,
-              ),
-            ),
-          );
-        },
+      child: Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(servingList.length, (index) {
+              final t = servingList[index] as Map<String, dynamic>;
+              final num = t['queue_number'] ?? 0;
+              final numStr = '#${num.toString().padLeft(3, '0')}';
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1976D2),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF1976D2).withOpacity(0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    )
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  numStr,
+                  style: const TextStyle(
+                    color: Colors.white, 
+                    fontSize: 14, 
+                    fontWeight: FontWeight.w900, 
+                    fontFamily: 'monospace',
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }

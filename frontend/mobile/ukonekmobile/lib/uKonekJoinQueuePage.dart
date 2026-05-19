@@ -781,7 +781,12 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
                 Row(children: [
                   _statChip(Icons.timer_outlined, 'Est. Wait', '${queue.estimatedWaitMinutes} mins', _C.primaryMid),
                   const SizedBox(width: 12),
-                  _statChip(Icons.confirmation_number_rounded, 'Serving', '#${(queue.currentlyServingQueueNumber ?? 0).toString().padLeft(3, '0')}', statusColor),
+                  _statChip(
+                    Icons.people_outline_rounded,
+                    'People Ahead',
+                    '${ahead > 0 ? ahead : "0"}',
+                    _C.primaryMid,
+                  ),
                 ]),
                 const SizedBox(height: 24),
 

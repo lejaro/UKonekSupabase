@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'uKonekMenuPage.dart';
 import 'uKonekDashboardPage.dart';
+import 'uKonekChangePasswordPage.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 
@@ -25,14 +27,42 @@ void main() async {
   runApp(const UKonekApp());
 }
 
-class UKonekApp extends StatelessWidget {
+class UKonekApp extends StatefulWidget {
   const UKonekApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Check if a patient session already exists
-    final session = Supabase.instance.client.auth.currentSession;
+  State<UKonekApp> createState() => _UKonekAppState();
+}
 
+class _UKonekAppState extends State<UKonekApp> {
+  late final StreamSubscription<AuthState> _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen to Auth state changes globally to intercept deep links for password recovery
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final AuthChangeEvent event = data.event;
+      debugPrint('UKonekApp: Auth State Change Event: $event');
+      
+      if (event == AuthChangeEvent.passwordRecovery) {
+        debugPrint('UKonekApp: Password recovery event detected! Navigating to Change Password page.');
+        NotificationService.navigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const uKonekChangePasswordPage()),
+          (route) => false,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: NotificationService.navigatorKey,
       title: 'uKonek Medical Clinic',
@@ -69,9 +99,6 @@ class _RootHandlerState extends State<RootHandler> {
   }
 
   Future<void> _checkSession() async {
-    // Add a tiny delay to allow the loading spinner to be visible and everything to settle
-    await Future.delayed(const Duration(milliseconds: 500));
-
     final authClient = Supabase.instance.client.auth;
     final session = authClient.currentSession;
 

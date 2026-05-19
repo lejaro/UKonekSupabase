@@ -1002,11 +1002,22 @@ class ApiService {
   }
 
   static Future<void> requestPasswordReset({required String email}) async {
-    await _client.auth.resetPasswordForEmail(email.trim().toLowerCase());
+    String? redirectTo = const String.fromEnvironment('APP_REDIRECT_URL');
+    if (redirectTo.isEmpty) {
+      redirectTo = kIsWeb ? Uri.base.origin : 'ukonekmobile://reset-password';
+    }
+    await _client.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      redirectTo: redirectTo,
+    );
   }
 
-  static Future<void> resetCitizenPassword({required String email, required String otp, required String password, required String confirmPassword}) async {
-    throw Exception('OTP reset is no longer supported. Use the Supabase recovery email link to reset password.');
+  static Future<void> resetCitizenPassword({required String password}) async {
+    try {
+      await _client.auth.updateUser(UserAttributes(password: password));
+    } on AuthException catch (error) {
+      throw Exception(error.message);
+    }
   }
 
   static Future<void> signOut() async {

@@ -3,13 +3,7 @@ import 'services/api_service.dart';
 import 'uKonekLoginPage.dart';
 
 class uKonekChangePasswordPage extends StatefulWidget {
-  final String email;
-  final String otp;
-  const uKonekChangePasswordPage({
-    super.key,
-    required this.email,
-    required this.otp,
-  });
+  const uKonekChangePasswordPage({super.key});
 
   @override
   State<uKonekChangePasswordPage> createState() =>
@@ -17,7 +11,7 @@ class uKonekChangePasswordPage extends StatefulWidget {
 }
 
 class _uKonekChangePasswordPageState
-    extends State<uKonekChangePasswordPage> {
+    extends State<uKonekChangePasswordPage> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final newPasswordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
@@ -27,8 +21,34 @@ class _uKonekChangePasswordPageState
   bool _isLoading = false;
   bool _success = false;
 
-  static const _primary = Color(0xFF0D47A1);
-  static const _primaryLight = Color(0xFF1976D2);
+  // ── Updated Medical Green Design Tokens ──────────────────────
+  static const _primary      = Color(0xFF28A745); // Health Green
+  static const _primary2     = Color(0xFF1B5E20); // Forest Green
+  static const _bg           = Color(0xFFF8FCF9); // Mint Background
+  static const _textDark     = Color(0xFF1B2E1E); // Dark Forest Charcoal
+  static const _textMuted    = Color(0xFF637367); // Muted Sage
+  static const _fieldBdr     = Color(0xFFE2E9E3); // Light Mist Border
+
+  late AnimationController _animController;
+  late Animation<double> _fadeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 400));
+    _fadeAnim =
+        CurvedAnimation(parent: _animController, curve: Curves.easeOut);
+    _animController.forward();
+  }
+
+  @override
+  void dispose() {
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
+    _animController.dispose();
+    super.dispose();
+  }
 
   // Password strength
   String get _password => newPasswordController.text;
@@ -52,44 +72,43 @@ class _uKonekChangePasswordPageState
     setState(() => _isLoading = true);
     try {
       await ApiService.resetCitizenPassword(
-        email: widget.email,
-        otp: widget.otp,
         password: newPasswordController.text,
-        confirmPassword: confirmPasswordController.text,
       );
+      // After successfully updating the password in Supabase, we should also log out to clear the recovery session
+      // and force the user to sign in with their new credentials.
+      await ApiService.signOut();
+      
       if (!mounted) return;
       setState(() {
         _isLoading = false;
         _success = true;
       });
+      _animController
+        ..reset()
+        ..forward();
     } catch (error) {
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(error.toString().replaceFirst('Exception: ', '')),
         backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ));
     }
   }
 
   @override
-  void dispose() {
-    newPasswordController.dispose();
-    confirmPasswordController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFF),
+      backgroundColor: _bg,
       body: Column(
         children: [
-          // ── Header ────────────────────────────────────────────
+          // ── Header (Green Gradient) ─────────────────────────
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                  colors: [_primary, _primaryLight],
+                  colors: [_primary, _primary2],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight),
               borderRadius: BorderRadius.only(
@@ -113,12 +132,12 @@ class _uKonekChangePasswordPageState
                   const Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("New Password",
+                        Text("Reset Password",
                             style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold)),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text("Create a strong new password",
                             style: TextStyle(
                                 color: Colors.white70, fontSize: 12)),
@@ -129,9 +148,12 @@ class _uKonekChangePasswordPageState
           ),
 
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: _success ? _buildSuccessState() : _buildForm(),
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: _success ? _buildSuccessState() : _buildForm(),
+              ),
             ),
           ),
         ],
@@ -156,13 +178,13 @@ class _uKonekChangePasswordPageState
             style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1A1A2E))),
+                color: _textDark)),
         const SizedBox(height: 8),
         Text(
           "Your new password must be different\nfrom your previous password.",
           textAlign: TextAlign.center,
           style: TextStyle(
-              fontSize: 13, color: Colors.grey.shade500, height: 1.5),
+              fontSize: 13, color: _textMuted, height: 1.5),
         ),
         const SizedBox(height: 32),
 
@@ -172,7 +194,7 @@ class _uKonekChangePasswordPageState
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: _textDark.withOpacity(0.05),
                 blurRadius: 20,
                 offset: const Offset(0, 6))],
           ),
@@ -191,7 +213,7 @@ class _uKonekChangePasswordPageState
                         _obscureNew
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
-                        size: 20, color: Colors.grey.shade400),
+                        size: 20, color: _textMuted),
                     onPressed: () =>
                         setState(() => _obscureNew = !_obscureNew),
                   ),
@@ -215,7 +237,7 @@ class _uKonekChangePasswordPageState
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
                           value: _strengthLevel / 4,
-                          backgroundColor: Colors.grey.shade200,
+                          backgroundColor: _bg,
                           valueColor:
                           AlwaysStoppedAnimation(_strengthColor),
                           minHeight: 5,
@@ -243,7 +265,7 @@ class _uKonekChangePasswordPageState
                         _obscureConfirm
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
-                        size: 20, color: Colors.grey.shade400),
+                        size: 20, color: _textMuted),
                     onPressed: () =>
                         setState(() => _obscureConfirm = !_obscureConfirm),
                   ),
@@ -265,7 +287,7 @@ class _uKonekChangePasswordPageState
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0F4FF),
+                    color: _primary.withOpacity(0.06),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -275,7 +297,7 @@ class _uKonekChangePasswordPageState
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: _primary)),
+                              color: _primary2)),
                       const SizedBox(height: 6),
                       ...[
                         "At least 8 characters",
@@ -292,7 +314,7 @@ class _uKonekChangePasswordPageState
                           Text(tip,
                               style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.grey.shade600)),
+                                  color: _textMuted)),
                         ]),
                       )),
                     ],
@@ -322,7 +344,7 @@ class _uKonekChangePasswordPageState
                         : const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text("CHANGE PASSWORD",
+                        Text("SAVE NEW PASSWORD",
                             style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
@@ -359,13 +381,13 @@ class _uKonekChangePasswordPageState
             style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1A1A2E))),
+                color: _textDark)),
         const SizedBox(height: 10),
         Text(
           "Your password has been successfully updated.\nYou can now sign in with your new password.",
           textAlign: TextAlign.center,
           style: TextStyle(
-              fontSize: 13, color: Colors.grey.shade500, height: 1.6),
+              fontSize: 13, color: _textMuted, height: 1.6),
         ),
         const SizedBox(height: 40),
         SizedBox(
@@ -421,24 +443,24 @@ class _uKonekChangePasswordPageState
         obscureText: obscure,
         validator: validator,
         onChanged: onChanged,
-        style: const TextStyle(fontSize: 14, color: Color(0xFF1A1A2E)),
+        style: const TextStyle(fontSize: 14, color: _textDark),
         decoration: InputDecoration(
           labelText: label,
           labelStyle:
-          TextStyle(fontSize: 13, color: Colors.grey.shade500),
+          TextStyle(fontSize: 13, color: _textMuted),
           prefixIcon:
           Icon(icon, color: _primary.withOpacity(0.6), size: 20),
           suffixIcon: suffix,
           filled: true,
-          fillColor: const Color(0xFFF8FAFF),
+          fillColor: _bg,
           contentPadding:
           const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFDDE3F0))),
+              borderSide: const BorderSide(color: _fieldBdr)),
           enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFDDE3F0))),
+              borderSide: const BorderSide(color: _fieldBdr)),
           focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide:

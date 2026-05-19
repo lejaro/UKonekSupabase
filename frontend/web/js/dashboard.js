@@ -170,13 +170,13 @@ function renderQueueSkeleton(container) {
   let cardsHtml = '';
   for (let i = 0; i < 2; i++) {
     cardsHtml += `
-      <div class="skeleton-stat-card skeleton-pulse" style="margin-bottom: 12px; gap: 8px; border-radius: 8px; border: 1px solid #e2e8f0; padding: 12px;">
+      <div class="skeleton-stat-card" style="margin-bottom: 12px; gap: 8px; border-radius: 8px; border: 1px solid #e2e8f0; padding: 12px; background: #ffffff;">
         <div class="skeleton-stat-card-header" style="display:flex; align-items:center; gap:8px;">
-          <div class="skeleton-shimmer skeleton-circle" style="width: 18px; height: 18px; flex-shrink: 0; border-radius:50%;"></div>
-          <div class="skeleton-shimmer skeleton-text short" style="height: 12px; margin: 0; width: 40%; border-radius:4px;"></div>
+          <div class="skeleton-circle" style="width: 18px; height: 18px; flex-shrink: 0; border-radius:50%; background: #e2e8f0;"></div>
+          <div class="skeleton-text short" style="height: 12px; margin: 0; width: 40%; border-radius:4px; background: #e2e8f0;"></div>
         </div>
-        <div class="skeleton-shimmer skeleton-text medium" style="height: 12px; margin: 4px 0 0 0; width: 70%; border-radius:4px; display:block;"></div>
-        <div class="skeleton-shimmer skeleton-text long" style="height: 10px; margin: 4px 0 0 0; width: 90%; border-radius:4px; display:block;"></div>
+        <div class="skeleton-text medium" style="height: 12px; margin: 4px 0 0 0; width: 70%; border-radius:4px; display:block; background: #e2e8f0;"></div>
+        <div class="skeleton-text long" style="height: 10px; margin: 4px 0 0 0; width: 90%; border-radius:4px; display:block; background: #e2e8f0;"></div>
       </div>
     `;
   }
@@ -196,16 +196,30 @@ function toggleChartSkeleton(chartCanvasId, isLoading) {
     if (!wrapper) {
       wrapper = document.createElement('div');
       wrapper.className = 'skeleton-chart-wrapper';
-      wrapper.style.cssText = 'width:100%; height:200px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; position:relative; overflow:hidden;';
-      wrapper.innerHTML = `
-        <div style="display:flex;align-items:flex-end;gap:12px;height:120px;width:80%;justify-content:center;">
-          <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 40%; width: 24px; height: 40px; border-radius: 4px 4px 0 0;"></div>
-          <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 70%; width: 24px; height: 75px; border-radius: 4px 4px 0 0;"></div>
-          <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 50%; width: 24px; height: 55px; border-radius: 4px 4px 0 0;"></div>
-          <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 90%; width: 24px; height: 95px; border-radius: 4px 4px 0 0;"></div>
-          <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 60%; width: 24px; height: 65px; border-radius: 4px 4px 0 0;"></div>
-        </div>
-      `;
+      
+      const isCircular = chartCanvasId === 'dashboard-chart';
+      if (isCircular) {
+        wrapper.style.cssText = 'width:100%; height:200px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; position:relative; overflow:hidden;';
+        wrapper.innerHTML = `
+          <div class="skeleton-shimmer" style="width: 140px; height: 140px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 4px 12px rgba(15,23,42,0.03);">
+            <div style="width: 82px; height: 82px; border-radius: 50%; background: #ffffff; box-shadow: inset 0 2px 6px rgba(15,23,42,0.06); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2;">
+              <div class="skeleton-shimmer" style="width: 28px; height: 12px; border-radius: 3px; margin-bottom: 4px;"></div>
+              <div class="skeleton-shimmer" style="width: 36px; height: 8px; border-radius: 2px;"></div>
+            </div>
+          </div>
+        `;
+      } else {
+        wrapper.style.cssText = 'width:100%; height:200px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; position:relative; overflow:hidden;';
+        wrapper.innerHTML = `
+          <div style="display:flex;align-items:flex-end;gap:12px;height:120px;width:80%;justify-content:center;">
+            <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 40%; width: 24px; height: 40px; border-radius: 4px 4px 0 0;"></div>
+            <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 70%; width: 24px; height: 75px; border-radius: 4px 4px 0 0;"></div>
+            <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 50%; width: 24px; height: 55px; border-radius: 4px 4px 0 0;"></div>
+            <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 90%; width: 24px; height: 95px; border-radius: 4px 4px 0 0;"></div>
+            <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 60%; width: 24px; height: 65px; border-radius: 4px 4px 0 0;"></div>
+          </div>
+        `;
+      }
       canvas.style.display = 'none';
       canvas.parentElement.appendChild(wrapper);
     }
@@ -4302,6 +4316,10 @@ function handleAutoLogoutOnClose() {
 }
 
 function renderDashboardInsights() {
+  // Dismiss skeletons once data is ready to render
+  toggleStatsSkeleton(false);
+  toggleChartSkeleton('dashboard-chart', false);
+
   if (statTotalStaff) statTotalStaff.textContent = String(latestStaffList.length);
 
   const announcementsCount = latestAnnouncementsList.length || 0;
@@ -4426,8 +4444,8 @@ function renderDashboardChart() {
     baseSize,
     centerX: baseSize / 2,
     centerY: baseSize / 2,
-    radius: baseSize / 2 - 28,
-    ringWidth: 38
+    radius: baseSize / 2 - 50, // Reduced from -28 to -50 to make the radius smaller and more balanced
+    ringWidth: 32 // Slightly thinner for an elegant, premium look
   };
 
   const duration = 900;
@@ -4466,19 +4484,24 @@ function drawDashboardPie(ctx, segments, dimensions, progress, total) {
   let consumedSweep = 0;
   let startAngle = -Math.PI / 2;
 
+  // Use 'butt' to prevent round ends from overlapping adjacent segments, producing a clean separator.
   ctx.lineWidth = ringWidth;
-  ctx.lineCap = 'round';
+  ctx.lineCap = 'butt';
   ctx.lineJoin = 'round';
   ctx.shadowBlur = 18;
   ctx.shadowColor = 'rgba(15, 23, 42, 0.15)';
 
+  // Elegant subtle gap between segments if multiple segments are present
+  const gapAngle = segments.length > 1 ? 0.03 : 0;
+
   segments.forEach((segment) => {
     const segmentSweep = segment.ratio * Math.PI * 2;
     const drawableSweep = Math.min(segmentSweep, Math.max(totalSweep - consumedSweep, 0));
-    if (drawableSweep > 0.0001) {
+    if (drawableSweep > gapAngle + 0.001) {
       ctx.beginPath();
       ctx.strokeStyle = segment.color;
-      ctx.arc(centerX, centerY, radius, startAngle, startAngle + drawableSweep);
+      // Subtract half the gap from each end to draw a beautiful centered segment with gaps
+      ctx.arc(centerX, centerY, radius, startAngle + gapAngle / 2, startAngle + drawableSweep - gapAngle / 2);
       ctx.stroke();
     }
     startAngle += segmentSweep;
@@ -4487,23 +4510,28 @@ function drawDashboardPie(ctx, segments, dimensions, progress, total) {
 
   ctx.shadowBlur = 0;
 
-  const innerRadius = radius - ringWidth + 12;
+  // Perfectly align the inner white circle with the inner boundary of the ring (radius - ringWidth / 2 = 113px)
+  const innerRadius = radius - ringWidth / 2;
   ctx.beginPath();
   ctx.fillStyle = '#ffffff';
   ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
-  ctx.lineWidth = 1;
+  
+  // Sleek subtle inner border
+  ctx.strokeStyle = '#e2e8f0';
+  ctx.lineWidth = 1.5;
   ctx.stroke();
 
+  // Premium text typography and hierarchy
   ctx.fillStyle = '#0f172a';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '600 24px "Segoe UI", "Inter", sans-serif';
-  ctx.fillText(String(total), centerX, centerY - 6);
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '13px "Segoe UI", "Inter", sans-serif';
-  ctx.fillText('Total', centerX, centerY + 16);
+  ctx.font = '600 28px "Inter", "Segoe UI", -apple-system, sans-serif';
+  ctx.fillText(String(total), centerX, centerY - 8);
+  
+  ctx.fillStyle = '#64748b';
+  ctx.font = '500 11px "Inter", "Segoe UI", -apple-system, sans-serif';
+  ctx.fillText('TOTAL ITEMS', centerX, centerY + 14);
 }
 
 function easeOutCubic(value) {
@@ -5310,6 +5338,8 @@ async function initDashboardData() {
     console.error('Dashboard data initialization failed:', error);
     showToast('Some data could not be loaded. Please refresh.', 'error');
   } finally {
+    toggleStatsSkeleton(false);
+    toggleChartSkeleton('dashboard-chart', false);
     dismissPagePreloader();
   }
 }

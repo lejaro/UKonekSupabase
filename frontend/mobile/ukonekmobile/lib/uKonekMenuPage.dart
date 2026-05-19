@@ -27,7 +27,8 @@ class _uKonekMenuPageState extends State<uKonekMenuPage>
 
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: Duration.zero,
+      value: 1.0,
     );
 
     _fadeIn = CurvedAnimation(
