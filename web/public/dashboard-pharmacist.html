@@ -1,0 +1,613 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>U-Konek+ — Pharmacist Dashboard</title>
+  <link rel="stylesheet" href="../src/css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    /* ── Pharmacist-specific overrides ── */
+    :root {
+      --ph-green: #16a34a;
+      --ph-green-light: #dcfce7;
+      --ph-amber: #d97706;
+      --ph-amber-light: #fef3c7;
+      --ph-red: #dc2626;
+      --ph-red-light: #fee2e2;
+      --ph-blue: #0369a1;
+      --ph-blue-light: #e0f2fe;
+      --ph-gray: #64748b;
+    }
+
+    .ph-header {
+      background: linear-gradient(135deg, #166534 0%, #15803d 100%);
+      color: #fff;
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .ph-header-brand { display: flex; align-items: center; gap: 12px; }
+    .ph-header-brand img { height: 40px; width: 40px; object-fit: contain; }
+    .ph-header-brand h1 { font-size: 18px; font-weight: 700; margin: 0; color: #fff; }
+    .ph-header-brand span { font-size: 12px; opacity: 0.8; display: block; }
+    .ph-header-user { display: flex; align-items: center; gap: 12px; }
+    .ph-header-user .user-badge { font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 4px 14px; }
+    .ph-logout-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: background 0.2s; }
+    .ph-logout-btn:hover { background: rgba(255,255,255,0.25); }
+
+    .ph-main { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
+
+    /* Summary Cards */
+    .ph-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    @media (max-width: 900px) { .ph-stats { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .ph-stats { grid-template-columns: 1fr; } }
+    .ph-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .ph-card-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .ph-card-icon.green  { background: var(--ph-green-light); }
+    .ph-card-icon.amber  { background: var(--ph-amber-light); }
+    .ph-card-icon.red    { background: var(--ph-red-light); }
+    .ph-card-icon.blue   { background: var(--ph-blue-light); }
+    .ph-card-label { font-size: 12px; color: var(--ph-gray); font-weight: 500; }
+    .ph-card-value { font-size: 28px; font-weight: 800; margin: 0; line-height: 1; }
+    .ph-card-value.green { color: var(--ph-green); }
+    .ph-card-value.amber { color: var(--ph-amber); }
+    .ph-card-value.red   { color: var(--ph-red); }
+    .ph-card-value.blue  { color: var(--ph-blue); }
+
+    /* Panel */
+    .ph-panel {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .ph-panel-head {
+      padding: 18px 24px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .ph-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; color: #1e293b; }
+    .ph-panel-head span { font-size: 13px; color: var(--ph-gray); display: block; }
+    .ph-panel-body { padding: 20px 24px; }
+
+    /* Toolbar */
+    .ph-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .ph-search { flex: 1; min-width: 180px; padding: 8px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; outline: none; }
+    .ph-search:focus { border-color: var(--ph-green); }
+    .ph-filter-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .ph-filter-btn {
+      padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer;
+      border: 1px solid #e2e8f0; background: #f8fafc; color: #475569; transition: all 0.15s;
+    }
+    .ph-filter-btn:hover { background: #f1f5f9; }
+    .ph-filter-btn.active { background: var(--ph-green); color: #fff; border-color: var(--ph-green); }
+    .ph-filter-btn.amber.active { background: var(--ph-amber); border-color: var(--ph-amber); }
+    .ph-filter-btn.red.active   { background: var(--ph-red);   border-color: var(--ph-red); }
+
+    /* Table */
+    .ph-table-wrap { overflow-x: auto; }
+    .ph-table { width: 100%; border-collapse: collapse; }
+    .ph-table th { background: #f8fafc; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 10px 14px; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    .ph-table td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; font-size: 14px; color: #1e293b; vertical-align: middle; }
+    .ph-table tr:last-child td { border-bottom: none; }
+    .ph-table tr:hover td { background: #f8fafc; }
+    .ph-table .empty-row td { text-align: center; color: #94a3b8; padding: 32px; }
+
+    /* Status badges */
+    .badge {
+      display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap;
+    }
+    .badge-green   { background: var(--ph-green-light);  color: #166534; }
+    .badge-amber   { background: var(--ph-amber-light);  color: #92400e; }
+    .badge-red     { background: var(--ph-red-light);    color: #991b1b; }
+    .badge-gray    { background: #f1f5f9; color: #475569; }
+    .badge-blue    { background: var(--ph-blue-light);   color: #0c4a6e; }
+
+    /* Action buttons */
+    .ph-btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px;
+      border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+      border: none; transition: opacity 0.15s;
+    }
+    .ph-btn:hover { opacity: 0.87; }
+    .ph-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ph-btn-primary { background: var(--ph-green); color: #fff; }
+    .ph-btn-outline { background: transparent; border: 1px solid var(--ph-green); color: var(--ph-green); }
+    .ph-btn-sm { padding: 5px 11px; font-size: 12px; border-radius: 6px; }
+    .ph-btn-edit   { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .ph-btn-delete { background: var(--ph-red-light); color: #991b1b; border: 1px solid #fecaca; }
+
+    /* Add form inline panel */
+    .ph-add-form { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 12px; align-items: end; }
+    @media (max-width: 800px) { .ph-add-form { grid-template-columns: 1fr 1fr; } }
+    .ph-field label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+    .ph-field input, .ph-field textarea, .ph-field select {
+      width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+      font-size: 14px; outline: none; box-sizing: border-box;
+    }
+    .ph-field input:focus, .ph-field textarea:focus { border-color: var(--ph-green); }
+    .ph-field input[type="date"] { color: #475569; }
+
+    /* Edit modal */
+    .ph-modal-overlay {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.5);
+      display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+    }
+    .ph-modal-overlay.hidden { display: none; }
+    .ph-modal-box {
+      background: #fff; border-radius: 16px; padding: 28px; width: 100%; max-width: 500px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .ph-modal-box h3 { margin: 0 0 20px; font-size: 18px; font-weight: 700; color: #1e293b; }
+    .ph-modal-fields { display: grid; gap: 14px; }
+    .ph-modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+    /* Toast */
+    #ph-toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+      display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+    }
+    .ph-toast-item {
+      padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600;
+      color: #fff; opacity: 0; transform: translateY(12px);
+      transition: all 0.3s; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      max-width: 320px;
+    }
+    .ph-toast-item.show { opacity: 1; transform: translateY(0); }
+    .ph-toast-item.success { background: var(--ph-green); }
+    .ph-toast-item.error   { background: var(--ph-red); }
+    .ph-toast-item.warning { background: var(--ph-amber); }
+    .ph-toast-item.info    { background: var(--ph-blue); }
+
+    /* Spinner */
+    .ph-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: ph-spin 0.6s linear infinite; }
+    @keyframes ph-spin { to { transform: rotate(360deg); } }
+
+    .ph-divider { height: 1px; background: #f1f5f9; margin: 0 0 20px; }
+
+    /* Confirm delete inline */
+    .ph-confirm-row td { background: #fff5f5 !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="ph-header">
+    <div class="ph-header-brand">
+      <img src="./U-KonekLogo-transparent.png" alt="U-Konek">
+      <div>
+        <h1>U-Konek+ Pharmacy</h1>
+        <span>Medicine Management</span>
+      </div>
+    </div>
+    <div class="ph-header-user">
+      <span class="user-badge" id="ph-user-name">Loading...</span>
+      <button class="ph-logout-btn" id="ph-logout-btn">Sign Out</button>
+    </div>
+  </header>
+
+  <main class="ph-main">
+
+    <!-- Summary Cards -->
+    <div class="ph-stats">
+      <div class="ph-card">
+        <div class="ph-card-icon blue">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+        </div>
+        <div>
+          <div class="ph-card-label">Total Medicines</div>
+          <div class="ph-card-value blue" id="stat-total">—</div>
+        </div>
+      </div>
+      <div class="ph-card">
+        <div class="ph-card-icon green">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <div>
+          <div class="ph-card-label">In Stock</div>
+          <div class="ph-card-value green" id="stat-in-stock">—</div>
+        </div>
+      </div>
+      <div class="ph-card">
+        <div class="ph-card-icon amber">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div>
+          <div class="ph-card-label">Low / Out of Stock</div>
+          <div class="ph-card-value amber" id="stat-low">—</div>
+        </div>
+      </div>
+      <div class="ph-card">
+        <div class="ph-card-icon red">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div>
+          <div class="ph-card-label">Expired / Expiring Soon</div>
+          <div class="ph-card-value red" id="stat-expiry">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dispense Prescription Panel -->
+    <div class="ph-panel" id="dispense-panel">
+      <div class="ph-panel-head">
+        <div>
+          <h2>Dispense Prescription</h2>
+          <span>Look up a prescription by ID, verify details, then confirm dispensing to deduct stock</span>
+        </div>
+      </div>
+      <div class="ph-panel-body">
+        <!-- Lookup form -->
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px;">
+          <div class="ph-field" style="flex:1;min-width:200px;">
+            <label for="rx-code-input">Prescription ID</label>
+            <input id="rx-code-input" type="text" value="RX-" placeholder="e.g. RX-000012" style="text-transform:uppercase;" />
+          </div>
+          <button class="ph-btn ph-btn-primary" id="rx-lookup-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Look Up
+          </button>
+          <button class="ph-btn ph-btn-outline" id="rx-scan-btn" style="border-color: #0ea5e9; color: #0ea5e9;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><rect x="7" y="7" width="3" height="3"/><rect x="14" y="7" width="3" height="3"/><rect x="7" y="14" width="3" height="3"/><path d="M14 14h3v3h-3z"/></svg>
+            Scan QR
+          </button>
+          <button class="ph-btn ph-btn-outline" id="rx-clear-btn" style="display:none;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Clear
+          </button>
+        </div>
+
+        <!-- Prescription detail card (hidden until lookup) -->
+        <div id="rx-detail-card" style="display:none;">
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+              <div>
+                <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Prescription ID</div>
+                <div style="font-size:20px;font-weight:800;color:#1e293b;font-family:monospace;" id="rx-code-display">—</div>
+              </div>
+              <div id="rx-status-badge"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;" class="rx-meta-grid">
+              <div>
+                <div style="font-size:11px;color:#64748b;font-weight:600;">Patient</div>
+                <div style="font-size:14px;font-weight:600;color:#1e293b;" id="rx-patient">—</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:#64748b;font-weight:600;">Doctor</div>
+                <div style="font-size:14px;font-weight:600;color:#1e293b;" id="rx-doctor">—</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:#64748b;font-weight:600;">Issued</div>
+                <div style="font-size:14px;font-weight:600;color:#1e293b;" id="rx-issued">—</div>
+              </div>
+            </div>
+
+            <!-- Items table -->
+            <div style="font-size:12px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Medicines Prescribed</div>
+            <div style="overflow-x:auto;">
+              <table class="ph-table" style="margin-bottom:0;">
+                <thead>
+                  <tr>
+                    <th>Medicine</th>
+                    <th>Qty</th>
+                    <th>Unit</th>
+                    <th>Dosage</th>
+                    <th>Frequency</th>
+                    <th>Instructions</th>
+                  </tr>
+                </thead>
+                <tbody id="rx-items-tbody">
+                  <tr class="empty-row"><td colspan="6">—</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Dispense action -->
+          <div id="rx-dispense-action" style="display:none;">
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+              <div>
+                <div style="font-weight:700;color:#166534;font-size:14px;">Ready to dispense?</div>
+                <div style="font-size:13px;color:#15803d;">Confirming will deduct the prescribed quantities from inventory. This cannot be undone.</div>
+              </div>
+              <button class="ph-btn ph-btn-primary" id="rx-confirm-dispense-btn" style="background:#16a34a;min-width:160px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                Confirm Dispensed
+              </button>
+            </div>
+          </div>
+
+          <!-- Already dispensed notice -->
+          <div id="rx-dispensed-notice" style="display:none;">
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;">
+              <div style="font-weight:700;color:#166534;display:flex;align-items:center;gap:8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                Already Dispensed
+              </div>
+              <div style="font-size:13px;color:#15803d;" id="rx-dispensed-by">This prescription has already been fulfilled.</div>
+            </div>
+          </div>
+
+          <!-- Cancelled notice -->
+          <div id="rx-cancelled-notice" style="display:none;">
+            <div style="background:#fff5f5;border:1px solid #fecaca;border-radius:10px;padding:16px;">
+              <div style="font-weight:700;color:#991b1b;display:flex;align-items:center;gap:8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                Cancelled
+              </div>
+              <div style="font-size:13px;color:#b91c1c;">This prescription has been cancelled and cannot be dispensed.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Medicine Panel -->
+    <div class="ph-panel">
+      <div class="ph-panel-head">
+        <div>
+          <h2>Add New Medicine</h2>
+          <span>Register a new medicine to the inventory</span>
+        </div>
+      </div>
+      <div class="ph-panel-body">
+        <form id="ph-add-form">
+          <div class="ph-add-form">
+            <div class="ph-field">
+              <label for="add-name">Medicine Name *</label>
+              <input id="add-name" type="text" placeholder="e.g., Amoxicillin" required />
+            </div>
+            <div class="ph-field">
+              <label for="add-qty">Stock Qty *</label>
+              <input id="add-qty" type="number" min="0" value="0" required />
+            </div>
+            <div class="ph-field">
+              <label for="add-unit">Unit</label>
+              <input id="add-unit" type="text" placeholder="e.g., tablet" />
+            </div>
+            <div class="ph-field">
+              <label for="add-expiry">Expiration Date</label>
+              <input id="add-expiry" type="date" />
+            </div>
+            <div class="ph-field">
+              <label>&nbsp;</label>
+              <button type="submit" class="ph-btn ph-btn-primary" id="add-submit-btn">
+                <span id="add-btn-label">+ Add Medicine</span>
+              </button>
+            </div>
+          </div>
+          <div class="ph-field" style="margin-top:12px; max-width:600px;">
+            <label for="add-desc">Description (optional)</label>
+            <input id="add-desc" type="text" placeholder="Brief notes about this medicine" />
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Medicine List Panel -->
+    <div class="ph-panel">
+      <div class="ph-panel-head">
+        <div>
+          <h2>Medicine Inventory</h2>
+          <span id="ph-list-subtitle">All medicines</span>
+        </div>
+        <button class="ph-btn ph-btn-outline ph-btn-sm" id="ph-refresh-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refresh
+        </button>
+      </div>
+      <div class="ph-panel-body" style="padding-bottom:10px;">
+        <div class="ph-toolbar" style="margin-bottom:16px;">
+          <input class="ph-search" type="search" id="ph-search" placeholder="Search medicine name…" />
+          <select id="ph-sort-select" class="ph-search" style="flex: 0 1 180px; cursor: pointer;">
+            <option value="name-asc">Name (A-Z)</option>
+            <option value="name-desc">Name (Z-A)</option>
+            <option value="stock-desc">Highest Stock</option>
+            <option value="stock-asc">Lowest Stock</option>
+            <option value="expiry-asc">Expiry (Soonest)</option>
+            <option value="expiry-desc">Expiry (Latest)</option>
+          </select>
+          <div class="ph-filter-group">
+            <button class="ph-filter-btn active" data-filter="all">All</button>
+            <button class="ph-filter-btn amber" data-filter="low">Low Stock</button>
+            <button class="ph-filter-btn red" data-filter="expired">Expired</button>
+            <button class="ph-filter-btn amber" data-filter="expiring">Expiring Soon</button>
+          </div>
+          <button id="ph-csv-import-btn" class="ph-btn ph-btn-outline ph-btn-sm" style="border-color:#16a34a;color:#16a34a;">Import CSV</button>
+          <button id="ph-csv-export-btn" class="ph-btn ph-btn-outline ph-btn-sm">Export CSV</button>
+          <button id="ph-pdf-export-btn" class="ph-btn ph-btn-primary ph-btn-sm">Export PDF</button>
+        </div>
+      </div>
+      <div class="ph-divider"></div>
+      <div class="ph-table-wrap">
+        <table class="ph-table">
+          <thead>
+            <tr>
+              <th>Medicine Name</th>
+              <th>Description</th>
+              <th>Stock Qty</th>
+              <th>Unit</th>
+              <th>Expiration Date</th>
+              <th>Stock Status</th>
+              <th>Expiry Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ph-medicines-tbody">
+            <tr class="empty-row"><td colspan="8">Loading medicines…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Confirmation Modal for Adding Medicine -->
+  <div id="ph-confirm-add-modal" class="ph-modal-overlay hidden">
+    <div class="ph-modal-box" style="max-width: 450px;">
+      <h3 style="display: flex; align-items: center; gap: 10px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Confirm New Medicine
+      </h3>
+      <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
+        Are you sure you want to add this medicine to the inventory? Please verify the details below:
+      </p>
+      
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+        <div style="margin-bottom: 10px;">
+          <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase;">Name</div>
+          <div style="font-size: 15px; font-weight: 700; color: #1e293b;" id="confirm-add-name">—</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase;">Quantity</div>
+            <div style="font-size: 15px; font-weight: 700; color: #1e293b;" id="confirm-add-qty">—</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase;">Expiration</div>
+            <div style="font-size: 15px; font-weight: 700; color: #1e293b;" id="confirm-add-expiry">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ph-modal-actions">
+        <button type="button" class="ph-btn ph-btn-outline" id="confirm-add-cancel-btn">Cancel</button>
+        <button type="button" class="ph-btn ph-btn-primary" id="confirm-add-submit-btn">Confirm & Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="ph-edit-modal" class="ph-modal-overlay hidden">
+    <div class="ph-modal-box">
+      <h3>Edit Medicine</h3>
+      <input type="hidden" id="edit-id" />
+      <div class="ph-modal-fields">
+        <div class="ph-field">
+          <label>Medicine Name</label>
+          <input id="edit-name-display" type="text" disabled style="background:#f8fafc;color:#64748b;" />
+        </div>
+        <div class="ph-field">
+          <label for="edit-desc">Description</label>
+          <input id="edit-desc" type="text" placeholder="Brief notes" />
+        </div>
+        <div class="ph-field">
+          <label for="edit-qty">Stock Quantity *</label>
+          <input id="edit-qty" type="number" min="0" required />
+        </div>
+        <div class="ph-field">
+          <label for="edit-expiry">Expiration Date</label>
+          <input id="edit-expiry" type="date" />
+        </div>
+      </div>
+      <div class="ph-modal-actions">
+        <button type="button" class="ph-btn ph-btn-outline" id="edit-cancel-btn">Cancel</button>
+        <button type="button" class="ph-btn ph-btn-primary" id="edit-save-btn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="ph-delete-modal" class="ph-modal-overlay hidden">
+    <div class="ph-modal-box" style="max-width: 400px;">
+      <h3 style="display: flex; align-items: center; gap: 10px; color: #dc2626;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        Confirm Deletion
+      </h3>
+      <p style="font-size: 14px; color: #64748b; margin-bottom: 24px;">
+        Are you sure you want to delete <strong id="delete-med-name" style="color: #1e293b;"></strong>? This action will archive the medicine and remove it from the active inventory. This cannot be undone.
+      </p>
+      <div class="ph-modal-actions">
+        <button type="button" class="ph-btn ph-btn-outline" id="delete-cancel-btn">Cancel</button>
+        <button type="button" class="ph-btn ph-btn-primary" id="delete-confirm-btn" style="background: #dc2626;">Yes, Delete Medicine</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dispense Confirmation Modal -->
+  <div id="ph-dispense-modal" class="ph-modal-overlay hidden">
+    <div class="ph-modal-box" style="max-width: 500px;">
+      <h3 style="display: flex; align-items: center; gap: 10px; color: #16a34a;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Confirm Dispensing
+      </h3>
+      <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
+        Are you sure you want to fulfill prescription <strong id="dispense-modal-rx-code" style="color: #1e293b; font-family: monospace;"></strong>?
+      </p>
+      
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+        <div style="font-size: 11px; color: #15803d; font-weight: 700; text-transform: uppercase; margin-bottom: 8px;">Important Reminder</div>
+        <div style="font-size: 13px; color: #166534; line-height: 1.5;">
+          This action will automatically deduct the prescribed quantities from your current inventory levels. This cannot be undone once confirmed.
+        </div>
+      </div>
+
+      <div class="ph-modal-actions">
+        <button type="button" class="ph-btn ph-btn-outline" id="dispense-modal-cancel-btn">Cancel</button>
+        <button type="button" class="ph-btn ph-btn-primary" id="dispense-modal-confirm-btn" style="background: #16a34a;">Confirm & Dispense</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logout Confirmation Modal -->
+  <div id="ph-logout-modal" class="ph-modal-overlay hidden">
+    <div class="ph-modal-box" style="max-width: 400px;">
+      <h3 style="display: flex; align-items: center; gap: 10px; color: #dc2626;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Confirm Sign Out
+      </h3>
+      <p style="font-size: 14px; color: #64748b; margin-bottom: 24px;">
+        Are you sure you want to sign out of your session? You will need to log back in to manage pharmacy inventory and dispensing.
+      </p>
+      <div class="ph-modal-actions">
+        <button type="button" class="ph-btn ph-btn-outline" id="ph-logout-cancel-btn">Cancel</button>
+        <button type="button" class="ph-btn ph-btn-primary" id="ph-logout-confirm-btn" style="background: #dc2626;">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="ph-toast"></div>
+
+  <!-- QR Scanner Modal -->
+  <div id="ph-scanner-modal" class="ph-modal-overlay hidden">
+    <div class="ph-modal-box" style="max-width: 400px; padding: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0;">Scan Prescription QR</h3>
+        <button id="scanner-close-x" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #64748b;">✕</button>
+      </div>
+      <div id="qr-reader" style="width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; background: #f8fafc;"></div>
+      <div style="margin-top: 16px; font-size: 13px; color: #64748b; text-align: center;">
+        Point your camera at the prescription QR code.
+      </div>
+    </div>
+  </div>
+
+  <script src="../src/js/runtime-config.js"></script>
+  <script src="../src/js/csv-import.js"></script>
+  <script src="../src/js/dashboard-pharmacist.js?v=20260503g"></script>
+</body>
+</html>

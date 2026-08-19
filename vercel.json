@@ -1,8 +1,0 @@
-{
-  "version": 2,
-  "name": "ukonek-supabase",
-  "rewrites": [
-    { "source": "/", "destination": "/frontend/web/html/index.html" },
-    { "source": "/(.*)", "destination": "/frontend/web/$1" }
-  ]
-}
