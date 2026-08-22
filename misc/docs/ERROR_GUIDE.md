@@ -1,0 +1,1 @@
+Forget password error 500 - most commonly caused by SMTP set up in supabase. Fixed by submitting the app password again.

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'uKonekOtpPage.dart';
+import 'utils/app_transitions.dart';
 
 class uKonekPreviewPage extends StatelessWidget {
   final String firstName, middleName, surname, nameExtension;
@@ -282,8 +283,8 @@ class uKonekPreviewPage extends StatelessWidget {
         ),
         onPressed: () => Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => uKonekOtpPage(
+          AppPageRoute.slideRight(
+            uKonekOtpPage(
               firstName:        firstName,
               middleName:       middleName,
               surname:          surname,

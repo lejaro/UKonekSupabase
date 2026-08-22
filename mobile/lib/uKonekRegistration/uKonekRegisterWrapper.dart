@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ukonekmobile/uKonekPreviewPage.dart';
+import '../utils/app_transitions.dart';
 import 'steps/personal_info_step.dart';
 import 'steps/contact_address_step.dart';
 
@@ -130,8 +131,8 @@ class _uKonekRegisterWrapperState
   void _navigateToPreview() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => uKonekPreviewPage(
+      AppPageRoute.slideRight(
+        uKonekPreviewPage(
           firstName:        firstNameController.text,
           middleName:       middleNameController.text,
           surname:          lastNameController.text,

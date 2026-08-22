@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
 import 'uKonekLoginPage.dart';
+import 'utils/app_transitions.dart';
 
 class uKonekChangePasswordPage extends StatefulWidget {
   const uKonekChangePasswordPage({super.key});
@@ -404,9 +405,8 @@ class _uKonekChangePasswordPageState
             ),
             onPressed: () => Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const uKonekLoginPage()),
-                  (route) => false,
+              AppPageRoute.fadeThrough(const uKonekLoginPage()),
+              (route) => false,
             ),
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,

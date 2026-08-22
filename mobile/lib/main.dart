@@ -5,13 +5,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'uKonekMenuPage.dart';
 import 'uKonekDashboardPage.dart';
+import 'uKonekMainShellPage.dart';
 import 'uKonekChangePasswordPage.dart';
+import 'config/supabase_config.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
-
-// Database configuration
-const _supabaseUrl = 'https://dqjxpwbsbzagbjtulhue.supabase.co';
-const _supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxanhwd2JzYnphZ2JqdHVsaHVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNTM5ODUsImV4cCI6MjA4OTgyOTk4NX0.0Gvbjf2qrcVy9VF5QCKWaHXw19rVOsOTBz9DmHWPX9g';
+import 'utils/app_transitions.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,8 +20,8 @@ void main() async {
 
   // Initialize Supabase for patient authentication
   await Supabase.initialize(
-    url: _supabaseUrl,
-    anonKey: _supabaseAnonKey,
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
   );
 
   runApp(const UKonekApp());
@@ -39,6 +38,13 @@ class _UKonekAppState extends State<UKonekApp> {
   late final StreamSubscription<AuthState> _authSubscription;
   StreamSubscription<Uri>? _deepLinkSubscription;
 
+  // ── Cold-start recovery guard ─────────────────────────────────
+  // Set to true when we detect a recovery deep link at launch so that
+  // RootHandler knows it must not navigate away before the auth event fires.
+  static bool _pendingPasswordRecovery = false;
+
+  static bool get pendingPasswordRecovery => _pendingPasswordRecovery;
+
   @override
   void initState() {
     super.initState();
@@ -50,29 +56,39 @@ class _UKonekAppState extends State<UKonekApp> {
 
       if (event == AuthChangeEvent.passwordRecovery) {
         debugPrint('UKonekApp: Password recovery event detected! Navigating to Change Password page.');
+        // Clear the pending flag so RootHandler unblocks if it is waiting
+        _pendingPasswordRecovery = false;
         NotificationService.navigatorKey.currentState?.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const uKonekChangePasswordPage()),
+          AppPageRoute.slideRight(const uKonekChangePasswordPage()),
           (route) => false,
         );
       }
     });
 
-    // ── 2. Listen for incoming deep links (handles reset link clicks) ──
+    // ── 2. Process deep links ─────────────────────────────────────
     _initDeepLinks();
   }
 
   Future<void> _initDeepLinks() async {
     final appLinks = AppLinks();
 
-    // Handle the link that launched the app (cold start)
+    // Handle the link that launched the app (cold start).
+    // We must process this BEFORE RootHandler finishes navigating.
     try {
       final initialUri = await appLinks.getInitialLink();
       if (initialUri != null) {
         debugPrint('UKonekApp: Initial deep link: $initialUri');
+        final isRecovery = _isPasswordRecoveryLink(initialUri);
+        if (isRecovery) {
+          // Flag RootHandler to wait – the recovery event will navigate instead
+          _pendingPasswordRecovery = true;
+          debugPrint('UKonekApp: Cold-start recovery link detected; blocking RootHandler redirect.');
+        }
         await _handleDeepLink(initialUri);
       }
     } catch (e) {
       debugPrint('UKonekApp: Error reading initial deep link: $e');
+      _pendingPasswordRecovery = false;
     }
 
     // Handle links when the app is already running (warm start)
@@ -87,25 +103,49 @@ class _UKonekAppState extends State<UKonekApp> {
     );
   }
 
-  Future<void> _handleDeepLink(Uri uri) async {
+  /// Returns true if the URI is a Supabase password-recovery deep link.
+  static bool _isPasswordRecoveryLink(Uri uri) {
     final uriStr = uri.toString();
-    debugPrint('UKonekApp: Handling deep link: $uriStr');
 
-    // Supabase reset links contain access_token or code in the fragment/query
-    final isResetLink = uriStr.contains('reset-password') ||
-        uriStr.contains('type=recovery') ||
-        (uri.fragment.contains('access_token') && uri.fragment.contains('type=recovery')) ||
-        uri.queryParameters['type'] == 'recovery';
+    // PKCE flow: ukonekmobile://reset-password?code=...
+    // Supabase uses a `code` query param for the PKCE exchange
+    if (uri.queryParameters.containsKey('code') &&
+        uriStr.contains('reset-password')) return true;
 
-    if (!isResetLink) return;
+    // Implicit flow fragment: ukonekmobile://reset-password#access_token=...&type=recovery
+    if (uri.fragment.isNotEmpty) {
+      // Parse fragment as query parameters (key=value&key2=value2)
+      final fragParams = Uri.splitQueryString(uri.fragment);
+      if (fragParams['type'] == 'recovery') return true;
+    }
+
+    // Query-encoded token: ?type=recovery
+    if (uri.queryParameters['type'] == 'recovery') return true;
+
+    // Host or path hint (covers both flows)
+    if (uriStr.contains('reset-password')) return true;
+
+    return false;
+  }
+
+  Future<void> _handleDeepLink(Uri uri) async {
+    debugPrint('UKonekApp: Handling deep link: $uri');
+
+    if (!_isPasswordRecoveryLink(uri)) {
+      debugPrint('UKonekApp: Not a recovery link, ignoring.');
+      return;
+    }
 
     try {
-      // Let Supabase process the recovery token from the URL
-      // This triggers the passwordRecovery AuthChangeEvent
+      // Let Supabase process the recovery token from the URL.
+      // On success this fires the passwordRecovery AuthChangeEvent which
+      // navigates to uKonekChangePasswordPage.
       await Supabase.instance.client.auth.getSessionFromUrl(uri);
       debugPrint('UKonekApp: Session recovered from deep link URL.');
     } catch (e) {
       debugPrint('UKonekApp: Failed to get session from URL: $e');
+      // Clear the guard so RootHandler doesn't hang indefinitely
+      _pendingPasswordRecovery = false;
     }
   }
 
@@ -154,6 +194,23 @@ class _RootHandlerState extends State<RootHandler> {
   }
 
   Future<void> _checkSession() async {
+    // ── Guard: if a cold-start password recovery link was detected,
+    // wait briefly for the auth event to fire and navigate on its own.
+    // We poll for up to 5 s; if the event fires, the auth listener will
+    // push the Change Password page before we do anything here.
+    if (_UKonekAppState.pendingPasswordRecovery) {
+      debugPrint('RootHandler: Waiting for password recovery deep link to be processed...');
+      for (var i = 0; i < 50; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        if (!_UKonekAppState.pendingPasswordRecovery) {
+          debugPrint('RootHandler: Recovery event handled, skipping normal session check.');
+          return;
+        }
+      }
+      // Timed out – recovery link processing failed; fall through to normal flow
+      debugPrint('RootHandler: Timed out waiting for recovery, continuing normal flow.');
+    }
+
     final authClient = Supabase.instance.client.auth;
     final session = authClient.currentSession;
 
@@ -180,7 +237,7 @@ class _RootHandlerState extends State<RootHandler> {
 
       final displayName = profile['username'] ?? session.user.email ?? 'User';
 
-      _navigate(uKonekDashboardPage(
+      _navigate(uKonekMainShellPage(
         username: displayName,
         citizenId: profile['id'].toString(),
         fullname: '${profile['firstname']} ${profile['surname']}',
@@ -203,7 +260,7 @@ class _RootHandlerState extends State<RootHandler> {
   void _navigate(Widget page) {
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => page),
+      AppPageRoute.fadeThrough(page),
     );
   }
 

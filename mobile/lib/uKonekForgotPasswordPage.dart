@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
 import 'uKonekLoginPage.dart';
+import 'utils/app_transitions.dart';
 
 class uKonekForgotPasswordPage extends StatefulWidget {
   const uKonekForgotPasswordPage({super.key});
@@ -329,9 +330,8 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
             ),
             onPressed: () => Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const uKonekLoginPage()),
-                  (route) => false,
+              AppPageRoute.fadeThrough(const uKonekLoginPage()),
+              (route) => false,
             ),
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,

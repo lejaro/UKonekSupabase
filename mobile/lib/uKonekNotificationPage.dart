@@ -200,13 +200,15 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
 
   int _parseTime(String t) {
     try {
-      final parts = t.split(' ');
+      final clean = t.trim().replaceAll('\u202f', ' ').replaceAll('\u00a0', ' ');
+      final parts = clean.split(' ');
       final hm = parts[0].split(':');
       int h = int.parse(hm[0]);
       int m = int.parse(hm[1]);
       if (parts.length > 1) {
-        if (parts[1].toUpperCase() == 'PM' && h != 12) h += 12;
-        if (parts[1].toUpperCase() == 'AM' && h == 12) h = 0;
+        final period = parts[1].toUpperCase().replaceAll('.', '');
+        if ((period == 'PM' || period == 'P') && h != 12) h += 12;
+        if ((period == 'AM' || period == 'A') && h == 12) h = 0;
       }
       return h * 60 + m;
     } catch (_) { return 0; }

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
@@ -119,6 +118,8 @@ class PrescriptionRecord {
   final String doctorName;
   final String medicineName;
   final int quantity;
+  final int dispensedQuantity;
+  final int remainingQuantity;
   final String unit;
   final String dosage;
   final String frequency;
@@ -137,6 +138,8 @@ class PrescriptionRecord {
     required this.doctorName,
     required this.medicineName,
     required this.quantity,
+    required this.dispensedQuantity,
+    required this.remainingQuantity,
     required this.unit,
     required this.dosage,
     required this.frequency,
@@ -157,11 +160,24 @@ class PrescriptionRecord {
   bool get isPrescriptionDispensed => dispensingStatus == 'dispensed';
   bool get isCancelled            => dispensingStatus == 'cancelled';
   bool get isPending              => dispensingStatus == 'pending';
+  bool get isPartial              => dispensingStatus == 'partial';
 
   String get quantityLabel {
     final normalizedUnit = unit.trim();
     if (normalizedUnit.isEmpty) return quantity.toString();
     return '$quantity $normalizedUnit';
+  }
+
+  String get dispensedQuantityLabel {
+    final normalizedUnit = unit.trim();
+    if (normalizedUnit.isEmpty) return dispensedQuantity.toString();
+    return '$dispensedQuantity $normalizedUnit';
+  }
+
+  String get remainingQuantityLabel {
+    final normalizedUnit = unit.trim();
+    if (normalizedUnit.isEmpty) return remainingQuantity.toString();
+    return '$remainingQuantity $normalizedUnit';
   }
 
   factory PrescriptionRecord.fromMap(Map<String, dynamic> m) {
@@ -174,6 +190,8 @@ class PrescriptionRecord {
       doctorName:       (m['doctor_name']        as String?) ?? '',
       medicineName:     (m['medicine_name']      as String?) ?? '',
       quantity:         (m['quantity']           as num?)?.toInt() ?? 0,
+      dispensedQuantity: (m['dispensed_quantity'] as num?)?.toInt() ?? 0,
+      remainingQuantity: (m['remaining_quantity'] as num?)?.toInt() ?? ((m['quantity'] as num?)?.toInt() ?? 0),
       unit:             (m['unit']               as String?) ?? '',
       dosage:           (m['dosage']             as String?) ?? '',
       frequency:        (m['frequency']          as String?) ?? '',
@@ -346,6 +364,28 @@ class ScheduledMedicine {
       isAvailable:        (m['is_available']          as bool?) ?? true,
       isDispensed:        (m['is_dispensed']          as bool?) ?? false,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'prescription_item_id': prescriptionItemId,
+      'prescription_id': prescriptionId,
+      'prescription_code': prescriptionCode,
+      'dispensing_status': dispensingStatus,
+      'issued_at': issuedAt.toIso8601String(),
+      'dispensed_at': dispensedAt?.toIso8601String(),
+      'doctor_name': doctorName,
+      'medicine_name': medicineName,
+      'quantity': quantity,
+      'unit': unit,
+      'dosage': dosage,
+      'frequency': frequency,
+      'duration': duration,
+      'instructions': instructions,
+      'additional_info': additionalInfo,
+      'is_available': isAvailable,
+      'is_dispensed': isDispensed,
+    };
   }
 }
 
@@ -733,6 +773,31 @@ class PrescribedMedicine {
 class ApiService {
   static SupabaseClient get _client => Supabase.instance.client;
 
+  // ── TTL-based in-memory cache to reduce redundant RPC calls ──────────
+  static final Map<String, _CacheEntry> _cache = {};
+
+  /// Retrieve a cached value if it exists and hasn't expired.
+  static T? _getCached<T>(String key) {
+    final entry = _cache[key];
+    if (entry == null) return null;
+    if (DateTime.now().isAfter(entry.expiresAt)) {
+      _cache.remove(key);
+      return null;
+    }
+    return entry.value as T;
+  }
+
+  /// Store a value in the cache with a TTL duration.
+  static void _setCache<T>(String key, T value, Duration ttl) {
+    _cache[key] = _CacheEntry(value: value, expiresAt: DateTime.now().add(ttl));
+  }
+
+  /// Clear all cached data (call on sign-out or manual refresh).
+  static void clearAllCaches() {
+    _cache.clear();
+    _cachedCitizenProfile = null;
+  }
+
   static String? _resolveEmailRedirectUrl() {
     const configured = String.fromEnvironment('APP_REDIRECT_URL');
     if (configured.isNotEmpty) return configured;
@@ -1021,7 +1086,7 @@ class ApiService {
   }
 
   static Future<void> signOut() async {
-    clearCitizenProfileCache();
+    clearAllCaches();
     try {
       await _client.auth.signOut();
     } catch (e) {
@@ -1051,6 +1116,10 @@ class ApiService {
     final now = DateTime.now();
     final dateFrom = DateTime(now.year, now.month, now.day);
     final dateTo = to ?? dateFrom.add(const Duration(days: 30));
+    final cacheKey = 'doctor_schedules_${_asDate(from ?? dateFrom)}_${_asDate(dateTo)}';
+
+    final cached = _getCached<List<DoctorSchedule>>(cacheKey);
+    if (cached != null) return cached;
 
     final response = await _client.rpc(
       'list_available_doctor_schedules',
@@ -1061,7 +1130,9 @@ class ApiService {
     );
 
     final rows = (response as List<dynamic>?) ?? const [];
-    return rows.whereType<Map<String, dynamic>>().map(DoctorSchedule.fromMap).toList(growable: false);
+    final result = rows.whereType<Map<String, dynamic>>().map(DoctorSchedule.fromMap).toList(growable: false);
+    _setCache(cacheKey, result, const Duration(minutes: 5));
+    return result;
   }
 
   static Future<void> submitCitizenFeedback(FeedbackSubmission feedback) async {
@@ -1086,14 +1157,21 @@ class ApiService {
 
   static Future<List<QueueServiceOption>> listAvailableQueueServices({DateTime? date}) async {
     final normalizedDate = date ?? DateTime.now();
+    final cacheKey = 'queue_services_${_asDate(normalizedDate)}';
+
+    final cached = _getCached<List<QueueServiceOption>>(cacheKey);
+    if (cached != null) return cached;
+
     final response = await _client.rpc('list_available_queue_services', params: {'p_date': _asDate(normalizedDate)});
 
     final rows = (response as List<dynamic>?) ?? const [];
-    return rows
+    final result = rows
         .whereType<Map<String, dynamic>>()
         .map(QueueServiceOption.fromMap)
         .where((entry) => entry.serviceKey.isNotEmpty && entry.serviceLabel.isNotEmpty)
         .toList(growable: false);
+    _setCache(cacheKey, result, const Duration(minutes: 5));
+    return result;
   }
 
   static Future<QueueTicket> joinQueue(QueueJoinRequest request) async {
@@ -1141,10 +1219,16 @@ class ApiService {
   }
 
   static Future<QueueLimiterStatus> getQueueLimiterStatus() async {
+    const cacheKey = 'queue_limiter_status';
+    final cached = _getCached<QueueLimiterStatus>(cacheKey);
+    if (cached != null) return cached;
+
     final response = await _client.rpc('get_queue_limiter_status');
     final rows = (response as List<dynamic>?) ?? const [];
     if (rows.isEmpty || rows.first is! Map<String, dynamic>) return QueueLimiterStatus.disabled();
-    return QueueLimiterStatus.fromMap(rows.first as Map<String, dynamic>);
+    final result = QueueLimiterStatus.fromMap(rows.first as Map<String, dynamic>);
+    _setCache(cacheKey, result, const Duration(seconds: 30));
+    return result;
   }
 
   static Future<List<PrescribedMedicine>> getMyPrescribedMedicines() async {
@@ -1185,7 +1269,7 @@ class ApiService {
     return '${d.year}-$mm-$dd';
   }
 
-  static Future<List<VitalSigns>> fetchVitalSigns() async {
+  static Future<List<VitalSigns>> fetchVitalSigns({int limit = 50}) async {
     final user = _client.auth.currentUser;
     if (user == null) return [];
 
@@ -1193,7 +1277,7 @@ class ApiService {
       final profile = await fetchMyCitizenProfile();
       final citizenId = profile['id'];
 
-      final response = await _client.from('vital_signs').select().eq('citizen_id', citizenId).order('created_at', ascending: false);
+      final response = await _client.from('vital_signs').select().eq('citizen_id', citizenId).order('created_at', ascending: false).limit(limit);
       final rows = (response as List<dynamic>?) ?? const [];
       return rows.whereType<Map<String, dynamic>>().map(VitalSigns.fromMap).toList();
     } catch (e) {
@@ -1230,7 +1314,7 @@ class ApiService {
     }
   }
 
-  static Future<List<Consultation>> fetchConsultations() async {
+  static Future<List<Consultation>> fetchConsultations({int limit = 50}) async {
     final user = _client.auth.currentUser;
     if (user == null) return [];
 
@@ -1238,7 +1322,7 @@ class ApiService {
       final profile = await fetchMyCitizenProfile();
       final citizenId = profile['id'];
 
-      final response = await _client.from('consultations').select('*, doctor:staff!doctor_staff_id(first_name, last_name)').eq('patient_citizen_id', citizenId).order('consulted_at', ascending: false);
+      final response = await _client.from('consultations').select('*, doctor:staff!doctor_staff_id(first_name, last_name)').eq('patient_citizen_id', citizenId).order('consulted_at', ascending: false).limit(limit);
       final rows = (response as List<dynamic>?) ?? const [];
       return rows.whereType<Map<String, dynamic>>().map(Consultation.fromMap).toList();
     } catch (e) {
@@ -1258,23 +1342,28 @@ class ApiService {
     }
   }
 
-  static Future<void> logMedicineIntake({required int prescriptionItemId, required String scheduledTime, required int doseIndex}) async {
-    final profile = await fetchMyCitizenProfile();
-    final citizenId = profile['id'];
+  static Future<void> logMedicineIntake({required int prescriptionItemId, required String scheduledTime, required int doseIndex, int? citizenId}) async {
+    if (citizenId == null) {
+      final profile = await fetchMyCitizenProfile();
+      citizenId = (profile['id'] as num).toInt();
+    }
 
-    await _client.from('medicine_intake_logs').insert({
+    await _client.from('medicine_intake_logs').upsert({
       'citizen_id': citizenId,
       'prescription_item_id': prescriptionItemId,
       'scheduled_time': scheduledTime,
       'dose_index': doseIndex,
       'status': 'taken',
       'actual_time': DateTime.now().toUtc().toIso8601String(),
-    });
+      'intake_date': DateTime.now().toIso8601String().substring(0, 10),
+    }, onConflict: 'citizen_id,prescription_item_id,dose_index,intake_date');
   }
 
-  static Future<List<Map<String, dynamic>>> getIntakeLogsForDate(DateTime date) async {
-    final profile = await fetchMyCitizenProfile();
-    final citizenId = profile['id'];
+  static Future<List<Map<String, dynamic>>> getIntakeLogsForDate(DateTime date, {int? citizenId}) async {
+    if (citizenId == null) {
+      final profile = await fetchMyCitizenProfile();
+      citizenId = (profile['id'] as num).toInt();
+    }
 
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -1310,4 +1399,12 @@ class ApiService {
       return {};
     }
   }
+}
+
+/// Internal cache entry with expiry time.
+class _CacheEntry {
+  final dynamic value;
+  final DateTime expiresAt;
+
+  const _CacheEntry({required this.value, required this.expiresAt});
 }

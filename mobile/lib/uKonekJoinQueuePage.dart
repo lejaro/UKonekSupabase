@@ -5,6 +5,8 @@ import 'package:ukonekmobile/uKonekDashboardPage.dart';
 import 'services/api_service.dart';
 import 'uKonekMedicineScheduler.dart';
 import 'uKonekProfilePage.dart';
+import 'utils/app_transitions.dart';
+import 'uKonekMainShellPage.dart';
 
 // ── Design Tokens ─────────────────────────────────────────────
 class _C {
@@ -28,11 +30,14 @@ class uKonekJoinQueuePage extends StatefulWidget {
   final String citizenId;
   final String? initialServiceKey;
 
+  final bool isEmbeddedInShell;
+
   const uKonekJoinQueuePage({
     super.key,
     required this.username,
     required this.citizenId,
     this.initialServiceKey,
+    this.isEmbeddedInShell = false,
   });
 
   @override
@@ -305,7 +310,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
           ),
         ),
       ]),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: widget.isEmbeddedInShell ? null : _buildBottomNav(),
     );
   }
 
@@ -930,8 +935,8 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
     );
   }
 
-  MaterialPageRoute _pageRoute(Widget page) =>   // ← THIS TOO
-  MaterialPageRoute(builder: (_) => page);
+  Route _pageRoute(Widget page) =>
+  AppPageRoute.slideRight(page);
 
   Widget _sectionLabel(String text, IconData icon) {
     return Row(children: [

@@ -11,8 +11,9 @@ import 'uKonekMedicineScheduler.dart';
 import 'uKonekNotificationPage.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'uKonekPrescriptionPage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'services/notification_service.dart';
+import 'utils/app_transitions.dart';
+import 'uKonekMainShellPage.dart';
 
 
 class _C {
@@ -69,7 +70,10 @@ class uKonekDashboardPage extends StatefulWidget {
     this.emergencyName    = '',
     this.emergencyContact = '',
     this.relation         = '',
+    this.isEmbeddedInShell = false,
   });
+
+  final bool isEmbeddedInShell;
 
   @override
   State<uKonekDashboardPage> createState() => _uKonekDashboardPageState();
@@ -90,14 +94,17 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
   // ── Navigate to profile with ALL registration fields ──────────
   void _navigateToProfile() {
+    if (widget.isEmbeddedInShell) {
+      uKonekMainShellPage.switchTab(context, 3);
+      return;
+    }
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => uKonekProfilePage(
+      AppPageRoute.slideRight(
+        uKonekProfilePage(
           username:         widget.username,
           citizenId:        widget.citizenId,
           fullName:         widget.fullname,
-          // ✅ Add these — were missing causing profile to show incomplete name
           firstName:        widget.firstName,
           middleName:       widget.middleName,
           surname:          widget.surname,
@@ -354,7 +361,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                               children: [
                                 const Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF637367)),
                                 const SizedBox(width: 6),
-                                Text('Quantity: ${item.quantityLabel}', style: const TextStyle(fontSize: 12, color: Color(0xFF637367))),
+                                Text('Remaining: ${item.remainingQuantityLabel} of ${item.quantityLabel}', style: const TextStyle(fontSize: 12, color: Color(0xFF637367))),
                               ],
                             ),
                           ],
@@ -476,7 +483,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                       _sectionHeader('My Prescriptions'),
                       if (_prescribedMedicines.isNotEmpty)
                         GestureDetector(
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrescriptionPage())),
+                          onTap: () => Navigator.push(context, AppPageRoute.slideRight(const PrescriptionPage())),
                           child: const Text('View All', style: TextStyle(color: _C.primaryMid, fontSize: 13, fontWeight: FontWeight.w600)),
                         ),
                     ],
@@ -489,7 +496,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: widget.isEmbeddedInShell ? null : _buildBottomNav(),
     );
   }
 
@@ -608,8 +615,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         if (!mounted) return;
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => uKonekNotificationPage(
+          AppPageRoute.slideRight(
+            uKonekNotificationPage(
               username: widget.username,
               fullname: widget.fullname,
             ),
@@ -888,10 +895,14 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         final color = s['color'] as Color;
         return GestureDetector(
           onTap: () async {
+            if (widget.isEmbeddedInShell) {
+              uKonekMainShellPage.switchTab(context, 2);
+              return;
+            }
             final joined = await Navigator.push<bool>(
               context,
-              MaterialPageRoute(
-                builder: (_) => uKonekJoinQueuePage(
+              AppPageRoute.slideRight(
+                uKonekJoinQueuePage(
                   username: widget.username,
                   citizenId: widget.citizenId,
                   initialServiceKey: s['key'] as String,
@@ -928,39 +939,43 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
       childAspectRatio: 2.3,
       children: [
         _actionBtn('My Patient ID', Icons.qr_code_scanner_rounded, _C.primaryMid, () {
-          _navigateToProfile(); // Navigates to profile where QR is now located
+          _navigateToProfile(); // Navigates to profile where QR is located
         }),
         _actionBtn('Join Queue', Icons.add_circle_outline_rounded, _C.primary, () async {
-          final joined = await Navigator.push<bool>(context, MaterialPageRoute(
-            builder: (_) => uKonekJoinQueuePage(username: widget.username, citizenId: widget.citizenId),
+          if (widget.isEmbeddedInShell) {
+            uKonekMainShellPage.switchTab(context, 2);
+            return;
+          }
+          final joined = await Navigator.push<bool>(context, AppPageRoute.slideRight(
+            uKonekJoinQueuePage(username: widget.username, citizenId: widget.citizenId),
           ));
           if (joined == true) _loadAllData(isInitial: false);
         }),
-        // NEW: View E-Prescription Button (Dynamic)
+        // View E-Prescription Button
         _actionBtn('E-Prescription', Icons.receipt_long_rounded, const Color(0xFF6F42C1), () {
-          // Filter out dispensed items for the e-prescription view
           final activeMeds = _prescribedMedicines.where((m) => !m.isPrescriptionDispensed && !m.isDispensed).toList();
-          
           if (activeMeds.isNotEmpty) {
-            // Group prescriptions by prescription_id and get the latest one
             final Map<int, List<PrescriptionRecord>> grouped = {};
             for (var item in activeMeds) {
               grouped.putIfAbsent(item.prescriptionId, () => []).add(item);
             }
-            
-            // Get the latest prescription (first group since data is ordered by issued_at desc)
             final latestPrescriptionItems = grouped.values.first.toList();
             _showEPrescriptionModal(latestPrescriptionItems);
           } else {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const PrescriptionPage()));
+            Navigator.push(context, AppPageRoute.slideRight(const PrescriptionPage()));
           }
         }),
         _actionBtn('Records', Icons.assignment_outlined, const Color(0xFF17A2B8), () =>
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const uKonekHealthRecordsPage()))),
-        _actionBtn('Scheduler', Icons.alarm_on_outlined, const Color(0xFF6F42C1), () =>
-            Navigator.push(context, MaterialPageRoute(builder: (_) => uKonekMedicineSchedulerPage(username: widget.username, citizenId: widget.citizenId)))),
+            Navigator.push(context, AppPageRoute.slideRight(const uKonekHealthRecordsPage()))),
+        _actionBtn('Scheduler', Icons.alarm_on_outlined, const Color(0xFF6F42C1), () {
+          if (widget.isEmbeddedInShell) {
+            uKonekMainShellPage.switchTab(context, 1);
+            return;
+          }
+          Navigator.push(context, AppPageRoute.slideRight(uKonekMedicineSchedulerPage(username: widget.username, citizenId: widget.citizenId)));
+        }),
         _actionBtn('Feedback', Icons.feedback_outlined, const Color(0xFFF59E0B), () =>
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const uKonekFeedbackPage()))),
+            Navigator.push(context, AppPageRoute.slideRight(const uKonekFeedbackPage()))),
       ],
     );
   }
@@ -1021,7 +1036,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               ? const Text('No recent prescriptions.', style: TextStyle(color: _C.textMuted))
               : Column(children: [
                   for (var i = 0; i < medicines.length; i++) ...[
-                    _medRow(medicines[i].medicineName, medicines[i].quantityLabel, 'PRESCRIBED', _C.primaryMid),
+                    _medRow(medicines[i].medicineName, medicines[i].remainingQuantityLabel, medicines[i].isPartial ? 'PARTIAL' : 'PRESCRIBED', medicines[i].isPartial ? _C.warning : _C.primaryMid),
                     if (i < medicines.length - 1) const Divider(height: 28, color: _C.divider),
                   ],
                 ])),
@@ -1074,15 +1089,15 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   if (i == 0) {
                     // Already on Home
                   } else if (i == 1) {
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => uKonekMedicineSchedulerPage(
+                    Navigator.push(context, AppPageRoute.slideRight(
+                      uKonekMedicineSchedulerPage(
                         username:  widget.username,
                         citizenId: widget.citizenId,
                       ),
                     )).then((_) => setState(() => _selectedTab = 0));
                   } else if (i == 2) {
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => uKonekJoinQueuePage(
+                    Navigator.push(context, AppPageRoute.slideRight(
+                      uKonekJoinQueuePage(
                         username:  widget.username,
                         citizenId: widget.citizenId,
                       ),

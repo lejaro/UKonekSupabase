@@ -1,4 +1,4 @@
-﻿const sidebar = document.getElementById('sidebar');
+const sidebar = document.getElementById('sidebar');
 const burger = document.getElementById('burger');
 
 const getApiBase = () => {
@@ -23,6 +23,7 @@ const ADMIN_DASHBOARD_REFRESH_MS = 15000;
 let presenceHeartbeatTimer = null;
 let adminDashboardRefreshTimer = null;
 let adminDashboardRefreshInFlight = false;
+let manualRefreshInFlight = false;
 const DASHBOARD_REQUEST_TIMEOUT_MS = 15000;
 
 function formatPhysicalExam(physicalExam) {
@@ -2747,9 +2748,11 @@ if (scheduleSuccessOkBtn) {
 
 async function initializeDashboard() {
   try {
-    // Master init - call all content population functions
-    await initProfileAndSchedule().catch(e => console.error('Profile init failed:', e));
-    await initClinicalData().catch(e => console.error('Clinical init failed:', e));
+    // Master init - parallelize independent data loads for faster startup
+    await Promise.all([
+      initProfileAndSchedule().catch(e => console.error('Profile init failed:', e)),
+      initClinicalData().catch(e => console.error('Clinical init failed:', e))
+    ]);
     const tabStats = document.getElementById('tab-stats');
     const statsPane = document.getElementById('stats-pane');
 
@@ -2769,7 +2772,11 @@ async function initializeDashboard() {
         announcementsPane.classList.add('hidden');
         feedbackPane.classList.remove('hidden');
         statsPane.classList.add('hidden');
-        refreshFeedbackData();
+        if (!latestFeedbackList || latestFeedbackList.length === 0 || (Date.now() - lastFeedbackRefreshTime > 60000)) {
+          refreshFeedbackData();
+        } else {
+          renderFeedbackTable();
+        }
       };
       tabStats.onclick = () => {
         tabAnnouncements.classList.remove('active');
@@ -3197,6 +3204,29 @@ function applyStaffFinder() {
 }
 
 
+const citizenDetailCache = new Map();
+
+async function fetchCitizenFullProfile(userId, fallbackUser = null) {
+  const numericId = Number(userId);
+  if (!numericId) return fallbackUser;
+  if (citizenDetailCache.has(numericId)) {
+    return citizenDetailCache.get(numericId);
+  }
+  try {
+    const { supabase } = await loadSupabaseModule();
+    const { data } = await supabase
+      .from('citizens')
+      .select('id,firstname,surname,username,email,contact_number,sex,age,date_of_birth,complete_address,emergency_contact_complete_name,emergency_contact_contact_number,relation,created_at')
+      .eq('id', numericId)
+      .single();
+    const result = data || fallbackUser;
+    if (result) citizenDetailCache.set(numericId, result);
+    return result;
+  } catch (_) {
+    return fallbackUser;
+  }
+}
+
 function renderCitizensTable(filteredList) {
   if (!patientsTbody) return;
 
@@ -3221,19 +3251,23 @@ function renderCitizensTable(filteredList) {
           <button class="chip-btn" style="margin:0; padding:4px 12px; font-size:11px; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd;">View Records</button>
         </td>
       `;
-      row.addEventListener('click', async () => {
-        // Fetch full citizen profile (includes health-related fields not in the list query)
-        try {
-          const { supabase } = await loadSupabaseModule();
-          const { data } = await supabase
-            .from('citizens')
-            .select('id,firstname,surname,username,email,contact_number,sex,age,date_of_birth,complete_address,emergency_contact_complete_name,emergency_contact_contact_number,relation,created_at')
-            .eq('id', user.id)
-            .single();
-          openCitizenHealthModal(data || user);
-        } catch (_) {
-          openCitizenHealthModal(user);
+
+      let hoverPrefetchTimer = null;
+      row.addEventListener('mouseenter', () => {
+        if (!citizenDetailCache.has(Number(user.id))) {
+          hoverPrefetchTimer = setTimeout(() => {
+            fetchCitizenFullProfile(user.id, user);
+          }, 200);
         }
+      });
+      row.addEventListener('mouseleave', () => {
+        if (hoverPrefetchTimer) clearTimeout(hoverPrefetchTimer);
+      });
+
+      row.addEventListener('click', async () => {
+        // Fetch or read from in-memory cache
+        const profile = await fetchCitizenFullProfile(user.id, user);
+        openCitizenHealthModal(profile || user);
       });
       fragment.appendChild(row);
     });
@@ -3781,6 +3815,7 @@ let latestStaffList = [];
 let latestPatientsList = [];
 let latestAnnouncementsList = [];
 let latestFeedbackList = [];
+let lastFeedbackRefreshTime = 0;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FEEDBACK DATA LOADING AND RENDERING
@@ -3788,7 +3823,9 @@ let latestFeedbackList = [];
 
 async function refreshFeedbackData() {
   const feedbackTbody = document.getElementById('feedback-tbody');
-  if (feedbackTbody) renderTableSkeleton(feedbackTbody, 4, 3);
+  if (feedbackTbody && (!latestFeedbackList || latestFeedbackList.length === 0)) {
+    renderTableSkeleton(feedbackTbody, 4, 3);
+  }
   if (isDemoMode) {
     // Demo mode: use mock data
     latestFeedbackList = [
@@ -3809,6 +3846,7 @@ async function refreshFeedbackData() {
         created_at: new Date(Date.now() - 86400000).toISOString()
       }
     ];
+    lastFeedbackRefreshTime = Date.now();
     renderFeedbackTable();
     return;
   }
@@ -3848,6 +3886,7 @@ async function refreshFeedbackData() {
         : null
     }));
 
+    lastFeedbackRefreshTime = Date.now();
     renderFeedbackTable();
   } catch (err) {
     console.error('Error loading feedback:', err);
@@ -4216,16 +4255,49 @@ function stopPresenceHeartbeat() {
   presenceHeartbeatTimer = null;
 }
 
+let staffRealtimeChannel = null;
+
+async function setupStaffRealtimeSubscription() {
+  if (isDemoMode || staffRealtimeChannel) return;
+  try {
+    const { supabase } = await loadSupabaseModule();
+    staffRealtimeChannel = supabase
+      .channel('staff-account-updates')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'staff'
+      }, () => {
+        if (document.visibilityState === 'visible') {
+          loadStaffData().catch(() => {});
+        }
+      })
+      .subscribe();
+  } catch (err) {
+    console.warn('Staff realtime setup error:', err);
+  }
+}
+
 function stopAdminDashboardAutoRefresh() {
-  if (!adminDashboardRefreshTimer) return;
-  clearInterval(adminDashboardRefreshTimer);
-  adminDashboardRefreshTimer = null;
+  if (adminDashboardRefreshTimer) {
+    clearInterval(adminDashboardRefreshTimer);
+    adminDashboardRefreshTimer = null;
+  }
+  if (staffRealtimeChannel) {
+    try {
+      loadSupabaseModule().then(({ supabase }) => supabase.removeChannel(staffRealtimeChannel));
+    } catch (_) {}
+    staffRealtimeChannel = null;
+  }
 }
 
 function startAdminDashboardAutoRefresh() {
+  setupStaffRealtimeSubscription();
   if (adminDashboardRefreshTimer) return;
 
   const runRefresh = async () => {
+    // Only poll if tab is actively visible to prevent background battery/network drain
+    if (document.visibilityState !== 'visible') return;
     if (adminDashboardRefreshInFlight) return;
     adminDashboardRefreshInFlight = true;
     try {
@@ -5382,17 +5454,29 @@ window.addEventListener('beforeunload', () => {
 
 if (dashRefreshBtn) {
   dashRefreshBtn.addEventListener('click', async () => {
-    storedAccounts.clear();
-    await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData(), refreshFeedbackData()]);
-    showToast('Dashboard data refreshed.', 'info');
+    if (manualRefreshInFlight) return;
+    manualRefreshInFlight = true;
+    try {
+      storedAccounts.clear();
+      await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData(), refreshFeedbackData()]);
+      showToast('Dashboard data refreshed.', 'info');
+    } finally {
+      manualRefreshInFlight = false;
+    }
   });
 }
 
 if (refreshAccountsBtn) {
   refreshAccountsBtn.addEventListener('click', async () => {
-    storedAccounts.clear();
-    await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData(), refreshFeedbackData()]);
-    showToast('Account tables refreshed.', 'info');
+    if (manualRefreshInFlight) return;
+    manualRefreshInFlight = true;
+    try {
+      storedAccounts.clear();
+      await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData(), refreshFeedbackData()]);
+      showToast('Account tables refreshed.', 'info');
+    } finally {
+      manualRefreshInFlight = false;
+    }
   });
 }
 
@@ -7097,7 +7181,9 @@ function renderArchivedMedicines() {
 
 async function refreshArchivedMedicineData() {
   const archTbody = document.getElementById('medicine-archived-tbody');
-  if (archTbody) renderTableSkeleton(archTbody, 5, 3);
+  if (archTbody && (!archivedMedicines || archivedMedicines.length === 0)) {
+    renderTableSkeleton(archTbody, 5, 3);
+  }
   try {
     archivedMedicines = await listArchivedMedicineData();
   } catch (error) {
@@ -7109,7 +7195,9 @@ async function refreshArchivedMedicineData() {
 
 async function refreshMedicineData() {
   const medTbody = document.getElementById('medicine-tbody');
-  if (medTbody) renderTableSkeleton(medTbody, 7, 5);
+  if (medTbody && (!medicines || medicines.length === 0)) {
+    renderTableSkeleton(medTbody, 7, 5);
+  }
   try {
     medicines = await listMedicineData();
   } catch (error) {
@@ -8140,12 +8228,13 @@ async function searchPrescription() {
     if (medicineNames.length > 0) {
       const { data: stockData } = await supabase
         .from('medicines')
-        .select('medicine_name, stock_quantity')
-        .in('medicine_name', medicineNames);
+        .select('name, qty')
+        .in('name', medicineNames)
+        .is('archived_at', null);
 
       if (stockData) {
         stockData.forEach(item => {
-          stockMap[item.medicine_name] = item.stock_quantity;
+          stockMap[item.name] = item.qty;
         });
       }
     }
@@ -8200,6 +8289,10 @@ function displayPrescriptionData() {
     statusBadge.textContent = 'Dispensed';
     statusBadge.style.background = '#dcfce7';
     statusBadge.style.color = '#166534';
+  } else if (status === 'partial') {
+    statusBadge.textContent = 'Partially Dispensed';
+    statusBadge.style.background = '#fef9c3';
+    statusBadge.style.color = '#854d0e';
   } else if (status === 'cancelled') {
     statusBadge.textContent = 'Cancelled';
     statusBadge.style.background = '#fee2e2';
@@ -8217,12 +8310,17 @@ function displayPrescriptionData() {
   let hasInsufficientStock = false;
 
   currentMedicineItems.forEach((item, index) => {
-    const hasStock = item.currentStock >= item.quantity;
-    if (!hasStock) hasInsufficientStock = true;
+    const remaining = item.remaining_quantity ?? (item.quantity - (item.dispensed_quantity ?? 0));
+    const dispensedQty = item.dispensed_quantity ?? 0;
+    const itemFullyDispensed = remaining <= 0;
+    const hasStock = item.currentStock >= remaining;
+    if (!hasStock && !itemFullyDispensed) hasInsufficientStock = true;
 
     const isDispensed = status === 'dispensed';
     const isCancelled = status === 'cancelled';
-    const canSelect = !isDispensed && !isCancelled && hasStock;
+    // Allow selecting undispensed items that have stock; partial rows are still selectable
+    const canSelect = !isDispensed && !isCancelled && !itemFullyDispensed && item.currentStock > 0;
+    const maxDispense = Math.min(remaining, Math.max(0, item.currentStock));
 
     const row = document.createElement('tr');
     row.innerHTML = `
@@ -8236,37 +8334,35 @@ function displayPrescriptionData() {
       </td>
       <td><strong>${escapeHtml(item.medicine_name)}</strong></td>
       <td>${escapeHtml(item.dosage || '-')}</td>
-      <td>${item.quantity} ${escapeHtml(item.unit || '')}</td>
+      <td style="text-align:center;">${item.quantity} ${escapeHtml(item.unit || '')}</td>
+      <td style="text-align:center;">${dispensedQty}</td>
+      <td style="text-align:center;font-weight:600;color:${itemFullyDispensed ? '#16a34a' : '#0891b2'};">${remaining}</td>
       <td>
         <span style="color: ${hasStock ? '#16a34a' : '#dc2626'}; font-weight: 600;">
           ${item.currentStock}
         </span>
       </td>
-      <td style="text-align: center;">
-        <input 
-          type="checkbox" 
-          class="pharmacy-available-checkbox" 
-          data-index="${index}"
-          ${item.is_available !== false ? 'checked' : ''}
-          ${isDispensed || isCancelled ? 'disabled' : ''}
-          style="width: 18px; height: 18px; cursor: pointer;">
-      </td>
-      <td style="text-align: center;">
-        <input 
-          type="checkbox" 
-          class="pharmacy-given-checkbox" 
-          data-index="${index}"
-          ${item.is_dispensed ? 'checked' : ''}
-          ${isDispensed || isCancelled ? 'disabled' : ''}
-          style="width: 18px; height: 18px; cursor: pointer;">
+      <td>
+        ${itemFullyDispensed
+          ? '<span style="color:#16a34a;">Complete</span>'
+          : `<input
+              type="number"
+              class="pharmacy-dispense-quantity"
+              data-index="${index}"
+              min="1"
+              max="${maxDispense}"
+              value="${maxDispense}"
+              ${canSelect ? '' : 'disabled'}
+              style="width:64px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;"
+            >`}
       </td>
       <td>
-        ${item.is_available === false
-          ? '<span style="color: #64748b; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Out of Stock</span>'
-          : (item.is_dispensed 
-              ? '<span style="color: #16a34a; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Given</span>'
-              : (hasStock 
-                  ? '<span style="color: #0891b2; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Pending</span>' 
+        ${itemFullyDispensed
+          ? '<span style="color: #16a34a; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Done</span>'
+          : (dispensedQty > 0
+              ? '<span style="color: #d97706; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Partial</span>'
+              : (hasStock
+                  ? '<span style="color: #0891b2; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Pending</span>'
                   : '<span style="color: #dc2626; font-weight: 600; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Insufficient</span>'))}
       </td>
     `;
@@ -8275,24 +8371,26 @@ function displayPrescriptionData() {
 
   // Show/hide warning message
   const warningDiv = document.getElementById('pharmacy-warning-message');
-  if (hasInsufficientStock && status === 'pending') {
+  if (hasInsufficientStock && (status === 'pending' || status === 'partial')) {
     warningDiv.classList.remove('hidden');
   } else {
     warningDiv.classList.add('hidden');
   }
 
-  // Disable buttons if already dispensed or cancelled
+  // Disable buttons if already fully dispensed or cancelled; keep enabled for pending/partial
   const dispenseSelectedBtn = document.getElementById('pharmacy-dispense-selected-btn');
   const dispenseAllBtn = document.getElementById('pharmacy-dispense-all-btn');
   const cancelBtn = document.getElementById('pharmacy-cancel-prescription-btn');
+  const isDispensed = status === 'dispensed';
+  const isCancelled = status === 'cancelled';
 
   if (isDispensed || isCancelled) {
     dispenseSelectedBtn.disabled = true;
     dispenseAllBtn.disabled = true;
-    cancelBtn.disabled = true;
+    cancelBtn.disabled = isDispensed; // can still cancel a partial
     dispenseSelectedBtn.style.opacity = '0.5';
     dispenseAllBtn.style.opacity = '0.5';
-    cancelBtn.style.opacity = '0.5';
+    cancelBtn.style.opacity = isDispensed ? '0.5' : '1';
   } else {
     dispenseSelectedBtn.disabled = false;
     dispenseAllBtn.disabled = false;
@@ -8311,70 +8409,77 @@ async function dispenseSelectedMedicines() {
     return;
   }
 
-  const selectedItems = Array.from(checkboxes).map(cb => {
+  const selectedItems = [];
+  for (const cb of checkboxes) {
     const index = parseInt(cb.dataset.index);
-    return currentMedicineItems[index];
-  });
+    const item = currentMedicineItems[index];
+    const input = document.querySelector(`.pharmacy-dispense-quantity[data-index="${index}"]`);
+    const quantity = parseInt(input?.value, 10);
+    const remaining = item.remaining_quantity ?? (item.quantity - (item.dispensed_quantity ?? 0));
+    const maximum = Math.min(remaining, item.currentStock);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > maximum) {
+      showToast(`Enter a quantity from 1 to ${maximum} for ${item.medicine_name}.`, 'warning');
+      return;
+    }
+    selectedItems.push({ ...item, dispenseQuantity: quantity });
+  }
 
-  await dispenseMedicines(selectedItems, false);
+  await dispenseMedicines(selectedItems);
 }
 
 async function dispenseAllMedicines() {
-  const availableItems = currentMedicineItems.filter(item => item.currentStock >= item.quantity);
+  // Only include undispensed items that have sufficient stock
+  const availableItems = currentMedicineItems.filter(item => {
+    const remaining = item.remaining_quantity ?? (item.quantity - (item.dispensed_quantity ?? 0));
+    return remaining > 0 && item.currentStock > 0;
+  });
   
   if (availableItems.length === 0) {
     showToast('No medicines available to dispense', 'error');
     return;
   }
 
-  await dispenseMedicines(availableItems, true);
+  await dispenseMedicines(availableItems);
 }
 
-async function dispenseMedicines(items, isFullDispense) {
+async function dispenseMedicines(items) {
   if (!confirm(`Are you sure you want to dispense ${items.length} medicine(s)?`)) {
     return;
   }
 
+  // Build per-item payload using remaining_quantity (dispense remaining for selected items)
+  const dispensePayload = items.map(item => ({
+    prescription_item_id: item.id,
+    quantity: item.dispenseQuantity ?? Math.min(
+      item.remaining_quantity ?? (item.quantity - (item.dispensed_quantity ?? 0)),
+      item.currentStock
+    )
+  }));
+
   try {
     const { supabase } = await loadSupabaseModule();
 
-    // Update medicine stock
-    for (const item of items) {
-      const newStock = item.currentStock - item.quantity;
-      
-      const { error: stockError } = await supabase
-        .from('medicines')
-        .update({ stock_quantity: newStock })
-        .eq('medicine_name', item.medicine_name);
+    const { data, error } = await supabase.rpc('dispense_prescription_items', {
+      p_prescription_code: currentPrescriptionData.prescription_code,
+      p_items: dispensePayload
+    });
 
-      if (stockError) {
-        console.error('Error updating stock:', stockError);
-        showToast(`Error updating stock for ${item.medicine_name}`, 'error');
-        return;
-      }
+    if (error) {
+      console.error('Error dispensing medicines:', error);
+      showToast(error.message || 'Error dispensing medicines', 'error');
+      return;
     }
 
-    // Update prescription status if all items dispensed
-    if (isFullDispense || items.length === currentMedicineItems.length) {
-      const { error: prescriptionError } = await supabase
-        .from('prescription_headers')
-        .update({ 
-          dispensing_status: 'dispensed',
-          dispensed_at: new Date().toISOString()
-        })
-        .eq('id', currentPrescriptionData.id);
-
-      if (prescriptionError) {
-        console.error('Error updating prescription:', prescriptionError);
-      }
-
-      currentPrescriptionData.dispensing_status = 'dispensed';
-      currentPrescriptionData.dispensed_at = new Date().toISOString();
+    if (data?.error) {
+      showToast(data.error, 'error');
+      return;
     }
 
-    showToast(`Successfully dispensed ${items.length} medicine(s)`, 'success');
-    
-    // Refresh the display
+    const newStatus = data?.dispensing_status || 'dispensed';
+    const label = newStatus === 'partial' ? 'partially dispensed' : 'fully dispensed';
+    showToast(`Prescription ${newStatus === 'partial' ? 'partially' : 'successfully'} dispensed (${items.length} item(s))`, 'success');
+
+    // Refresh the display with updated data from DB
     await searchPrescription();
 
   } catch (error) {

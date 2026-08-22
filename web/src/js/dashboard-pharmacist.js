@@ -814,9 +814,10 @@ function rxHide(el) { if (el) el.style.display = 'none'; }
 function renderRxStatusBadge(status) {
   if (!rxStatusBadge) return;
   const map = {
-    pending:   { cls: 'badge-blue',  label: 'Pending' },
-    dispensed: { cls: 'badge-green', label: 'Dispensed' },
-    cancelled: { cls: 'badge-red',   label: 'Cancelled' }
+    pending:   { cls: 'badge-blue',   label: 'Pending' },
+    partial:   { cls: 'badge-yellow', label: 'Partially Dispensed' },
+    dispensed: { cls: 'badge-green',  label: 'Dispensed' },
+    cancelled: { cls: 'badge-red',    label: 'Cancelled' }
   };
   const s = map[status] || { cls: 'badge-gray', label: status };
   rxStatusBadge.innerHTML = `<span class="badge ${s.cls}" style="font-size:13px;padding:5px 14px;">${s.label}</span>`;
@@ -825,19 +826,44 @@ function renderRxStatusBadge(status) {
 function renderRxItems(items) {
   if (!rxItemsTbody) return;
   if (!Array.isArray(items) || !items.length) {
-    rxItemsTbody.innerHTML = '<tr class="empty-row"><td colspan="6">No items.</td></tr>';
+    rxItemsTbody.innerHTML = '<tr class="empty-row"><td colspan="8">No items.</td></tr>';
     return;
   }
-  rxItemsTbody.innerHTML = items.map(it => `
-    <tr>
-      <td><strong>${escHtml(it.medicine_name)}</strong></td>
-      <td>${it.quantity}</td>
-      <td>${escHtml(it.unit) || '—'}</td>
-      <td>${escHtml(it.dosage) || '—'}</td>
-      <td>${escHtml(it.frequency) || '—'}</td>
-      <td style="font-size:13px;color:#64748b;">${escHtml(it.instructions) || '—'}</td>
-    </tr>
-  `).join('');
+  rxItemsTbody.innerHTML = items.map(it => {
+    const remaining = it.remaining_quantity ?? (it.quantity - (it.dispensed_quantity ?? 0));
+    const isFullyDispensed = remaining <= 0;
+    const dispensedQty = it.dispensed_quantity ?? 0;
+    const statusHtml = isFullyDispensed
+      ? '<span style="color:#16a34a;font-weight:600;">&#10003; Done</span>'
+      : (dispensedQty > 0
+          ? '<span style="color:#d97706;font-weight:600;">Partial</span>'
+          : '<span style="color:#64748b;">Pending</span>');
+    return `
+      <tr>
+        <td><strong>${escHtml(it.medicine_name)}</strong></td>
+        <td style="text-align:center;">${it.quantity} ${escHtml(it.unit || '')}</td>
+        <td style="text-align:center;">${dispensedQty}</td>
+        <td style="text-align:center;">${remaining}</td>
+        <td>${escHtml(it.dosage) || '—'}</td>
+        <td>${escHtml(it.frequency) || '—'}</td>
+        <td style="font-size:13px;color:#64748b;">${escHtml(it.instructions) || '—'}</td>
+        <td style="text-align:center;">
+          ${isFullyDispensed
+            ? statusHtml
+            : `<input
+                type="number"
+                class="rx-dispense-qty-input"
+                data-item-id="${it.id}"
+                data-remaining="${remaining}"
+                min="1"
+                max="${remaining}"
+                value="${remaining}"
+                style="width:64px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;"
+              >`}
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function clearRxLookup() {
@@ -877,11 +903,13 @@ async function lookupPrescription() {
     rxHide(rxDispensedNotice);
     rxHide(rxCancelledNotice);
 
-    if (data.dispensing_status === 'pending') {
+    if (data.dispensing_status === 'pending' || data.dispensing_status === 'partial') {
       rxShow(rxDispenseAction);
     } else if (data.dispensing_status === 'dispensed') {
-      const when = data.dispensed_at ? new Date(data.dispensed_at).toLocaleString('en-PH') : 'earlier';
-      if (rxDispensedBy) rxDispensedBy.textContent = `Dispensed on ${when}.`;
+      const when = data.last_dispensed_at
+        ? new Date(data.last_dispensed_at).toLocaleString('en-PH')
+        : (data.dispensed_at ? new Date(data.dispensed_at).toLocaleString('en-PH') : 'earlier');
+      if (rxDispensedBy) rxDispensedBy.textContent = `Fully dispensed on ${when}.`;
       rxShow(rxDispensedNotice);
     } else if (data.dispensing_status === 'cancelled') {
       rxShow(rxCancelledNotice);
@@ -902,6 +930,34 @@ async function confirmDispense() {
   if (!currentRxData) return;
   const code = currentRxData.prescription_code;
 
+  // Collect and validate per-item quantities from the rendered inputs
+  const inputs = document.querySelectorAll('.rx-dispense-qty-input');
+  const pendingItems = [];
+  let hasError = false;
+
+  inputs.forEach(input => {
+    const itemId = parseInt(input.dataset.itemId, 10);
+    const remaining = parseInt(input.dataset.remaining, 10);
+    const qty = parseInt(input.value, 10);
+
+    if (isNaN(qty) || qty <= 0) {
+      showToast(`Enter a quantity greater than 0 for each item.`, 'warning');
+      hasError = true;
+      return;
+    }
+    if (qty > remaining) {
+      showToast(`Quantity exceeds remaining (${remaining}) for one or more items.`, 'warning');
+      hasError = true;
+      return;
+    }
+    pendingItems.push({ prescription_item_id: itemId, quantity: qty });
+  });
+
+  if (hasError || pendingItems.length === 0) return;
+
+  // Stash on state for the confirm handler
+  currentRxData._pendingDispenseItems = pendingItems;
+
   if (dispenseModalCode) dispenseModalCode.textContent = code;
   if (dispenseModal) {
     dispenseModal.classList.remove('hidden');
@@ -912,23 +968,34 @@ async function confirmDispense() {
 async function handleActualDispense() {
   if (!currentRxData) return;
   const code = currentRxData.prescription_code;
+  const items = currentRxData._pendingDispenseItems;
+
+  if (!items || items.length === 0) {
+    showToast('No items to dispense.', 'warning');
+    return;
+  }
 
   setLoading(dispenseConfirmBtn, true);
   try {
     const sb = await getSupabase();
-    const { data, error } = await sb.rpc('dispense_prescription', { p_prescription_code: code });
+    const { data, error } = await sb.rpc('dispense_prescription_items', {
+      p_prescription_code: code,
+      p_items: items
+    });
     if (error) throw new Error(error.message);
     if (data?.error) throw new Error(data.error);
 
-    showToast(`Prescription ${code} dispensed. Stock updated.`, 'success');
+    const newStatus = data.dispensing_status || 'dispensed';
+    const label = newStatus === 'partial' ? 'partially dispensed' : 'dispensed';
+    showToast(`Prescription ${code} ${label}. Stock updated.`, 'success');
 
     // Refresh inventory list
     await loadMedicines();
     renderMedicines();
 
-    // Re-lookup to update the card status
+    // Re-lookup to update the card status and quantities
     await lookupPrescription();
-    
+
     // Close modal
     if (dispenseModal) {
       dispenseModal.classList.add('hidden');

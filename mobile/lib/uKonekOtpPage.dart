@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'services/api_service.dart';
 import 'uKonekCredentialsPage.dart';
+import 'utils/app_transitions.dart';
 
 class uKonekOtpPage extends StatefulWidget {
   final String firstName;
@@ -145,8 +147,8 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
       if (!mounted) return;
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => uKonekCredentialsPage(
+        AppPageRoute.slideRight(
+          uKonekCredentialsPage(
             firstName: widget.firstName,
             middleName: widget.middleName,
             surname: widget.surname,

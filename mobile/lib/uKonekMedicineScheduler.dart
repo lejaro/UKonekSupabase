@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show File;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'uKonekDashboardPage.dart';
@@ -9,15 +10,20 @@ import 'uKonekProfilePage.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'utils/app_transitions.dart';
+import 'uKonekMainShellPage.dart';
 
 class uKonekMedicineSchedulerPage extends StatefulWidget {
   final String username;
   final String citizenId;
 
+  final bool isEmbeddedInShell;
+
   const uKonekMedicineSchedulerPage({
     super.key,
     required this.username,
     required this.citizenId,
+    this.isEmbeddedInShell = false,
   });
 
   @override
@@ -40,6 +46,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   List<Consultation> _consultations = [];
   final Set<String> _takenDoses = {};
   final Map<String, String> _customDoseTimes = {};
+  final Map<String, DateTime> _takenTimestamps = {};
   final List<Map<String, dynamic>> _manualIntakes = [];
   bool _notificationsEnabled = true;
   DateTime _selectedDate = DateTime.now();
@@ -60,20 +67,63 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   final Set<int> _startedPrescriptions = {};
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    final dateKey = DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+    // Prune old cached logs in the background (R5)
+    MedicineCacheService.pruneOldLogs(widget.citizenId);
+
+    // 1. Instant local load if cache is available
+    final cachedMeds = await MedicineCacheService.loadCachedSchedule(widget.citizenId);
+    final cachedLogs = await MedicineCacheService.loadCachedIntakeLogs(widget.citizenId, dateKey);
+    final prefs = await SharedPreferences.getInstance();
+
+    if (cachedMeds != null && cachedMeds.isNotEmpty && mounted) {
+      _persistedStartTimes.clear();
+      for (var med in cachedMeds) {
+        final stored = prefs.getString('med_start_${med.prescriptionItemId}');
+        if (stored != null) _persistedStartTimes[med.prescriptionItemId] = stored;
+      }
+      setState(() {
+        _medicines = cachedMeds.where((m) => m.isDispensed || m.dispensingStatus == 'dispensed').toList();
+        if (cachedLogs != null) {
+          _takenDoses.clear();
+          _startedPrescriptions.clear();
+          for (var log in cachedLogs) {
+            final pid = (log['prescription_item_id'] as num).toInt();
+            _takenDoses.add('${pid}_${log['dose_index']}');
+            _startedPrescriptions.add(pid);
+          }
+        }
+        _loading = false;
+        _error = null;
+      });
+      _scheduleNotifications();
+    } else {
+      setState(() { _loading = true; _error = null; });
+    }
+
+    // 2. Skip network fetch if cache is fresh (A4)
+    final isFresh = await MedicineCacheService.isScheduleCacheFresh(widget.citizenId);
+    if (isFresh && cachedMeds != null && cachedMeds.isNotEmpty) return;
+
+    // 3. Fetch fresh data from network & sync offline queue
     try {
+      MedicineCacheService.syncPendingIntakeLogs();
+
       final results = await Future.wait<dynamic>([
         ApiService.getMedicineSchedule(),
         ApiService.getIntakeLogsForDate(_selectedDate),
-        SharedPreferences.getInstance(),
         ApiService.fetchConsultations(),
       ]);
+
       final meds = results[0] as List<ScheduledMedicine>;
       final logs = results[1] as List<Map<String, dynamic>>;
-      final prefs = results[2] as SharedPreferences;
-      final consultations = results[3] as List<Consultation>;
+      final consultations = results[2] as List<Consultation>;
 
-      // Load persisted start times
+      // Cache schedule & logs locally
+      await MedicineCacheService.saveSchedule(widget.citizenId, meds);
+      await MedicineCacheService.saveIntakeLogs(widget.citizenId, dateKey, logs);
+
       _persistedStartTimes.clear();
       for (var med in meds) {
         final stored = prefs.getString('med_start_${med.prescriptionItemId}');
@@ -81,61 +131,143 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           _persistedStartTimes[med.prescriptionItemId] = stored;
         }
       }
-      
+
+      if (mounted) {
+        setState(() {
+          _medicines = meds.where((m) => m.isDispensed || m.dispensingStatus == 'dispensed').toList();
+          _consultations = consultations;
+          _takenDoses.clear();
+          _startedPrescriptions.clear();
+          for (var log in logs) {
+            final pid = (log['prescription_item_id'] as num).toInt();
+            _takenDoses.add('${pid}_${log['dose_index']}');
+            _startedPrescriptions.add(pid);
+          }
+          _loading = false;
+        });
+        _scheduleNotifications();
+      }
+    } catch (e) {
+      if (_medicines.isEmpty && mounted) {
+        setState(() { _error = e.toString(); _loading = false; });
+      }
+    }
+  }
+
+  Future<void> _loadDateLogs(DateTime date) async {
+    setState(() => _selectedDate = date);
+    final dateKey = DateFormat('yyyy-MM-dd').format(date);
+
+    // Instant local intake logs for selected date
+    final cachedLogs = await MedicineCacheService.loadCachedIntakeLogs(widget.citizenId, dateKey);
+    if (cachedLogs != null && mounted) {
       setState(() {
-        // ONLY show medicines that HAVE been dispensed by the pharmacy in the scheduler
-        _medicines = meds.where((m) => m.isDispensed || m.dispensingStatus == 'dispensed').toList();
-        _consultations = consultations;
         _takenDoses.clear();
         _startedPrescriptions.clear();
-        for (var log in logs) {
+        for (var log in cachedLogs) {
           final pid = (log['prescription_item_id'] as num).toInt();
           _takenDoses.add('${pid}_${log['dose_index']}');
           _startedPrescriptions.add(pid);
         }
-        _loading = false;
       });
-      _scheduleNotifications();
-    } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
     }
+
+    // Refresh logs in background
+    try {
+      final logs = await ApiService.getIntakeLogsForDate(date, citizenId: int.tryParse(widget.citizenId));
+      await MedicineCacheService.saveIntakeLogs(widget.citizenId, dateKey, logs);
+      if (mounted && DateUtils.isSameDay(_selectedDate, date)) {
+        setState(() {
+          _takenDoses.clear();
+          for (var log in logs) {
+            final pid = (log['prescription_item_id'] as num).toInt();
+            _takenDoses.add('${pid}_${log['dose_index']}');
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _markAsTaken(ScheduledMedicine med, int doseIndex, String scheduledTime) async {
     final key = '${med.prescriptionItemId}_$doseIndex';
     if (_takenDoses.contains(key)) return;
-    
+
     final now = DateTime.now();
+    final dateKey = DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+    // Haptic feedback for satisfying confirmation
+    HapticFeedback.mediumImpact();
+
+    // 1. Optimistic immediate local UI update
+    setState(() {
+      _takenDoses.add(key);
+      _takenTimestamps[key] = now;
+      _startedPrescriptions.add(med.prescriptionItemId);
+
+      final intervalMins = med.doseIntervalMinutes;
+      if (intervalMins > 0) {
+        int runningMins = now.hour * 60 + now.minute;
+        for (int i = doseIndex + 1; i < med.doseTimes.length; i++) {
+          final nextKey = '${med.prescriptionItemId}_$i';
+          runningMins += intervalMins;
+          final nextH = (runningMins ~/ 60) % 24;
+          final nextM = runningMins % 60;
+          _customDoseTimes[nextKey] = TimeOfDay(hour: nextH, minute: nextM).format(context);
+        }
+      }
+    });
+
+    // 2. Persist locally and queue for background sync
+    await MedicineCacheService.recordLocalIntake(
+      widget.citizenId,
+      prescriptionItemId: med.prescriptionItemId,
+      scheduledTime: scheduledTime,
+      doseIndex: doseIndex,
+      dateKey: dateKey,
+    );
+
+    _scheduleNotifications();
+
+    // Show undo SnackBar (U1)
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${med.medicineName} marked as taken'),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'UNDO',
+            textColor: Colors.white,
+            onPressed: () => _undoMarkAsTaken(key),
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: _primaryMid,
+        ),
+      );
+    }
+
+    // 3. Attempt background sync (citizenId passed to avoid redundant profile fetch)
     try {
-      // Use the selected date instead of strictly "now" for historical/future logging if needed,
-      // but usually intake logs are for when you actually take it. 
-      // For this app, we'll stick to actual_time = now.
       await ApiService.logMedicineIntake(
         prescriptionItemId: med.prescriptionItemId,
         scheduledTime: scheduledTime,
         doseIndex: doseIndex,
+        citizenId: int.tryParse(widget.citizenId),
       );
-      
-      setState(() {
-        _takenDoses.add(key);
-        _startedPrescriptions.add(med.prescriptionItemId);
-        
-        final intervalMins = med.doseIntervalMinutes;
-        if (intervalMins > 0) {
-          int runningMins = now.hour * 60 + now.minute;
-          for (int i = doseIndex + 1; i < med.doseTimes.length; i++) {
-            final nextKey = '${med.prescriptionItemId}_$i';
-            runningMins += intervalMins;
-            final nextH = (runningMins ~/ 60) % 24;
-            final nextM = runningMins % 60;
-            _customDoseTimes[nextKey] = TimeOfDay(hour: nextH, minute: nextM).format(context);
-          }
-        }
-        _scheduleNotifications();
-      });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      debugPrint('Intake stored locally, will sync when online: $e');
     }
+  }
+
+  void _undoMarkAsTaken(String key) {
+    setState(() {
+      _takenDoses.remove(key);
+      _takenTimestamps.remove(key);
+    });
+    // Note: local cache will be overwritten on next _load().
+    // The server record (if synced) will remain, but will be re-synced on next intake.
+    _scheduleNotifications();
   }
 
   Future<void> _setupAndMarkTaken(ScheduledMedicine med, int doseIndex, TimeOfDay picked) async {
@@ -145,9 +277,11 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
 
   Future<void> _scheduleNotifications() async {
     try {
-      await NotificationService.cancelAll();
+      // Bug #7: Only cancel medicine reminders, not clinic alerts
+      await NotificationService.cancelMedicineReminders();
       final grouped = _groupedTodayDoses;
-      int id = 0;
+      // Bug #6: Use offset IDs to avoid collisions with other notification types
+      int id = NotificationService.medicineIdOffset;
       
       for (var entry in grouped.entries) {
         final timeStr = entry.key;
@@ -214,8 +348,12 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       final isStarted = persistedStart != null || _startedPrescriptions.contains(med.prescriptionItemId);
       
       if (!isStarted && isToday) {
+        // First-time setup only shown for today
         allDoses.add({'med': med, 'time': 'Setup Required', 'doseIndex': -1, 'mins': -1});
-      } else {
+      } else if (med.dailyDoseCount == 0) {
+        // R2: PRN (as-needed) medicines go into a separate group
+        allDoses.add({'med': med, 'time': 'As Needed', 'doseIndex': 0, 'mins': 9999});
+      } else if (isStarted || !isToday) {
         final intervalMins = med.doseIntervalMinutes;
         final baseTime = persistedStart ?? med.doseTimes.first;
         
@@ -236,8 +374,16 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       }
     }
 
-    // Sort by minutes
-    allDoses.sort((a, b) => (a['mins'] as int).compareTo(b['mins'] as int));
+    // Sort by minutes, handling midnight-crossing doses correctly
+    // Doses after midnight (< 6 AM) from late-night schedules should come after 11 PM doses
+    allDoses.sort((a, b) {
+      final aMin = a['mins'] as int;
+      final bMin = b['mins'] as int;
+      // Treat early-morning hours (0-359 = midnight to 5:59 AM) as next-day if mixed with evening
+      final aAdj = (aMin < 360 && allDoses.any((d) => (d['mins'] as int) > 720)) ? aMin + 1440 : aMin;
+      final bAdj = (bMin < 360 && allDoses.any((d) => (d['mins'] as int) > 720)) ? bMin + 1440 : bMin;
+      return aAdj.compareTo(bAdj);
+    });
 
     // Grouping logic
     for (var dose in allDoses) {
@@ -276,14 +422,15 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
 
   int _parseTime(String t) {
     try {
-      final p = t.split(' ');
+      final clean = t.trim().replaceAll('\u202f', ' ').replaceAll('\u00a0', ' ');
+      final p = clean.split(' ');
       final hm = p[0].split(':');
       int h = int.parse(hm[0]);
       final m = int.parse(hm[1]);
       if (p.length > 1) {
-        final period = p[1].toUpperCase();
-        if (period == 'PM' && h != 12) h += 12;
-        if (period == 'AM' && h == 12) h = 0;
+        final period = p[1].toUpperCase().replaceAll('.', '');
+        if ((period == 'PM' || period == 'P') && h != 12) h += 12;
+        if ((period == 'AM' || period == 'A') && h == 12) h = 0;
       }
       return h * 60 + m;
     } catch (_) { return 0; }
@@ -393,7 +540,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           ),
         ]),
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: widget.isEmbeddedInShell ? null : _buildBottomNav(),
     );
   }
 
@@ -518,8 +665,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
     final tMins = _parseTime(time);
     final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
-    // Time window: strictly today, no earlier than 30 mins before, no later than 4 hours after
-    final isLocked = !isToday || nowMins < tMins - 30 || nowMins > tMins + 240;
+    // Time window: only lock if it's not today or if it's too early (more than 30 mins before scheduled time)
+    // Past doses should still be actionable so users can record late intakes
+    final isLocked = !isToday || nowMins < tMins - 30;
 
     return Container(
       width: double.infinity,
@@ -695,6 +843,87 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       );
     }
 
+    // R2: PRN (as-needed) medicines
+    if (time == 'As Needed') {
+      final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.teal.shade50,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.teal.withOpacity(0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(color: Colors.teal, shape: BoxShape.circle),
+                child: const Icon(Icons.medication_liquid_rounded, color: Colors.white, size: 16),
+              ),
+              const SizedBox(width: 10),
+              Text('Take as needed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.teal.shade800)),
+            ]),
+            const SizedBox(height: 12),
+            ...items.map((item) {
+              final med = item['med'] as ScheduledMedicine;
+              final key = '${med.prescriptionItemId}_${item['doseIndex']}';
+              final taken = _takenDoses.contains(key);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.medication_rounded, color: taken ? _primary : Colors.teal.shade300, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(med.medicineName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: taken ? _primary.withOpacity(0.6) : _textDark)),
+                          if (med.dosage.isNotEmpty) Text(med.dosage, style: const TextStyle(fontSize: 11, color: _textMuted)),
+                          if (med.instructions.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(med.instructions, style: TextStyle(fontSize: 10, color: _textMuted.withOpacity(0.8), fontStyle: FontStyle.italic)),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (!taken && isToday) TextButton.icon(
+                      onPressed: () => _markAsTaken(med, item['doseIndex'] as int, 'PRN'),
+                      icon: const Icon(Icons.check_rounded, size: 16),
+                      label: const Text('Take', style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.teal,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        backgroundColor: Colors.teal.withOpacity(0.1),
+                      ),
+                    ) else if (taken) Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: _primary, size: 20),
+                        if (_takenTimestamps.containsKey(key))
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              DateFormat('h:mm a').format(_takenTimestamps[key]!),
+                              style: const TextStyle(fontSize: 8, color: _primary, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      );
+    }
+
     final allTaken = items.every((i) => _takenDoses.contains('${(i['med'] as ScheduledMedicine).prescriptionItemId}_${i['doseIndex']}'));
     final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
     final tMins = _parseTime(time);
@@ -713,8 +942,10 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       status = 'UPCOMING';
       statusColor = const Color(0xFF007BFF);
     } else if (isPast || (isToday && nowMins > tMins + 240)) {
-      status = 'MISSED';
-      statusColor = Colors.red;
+      // Past the window — show as LATE but still allow user to mark as taken
+      status = 'LATE';
+      statusColor = Colors.orange;
+      isLocked = false;
     } else {
       isLocked = false;
     }
@@ -793,7 +1024,20 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                               icon: Icon(Icons.check_circle_outline_rounded, color: isLocked ? _textMuted.withOpacity(0.2) : _primary, size: 22),
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
-                            ) else const Icon(Icons.check_circle_rounded, color: _primary, size: 20),
+                            ) else Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.check_circle_rounded, color: _primary, size: 20),
+                                if (_takenTimestamps.containsKey(key))
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      DateFormat('h:mm a').format(_takenTimestamps[key]!),
+                                      style: const TextStyle(fontSize: 8, color: _primary, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ],
                         ),
                       );
@@ -803,9 +1047,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                       SizedBox(
                         width: double.infinity,
                         child: TextButton(
-                          onPressed: isLocked ? null : () {
+                          onPressed: isLocked ? null : () async {
                             for (var item in items) {
-                              _markAsTaken(item['med'] as ScheduledMedicine, item['doseIndex'] as int, time);
+                              await _markAsTaken(item['med'] as ScheduledMedicine, item['doseIndex'] as int, time);
                             }
                           },
                           child: Text('Mark all as taken', style: TextStyle(color: isLocked ? _textMuted.withOpacity(0.3) : _primary, fontWeight: FontWeight.bold, fontSize: 13)),
@@ -930,12 +1174,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           }
 
           return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedDate = date;
-                _load();
-              });
-            },
+            onTap: () => _loadDateLogs(date),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               width: 60,
@@ -1031,9 +1270,13 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
             ),
           ),
           const SizedBox(width: 16),
-          Image.network(
-            'https://cdn-icons-png.flaticon.com/512/2838/2838634.png', 
+          Container(
             width: 60, height: 60,
+            decoration: BoxDecoration(
+              color: const Color(0xFF7B3AF5).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.tips_and_updates_rounded, color: Color(0xFF7B3AF5), size: 32),
           ),
         ],
       ),
@@ -1209,13 +1452,16 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   }
 
   Future<void> _pickTime(BuildContext context, ScheduledMedicine med, int doseIndex, String currentTime) async {
-    final parts = currentTime.split(' ');
+    // Normalize non-ASCII spaces (\u202f narrow no-break space, \u00a0 no-break space) for locale compatibility
+    final clean = currentTime.trim().replaceAll('\u202f', ' ').replaceAll('\u00a0', ' ');
+    final parts = clean.split(' ');
     final hm = parts[0].split(':');
     int h = int.parse(hm[0]);
     final m = int.parse(hm[1]);
     if (parts.length > 1) {
-      if (parts[1] == 'PM' && h != 12) h += 12;
-      if (parts[1] == 'AM' && h == 12) h = 0;
+      final period = parts[1].toUpperCase().replaceAll('.', '');
+      if ((period == 'PM' || period == 'P') && h != 12) h += 12;
+      if ((period == 'AM' || period == 'A') && h == 12) h = 0;
     }
 
     final picked = await showTimePicker(
@@ -1433,8 +1679,8 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         ),
       ),
     );
-  }  MaterialPageRoute _pageRoute(Widget page) =>   // ← THIS TOO
-  MaterialPageRoute(builder: (_) => page);
+  }  Route _pageRoute(Widget page) =>
+  AppPageRoute.slideRight(page);
 
 
   Widget _sectionHeader(String title) => Text(title,

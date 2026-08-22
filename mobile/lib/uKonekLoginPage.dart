@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'services/api_service.dart';
 import 'uKonekDashboardPage.dart';
+import 'uKonekMainShellPage.dart';
 import 'package:ukonekmobile/uKonekRegistration/uKonekRegisterWrapper.dart';
 import 'uKonekMenuPage.dart';
 import 'uKonekForgotPasswordPage.dart';
+import 'utils/app_transitions.dart';
 
 class uKonekLoginPage extends StatefulWidget {
   const uKonekLoginPage({super.key});
@@ -162,34 +164,18 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
 
       Navigator.pushAndRemoveUntil(
         context,
-        PageRouteBuilder(
-          pageBuilder: (_, _, _) => uKonekDashboardPage(
+        AppPageRoute.fadeThrough(
+          uKonekMainShellPage(
             // ── Core ─────────────────────────────────────────────
             username:         displayName,
             citizenId:        (user['id'] ?? '').toString(),
             fullname:         fullName,
-            // ── Personal ─────────────────────────────────────────
-            firstName:        firstName,
-            middleName:       middleName,
-            surname:          surname,
-            nameExtension:    _str(user, 'name_extension'),
-            dob:              _str(user, 'date_of_birth'),
-            age:              (user['age']?.toString()) ?? '',
-            sex:              _str(user, 'sex'),
-            // ── Contact ──────────────────────────────────────────
             email:            _str(user, 'email'),
             phone:            _str(user, 'contact_number'),
             address:          _str(user, 'complete_address'),
-            // ── Emergency ────────────────────────────────────────
-            emergencyName:    _str(user, 'emergency_contact_complete_name'),
-            emergencyContact: _str(user, 'emergency_contact_contact_number'),
-            relation:         _str(user, 'relation'),
           ),
-          transitionDuration: const Duration(milliseconds: 500),
-          transitionsBuilder: (_, animation, _, child) =>
-              FadeTransition(opacity: animation, child: child),
         ),
-            (route) => false,
+        (route) => false,
       );
     } catch (error) {
       if (!mounted) return;
@@ -263,7 +249,7 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
       child: Column(children: [
         Row(children: [
           GestureDetector(
-            onTap: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const uKonekMenuPage()), (route) => false),
+            onTap: () => Navigator.pushAndRemoveUntil(context, AppPageRoute.fadeThrough(const uKonekMenuPage()), (route) => false),
             child: Container(
               width: 38, height: 38,
               decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(12)),
@@ -342,7 +328,7 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const uKonekForgotPasswordPage())),
+                onPressed: () => Navigator.push(context, AppPageRoute.slideRight(const uKonekForgotPasswordPage())),
                 child: const Text('Forgot password?', style: TextStyle(color: _primary, fontSize: 12, fontWeight: FontWeight.w600)),
               ),
             ),
@@ -389,7 +375,7 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
                       text: 'Register here',
                       style: const TextStyle(color: _primary, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
                       recognizer: TapGestureRecognizer()
-                        ..onTap = () => Navigator.push(context, MaterialPageRoute(builder: (_) => const uKonekRegisterWrapper())),
+                        ..onTap = () => Navigator.push(context, AppPageRoute.slideRight(const uKonekRegisterWrapper())),
                     ),
                   ],
                 ),

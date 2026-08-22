@@ -4,8 +4,10 @@ import 'uKonekMenuPage.dart';
 import 'services/api_service.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'uKonekMedicineScheduler.dart';  // ✅ added
-import 'uKonekJoinQueuePage.dart';// ✅ added
+import 'uKonekJoinQueuePage.dart';
 import 'uKonekDashboardPage.dart';
+import 'utils/app_transitions.dart';
+import 'uKonekMainShellPage.dart';
 
 // ── Design tokens ──────────────────────────────────────────────
 class _C {
@@ -62,7 +64,10 @@ class uKonekProfilePage extends StatefulWidget {
     this.emergencyContact = '',
     this.relation         = '',
     this.idVerified       = false,
+    this.isEmbeddedInShell = false,
   });
+
+  final bool isEmbeddedInShell;
 
   @override
   State<uKonekProfilePage> createState() => _uKonekProfilePageState();
@@ -230,7 +235,7 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _C.bg,
-      bottomNavigationBar: _buildBottomNav(), // ✅ wired in
+      bottomNavigationBar: widget.isEmbeddedInShell ? null : _buildBottomNav(),
       body: Column(children: [
         _buildHeader(context),
         Expanded(
@@ -297,10 +302,14 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
                 onTap: () {
                   setState(() => _selectedTab = i);
                   if (i == 0) {
-                    Navigator.pop(context); // Pop back to Dashboard
+                    Navigator.push(context, AppPageRoute.slideRight(uKonekDashboardPage(
+                      username: widget.username,
+                      citizenId: widget.citizenId,
+                      fullname: widget.fullName,
+                    )));
                   } else if (i == 1) {
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => uKonekMedicineSchedulerPage(
+                    Navigator.push(context, AppPageRoute.slideRight(
+                      uKonekMedicineSchedulerPage(
                         username:  widget.username,
                         citizenId: widget.citizenId,
                       ),
@@ -308,8 +317,8 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
                       if (mounted) setState(() => _selectedTab = 3);
                     });
                   } else if (i == 2) {
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => uKonekJoinQueuePage(
+                    Navigator.push(context, AppPageRoute.slideRight(
+                      uKonekJoinQueuePage(
                         username:  widget.username,
                         citizenId: widget.citizenId,
                       ),
@@ -544,7 +553,7 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
                   if (context.mounted) {
                     Navigator.pushAndRemoveUntil(
                       context,
-                      MaterialPageRoute(builder: (_) => const uKonekMenuPage()),
+                      AppPageRoute.fadeThrough(const uKonekMenuPage()),
                       (route) => false,
                     );
                   }

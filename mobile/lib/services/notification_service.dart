@@ -6,6 +6,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../uKonekMedicineScheduler.dart';
+import '../utils/app_transitions.dart';
 
 class NotificationService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -18,8 +19,12 @@ class NotificationService {
     tz.initializeTimeZones();
     try {
       tz.setLocalLocation(tz.getLocation('Asia/Manila'));
-    } catch (e) {
-      debugPrint('Timezone error: $e');
+    } catch (_) {
+      try {
+        tz.setLocalLocation(tz.local);
+      } catch (e) {
+        debugPrint('Timezone fallback error: $e');
+      }
     }
 
     const AndroidInitializationSettings initializationSettingsAndroid =
@@ -49,8 +54,8 @@ class NotificationService {
           try {
             final data = jsonDecode(payload);
             if (data['action'] == 'medicine') {
-              navigatorKey.currentState?.push(MaterialPageRoute(
-                builder: (_) => uKonekMedicineSchedulerPage(
+              navigatorKey.currentState?.push(AppPageRoute.slideRight(
+                uKonekMedicineSchedulerPage(
                   username: data['username'] ?? '',
                   citizenId: data['citizenId'] ?? '',
                 ),
@@ -88,6 +93,7 @@ class NotificationService {
     required String body,
     required int hour,
     required int minute,
+    DateTimeComponents? matchDateTimeComponents,
     String? payload,
   }) async {
     if (kIsWeb) return;
@@ -125,7 +131,7 @@ class NotificationService {
         iOS: DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time,
+      matchDateTimeComponents: matchDateTimeComponents,
       payload: payload,
     );
   }
@@ -153,6 +159,19 @@ class NotificationService {
       ),
       payload: payload,
     );
+  }
+
+  /// ID offset for medicine reminders. Medicine IDs use range 1000-1999.
+  static const int medicineIdOffset = 1000;
+  static const int _maxMedicineNotifications = 100;
+
+  /// Cancel only medicine reminder notifications (IDs 1000-1099)
+  /// without affecting clinic alerts or other notification channels.
+  static Future<void> cancelMedicineReminders() async {
+    if (kIsWeb) return;
+    for (int i = 0; i < _maxMedicineNotifications; i++) {
+      await _notificationsPlugin.cancel(medicineIdOffset + i);
+    }
   }
 
   static Future<void> cancelAll() async {

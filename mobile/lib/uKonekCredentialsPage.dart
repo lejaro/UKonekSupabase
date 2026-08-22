@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'uKonekLoginPage.dart';
 import 'services/api_service.dart';
+import 'utils/app_transitions.dart';
 
 class uKonekCredentialsPage extends StatefulWidget {
   final String firstName, middleName, surname, nameExtension;
@@ -598,9 +599,8 @@ class _uKonekCredentialsPageState
               ),
               onPressed: () => Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(
-                    builder: (_) => const uKonekLoginPage()),
-                    (route) => false,
+                AppPageRoute.fadeThrough(const uKonekLoginPage()),
+                (route) => false,
               ),
               child: const Text('GO TO SIGN IN',
                   style: TextStyle(

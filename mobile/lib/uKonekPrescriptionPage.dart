@@ -39,6 +39,7 @@ class _PrescriptionGroup {
   bool get isDispensed => dispensingStatus == 'dispensed';
   bool get isCancelled => dispensingStatus == 'cancelled';
   bool get isPending   => dispensingStatus == 'pending';
+  bool get isPartial   => dispensingStatus == 'partial';
 }
 
 class PrescriptionPage extends StatefulWidget {
@@ -50,9 +51,10 @@ class PrescriptionPage extends StatefulWidget {
 
 class _PrescriptionPageState extends State<PrescriptionPage> {
   int _selectedFilter = 0;
-  final List<String> _filters = ['All', 'Pending', 'Dispensed'];
+  final List<String> _filters = ['All', 'Pending', 'Partial', 'Dispensed'];
 
   bool _loading = true;
+  bool _refreshing = false;
   String? _error;
   List<_PrescriptionGroup> _groups = [];
 
@@ -72,6 +74,32 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
       });
     } catch (e) {
       setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _refreshPrescriptionStatus() async {
+    if (_refreshing || _loading) return;
+    setState(() => _refreshing = true);
+    try {
+      final records = await ApiService.fetchPrescriptions();
+      if (!mounted) return;
+      setState(() => _groups = _buildGroups(records));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Prescription status updated.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to refresh prescriptions: $e'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
     }
   }
 
@@ -233,17 +261,29 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                 Text('Your medication records', style: TextStyle(color: Colors.white70, fontSize: 12)),
               ],
             )),
-            GestureDetector(
-              onTap: _load,
+            Semantics(
+              button: true,
+              label: 'Refresh prescription status',
+              child: GestureDetector(
+              onTap: _refreshPrescriptionStatus,
               child: Container(
                 width: 38, height: 38,
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.18),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
+                child: _refreshing
+                    ? const SizedBox(
+                        width: 19,
+                        height: 19,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
               ),
-            ),
+            )),
           ]),
         ),
       ),
@@ -257,7 +297,8 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
         : _C.warning;
     final statusLabel = g.isDispensed ? 'Dispensed'
         : g.isCancelled ? 'Cancelled'
-        : 'Pending';
+      : g.isPartial ? 'Partial'
+      : 'Pending';
 
     return GestureDetector(
       onTap: () => _showGroupDetail(g),
@@ -323,7 +364,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                     style: const TextStyle(fontSize: 13, color: _C.textDark),
                     maxLines: 1, overflow: TextOverflow.ellipsis,
                   )),
-                  Text('×${item.quantity}${item.unit.isNotEmpty ? " ${item.unit}" : ""}',
+                  Text('Remaining ×${item.remainingQuantity}${item.unit.isNotEmpty ? " ${item.unit}" : ""}',
                       style: const TextStyle(fontSize: 12, color: _C.textMuted, fontWeight: FontWeight.w600)),
                 ]),
               )),
@@ -360,7 +401,8 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
         : _C.warning;
     final statusLabel = g.isDispensed ? 'Dispensed'
         : g.isCancelled ? 'Cancelled'
-        : 'Pending';
+      : g.isPartial ? 'Partial'
+      : 'Pending';
 
     showModalBottomSheet(
       context: context,
@@ -485,10 +527,15 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
               color: _C.primaryMid.withOpacity(0.08),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text('×${item.quantity}${item.unit.isNotEmpty ? " ${item.unit}" : ""}',
+            child: Text('Prescribed ×${item.quantity}${item.unit.isNotEmpty ? " ${item.unit}" : ""}',
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _C.primaryMid)),
           ),
         ]),
+
+          const SizedBox(height: 10),
+          _infoRow(Icons.shopping_bag_outlined, 'Dispensed', item.dispensedQuantityLabel),
+          const SizedBox(height: 8),
+          _infoRow(Icons.inventory_2_outlined, 'Remaining', item.remainingQuantityLabel),
 
         if (item.frequency.isNotEmpty) ...[
           const SizedBox(height: 10),
