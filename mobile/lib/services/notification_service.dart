@@ -51,22 +51,21 @@ class NotificationService {
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
         final payload = response.payload;
         if (payload != null && payload.isNotEmpty) {
-          try {
-            final data = jsonDecode(payload);
-            if (data['action'] == 'medicine') {
-              navigatorKey.currentState?.push(AppPageRoute.slideRight(
-                uKonekMedicineSchedulerPage(
-                  username: data['username'] ?? '',
-                  citizenId: data['citizenId'] ?? '',
-                ),
-              ));
-            }
-          } catch (e) {
-            debugPrint('Error parsing notification payload: $e');
-          }
+          _handleNotificationPayload(payload);
         }
       },
     );
+
+    // Handle cold start app launch from notification
+    final launchDetails = await _notificationsPlugin.getNotificationAppLaunchDetails();
+    if (launchDetails != null && launchDetails.didNotificationLaunchApp) {
+      final payload = launchDetails.notificationResponse?.payload;
+      if (payload != null && payload.isNotEmpty) {
+        Future.delayed(const Duration(milliseconds: 600), () {
+          _handleNotificationPayload(payload);
+        });
+      }
+    }
 
     // Request permissions for Android 13+
     final androidImplementation = _notificationsPlugin
@@ -74,6 +73,24 @@ class NotificationService {
     if (androidImplementation != null) {
       await androidImplementation.requestNotificationsPermission();
       await androidImplementation.requestExactAlarmsPermission();
+    }
+  }
+
+  static void _handleNotificationPayload(String payload) {
+    try {
+      final data = jsonDecode(payload);
+      if (data['action'] == 'medicine') {
+        final username = data['username'] ?? '';
+        final citizenId = data['citizenId'] ?? '';
+        navigatorKey.currentState?.push(AppPageRoute.slideRight(
+          uKonekMedicineSchedulerPage(
+            username: username,
+            citizenId: citizenId,
+          ),
+        ));
+      }
+    } catch (e) {
+      debugPrint('Error parsing notification payload: $e');
     }
   }
 
@@ -93,7 +110,7 @@ class NotificationService {
     required String body,
     required int hour,
     required int minute,
-    DateTimeComponents? matchDateTimeComponents,
+    DateTimeComponents? matchDateTimeComponents = DateTimeComponents.time,
     String? payload,
   }) async {
     if (kIsWeb) return;
@@ -161,16 +178,16 @@ class NotificationService {
     );
   }
 
-  /// ID offset for medicine reminders. Medicine IDs use range 1000-1999.
+  /// ID offset for medicine reminders. Medicine IDs use range 1000-1099.
   static const int medicineIdOffset = 1000;
-  static const int _maxMedicineNotifications = 100;
+  static const int maxMedicineNotifications = 100;
 
   /// Cancel only medicine reminder notifications (IDs 1000-1099)
   /// without affecting clinic alerts or other notification channels.
   static Future<void> cancelMedicineReminders() async {
     if (kIsWeb) return;
-    for (int i = 0; i < _maxMedicineNotifications; i++) {
-      await _notificationsPlugin.cancel(medicineIdOffset + i);
+    for (int i = 0; i < maxMedicineNotifications; i++) {
+      await _notificationsPlugin.cancel(id: medicineIdOffset + i);
     }
   }
 

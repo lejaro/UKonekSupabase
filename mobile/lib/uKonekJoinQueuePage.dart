@@ -258,14 +258,20 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
       ),
     );
     if (confirm != true) return;
-    setState(() => _isSubmitting = true);
     try {
-      if (await ApiService.cancelMyQueue()) {
+      final success = await ApiService.cancelMyQueue();
+      if (success) {
         _stopRefreshTimer(); // Stop auto-refresh after leaving queue
         _refreshDashboard();
+        _showSnack('You have left the queue.');
+      } else {
+        _showSnack('Unable to cancel ticket. Please refresh.', isError: true);
       }
-    } catch (e) { _showSnack(e.toString()); }
-    finally { if (mounted) setState(() => _isSubmitting = false); }
+    } catch (e) {
+      _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   void _showSnack(String msg, {bool isError = false}) {
@@ -327,15 +333,6 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 20, 28),
           child: Row(children: [
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(13), border: Border.all(color: Colors.white.withOpacity(0.25))),
-                child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-              ),
-            ),
-            const SizedBox(width: 14),
             const Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Queue Tracker', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: -0.3)),

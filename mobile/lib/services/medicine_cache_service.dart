@@ -82,18 +82,20 @@ class MedicineCacheService {
     required String scheduledTime,
     required int doseIndex,
     required String dateKey,
+    DateTime? actualTime,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
       // 1. Update local date log cache
       final existing = await loadCachedIntakeLogs(citizenId, dateKey) ?? [];
+      final now = actualTime ?? DateTime.now();
       final newLog = {
         'prescription_item_id': prescriptionItemId,
         'scheduled_time': scheduledTime,
         'dose_index': doseIndex,
         'status': 'taken',
-        'actual_time': DateTime.now().toUtc().toIso8601String(),
+        'actual_time': now.toUtc().toIso8601String(),
       };
       
       // Avoid duplicate local entries
@@ -104,7 +106,7 @@ class MedicineCacheService {
         await saveIntakeLogs(citizenId, dateKey, existing);
       }
 
-      // 2. Append to offline sync queue
+      // 2. Append to offline sync queue (avoid duplicate pending sync requests)
       final queueRaw = prefs.getString(_pendingQueueKey);
       final queue = queueRaw != null ? (jsonDecode(queueRaw) as List<dynamic>).whereType<Map<String, dynamic>>().toList() : <Map<String, dynamic>>[];
       
@@ -113,11 +115,20 @@ class MedicineCacheService {
         'prescription_item_id': prescriptionItemId,
         'scheduled_time': scheduledTime,
         'dose_index': doseIndex,
+        'intake_date': dateKey,
         'timestamp': DateTime.now().toIso8601String(),
       };
       
-      queue.add(queueItem);
-      await prefs.setString(_pendingQueueKey, jsonEncode(queue));
+      final alreadyInQueue = queue.any((item) =>
+        (item['prescription_item_id'] as num?)?.toInt() == prescriptionItemId &&
+        (item['dose_index'] as num?)?.toInt() == doseIndex &&
+        item['intake_date'] == dateKey
+      );
+
+      if (!alreadyInQueue) {
+        queue.add(queueItem);
+        await prefs.setString(_pendingQueueKey, jsonEncode(queue));
+      }
     } catch (e) {
       debugPrint('Error recording local intake: $e');
     }
@@ -140,6 +151,8 @@ class MedicineCacheService {
             prescriptionItemId: (item['prescription_item_id'] as num).toInt(),
             scheduledTime: item['scheduled_time'] as String,
             doseIndex: (item['dose_index'] as num).toInt(),
+            citizenId: int.tryParse(item['citizen_id']?.toString() ?? ''),
+            intakeDate: item['intake_date'] as String?,
           );
         } catch (e) {
           debugPrint('Sync failed for item, keeping in queue: $e');
@@ -189,6 +202,43 @@ class MedicineCacheService {
       }
     } catch (e) {
       debugPrint('Error pruning old logs: $e');
+    }
+  }
+
+  /// Bug #6 fix: Remove an intake record from local cache and pending queue (for undo)
+  static Future<void> removeLocalIntake(
+    String citizenId, {
+    required String prescriptionItemKey,
+    required String dateKey,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // 1. Remove from cached date logs
+      final existing = await loadCachedIntakeLogs(citizenId, dateKey) ?? [];
+      existing.removeWhere((l) =>
+        '${l['prescription_item_id']}_${l['dose_index']}' == prescriptionItemKey
+      );
+      await saveIntakeLogs(citizenId, dateKey, existing);
+
+      // 2. Remove from pending sync queue specifically for this date
+      final queueRaw = prefs.getString(_pendingQueueKey);
+      if (queueRaw != null) {
+        final queue = (jsonDecode(queueRaw) as List<dynamic>)
+            .whereType<Map<String, dynamic>>()
+            .toList();
+        queue.removeWhere((item) =>
+          '${item['prescription_item_id']}_${item['dose_index']}' == prescriptionItemKey &&
+          (item['intake_date'] == null || item['intake_date'] == dateKey)
+        );
+        if (queue.isEmpty) {
+          await prefs.remove(_pendingQueueKey);
+        } else {
+          await prefs.setString(_pendingQueueKey, jsonEncode(queue));
+        }
+      }
+    } catch (e) {
+      debugPrint('Error removing local intake: $e');
     }
   }
 }

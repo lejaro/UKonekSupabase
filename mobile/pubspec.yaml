@@ -36,6 +36,15 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/launcher icon/U-KOnekLogo.png"
 
+flutter_native_splash:
+  color: "#ffffff"
+  image: "assets/launcher icon/U-KOnekLogo.png"
+  android_12:
+    image: "assets/launcher icon/U-KOnekLogo.png"
+    icon_background_color: "#ffffff"
+    color: "#ffffff"
+  web: false
+
 flutter:
   uses-material-design: true
 

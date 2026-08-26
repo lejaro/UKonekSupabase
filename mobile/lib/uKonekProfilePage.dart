@@ -377,15 +377,6 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
           child: Row(children: [
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                width: 38, height: 38,
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-              ),
-            ),
-            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

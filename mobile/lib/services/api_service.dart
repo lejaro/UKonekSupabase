@@ -61,6 +61,24 @@ class DoctorSchedule {
   }
 
   factory DoctorSchedule.fromMap(Map<String, dynamic> map) {
+    DateTime parsedDate;
+    try {
+      final rawDate = map['schedule_date']?.toString().trim() ?? '';
+      final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(rawDate);
+      if (match != null) {
+        parsedDate = DateTime(
+          int.parse(match.group(1)!),
+          int.parse(match.group(2)!),
+          int.parse(match.group(3)!),
+        );
+      } else {
+        final dt = DateTime.tryParse(rawDate) ?? DateTime.now();
+        parsedDate = DateTime(dt.year, dt.month, dt.day);
+      }
+    } catch (_) {
+      parsedDate = DateTime.now();
+    }
+
     return DoctorSchedule(
       id: (map['id'] as num?)?.toInt() ?? 0,
       doctorStaffId: (map['doctor_staff_id'] as num?)?.toInt() ?? 0,
@@ -68,7 +86,7 @@ class DoctorSchedule {
           ? (map['doctor_name'] as String).trim()
           : 'Unknown Doctor',
       specialization: ((map['specialization'] as String?) ?? '').trim(),
-      scheduleDate: DateTime.parse(map['schedule_date'] as String),
+      scheduleDate: parsedDate,
       startTime: (map['start_time'] as String?) ?? '',
       endTime: (map['end_time'] as String?) ?? '',
       notes: (map['notes'] as String?)?.trim().isEmpty == true ? null : (map['notes'] as String?),
@@ -185,8 +203,8 @@ class PrescriptionRecord {
       prescriptionId:   (m['prescription_id']   as num?)?.toInt() ?? 0,
       prescriptionCode: (m['prescription_code']  as String?) ?? '',
       dispensingStatus: (m['dispensing_status']  as String?) ?? 'pending',
-      issuedAt:         DateTime.parse((m['issued_at'] as String?) ?? DateTime.now().toIso8601String()),
-      dispensedAt:      m['dispensed_at'] != null ? DateTime.tryParse(m['dispensed_at'] as String) : null,
+      issuedAt:         DateTime.parse((m['issued_at'] as String?) ?? DateTime.now().toIso8601String()).toLocal(),
+      dispensedAt:      m['dispensed_at'] != null ? DateTime.tryParse(m['dispensed_at'] as String)?.toLocal() : null,
       doctorName:       (m['doctor_name']        as String?) ?? '',
       medicineName:     (m['medicine_name']      as String?) ?? '',
       quantity:         (m['quantity']           as num?)?.toInt() ?? 0,
@@ -254,14 +272,17 @@ class ScheduledMedicine {
     final f = frequency.toLowerCase().trim();
     if (f.isEmpty) return 1;
 
-    if (f.contains('prn') || f.contains('as needed')) return 0;
-    if (f.contains('stat')) return 1;
-    if (f.contains('od') || f.contains('once') || f.contains('om') || f.contains('on') || f.contains('daily')) return 1;
-    if (f.contains('bid') || f.contains('twice') || f.contains('q12h')) return 2;
-    if (f.contains('tid') || f.contains('thrice') || f.contains('q8h')) return 3;
-    if (f.contains('qid') || f.contains('q6h')) return 4;
-    if (f.contains('q4h')) return 6;
-    if (f.contains('q2h')) return 12;
+    // Check PRN / as needed first
+    if (RegExp(r'\b(prn|as\s+needed|as-needed|p\.r\.n)\b').hasMatch(f)) return 0;
+    if (RegExp(r'\b(stat)\b').hasMatch(f)) return 1;
+
+    // Check specific frequency patterns with word boundaries
+    if (RegExp(r'\b(q2h|every\s*2\s*h(ours?)?)\b').hasMatch(f)) return 12;
+    if (RegExp(r'\b(q4h|every\s*4\s*h(ours?)?)\b').hasMatch(f)) return 6;
+    if (RegExp(r'\b(qid|q6h|every\s*6\s*h(ours?)?|4\s*times?\s*(a|per)?\s*day|four\s*times?\s*(a|per)?\s*day)\b').hasMatch(f)) return 4;
+    if (RegExp(r'\b(tid|thrice|q8h|every\s*8\s*h(ours?)?|3\s*times?\s*(a|per)?\s*day|three\s*times?\s*(a|per)?\s*day)\b').hasMatch(f)) return 3;
+    if (RegExp(r'\b(bid|twice|q12h|every\s*12\s*h(ours?)?|2\s*times?\s*(a|per)?\s*day|two\s*times?\s*(a|per)?\s*day)\b').hasMatch(f)) return 2;
+    if (RegExp(r'\b(od|om|on|hs|once|daily|once\s*(a|per)?\s*day|every\s*day|q24h)\b').hasMatch(f)) return 1;
 
     final xday = RegExp(r'(\d+)\s*x').firstMatch(f);
     if (xday != null) return int.tryParse(xday.group(1)!) ?? 1;
@@ -269,12 +290,12 @@ class ScheduledMedicine {
     final hrs = RegExp(r'every\s+(\d+)\s+h').firstMatch(f);
     if (hrs != null) {
       final h = int.tryParse(hrs.group(1)!) ?? 8;
-      return (24 / h).floor();
+      return h > 0 ? (24 / h).floor() : 1;
     }
     final qhr = RegExp(r'q(\d+)h').firstMatch(f);
     if (qhr != null) {
       final h = int.tryParse(qhr.group(1)!) ?? 8;
-      return (24 / h).floor();
+      return h > 0 ? (24 / h).floor() : 1;
     }
 
     return 1;
@@ -291,13 +312,17 @@ class ScheduledMedicine {
         return val;
       }
     }
-    return 1;
+    if (dailyDoseCount > 0 && quantity > 0) {
+      return (quantity / dailyDoseCount).ceil();
+    }
+    return 30; // Default to 30 active days for dispensed medicines
   }
 
   DateTime get startDate => dispensedAt ?? issuedAt;
-  DateTime get endDate => DateTime(startDate.year, startDate.month, startDate.day).add(Duration(days: durationDays));
+  DateTime get endDate => DateTime(startDate.year, startDate.month, startDate.day).add(Duration(days: durationDays > 0 ? durationDays - 1 : 0));
 
   bool isActiveOn(DateTime date) {
+    if (dailyDoseCount == 0) return true; // PRN / As-needed is always active
     final d = DateTime(date.year, date.month, date.day);
     final s = DateTime(startDate.year, startDate.month, startDate.day);
     final e = DateTime(endDate.year, endDate.month, endDate.day);
@@ -307,13 +332,16 @@ class ScheduledMedicine {
   int get doseIntervalMinutes {
     final count = dailyDoseCount;
     if (count <= 1) return 0;
+    if (count == 2) return 12 * 60; // 12 hours (e.g. 8:00 AM, 8:00 PM)
+    if (count == 3) return 6 * 60;  // 6 hours (e.g. 8:00 AM, 2:00 PM, 8:00 PM)
+    if (count == 4) return 5 * 60;  // 5 hours (e.g. 7:00 AM, 12:00 PM, 5:00 PM, 10:00 PM)
     return (24 * 60) ~/ count;
   }
 
   List<String> get doseTimes {
     final f = frequency.toLowerCase().trim();
 
-    if (f.contains('stat')) {
+    if (RegExp(r'\b(stat)\b').hasMatch(f)) {
       try {
         return [DateFormat('hh:mm a').format(issuedAt)];
       } catch (_) {
@@ -321,17 +349,17 @@ class ScheduledMedicine {
       }
     }
 
-    if (f.contains('om')) return ['08:00 AM'];
-    if (f.contains('on')) return ['08:00 PM'];
-    if (f.contains('hs')) return ['09:00 PM'];
+    if (RegExp(r'\b(om)\b').hasMatch(f)) return ['08:00 AM'];
+    if (RegExp(r'\b(on)\b').hasMatch(f)) return ['08:00 PM'];
+    if (RegExp(r'\b(hs|at\s*bedtime|bedtime)\b').hasMatch(f)) return ['09:00 PM'];
 
     final count = dailyDoseCount;
     if (count <= 0) return [];
 
     if (count == 1) return ['08:00 AM'];
     if (count == 2) return ['08:00 AM', '08:00 PM'];
-    if (count == 3) return ['08:00 AM', '04:00 PM', '12:00 AM'];
-    if (count == 4) return ['06:00 AM', '12:00 PM', '06:00 PM', '12:00 AM'];
+    if (count == 3) return ['08:00 AM', '01:00 PM', '07:00 PM'];
+    if (count == 4) return ['07:00 AM', '12:00 PM', '05:00 PM', '09:00 PM'];
 
     final intervalHours = 24 ~/ count;
     return List.generate(count, (i) {
@@ -345,13 +373,16 @@ class ScheduledMedicine {
   }
 
   factory ScheduledMedicine.fromMap(Map<String, dynamic> m) {
+    final status = (m['dispensing_status'] as String?)?.toLowerCase().trim() ?? '';
+    final isDispensedVal = (m['is_dispensed'] as bool?) ?? 
+        (status == 'dispensed' || status == 'partial');
     return ScheduledMedicine(
       prescriptionItemId: (m['prescription_item_id'] as num?)?.toInt() ?? 0,
       prescriptionId:     (m['prescription_id']      as num?)?.toInt() ?? 0,
       prescriptionCode:   (m['prescription_code']    as String?) ?? '',
-      dispensingStatus:   (m['dispensing_status']    as String?) ?? '',
-      issuedAt:           DateTime.parse((m['issued_at'] as String?) ?? DateTime.now().toIso8601String()),
-      dispensedAt:        m['dispensed_at'] != null ? DateTime.tryParse(m['dispensed_at'] as String) : null,
+      dispensingStatus:   status,
+      issuedAt:           DateTime.parse((m['issued_at'] as String?) ?? DateTime.now().toIso8601String()).toLocal(),
+      dispensedAt:        m['dispensed_at'] != null ? DateTime.tryParse(m['dispensed_at'] as String)?.toLocal() : null,
       doctorName:         (m['doctor_name']           as String?) ?? '',
       medicineName:       (m['medicine_name']         as String?) ?? '',
       quantity:           (m['quantity']              as num?)?.toInt() ?? 0,
@@ -362,7 +393,7 @@ class ScheduledMedicine {
       instructions:       (m['instructions']          as String?) ?? '',
       additionalInfo:     (m['additional_info']       as String?) ?? '',
       isAvailable:        (m['is_available']          as bool?) ?? true,
-      isDispensed:        (m['is_dispensed']          as bool?) ?? false,
+      isDispensed:        isDispensedVal,
     );
   }
 
@@ -485,8 +516,8 @@ class Consultation {
       physicalExam: map['physical_exam'] as Map<String, dynamic>?,
       differentialDiagnosis: map['differential_diagnosis'],
       labOrders: map['lab_orders'],
-      followupDate: map['follow_up_date'] != null ? DateTime.tryParse(map['follow_up_date']) : null,
-      consultedAt: DateTime.parse(map['consulted_at']),
+      followupDate: map['follow_up_date'] != null ? DateTime.tryParse(map['follow_up_date'].toString())?.toLocal() : null,
+      consultedAt: DateTime.tryParse(map['consulted_at']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
       doctorName: drName,
     );
   }
@@ -1342,11 +1373,14 @@ class ApiService {
     }
   }
 
-  static Future<void> logMedicineIntake({required int prescriptionItemId, required String scheduledTime, required int doseIndex, int? citizenId}) async {
+  static Future<void> logMedicineIntake({required int prescriptionItemId, required String scheduledTime, required int doseIndex, int? citizenId, String? intakeDate}) async {
     if (citizenId == null) {
       final profile = await fetchMyCitizenProfile();
       citizenId = (profile['id'] as num).toInt();
     }
+
+    // Bug #5 fix: Use the passed intakeDate (from UI's selected date) rather than DateTime.now()
+    final dateStr = intakeDate ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     await _client.from('medicine_intake_logs').upsert({
       'citizen_id': citizenId,
@@ -1355,8 +1389,27 @@ class ApiService {
       'dose_index': doseIndex,
       'status': 'taken',
       'actual_time': DateTime.now().toUtc().toIso8601String(),
-      'intake_date': DateTime.now().toIso8601String().substring(0, 10),
+      'intake_date': dateStr,
     }, onConflict: 'citizen_id,prescription_item_id,dose_index,intake_date');
+  }
+
+  static Future<void> deleteMedicineIntakeLog({
+    required int prescriptionItemId,
+    required int doseIndex,
+    required String intakeDate,
+    int? citizenId,
+  }) async {
+    if (citizenId == null) {
+      final profile = await fetchMyCitizenProfile();
+      citizenId = (profile['id'] as num).toInt();
+    }
+    await _client
+        .from('medicine_intake_logs')
+        .delete()
+        .eq('citizen_id', citizenId)
+        .eq('prescription_item_id', prescriptionItemId)
+        .eq('dose_index', doseIndex)
+        .eq('intake_date', intakeDate);
   }
 
   static Future<List<Map<String, dynamic>>> getIntakeLogsForDate(DateTime date, {int? citizenId}) async {
@@ -1365,15 +1418,14 @@ class ApiService {
       citizenId = (profile['id'] as num).toInt();
     }
 
-    final startOfDay = DateTime(date.year, date.month, date.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
+    // Bug #4 fix: Query by intake_date (plain DATE column) instead of created_at (UTC timestamp)
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
 
     final response = await _client
         .from('medicine_intake_logs')
         .select()
         .eq('citizen_id', citizenId)
-        .gte('created_at', startOfDay.toUtc().toIso8601String())
-        .lt('created_at', endOfDay.toUtc().toIso8601String());
+        .eq('intake_date', dateStr);
 
     return (response as List<dynamic>?)?.whereType<Map<String, dynamic>>().toList() ?? [];
   }

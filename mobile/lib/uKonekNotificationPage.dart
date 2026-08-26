@@ -108,19 +108,25 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
 
       // 3. Medicine Reminders (Missed doses from today)
       final takenKeys = logs.map((l) => '${l['prescription_item_id']}_${l['dose_index']}').toSet();
-      final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
+      final now = DateTime.now();
+      final nowMins = now.hour * 60 + now.minute;
 
       for (var med in schedules) {
+        // Only active, dispensed scheduled prescriptions for today
+        if (!med.isDispensed || !med.isActiveOn(now) || med.dailyDoseCount <= 0) continue;
+
         for (int i = 0; i < med.doseTimes.length; i++) {
           final key = '${med.prescriptionItemId}_$i';
           if (!takenKeys.contains(key)) {
-            final tMins = _parseTime(med.doseTimes[i]);
+            final customTime = prefs.getString('med_dose_${med.prescriptionItemId}_$i');
+            final doseTimeStr = customTime ?? med.doseTimes[i];
+            final tMins = _parseTime(doseTimeStr);
             if (nowMins > tMins + 15) { // 15 mins past due
                notifications.add({
                 'id': 'med_${med.prescriptionItemId}_$i',
                 'title': 'Missed Dose: ${med.medicineName}',
-                'body': 'You missed your ${med.doseTimes[i]} intake. Please take it as soon as possible.',
-                'time': '${med.doseTimes[i]} Today',
+                'body': 'You missed your $doseTimeStr intake. Please take it as soon as possible.',
+                'time': '$doseTimeStr Today',
                 'type': 'reminder',
                 'isRead': false,
                 'rawDate': DateTime.now().subtract(const Duration(minutes: 5)), // Recent
@@ -131,7 +137,6 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
       }
 
       // 4. Follow-up Checkup Date Notifications
-      final now = DateTime.now();
       final todayDate = DateTime(now.year, now.month, now.day);
       final tomorrowDate = todayDate.add(const Duration(days: 1));
 
