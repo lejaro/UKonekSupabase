@@ -1288,51 +1288,92 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   }
 
   Widget _buildProgressCard(double completion) {
+    final isFull = completion >= 1.0;
+    final isHalf = completion >= 0.5;
+    final Color progressColor = isFull ? _primary : (isHalf ? const Color(0xFF00897B) : const Color(0xFF1976D2));
+    final String statusBadge = isFull 
+        ? '🎉 100% COMPLETE' 
+        : (isHalf ? '⚡ IN PROGRESS' : '📋 TO DO');
+
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F6FF),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: progressColor.withOpacity(0.2), width: 1.2),
+        boxShadow: const [
+          BoxShadow(color: Color(0x0C1B2E1E), blurRadius: 16, offset: Offset(0, 5)),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
-            decoration: const BoxDecoration(color: Color(0xFF007BFF), shape: BoxShape.circle),
-            child: const Icon(Icons.show_chart_rounded, color: Colors.white, size: 20),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: progressColor.withOpacity(0.10),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isFull ? Icons.verified_rounded : Icons.pie_chart_rounded, 
+              color: progressColor, 
+              size: 24,
+            ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Your progress', style: TextStyle(color: Color(0xFF0056B3), fontWeight: FontWeight.bold, fontSize: 14)),
-                const SizedBox(height: 8),
-                Text(completion >= 1.0 ? "Fantastic! You've taken all your meds." : completion >= 0.5 ? "Great job! You're doing amazing." : "Keep it up! Let's hit 100%.",
-                    style: const TextStyle(fontSize: 14, color: _textDark, fontWeight: FontWeight.w500)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: progressColor.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    statusBadge,
+                    style: TextStyle(
+                      color: progressColor, 
+                      fontWeight: FontWeight.w800, 
+                      fontSize: 9,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  isFull 
+                      ? "Fantastic! You've taken all your meds today." 
+                      : (isHalf ? "Great job! You're halfway through today's doses." : "Keep it up! Let's stay on schedule."),
+                  style: const TextStyle(fontSize: 13, color: _textDark, fontWeight: FontWeight.w600, height: 1.3),
+                ),
               ],
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Column(
             children: [
               Stack(
                 alignment: Alignment.center,
                 children: [
                   SizedBox(
-                    width: 60, height: 60,
+                    width: 58, 
+                    height: 58,
                     child: CircularProgressIndicator(
                       value: completion,
-                      strokeWidth: 8,
-                      backgroundColor: Colors.white,
-                      color: const Color(0xFF007BFF),
+                      strokeWidth: 7,
+                      backgroundColor: Colors.grey.shade100,
+                      color: progressColor,
                     ),
                   ),
-                  Text('${(completion * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _textDark)),
+                  Text(
+                    '${(completion * 100).toInt()}%', 
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: progressColor),
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              const Text('This day', style: TextStyle(fontSize: 10, color: _textMuted, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              const Text('Daily Goal', style: TextStyle(fontSize: 9, color: _textMuted, fontWeight: FontWeight.bold)),
             ],
           ),
         ],

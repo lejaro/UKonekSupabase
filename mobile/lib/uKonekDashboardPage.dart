@@ -456,42 +456,54 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         children: [
           _buildHeader(),
           Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildAnnouncements(),
-                  /*const SizedBox(height: 24),
-                  _buildQrSection(),*/
-                  const SizedBox(height: 20),
-                  _buildDoctorStatusSection(),
-                  const SizedBox(height: 24),
-                  _buildQueueCard(),
-                  const SizedBox(height: 28),
-                  _sectionHeader('Health Care Services'),
-                  const SizedBox(height: 14),
-                  _buildServiceIcons(),
-                  const SizedBox(height: 28),
-                  _sectionHeader('Quick Actions'),
-                  const SizedBox(height: 14),
-                  _buildQuickActionGrid(),
-                  const SizedBox(height: 28),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _sectionHeader('My Prescriptions'),
-                      if (_prescribedMedicines.isNotEmpty)
-                        GestureDetector(
-                          onTap: () => Navigator.push(context, AppPageRoute.slideRight(const PrescriptionPage())),
-                          child: const Text('View All', style: TextStyle(color: _C.primaryMid, fontSize: 13, fontWeight: FontWeight.w600)),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  _buildMedicineCard(),
-                ],
+            child: RefreshIndicator(
+              color: _C.primary,
+              backgroundColor: Colors.white,
+              displacement: 24,
+              onRefresh: () async {
+                HapticFeedback.lightImpact();
+                await _loadAllData(isInitial: false);
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildAnnouncements(),
+                    /*const SizedBox(height: 24),
+                    _buildQrSection(),*/
+                    const SizedBox(height: 20),
+                    _buildDoctorStatusSection(),
+                    const SizedBox(height: 24),
+                    _buildQueueCard(),
+                    const SizedBox(height: 28),
+                    _sectionHeader('Health Care Services'),
+                    const SizedBox(height: 14),
+                    _buildServiceIcons(),
+                    const SizedBox(height: 28),
+                    _sectionHeader('Quick Actions'),
+                    const SizedBox(height: 14),
+                    _buildQuickActionGrid(),
+                    const SizedBox(height: 28),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _sectionHeader('My Prescriptions'),
+                        if (_prescribedMedicines.isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              Navigator.push(context, AppPageRoute.slideRight(const PrescriptionPage()));
+                            },
+                            child: const Text('View All', style: TextStyle(color: _C.primaryMid, fontSize: 13, fontWeight: FontWeight.w600)),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _buildMedicineCard(),
+                  ],
+                ),
               ),
             ),
           ),
@@ -556,30 +568,52 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: [_C.primary, _C.primaryMid], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        gradient: LinearGradient(
+          colors: [_C.primary, _C.primaryMid], 
+          begin: Alignment.topLeft, 
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.only(bottomLeft: Radius.circular(32), bottomRight: Radius.circular(32)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x1A1B5E20),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+          padding: const EdgeInsets.fromLTRB(24, 18, 24, 26),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               GestureDetector(
-                onTap: _navigateToProfile,
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _navigateToProfile();
+                },
+                behavior: HitTestBehavior.opaque,
                 child: Row(children: [
                   Container(
-                    width: 44, height: 44,
+                    width: 46, height: 46,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withOpacity(0.22),
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withOpacity(0.4)),
+                      border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Center(
                       child: Text(
                         widget.username.isNotEmpty ? widget.username[0].toUpperCase() : 'U',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19),
                       ),
                     ),
                   ),
@@ -587,11 +621,11 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_getGreeting(), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      Text(_getGreeting(), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500)),
                       Row(children: [
-                        Text(widget.username, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text(widget.username, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: -0.2)),
                         const SizedBox(width: 4),
-                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 11),
+                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white60, size: 11),
                       ]),
                     ],
                   ),
@@ -676,11 +710,16 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         ),
         const SizedBox(height: 14),
         Container(
-          decoration: BoxDecoration(color: _C.surface, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 16, offset: Offset(0, 6))]),
+          decoration: BoxDecoration(
+            color: _C.surface, 
+            borderRadius: BorderRadius.circular(24), 
+            border: Border.all(color: const Color(0xFFE8F5E9), width: 1),
+            boxShadow: const [BoxShadow(color: Color(0x0C1B2E1E), blurRadius: 16, offset: Offset(0, 6))],
+          ),
           child: _isInitialLoading
-              ? const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()))
+              ? const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator(color: _C.primaryMid)))
               : (_doctors.isEmpty
-                  ? const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No doctors on duty.', style: TextStyle(color: _C.textMuted))))
+                  ? const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No doctors on duty at the moment.', style: TextStyle(color: _C.textMuted, fontSize: 13))))
                   : Column(children: List.generate(_doctors.length, (i) {
                       final item = _doctors[i];
                       return Column(children: [
@@ -721,9 +760,14 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     final statusColor = hasQueue ? _C.warning : _C.success;
     return Container(
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(color: _C.surface, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 16, offset: Offset(0, 6))]),
+      decoration: BoxDecoration(
+        color: _C.surface, 
+        borderRadius: BorderRadius.circular(24), 
+        border: Border.all(color: hasQueue ? statusColor.withOpacity(0.3) : const Color(0xFFE8F5E9), width: 1.2),
+        boxShadow: const [BoxShadow(color: Color(0x0C1B2E1E), blurRadius: 16, offset: Offset(0, 6))],
+      ),
       child: _isInitialLoading
-          ? const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()))
+          ? const SizedBox(height: 100, child: Center(child: CircularProgressIndicator(color: _C.primaryMid)))
           : Column(children: [
               Row(children: [
                 Container(
@@ -896,6 +940,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         final color = s['color'] as Color;
         return GestureDetector(
           onTap: () async {
+            HapticFeedback.lightImpact();
             if (widget.isEmbeddedInShell) {
               uKonekMainShellPage.switchTab(context, 2);
               return;
@@ -912,18 +957,35 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
             );
             if (joined == true) _loadAllData(isInitial: false);
           },
+          behavior: HitTestBehavior.opaque,
           child: Column(children: [
             Container(
-              width: 62, height: 62,
+              width: 64, height: 64,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: color.withOpacity(0.25)),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: color.withOpacity(0.20), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: Icon(s['icon'] as IconData, color: color, size: 28),
+              child: Center(
+                child: Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(s['icon'] as IconData, color: color, size: 24),
+                ),
+              ),
             ),
             const SizedBox(height: 8),
-            Text(s['label'] as String, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.textDark)),
+            Text(s['label'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _C.textDark)),
           ]),
         );
       }).toList(),
@@ -983,34 +1045,46 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
   Widget _actionBtn(String label, IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      behavior: HitTestBehavior.opaque,
       child: Container(
         decoration: BoxDecoration(
           color: _C.surface,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 10, offset: Offset(0, 4))],
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE8F5E9), width: 1),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0C1B2E1E), 
+              blurRadius: 12, 
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: color.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: color, size: 18),
+              child: Icon(icon, color: color, size: 19),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Flexible(
               child: Text(
                 label,
                 style: const TextStyle(
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w800,
                   fontSize: 13,
                   color: _C.textDark,
+                  letterSpacing: -0.2,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1030,11 +1104,21 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         .toList();
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: _C.surface, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 14, offset: Offset(0, 5))]),
+      decoration: BoxDecoration(
+        color: _C.surface, 
+        borderRadius: BorderRadius.circular(24), 
+        border: Border.all(color: const Color(0xFFE8F5E9), width: 1),
+        boxShadow: const [BoxShadow(color: Color(0x0C1B2E1E), blurRadius: 14, offset: Offset(0, 5))],
+      ),
       child: _isInitialLoading
-          ? const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()))
+          ? const SizedBox(height: 100, child: Center(child: CircularProgressIndicator(color: _C.primaryMid)))
           : (medicines.isEmpty
-              ? const Text('No recent prescriptions.', style: TextStyle(color: _C.textMuted))
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text('No active prescriptions to claim.', style: TextStyle(color: _C.textMuted, fontSize: 13)),
+                  ),
+                )
               : Column(children: [
                   for (var i = 0; i < medicines.length; i++) ...[
                     _medRow(medicines[i].medicineName, medicines[i].remainingQuantityLabel, medicines[i].isPartial ? 'PARTIAL' : 'PRESCRIBED', medicines[i].isPartial ? _C.warning : _C.primaryMid),

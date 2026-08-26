@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'uKonekMenuPage.dart';
 import 'services/api_service.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -492,7 +493,29 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
     );
   }
 
+  Future<void> _dialPhoneNumber(String phone) async {
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    if (cleanPhone.isEmpty) {
+      _snack('No valid phone number provided.', Colors.redAccent);
+      return;
+    }
+    HapticFeedback.lightImpact();
+    final uri = Uri.parse('tel:$cleanPhone');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        await Clipboard.setData(ClipboardData(text: cleanPhone));
+        _snack('Phone number copied to clipboard: $cleanPhone', _C.primaryMid);
+      }
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: cleanPhone));
+      _snack('Phone number copied to clipboard: $cleanPhone', _C.primaryMid);
+    }
+  }
+
   Widget _buildEmergencyCard() {
+    final hasContactNumber = _emergencyContact.isNotEmpty && _emergencyContact != '—';
     return _card(
       editLabel: 'Edit',
       onEdit: () => _showEditSheet(
@@ -512,7 +535,73 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         _divider(),
         _tile(Icons.people_outline_rounded,     'Relationship', _relation.isNotEmpty         ? _relation         : '—'),
         _divider(),
-        _tile(Icons.phone_callback_rounded,     'Number',       _emergencyContact.isNotEmpty ? _emergencyContact : '—'),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 38, height: 38,
+                decoration: BoxDecoration(color: _C.primary.withOpacity(0.07), borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.phone_callback_rounded, color: _C.primary, size: 18),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Number', style: TextStyle(color: _C.textMuted, fontSize: 11, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 2),
+                    Text(_emergencyContact.isNotEmpty ? _emergencyContact : '—', style: const TextStyle(fontWeight: FontWeight.bold, color: _C.textDark, fontSize: 14)),
+                  ],
+                ),
+              ),
+              if (hasContactNumber)
+                ElevatedButton.icon(
+                  onPressed: () => _dialPhoneNumber(_emergencyContact),
+                  icon: const Icon(Icons.call_rounded, size: 14, color: Colors.white),
+                  label: const Text('CALL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE53935),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF3F3),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFFFCDD2)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.local_hospital_rounded, color: Color(0xFFD32F2F), size: 18),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Clinic Emergency Hotline', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB71C1C))),
+                    Text('911 / (02) 8888-2546', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFFD32F2F))),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.phone_forwarded_rounded, color: Color(0xFFD32F2F), size: 20),
+                onPressed: () => _dialPhoneNumber('911'),
+                tooltip: 'Call Emergency Hotline',
+                constraints: const BoxConstraints(),
+                padding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

@@ -657,6 +657,7 @@ class QueueDashboardSnapshot {
   final String? citizenAddress;
   final String? citizenContact;
   final String? chiefComplaint;
+  final bool hasVitals;
 
   const QueueDashboardSnapshot({
     required this.queueId,
@@ -675,11 +676,12 @@ class QueueDashboardSnapshot {
     this.citizenAddress,
     this.citizenContact,
     this.chiefComplaint,
+    this.hasVitals = false,
   });
 
   bool get hasActiveQueue => queueId != null && myQueueNumber != null;
 
-  factory QueueDashboardSnapshot.fromMap(Map<String, dynamic> map) {
+  factory QueueDashboardSnapshot.fromMap(Map<String, dynamic> map, {bool hasVitals = false}) {
     final dateRaw = map['r_queue_date'] ?? map['queue_date'];
     DateTime? parsedDate;
     if (dateRaw is String && dateRaw.trim().isNotEmpty) {
@@ -702,6 +704,7 @@ class QueueDashboardSnapshot {
       citizenAddress: map['citizen_address']?.toString(),
       citizenContact: map['citizen_contact']?.toString(),
       chiefComplaint: map['chief_complaint']?.toString(),
+      hasVitals: hasVitals,
     );
   }
 
@@ -717,6 +720,7 @@ class QueueDashboardSnapshot {
     queueDate: null,
     isOnCall: false,
     waitingCount: 0,
+    hasVitals: false,
   );
 }
 
@@ -1246,7 +1250,20 @@ class ApiService {
     final response = await _client.rpc('get_my_queue_dashboard');
     final rows = (response as List<dynamic>?) ?? const [];
     if (rows.isEmpty || rows.first is! Map<String, dynamic>) return QueueDashboardSnapshot.empty;
-    return QueueDashboardSnapshot.fromMap(rows.first as Map<String, dynamic>);
+    final map = rows.first as Map<String, dynamic>;
+    final queueId = ((map['r_queue_id'] ?? map['queue_id']) as num?)?.toInt();
+    bool hasVitals = false;
+    if (queueId != null) {
+      try {
+        final vitalsCheck = await _client
+            .from('vital_signs')
+            .select('id')
+            .eq('queue_ticket_id', queueId)
+            .maybeSingle();
+        hasVitals = vitalsCheck != null;
+      } catch (_) {}
+    }
+    return QueueDashboardSnapshot.fromMap(map, hasVitals: hasVitals);
   }
 
   static Future<QueueLimiterStatus> getQueueLimiterStatus() async {

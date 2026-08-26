@@ -24,6 +24,7 @@ dependencies:
   flutter_local_notifications: ^21.0.0
   timezone: ^0.11.0
   shared_preferences: ^2.5.5
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
@@ -38,9 +39,9 @@ flutter_launcher_icons:
 
 flutter_native_splash:
   color: "#ffffff"
-  image: "assets/launcher icon/U-KOnekLogo.png"
+  image: "assets/logo/splash_logo.png"
   android_12:
-    image: "assets/launcher icon/U-KOnekLogo.png"
+    image: "assets/logo/splash_logo.png"
     icon_background_color: "#ffffff"
     color: "#ffffff"
   web: false
@@ -51,3 +52,5 @@ flutter:
   assets:
     - assets/welcome_screen/welcomPhoto-removebg-preview.png
     - assets/launcher icon/U-KOnekLogo.png
+    - assets/logo/splash_logo.png
+    - assets/logo/uKonekLogo.png
