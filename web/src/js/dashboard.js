@@ -343,6 +343,15 @@ function state() {
   const expanded = isMobile ? slid : !collapsed;
   burger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
   burger.classList.toggle('is-expanded', expanded);
+
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (backdrop) {
+    if (isMobile && slid) {
+      backdrop.classList.remove('hidden');
+    } else {
+      backdrop.classList.add('hidden');
+    }
+  }
 }
 
 function loadAuthServiceModule() {
@@ -399,7 +408,13 @@ if (burger) {
   window.addEventListener('resize', state);
 }
 
-
+const sidebarBackdropEl = document.getElementById('sidebar-backdrop');
+if (sidebarBackdropEl) {
+  sidebarBackdropEl.addEventListener('click', () => {
+    if (sidebar) sidebar.classList.remove('slid');
+    state();
+  });
+}
 
 document.addEventListener('click', (e) => {
   if (window.innerWidth <= 900 && sidebar && sidebar.classList.contains('slid')) {
@@ -410,6 +425,27 @@ document.addEventListener('click', (e) => {
     }
   }
 });
+
+// User Profile Popover Controller
+const profileTrigger = document.getElementById('user-profile-trigger');
+const profilePopover = document.getElementById('user-profile-popover');
+if (profileTrigger && profilePopover) {
+  profileTrigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isHidden = profilePopover.classList.contains('hidden');
+    profilePopover.classList.toggle('hidden', !isHidden);
+    profileTrigger.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!profilePopover.classList.contains('hidden')) {
+      if (!profilePopover.contains(e.target) && !profileTrigger.contains(e.target)) {
+        profilePopover.classList.add('hidden');
+        profileTrigger.setAttribute('aria-expanded', 'false');
+      }
+    }
+  });
+}
 
 state();
 
@@ -483,6 +519,12 @@ function dismissNotification(id) {
 }
 
 function showLogoutConfirmModal() {
+  if (profilePopover) {
+    profilePopover.classList.add('hidden');
+    if (profileTrigger) profileTrigger.setAttribute('aria-expanded', 'false');
+  }
+  const notifPanel = document.getElementById('notif-panel');
+  if (notifPanel) notifPanel.classList.add('hidden');
   if (!logoutConfirmModal) return;
   logoutConfirmModal.classList.remove('hidden');
 }
@@ -960,16 +1002,22 @@ function applyRoleAccess(user) {
 
   sessionUserRole = role || sessionUserRole;
 
-  const userNameNode = document.querySelector('.user-name');
-  if (userNameNode) {
-    userNameNode.textContent = getDisplayFirstName(user);
-  }
+  const userNameNodes = document.querySelectorAll('.user-name');
+  userNameNodes.forEach(node => {
+    node.textContent = getDisplayFirstName(user);
+  });
 
-  const userRoleNode = document.querySelector('.user-pos');
-  if (userRoleNode) {
+  const fullNameNodes = document.querySelectorAll('.user-name-full');
+  fullNameNodes.forEach(node => {
+    const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || 'Clinical Personnel';
+    node.textContent = fullName;
+  });
+
+  const userRoleNodes = document.querySelectorAll('.user-pos');
+  userRoleNodes.forEach(node => {
     const roleText = String(user?.role || 'Nurse');
-    userRoleNode.textContent = roleText.charAt(0).toUpperCase() + roleText.slice(1);
-  }
+    node.textContent = roleText.charAt(0).toUpperCase() + roleText.slice(1);
+  });
   applyRoleLogos(user?.role || 'nurse');
   applyConsultationAccess();
 
@@ -3346,6 +3394,18 @@ function clearActiveNav() {
   document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
 }
 
+const SECTION_BREADCRUMBS = {
+  'dashboard-section': 'Doctor Dashboard Overview',
+  'schedule-section': 'Availability Schedule',
+  'queue-section': 'Live Patient Queue',
+  'vitals-section': 'Vitals Triage & Assessment',
+  'consultation-section': 'Consultation & Clinical Notes',
+  'medicine-section': 'Pharmacy Inventory & Stock',
+  'users-section': 'Personnel & Citizen Directory',
+  'reports-section': 'Analytics, Announcements & Feedbacks',
+  'profile-section': 'Profile & Account Security'
+};
+
 function navigateToSection(sectionId, options = {}) {
   const targetId = document.getElementById(sectionId) ? sectionId : DEFAULT_SECTION_ID;
   let currentRole = getSessionRole();
@@ -3366,6 +3426,11 @@ function navigateToSection(sectionId, options = {}) {
   const navMatch = document.querySelector(`.nav [data-section="${allowedTarget}"]`);
   if (navMatch) navMatch.classList.add('is-active');
   setSectionHash(allowedTarget);
+
+  const topbarTitleNode = document.getElementById('main-topbar-title');
+  if (topbarTitleNode && SECTION_BREADCRUMBS[allowedTarget]) {
+    topbarTitleNode.textContent = SECTION_BREADCRUMBS[allowedTarget];
+  }
 }
 
 
@@ -5997,6 +6062,58 @@ const medicineArchivedPanel = document.getElementById('medicine-archived-panel')
 const medicineArchivedTbody = document.getElementById('medicine-archived-tbody');
 const medicineSearchInput = document.getElementById('medicine-search-input');
 
+function initConsultationQuickDiagnosis() {
+  document.querySelectorAll('.diag-chip').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = 'true';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const diagVal = btn.getAttribute('data-diag');
+      const diagInput = document.getElementById('consult-diagnosis');
+      if (diagInput && diagVal) {
+        diagInput.value = diagVal;
+        showToast(`Diagnosis applied: ${diagVal}`, 'info');
+        
+        // Switch to Diagnosis tab so the physician sees the populated field
+        const diagTabBtn = document.querySelector('.modal-tab[data-tab="tab-diagnosis"]');
+        if (diagTabBtn) {
+          diagTabBtn.click();
+        }
+        diagInput.focus();
+      }
+    });
+  });
+}
+
+function initPrescriptionDosagePresets() {
+  document.querySelectorAll('.rx-preset-chip').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = 'true';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const dosage = btn.getAttribute('data-dosage');
+      const sig = btn.getAttribute('data-sig');
+      
+      const linesContainer = document.getElementById('prescription-lines');
+      let lastLine = linesContainer?.lastElementChild;
+      if (!lastLine) {
+        const addBtn = document.getElementById('add-prescription-line');
+        if (addBtn) {
+          addBtn.click();
+          lastLine = linesContainer?.lastElementChild;
+        }
+      }
+      if (lastLine) {
+        const dosageInput = lastLine.querySelector('.rx-dosage-input') || lastLine.querySelector('input[placeholder*="Dosage"]');
+        const sigInput = lastLine.querySelector('.rx-instructions-input') || lastLine.querySelector('input[placeholder*="Instructions"]');
+        if (dosageInput && dosage) dosageInput.value = dosage;
+        if (sigInput && sig) sigInput.value = sig;
+        showToast('Prescription dosage shortcut applied.', 'info');
+      }
+    });
+  });
+}
+
 function openConsultationModal(prefill = {}) {
   if (!consultationModal) return;
   if (consultationForm) consultationForm.reset();
@@ -6014,7 +6131,7 @@ function openConsultationModal(prefill = {}) {
   // Show patient name + service in modal header
   if (displayId) {
     const namePart = prefill.patientName ? `<strong>${prefill.patientName}</strong>` : '';
-    const idPart = prefill.patientId ? `<span style="color:#64748b">(${prefill.patientId})</span>` : '—';
+    const idPart = prefill.patientId ? `<span style="color:#cbd5e1">(${prefill.patientId})</span>` : '—';
     const servicePart = prefill.serviceLabel ? ` &mdash; <em>${prefill.serviceLabel}</em>` : '';
     displayId.innerHTML = `${namePart} ${idPart}${servicePart}`.trim();
   }
@@ -6040,6 +6157,8 @@ function openConsultationModal(prefill = {}) {
   }
 
   initConsultationTabs();
+  initConsultationQuickDiagnosis();
+  initPrescriptionDosagePresets();
   consultationModal.classList.remove('hidden');
 }
 
@@ -6056,7 +6175,18 @@ async function loadVitalsForConsultation(queueTicketId) {
     const grid        = document.getElementById('consult-vitals-grid');
     const complaintEl = document.getElementById('consult-vitals-complaint');
     const notesEl     = document.getElementById('consult-vitals-notes');
+    const allergyBox  = document.getElementById('consult-allergy-alert');
+    const allergyText = document.getElementById('consult-allergy-text');
     if (!banner || !grid) return;
+
+    // Check for critical allergy warning
+    const allergies = data.allergies || data.drug_allergies || (data.notes && data.notes.toLowerCase().includes('allerg') ? data.notes : null);
+    if (allergies && allergyBox && allergyText) {
+      allergyText.textContent = allergies;
+      allergyBox.classList.remove('hidden');
+    } else if (allergyBox) {
+      allergyBox.classList.add('hidden');
+    }
 
     const vitals = [
       { label: 'BP',   value: data.blood_pressure       ? `${data.blood_pressure} mmHg` : null },
@@ -6069,9 +6199,9 @@ async function loadVitalsForConsultation(queueTicketId) {
     if (vitals.length === 0 && !data.chief_complaint) return;
 
     grid.innerHTML = vitals.map(v => `
-      <div style="background:#fff; border:1px solid #bbf7d0; border-radius:8px; padding:8px 10px; text-align:center;">
-        <div style="font-size:11px; color:#6b7280; margin-bottom:2px;">${v.label}</div>
-        <div style="font-size:14px; font-weight:700; color:#0f172a;">${v.value}</div>
+      <div class="vitals-mini-card">
+        <div class="v-label">${v.label}</div>
+        <div class="v-val">${v.value}</div>
       </div>
     `).join('');
 
@@ -6106,6 +6236,11 @@ function closeConsultationModal() {
   if (!consultationModal) return;
   consultationModal.classList.add('hidden');
   if (consultationForm) consultationForm.reset();
+}
+
+const consultModalCloseIcon = document.getElementById('consult-modal-close-icon');
+if (consultModalCloseIcon) {
+  consultModalCloseIcon.addEventListener('click', () => closeConsultationModal());
 }
 
 if (openConsultModalBtn) {
@@ -7924,7 +8059,7 @@ function addPrescriptionLine() {
     if (foundAllergy) {
       medInput.style.borderColor = '#ef4444';
       medInput.style.background = '#fef2f2';
-      errorContainer.textContent = `⚠️ ALLERGY DETECTED: Patient is allergic to "${foundAllergy.toUpperCase()}"!`;
+      errorContainer.textContent = `ALLERGY DETECTED: Patient is allergic to "${foundAllergy.toUpperCase()}"!`;
       errorContainer.style.display = 'block';
     } else {
       medInput.style.borderColor = '#cbd5e1';
@@ -8534,9 +8669,173 @@ function clearPharmacySearch() {
 //   initPharmacyModule();
 // }
 
-// --- Vital Signs Assessment Modal ---
+// --- Vital Signs Assessment Modal & Real-Time Risk Engine ---
 const vaModal = document.getElementById('vital-assessment-modal');
 const vaForm = document.getElementById('vital-assessment-form');
+
+function evaluateVitalsRisk() {
+  // 1. Blood Pressure Risk
+  const bpInput = document.getElementById('va-bp');
+  const bpBadge = document.getElementById('va-bp-badge');
+  if (bpInput && bpBadge) {
+    const val = bpInput.value.trim();
+    if (val && val.includes('/')) {
+      const [sysStr, diaStr] = val.split('/');
+      const sys = parseInt(sysStr, 10);
+      const dia = parseInt(diaStr, 10);
+      if (!isNaN(sys) && !isNaN(dia)) {
+        bpBadge.className = 'vital-risk-badge';
+        if (sys >= 180 || dia >= 120) {
+          bpBadge.classList.add('vital-risk-crisis');
+          bpBadge.textContent = 'Hypertensive Crisis';
+        } else if (sys >= 140 || dia >= 90) {
+          bpBadge.classList.add('vital-risk-stage2');
+          bpBadge.textContent = 'Stage 2 HTN Alert';
+        } else if (sys >= 130 || dia >= 80) {
+          bpBadge.classList.add('vital-risk-stage1');
+          bpBadge.textContent = 'Stage 1 HTN';
+        } else if (sys >= 120 && dia < 80) {
+          bpBadge.classList.add('vital-risk-elevated');
+          bpBadge.textContent = 'Elevated BP';
+        } else if (sys < 120 && dia < 80 && sys >= 90 && dia >= 60) {
+          bpBadge.classList.add('vital-risk-normal');
+          bpBadge.textContent = 'Normal BP';
+        } else if (sys < 90 || dia < 60) {
+          bpBadge.classList.add('vital-risk-hypo');
+          bpBadge.textContent = 'Hypotension';
+        }
+      } else {
+        bpBadge.classList.add('hidden');
+      }
+    } else {
+      bpBadge.classList.add('hidden');
+    }
+  }
+
+  // 2. Heart Rate Risk
+  const hrInput = document.getElementById('va-hr');
+  const hrBadge = document.getElementById('va-hr-badge');
+  if (hrInput && hrBadge) {
+    const hr = parseFloat(hrInput.value);
+    if (!isNaN(hr) && hr > 0) {
+      hrBadge.className = 'vital-risk-badge';
+      if (hr > 100) {
+        hrBadge.classList.add('vital-risk-tachy');
+        hrBadge.textContent = 'Tachycardia (>100 bpm)';
+      } else if (hr < 60) {
+        hrBadge.classList.add('vital-risk-brady');
+        hrBadge.textContent = 'Bradycardia (<60 bpm)';
+      } else {
+        hrBadge.classList.add('vital-risk-normal');
+        hrBadge.textContent = 'Normal Pulse';
+      }
+    } else {
+      hrBadge.classList.add('hidden');
+    }
+  }
+
+  // 3. Respiratory Rate Risk
+  const rrInput = document.getElementById('va-rr');
+  const rrBadge = document.getElementById('va-rr-badge');
+  if (rrInput && rrBadge) {
+    const rr = parseFloat(rrInput.value);
+    if (!isNaN(rr) && rr > 0) {
+      rrBadge.className = 'vital-risk-badge';
+      if (rr > 20) {
+        rrBadge.classList.add('vital-risk-tachy');
+        rrBadge.textContent = 'Tachypnea (>20 bpm)';
+      } else if (rr < 12) {
+        rrBadge.classList.add('vital-risk-brady');
+        rrBadge.textContent = 'Bradypnea (<12 bpm)';
+      } else {
+        rrBadge.classList.add('vital-risk-normal');
+        rrBadge.textContent = 'Normal RR';
+      }
+    } else {
+      rrBadge.classList.add('hidden');
+    }
+  }
+
+  // 4. Temperature Risk
+  const tempInput = document.getElementById('va-temp');
+  const tempBadge = document.getElementById('va-temp-badge');
+  if (tempInput && tempBadge) {
+    const temp = parseFloat(tempInput.value);
+    if (!isNaN(temp) && temp > 0) {
+      tempBadge.className = 'vital-risk-badge';
+      if (temp >= 38.0) {
+        tempBadge.classList.add('vital-risk-fever');
+        tempBadge.textContent = 'High Fever (≥38.0°C)';
+      } else if (temp >= 37.5) {
+        tempBadge.classList.add('vital-risk-elevated');
+        tempBadge.textContent = 'Low-Grade Fever';
+      } else if (temp < 35.5) {
+        tempBadge.classList.add('vital-risk-hypo');
+        tempBadge.textContent = 'Hypothermia Alert';
+      } else {
+        tempBadge.classList.add('vital-risk-normal');
+        tempBadge.textContent = 'Afebrile (Normal)';
+      }
+    } else {
+      tempBadge.classList.add('hidden');
+    }
+  }
+
+  // 5. Oxygen Saturation Risk
+  const spo2Input = document.getElementById('va-spo2');
+  const spo2Badge = document.getElementById('va-spo2-badge');
+  if (spo2Input && spo2Badge) {
+    const spo2 = parseFloat(spo2Input.value);
+    if (!isNaN(spo2) && spo2 > 0) {
+      spo2Badge.className = 'vital-risk-badge';
+      if (spo2 < 90) {
+        spo2Badge.classList.add('vital-risk-hypoxia');
+        spo2Badge.textContent = 'Critical Hypoxia (<90%)';
+      } else if (spo2 < 95) {
+        spo2Badge.classList.add('vital-risk-stage2');
+        spo2Badge.textContent = 'Low SpO₂ (Hypoxia)';
+      } else {
+        spo2Badge.classList.add('vital-risk-normal');
+        spo2Badge.textContent = 'Normal SpO₂ (≥95%)';
+      }
+    } else {
+      spo2Badge.classList.add('hidden');
+    }
+  }
+
+  // 6. Anthropometrics & Body Mass Index (BMI)
+  const heightInput = document.getElementById('va-height');
+  const weightInput = document.getElementById('va-weight');
+  const bmiValEl = document.getElementById('va-bmi-value');
+  const bmiBadge = document.getElementById('va-bmi-badge');
+  if (heightInput && weightInput && bmiValEl && bmiBadge) {
+    const h = parseFloat(heightInput.value);
+    const w = parseFloat(weightInput.value);
+    if (!isNaN(h) && !isNaN(w) && h > 40 && w > 2) {
+      const hm = h / 100;
+      const bmi = w / (hm * hm);
+      bmiValEl.textContent = bmi.toFixed(1);
+      bmiBadge.className = 'bmi-category-badge';
+      if (bmi < 18.5) {
+        bmiBadge.classList.add('bmi-underweight');
+        bmiBadge.textContent = 'Underweight';
+      } else if (bmi <= 24.9) {
+        bmiBadge.classList.add('bmi-normal');
+        bmiBadge.textContent = 'Normal Weight';
+      } else if (bmi <= 29.9) {
+        bmiBadge.classList.add('bmi-overweight');
+        bmiBadge.textContent = 'Overweight';
+      } else {
+        bmiBadge.classList.add('bmi-obese');
+        bmiBadge.textContent = 'Obese';
+      }
+      bmiBadge.classList.remove('hidden');
+    } else {
+      bmiValEl.textContent = '—';
+      bmiBadge.classList.add('hidden');
+    }
+  }
+}
 
 async function openVitalAssessmentModal(ticket) {
   if (!vaModal || !ticket) return;
@@ -8557,6 +8856,15 @@ async function openVitalAssessmentModal(ticket) {
     metaEl.textContent = `${ticket.service_label} | ${age} | ${gender}`;
   }
   if (badgeEl) badgeEl.style.display = 'none';
+
+  // Wire real-time risk assessment input listeners
+  ['va-bp', 'va-hr', 'va-rr', 'va-temp', 'va-spo2', 'va-height', 'va-weight'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.riskBound) {
+      el.addEventListener('input', evaluateVitalsRisk);
+      el.dataset.riskBound = 'true';
+    }
+  });
 
   // Load and display patient symptoms & reason submitted during queue entry
   const symptomsSection = document.getElementById('va-patient-symptoms-section');
@@ -8607,6 +8915,8 @@ async function openVitalAssessmentModal(ticket) {
       }
     }
   } catch (err) { console.warn('Error checking existing vitals:', err); }
+  
+  evaluateVitalsRisk();
   vaModal.classList.remove('hidden');
   vaModal.style.display = 'flex';
 }
@@ -8936,7 +9246,7 @@ const appointments = (() => {
       <div class="queue-ticket-card" data-id="${t.id}" draggable="true">
         <div class="queue-ticket-top">
           <span class="queue-ticket-queue">#${String(t.queue_number).padStart(3, '0')}</span>
-          ${(t.vitals && t.vitals.length > 0) ? '<span class="vitals-badge" title="Vital assessment completed">✓ Vitals</span>' : ''}
+          ${(t.vitals && t.vitals.length > 0) ? '<span class="vitals-badge" title="Vital assessment completed">Vitals Assessed</span>' : ''}
           <span class="queue-ticket-code">${t.ticket_code}</span>
         </div>
         <div class="queue-ticket-name" style="display:flex;align-items:center;">

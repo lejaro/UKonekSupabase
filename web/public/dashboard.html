@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 
 <head>
@@ -431,10 +431,11 @@
     }, 3000);
   </script>
   <div class="app">
+    <div id="sidebar-backdrop" class="sidebar-backdrop hidden" aria-hidden="true"></div>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-inner">
         <div class="brand-row">
-          <div class="logo"><img class="logo" src="./U-KonekLogo-transparent.png" alt="" /></div>
+          <div class="logo"><img class="logo" src="./U-KonekLogo-transparent.png" alt="U-Konek Logo" /></div>
           <div class="brand-stack">
             <h3 class="brand-text">U-Konek+</h3>
             <p class="brand-subtext">Medical Workspace</p>
@@ -456,7 +457,7 @@
           </div>
         </div>
 
-        <p class="sidebar-section-label">Main</p>
+        <p class="sidebar-section-label">Operations</p>
 
         <nav class="nav main-nav" aria-label="Main navigation">
           <a href="#" class="nav-item full-access" data-section="dashboard-section" title="Dashboard">
@@ -468,6 +469,7 @@
             </span>
             <span class="label">Dashboard</span>
           </a>
+
           <a href="#" class="nav-item full-access" data-section="schedule-section" title="Availability">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -478,37 +480,17 @@
             <span class="label">Availability</span>
           </a>
 
-          <div class="nav-item dropdown full-access">
-            <button class="nav-btn" aria-label="Users menu" title="Users" data-section="users-section"
-              data-pane="registered-pane">
-              <span class="nav-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="8.5" cy="7" r="3" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a3 3 0 0 1 0 5.75" />
-                </svg>
-              </span>
-              <span class="label">Users</span>
-              <span class="arrow">▾</span>
-            </button>
-            <div class="dropdown-menu hidden">
-              <a href="#" class="dropdown-item full-access" data-section="users-section" data-pane="registered-pane">Staffs</a>
-              <a href="#" class="dropdown-item full-access" data-section="users-section" data-pane="citizens-pane">Citizens</a>
-            </div>
-          </div>
+          <p class="sidebar-section-label clinical-only">Clinical Workflow</p>
 
-          <a href="#" class="nav-item clinical-only" data-section="queue-section" title="Queue">
+          <a href="#" class="nav-item clinical-only" data-section="queue-section" title="Queue Management">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 6v6l4 2" />
               </svg>
             </span>
-            <span class="label">Queue</span>
+            <span class="label">Live Queue</span>
           </a>
-
-
 
           <a href="#" class="nav-item clinical-only" data-section="vitals-section" title="Vitals Assessment">
             <span class="nav-icon" aria-hidden="true">
@@ -516,7 +498,7 @@
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
               </svg>
             </span>
-            <span class="label">Vitals Assessment</span>
+            <span class="label">Vitals Triage</span>
           </a>
 
           <a href="#" class="nav-item clinical-only" data-section="consultation-section" title="Consultations">
@@ -536,8 +518,30 @@
                 <path d="m8.5 8.5 7 7" />
               </svg>
             </span>
-            <span class="label">Medicine Inventory</span>
+            <span class="label">Pharmacy & Stock</span>
           </a>
+
+          <p class="sidebar-section-label">Management & System</p>
+
+          <div class="nav-item dropdown full-access">
+            <button class="nav-btn" aria-label="Users menu" title="Users" data-section="users-section"
+              data-pane="registered-pane">
+              <span class="nav-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="8.5" cy="7" r="3" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a3 3 0 0 1 0 5.75" />
+                </svg>
+              </span>
+              <span class="label">Personnel & Citizens</span>
+              <span class="arrow">▾</span>
+            </button>
+            <div class="dropdown-menu hidden">
+              <a href="#" class="dropdown-item full-access" data-section="users-section" data-pane="registered-pane">Medical Staff</a>
+              <a href="#" class="dropdown-item full-access" data-section="users-section" data-pane="citizens-pane">Citizen Directory</a>
+            </div>
+          </div>
 
           <div class="nav-item dropdown full-access">
             <button class="nav-btn" aria-label="Reports menu" title="Reports" data-section="reports-section"
@@ -548,11 +552,12 @@
                   <path d="M14 2v6h6" />
                 </svg>
               </span>
-              <span class="label">Reports</span>
+              <span class="label">Reports & Feedbacks</span>
+              <span class="arrow">▾</span>
             </button>
             <div class="dropdown-menu hidden">
               <a href="#" class="dropdown-item full-access" data-section="reports-section" data-tab="tab-announcements">Announcements</a>
-              <a href="#" class="dropdown-item full-access" data-section="reports-section" data-tab="tab-feedback">Feedback</a>
+              <a href="#" class="dropdown-item full-access" data-section="reports-section" data-tab="tab-feedback">Feedbacks</a>
             </div>
           </div>
 
@@ -564,7 +569,7 @@
                   d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-.33-1 1.65 1.65 0 0 0-1-.6 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1-.33H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1-.33 1.65 1.65 0 0 0 .6-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .33-1V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 .33 1 1.65 1.65 0 0 0 1 .6 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.13.32.2.66.2 1s-.07.68-.2 1z" />
               </svg>
             </span>
-            <span class="label">Profile</span>
+            <span class="label">Profile & Security</span>
           </a>
         </nav>
 
@@ -574,28 +579,57 @@
     <main class="mainview">
       <div class="topbar">
         <div class="topbar-left">
-          <div class="left-controls">
-            <p class="topbar-title" id="main-topbar-title">Doctor Systems Overview</p>
-          </div>
-          <div class="right-controls">
-            <button id="notif-btn" class="icon-btn topbar-icon-btn" aria-label="Notifications">
-              <span class="nav-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                </svg>
-              </span>
-            </button>
+          <div class="topbar-breadcrumbs">
+            <span class="breadcrumb-root">AFM Roquero Medical Clinic</span>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current" id="main-topbar-title">Doctor Systems Overview</span>
           </div>
         </div>
 
         <div class="topbar-right">
-          <div class="user-info">
-            <div class="user-name">User</div>
-            <div class="user-pos">Doctor</div>
+          <button id="notif-btn" class="icon-btn topbar-icon-btn" aria-label="Notifications" title="Notifications">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </span>
+          </button>
+
+          <div class="user-profile-menu-container">
+            <button id="user-profile-trigger" class="user-profile-chip" aria-haspopup="true" aria-expanded="false" title="User account options">
+              <div id="topbar-role-logo" class="role-logo role-logo-doctor" title="Doctor" aria-label="User role icon">D</div>
+              <div class="user-info">
+                <div class="user-name">User</div>
+                <div class="user-pos">Doctor</div>
+              </div>
+              <span class="profile-arrow" aria-hidden="true">▾</span>
+            </button>
+
+            <div id="user-profile-popover" class="user-profile-popover hidden" role="menu">
+              <div class="popover-user-header">
+                <div class="popover-user-name user-name-full">Clinical Personnel</div>
+                <div class="popover-user-meta">
+                  <span class="duty-badge"><span class="status-pulse-dot" style="width:6px;height:6px;margin-right:4px;"></span> On Duty</span>
+                  <span class="user-role-label user-pos">Doctor</span>
+                </div>
+              </div>
+              <div class="popover-divider"></div>
+              <a href="#" class="popover-item nav-item" data-section="profile-section" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-.33-1 1.65 1.65 0 0 0-1-.6 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1-.33H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1-.33 1.65 1.65 0 0 0 .6-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .33-1V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 .33 1 1.65 1.65 0 0 0 1 .6 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.13.32.2.66.2 1s-.07.68-.2 1z"/></svg>
+                Account Settings
+              </a>
+              <a href="#" class="popover-item nav-item full-access" data-section="schedule-section" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                Availability Schedule
+              </a>
+              <div class="popover-divider"></div>
+              <button id="logout-btn" class="popover-item popover-logout" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Sign Out
+              </button>
+            </div>
           </div>
-          <div id="topbar-role-logo" class="role-logo role-logo-doctor" title="Doctor" aria-label="User role icon">D</div>
-          <button id="logout-btn" class="icon-btn logout-btn" title="Logout">Logout</button>
         </div>
       </div>
 
@@ -1400,7 +1434,7 @@
               </div>
               <div style="display:flex;flex-direction:column;gap:3px;">
                 <label style="font-size:11px;color:transparent;">.</label>
-                <button id="consult-date-clear" class="chip-btn chip-btn-outline" style="width:140px;padding:5px 10px;font-size:12px;box-sizing:border-box;" title="Clear date filter">✕ Clear</button>
+                <button id="consult-date-clear" class="chip-btn chip-btn-outline" style="width:140px;padding:5px 10px;font-size:12px;box-sizing:border-box;" title="Clear date filter">Clear</button>
               </div>
               <div style="display:flex;flex-direction:column;gap:3px;">
                 <label style="font-size:11px;color:transparent;">.</label>
@@ -1639,6 +1673,7 @@
                     pattern="[0-9]{2,3}/[0-9]{2,3}"
                   />
                   <span class="vital-unit">mmHg</span>
+                  <div id="va-bp-badge" class="vital-risk-badge hidden"></div>
                 </div>
 
                 <!-- Heart Rate -->
@@ -1656,6 +1691,7 @@
                     placeholder="72"
                   />
                   <span class="vital-unit">bpm</span>
+                  <div id="va-hr-badge" class="vital-risk-badge hidden"></div>
                 </div>
 
                 <!-- Respiratory Rate -->
@@ -1673,6 +1709,7 @@
                     placeholder="16"
                   />
                   <span class="vital-unit">bpm</span>
+                  <div id="va-rr-badge" class="vital-risk-badge hidden"></div>
                 </div>
 
                 <!-- Temperature -->
@@ -1691,6 +1728,7 @@
                     placeholder="36.5"
                   />
                   <span class="vital-unit">°C</span>
+                  <div id="va-temp-badge" class="vital-risk-badge hidden"></div>
                 </div>
 
                 <!-- Oxygen Saturation -->
@@ -1708,6 +1746,34 @@
                     placeholder="98"
                   />
                   <span class="vital-unit">%</span>
+                  <div id="va-spo2-badge" class="vital-risk-badge hidden"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Anthropometrics & Body Composition -->
+            <div class="vital-section">
+              <div class="section-header">
+                <svg class="label-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1"/><path d="M18 8h4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-4"/></svg>
+                <span class="section-title">Anthropometrics & BMI</span>
+              </div>
+              <div class="vital-signs-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+                <div class="vital-field">
+                  <label class="vital-label" for="va-height">Height</label>
+                  <input id="va-height" class="vital-input" type="number" step="0.5" min="30" max="250" placeholder="170" />
+                  <span class="vital-unit">cm</span>
+                </div>
+                <div class="vital-field">
+                  <label class="vital-label" for="va-weight">Weight</label>
+                  <input id="va-weight" class="vital-input" type="number" step="0.1" min="1" max="300" placeholder="65" />
+                  <span class="vital-unit">kg</span>
+                </div>
+                <div class="vital-field bmi-display-field">
+                  <label class="vital-label">Calculated BMI</label>
+                  <div class="bmi-result-box">
+                    <span id="va-bmi-value" class="bmi-value">—</span>
+                    <span id="va-bmi-badge" class="bmi-category-badge hidden">—</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1828,136 +1894,178 @@
       </div>
 
       <div id="consultation-modal" class="modal-overlay hidden">
-        <div class="modal-box" style="max-width:850px; text-align:left; width: 95%; max-height: 92vh; overflow-y: auto;">
-          <div class="panel-head" style="margin-bottom: 20px; padding: 0;">
-            <h3 class="modal-heading" style="margin: 0;">Clinical Consultation Proper</h3>
-            <span class="panel-hint">Patient ID: <span id="consult-display-id">—</span></span>
+        <div class="modal-box consult-dual-pane-modal" style="max-width:1160px; text-align:left; width:96%; max-height:94vh; overflow:hidden; display:flex; flex-direction:column; padding:0;">
+          <!-- Modal Header -->
+          <div class="consult-modal-topbar">
+            <div class="consult-modal-title-group">
+              <div class="consult-badge-pill">Doctor Clinical Encounter</div>
+              <h3 class="modal-heading" style="margin:0; font-size:18px;">Clinical Consultation & EHR Workspace</h3>
+            </div>
+            <div class="consult-patient-meta-pill">
+              <span class="panel-hint">Patient ID: <span id="consult-display-id">—</span></span>
+            </div>
+            <button type="button" id="consult-modal-close-icon" class="modal-close" aria-label="Close modal">&times;</button>
           </div>
 
-          <div class="modal-tabs">
-            <button class="modal-tab active" data-tab="tab-history">1. History & Allergies</button>
-            <button class="modal-tab" data-tab="tab-exam">2. Physical Exam</button>
-            <button class="modal-tab" data-tab="tab-diagnosis">3. Diagnosis & Plan</button>
+          <!-- Dual-Pane Body -->
+          <div class="consult-dual-pane-body">
+            <!-- Left Pane: Patient Context, Vitals & Quick Triage -->
+            <aside class="consult-side-summary">
+              <!-- Critical Allergy Warning Banner -->
+              <div id="consult-allergy-alert" class="consult-allergy-box hidden">
+                <div class="allergy-header">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" style="vertical-align: middle;"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                  <strong>CRITICAL DRUG ALLERGIES</strong>
+                </div>
+                <div id="consult-allergy-text" class="allergy-body">—</div>
+              </div>
+
+              <!-- Vitals Summary from Nurse Assessment -->
+              <div id="consult-vitals-banner" class="consult-vitals-card" style="display:none;">
+                <div class="vitals-card-title">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                  <span>TRIAGE VITALS SUMMARY</span>
+                </div>
+                <div id="consult-vitals-grid" class="consult-vitals-mini-grid"></div>
+                <div id="consult-vitals-complaint" class="consult-vitals-extra"></div>
+                <div id="consult-vitals-notes" class="consult-vitals-extra"></div>
+              </div>
+
+              <!-- Quick Common Diagnosis Presets -->
+              <div class="consult-quick-diag-card">
+                <div class="quick-diag-header">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-3 4 3 4-3 4 3V8z"/><path d="M14 2v6h6"/></svg>
+                  <span>Common Diagnosis Presets (1-Click Fill)</span>
+                </div>
+                <div class="diag-chip-group">
+                  <button type="button" class="diag-chip" data-diag="Upper Respiratory Tract Infection (URTI)">URTI / Flu</button>
+                  <button type="button" class="diag-chip" data-diag="Essential (Primary) Hypertension Stage 2">Hypertension Stage 2</button>
+                  <button type="button" class="diag-chip" data-diag="Acute Gastroenteritis with Mild Dehydration">Acute Gastroenteritis</button>
+                  <button type="button" class="diag-chip" data-diag="Type 2 Diabetes Mellitus - Uncomplicated">Type 2 Diabetes</button>
+                  <button type="button" class="diag-chip" data-diag="Urinary Tract Infection (UTI), Unspecified">Urinary Tract Infection</button>
+                  <button type="button" class="diag-chip" data-diag="Bronchial Asthma in Acute Exacerbation">Asthma Exacerbation</button>
+                  <button type="button" class="diag-chip" data-diag="Gastroesophageal Reflux Disease (GERD)">GERD / Dyspepsia</button>
+                  <button type="button" class="diag-chip" data-diag="Tension-Type Headache, Acute">Tension Headache</button>
+                </div>
+              </div>
+            </aside>
+
+            <!-- Right Pane: Active SOAP Note & Plan Editor -->
+            <main class="consult-main-editor">
+              <div class="modal-tabs">
+                <button type="button" class="modal-tab active" data-tab="tab-history">1. History & Subjective</button>
+                <button type="button" class="modal-tab" data-tab="tab-exam">2. Physical Exam</button>
+                <button type="button" class="modal-tab" data-tab="tab-diagnosis">3. Assessment & Plan</button>
+              </div>
+
+              <form id="consultation-form" novalidate>
+                <input type="hidden" id="consult-patient-id" />
+
+                <!-- Tab 1: History -->
+                <div id="tab-history" class="tab-content active">
+                  <div class="assessment-field-grid">
+                    <div class="field">
+                      <label class="inputLabel">History of Present Illness (HPI)</label>
+                      <textarea id="consult-hpi" rows="3" placeholder="Describe the current symptoms, onset, and duration..."></textarea>
+                    </div>
+                    <div class="field">
+                      <label class="inputLabel">Past Medical History (PMH)</label>
+                      <textarea id="consult-pmh" rows="3" placeholder="Diabetes, Hypertension, previous surgeries, asthma, etc."></textarea>
+                    </div>
+                  </div>
+
+                  <div class="assessment-field-grid">
+                    <div class="field">
+                      <label class="inputLabel">Drug Allergies & Adverse Reactions</label>
+                      <input id="consult-allergies" class="manual-entry-input" style="border-color: #fecdd3;" placeholder="List all known drug allergies..." />
+                    </div>
+                    <div class="field">
+                      <label class="inputLabel">Immunization Status</label>
+                      <input id="consult-immunization" class="manual-entry-input" placeholder="e.g. Fully vaccinated, COVID-19 boosters" />
+                    </div>
+                  </div>
+
+                  <div class="field">
+                    <label class="inputLabel">Social & Lifestyle History</label>
+                    <input id="consult-social" class="manual-entry-input" placeholder="Diet, Exercise, Smoking, Alcohol, Work exposure..." />
+                  </div>
+                </div>
+
+                <!-- Tab 2: Exam -->
+                <div id="tab-exam" class="tab-content">
+                  <div class="assessment-field-grid">
+                    <div class="field">
+                      <label class="inputLabel">HEENT</label>
+                      <textarea id="exam-heent" rows="2" placeholder="Eyes, Ears, Nose, Throat findings..."></textarea>
+                    </div>
+                    <div class="field">
+                      <label class="inputLabel">Chest & Lungs</label>
+                      <textarea id="exam-chest" rows="2" placeholder="Breath sounds, heart rhythm, murmurs..."></textarea>
+                    </div>
+                  </div>
+                  <div class="assessment-field-grid">
+                    <div class="field">
+                      <label class="inputLabel">Abdomen</label>
+                      <textarea id="exam-abdomen" rows="2" placeholder="Tenderness, masses, bowel sounds..."></textarea>
+                    </div>
+                    <div class="field">
+                      <label class="inputLabel">Extremities & Musculoskeletal</label>
+                      <textarea id="exam-extremities" rows="2" placeholder="Edema, pulses, range of motion..."></textarea>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label class="inputLabel">Other Physical Findings</label>
+                    <textarea id="exam-others" rows="2" placeholder="Neurological, skin, or additional findings..."></textarea>
+                  </div>
+                </div>
+
+                <!-- Tab 3: Diagnosis & Plan -->
+                <div id="tab-diagnosis" class="tab-content">
+                  <div class="assessment-field-grid">
+                    <div class="field">
+                      <label class="inputLabel required-label">Primary Diagnosis <span style="color: #ef4444;">*</span></label>
+                      <input id="consult-diagnosis" class="manual-entry-input" required placeholder="Main clinical diagnosis or ICD-10 code" />
+                    </div>
+                    <div class="field">
+                      <label class="inputLabel">Possible Conditions (Differential)</label>
+                      <input id="consult-differential" class="manual-entry-input" placeholder="Other suspected conditions" />
+                    </div>
+                  </div>
+
+                  <div class="assessment-field-grid" style="grid-template-columns: 2fr 1fr;">
+                    <div class="field">
+                      <label class="inputLabel">Laboratory & Diagnostic Orders</label>
+                      <input id="consult-lab-orders" class="manual-entry-input" placeholder="e.g. CBC, Urinalysis, FBS, Lipid Profile, Chest X-ray" />
+                    </div>
+                    <div class="field">
+                      <label class="inputLabel">Follow-up Schedule</label>
+                      <input id="consult-followup" type="date" class="manual-entry-input" />
+                    </div>
+                  </div>
+
+                  <div class="field">
+                    <label class="inputLabel">Physician's Clinical Instructions & Treatment Plan</label>
+                    <textarea id="consult-notes" rows="4" placeholder="Treatment plan, patient dietary advice, and home instructions..."></textarea>
+                  </div>
+                </div>
+
+                <div class="actions consult-actions-bar">
+                  <button type="button" id="consultation-cancel-btn" class="btn btn-consult-cancel">Cancel Encounter</button>
+                  <div style="flex: 1;"></div>
+                  <button type="button" id="consult-prev-btn" class="btn btn-consult-back hidden">Back</button>
+                  <button type="button" id="consult-next-btn" class="btn btn-consult-next">
+                    <span>Next Step</span>
+                    <svg style="width: 18px; height: 18px; margin-left: 8px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+                  </button>
+                  <button type="submit" id="consult-submit-btn" class="btn btn-consult-save hidden">
+                    <span class="btn-spinner" aria-hidden="true"></span>
+                    <svg style="width: 18px; height: 18px; margin-right: 8px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    <span class="btn-label">SAVE & PROCEED TO RX</span>
+                  </button>
+                </div>
+              </form>
+            </main>
           </div>
-
-          <form id="consultation-form" novalidate>
-            <input type="hidden" id="consult-patient-id" />
-
-            <!-- Tab 1: History -->
-            <div id="tab-history" class="tab-content active">
-
-              <!-- Vitals summary injected by nurse assessment -->
-              <div id="consult-vitals-banner" style="display:none; background:#f0fdf4; border:1px solid #6ee7b7; border-radius:10px; padding:12px 16px; margin-bottom:14px;">
-                <div style="font-size:12px; font-weight:700; color:#065f46; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-                  <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                  VITAL SIGNS (from nurse assessment)
-                </div>
-                <div id="consult-vitals-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px;"></div>
-                <div id="consult-vitals-complaint" style="margin-top:8px; font-size:12px; color:#374151;"></div>
-                <div id="consult-vitals-notes" style="margin-top:4px; font-size:12px; color:#374151;"></div>
-              </div>
-
-              <div class="assessment-field-grid">
-                <div class="field">
-                  <label class="inputLabel">History of Present Illness</label>
-                  <textarea id="consult-hpi" rows="3" placeholder="Describe the current symptoms and duration..."></textarea>
-                </div>
-                <div class="field">
-                  <label class="inputLabel">Past Medical History</label>
-                  <textarea id="consult-pmh" rows="3" placeholder="Diabetes, Hypertension, previous surgeries, etc."></textarea>
-                </div>
-              </div>
-
-              <div class="assessment-field-grid">
-                <div class="field">
-                  <label class="inputLabel">Drug Allergies ⚠️</label>
-                  <input id="consult-allergies" class="manual-entry-input" style="border-color: #fecdd3;" placeholder="List all known drug allergies..." />
-                </div>
-                <div class="field">
-                  <label class="inputLabel">Immunization Status</label>
-                  <input id="consult-immunization" class="manual-entry-input" placeholder="e.g. Fully vaccinated, COVID-19 boosters" />
-                </div>
-              </div>
-
-              <div class="field">
-                <label class="inputLabel">Social History (Lifestyle)</label>
-                <input id="consult-social" class="manual-entry-input" placeholder="Diet, Exercise, Smoking, Alcohol, Work exposure..." />
-              </div>
-            </div>
-
-            <!-- Tab 2: Exam -->
-            <div id="tab-exam" class="tab-content">
-              <div class="assessment-field-grid">
-                <div class="field">
-                  <label class="inputLabel">HEENT</label>
-                  <textarea id="exam-heent" rows="2" placeholder="Eyes, Ears, Nose, Throat findings..."></textarea>
-                </div>
-                <div class="field">
-                  <label class="inputLabel">Chest & Lungs</label>
-                  <textarea id="exam-chest" rows="2" placeholder="Breath sounds, heart rhythm..."></textarea>
-                </div>
-              </div>
-              <div class="assessment-field-grid">
-                <div class="field">
-                  <label class="inputLabel">Abdomen</label>
-                  <textarea id="exam-abdomen" rows="2" placeholder="Tenderness, masses, bowel sounds..."></textarea>
-                </div>
-                <div class="field">
-                  <label class="inputLabel">Extremities</label>
-                  <textarea id="exam-extremities" rows="2" placeholder="Edema, pulses, range of motion..."></textarea>
-                </div>
-              </div>
-              <div class="field">
-                <label class="inputLabel">Other Physical Findings</label>
-                <textarea id="exam-others" rows="2"></textarea>
-              </div>
-            </div>
-
-            <!-- Tab 3: Diagnosis & Plan -->
-            <div id="tab-diagnosis" class="tab-content">
-              <div class="assessment-field-grid">
-                <div class="field">
-                  <label class="inputLabel required-label">Primary Diagnosis <span style="color: #ef4444;">*</span></label>
-                  <input id="consult-diagnosis" class="manual-entry-input" required placeholder="Main clinical finding" />
-                </div>
-                <div class="field">
-                  <label class="inputLabel">Possible Conditions (Differential)</label>
-                  <input id="consult-differential" class="manual-entry-input" placeholder="Other suspected conditions" />
-                </div>
-              </div>
-
-              <div class="assessment-field-grid" style="grid-template-columns: 2fr 1fr;">
-                <div class="field">
-                  <label class="inputLabel">Lab Requests (Orders)</label>
-                  <input id="consult-lab-orders" class="manual-entry-input" placeholder="e.g. CBC, Urinalysis, X-ray Chest PA" />
-                </div>
-                <div class="field">
-                  <label class="inputLabel">Follow-up Date</label>
-                  <input id="consult-followup" type="date" class="manual-entry-input" />
-                </div>
-              </div>
-
-              <div class="field">
-                <label class="inputLabel">Clinical Notes / Plan</label>
-                <textarea id="consult-notes" rows="4" placeholder="Treatment plan, advice, and instructions..."></textarea>
-              </div>
-            </div>
-
-            <div class="actions" style="gap:16px; margin-top: 32px; border-top: 1px solid #f1f5f9; padding-top: 24px; display: flex; justify-content: flex-end;">
-              <button type="button" id="consultation-cancel-btn" class="btn" style="padding: 10px 24px; background: #fef2f2; color: #991b1b; border: 1px solid #fee2e2; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;">Cancel</button>
-              <div style="flex: 1;"></div>
-              <button type="button" id="consult-prev-btn" class="btn hidden" style="padding: 10px 24px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;">Back</button>
-              <button type="button" id="consult-next-btn" class="btn" style="padding: 10px 32px; background: #16a34a; color: white; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2); font-weight: 700; display: inline-flex; align-items: center; justify-content: center;">
-                <span>Next Step</span>
-                <svg style="width: 18px; height: 18px; margin-left: 8px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
-              </button>
-              <button type="submit" id="consult-submit-btn" class="btn hidden" style="padding: 10px 32px; background: #16a34a; color: white; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2); font-weight: 700; display: inline-flex; align-items: center; justify-content: center;">
-                <span class="btn-spinner" aria-hidden="true"></span>
-                <svg style="width: 18px; height: 18px; margin-right: 8px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                <span class="btn-label">SAVE AND PRESCRIBE</span>
-              </button>
-            </div>
-          </form>
         </div>
       </div>
 
@@ -2314,6 +2422,19 @@
             </div>
             <form id="prescription-form">
             <input type="hidden" id="prescription-patient" />
+            
+            <!-- Quick Dosage / Frequency Shortcut Presets -->
+            <div class="prescription-presets-bar">
+              <span class="presets-label">Dosage Presets:</span>
+              <div class="prescription-presets-list">
+                <button type="button" class="rx-preset-chip" data-dosage="500 mg" data-sig="1 tablet PO three times daily (TID) after meals for 7 days">500mg TID x 7d</button>
+                <button type="button" class="rx-preset-chip" data-dosage="500 mg" data-sig="1 capsule PO twice daily (BID) for 5 days">500mg BID x 5d</button>
+                <button type="button" class="rx-preset-chip" data-dosage="10 mg" data-sig="1 tablet PO once daily (OD) at bedtime">10mg OD HS</button>
+                <button type="button" class="rx-preset-chip" data-dosage="500 mg" data-sig="1 tablet PO every 4-6 hrs as needed (PRN) for pain or fever">500mg PRN Pain</button>
+                <button type="button" class="rx-preset-chip" data-dosage="20 mg" data-sig="1 tablet PO once daily (OD) before breakfast">20mg OD AC</button>
+              </div>
+            </div>
+
             <div id="prescription-lines"></div>
             <div class="field">
               <button type="button" id="add-prescription-line" class="chip-btn">Add Medicine</button>
@@ -2444,25 +2565,6 @@
         </div>
       </div>
 
-      <!-- Feedback Detail Modal -->
-      <div id="feedback-detail-modal" class="modal-overlay hidden">
-        <div class="modal-box" style="max-width:500px;">
-          <h3 class="modal-heading" style="margin:0 0 16px 0;font-size:20px;color:#1e293b;">Feedback Details</h3>
-          <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #e2e8f0;">
-            <div style="font-weight:600;color:#1e293b;margin-bottom:6px;font-size:15px;">From: <span id="feedback-detail-from"></span></div>
-            <div style="font-size:13px;color:#64748b;display:flex;align-items:center;gap:8px;">
-              <span id="feedback-detail-date"></span> <span style="color:#cbd5e1;">|</span> Rating: <span id="feedback-detail-rating"></span>
-            </div>
-          </div>
-          <div style="font-weight:700;color:#1e293b;margin-bottom:8px;font-size:16px;" id="feedback-detail-subject"></div>
-          <div id="feedback-detail-body" style="font-size:14px;color:#334155;white-space:pre-wrap;line-height:1.6;margin-bottom:24px;max-height:300px;overflow-y:auto;padding-right:8px;"></div>
-          <div class="actions" style="display:flex;justify-content:flex-end;gap:12px;margin:0;">
-            <button id="feedback-detail-close" type="button" class="btn btn-close" style="width:auto;margin:0;">Close</button>
-            <button id="feedback-detail-delete-btn" type="button" class="btn" style="width:auto;background:#ef4444;margin:0;border:none;">Delete</button>
-          </div>
-        </div>
-      </div>
-
     </main>
   </div>
 
@@ -2539,10 +2641,10 @@
       try {
         const { startDate, endDate } = getDateRange();
         const result = await Reports.exportPatientReport(startDate, endDate);
-        showExportStatus(`✓ Patient Report exported successfully! (${result.count} records)`);
+        showExportStatus(`Patient Report exported successfully! (${result.count} records)`);
       } catch (error) {
         console.error('Export error:', error);
-        showExportStatus(`✗ Failed to export: ${error.message}`, true);
+        showExportStatus(`Failed to export: ${error.message}`, true);
       } finally {
         setButtonLoading(btn, false);
       }
@@ -2555,10 +2657,10 @@
       try {
         const { startDate, endDate } = getDateRange();
         const result = await Reports.exportConsultationReport(startDate, endDate);
-        showExportStatus(`✓ Consultation Report exported successfully! (${result.count} records)`);
+        showExportStatus(`Consultation Report exported successfully! (${result.count} records)`);
       } catch (error) {
         console.error('Export error:', error);
-        showExportStatus(`✗ Failed to export: ${error.message}`, true);
+        showExportStatus(`Failed to export: ${error.message}`, true);
       } finally {
         setButtonLoading(btn, false);
       }
@@ -2571,10 +2673,10 @@
       try {
         const { startDate, endDate } = getDateRange();
         const result = await Reports.exportDoctorActivityReport(startDate, endDate);
-        showExportStatus(`✓ Doctor Activity Report exported successfully! (${result.count} doctors)`);
+        showExportStatus(`Doctor Activity Report exported successfully! (${result.count} doctors)`);
       } catch (error) {
         console.error('Export error:', error);
-        showExportStatus(`✗ Failed to export: ${error.message}`, true);
+        showExportStatus(`Failed to export: ${error.message}`, true);
       } finally {
         setButtonLoading(btn, false);
       }
@@ -2587,10 +2689,10 @@
       try {
         const { startDate, endDate } = getDateRange();
         const result = await Reports.exportQueueReport(startDate, endDate);
-        showExportStatus(`✓ Queue Report exported successfully! (${result.count} tickets)`);
+        showExportStatus(`Queue Report exported successfully! (${result.count} tickets)`);
       } catch (error) {
         console.error('Export error:', error);
-        showExportStatus(`✗ Failed to export: ${error.message}`, true);
+        showExportStatus(`Failed to export: ${error.message}`, true);
       } finally {
         setButtonLoading(btn, false);
       }
@@ -2603,10 +2705,10 @@
       try {
         const { startDate, endDate } = getDateRange();
         const result = await Reports.exportSystemUsageReport(startDate, endDate);
-        showExportStatus(`✓ System Usage Report exported successfully! (${result.count} metrics)`);
+        showExportStatus(`System Usage Report exported successfully! (${result.count} metrics)`);
       } catch (error) {
         console.error('Export error:', error);
-        showExportStatus(`✗ Failed to export: ${error.message}`, true);
+        showExportStatus(`Failed to export: ${error.message}`, true);
       } finally {
         setButtonLoading(btn, false);
       }
@@ -2619,10 +2721,10 @@
       try {
         const { startDate, endDate } = getDateRange();
         const result = await Reports.exportStaffLoginLogsReport(startDate, endDate);
-        showExportStatus(`✓ Staff Session Logs exported successfully! (${result.count} logs)`);
+        showExportStatus(`Staff Session Logs exported successfully! (${result.count} logs)`);
       } catch (error) {
         console.error('Export error:', error);
-        showExportStatus(`✗ Failed to export: ${error.message}`, true);
+        showExportStatus(`Failed to export: ${error.message}`, true);
       } finally {
         setButtonLoading(btn, false);
       }

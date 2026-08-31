@@ -5,75 +5,113 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>U-Konek+ — Medical Personnel System</title>
-    <link rel="stylesheet" href="../src/css/style.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet">
+    <link rel="icon" href="../favicon.ico" />
+    <link rel="stylesheet" href="../src/css/style.css?v=20260504b" />
 </head>
 
 <body class="auth-page">
     <div id="preloader" class="preloader">
         <div class="preloader-logo" aria-hidden="true">
-            <img src="./U-KonekLogo-transparent.png" alt="">
-        </div>
-    </div>
-    <div class="wrap">
-        <div class="side" role="side">
-            <div class="SiteName">
-                <img class="logoLogIn" src="./U-KonekLogo-transparent.png" alt="">
-                <h1>U-Konek</h1>
-                <h2>+</h2>
-            </div>
-            <h5>A comprehensive healthcare management system designed for modern medical facilities. Streamline
-                operations, manage citizens, and enhance care.</h5>
-            <img src="#" alt="">
-        </div>
-        <div class="card" role="main">
-            <div class="brand">
-                <h1 id="panel-title">Welcome Back</h1>
-                <h4 id="panel-desc">Enter your credentials to access the portal</h4>
-            </div>
-
-
-            <div id="tab-login" class="tabs" role="tablist" aria-label="Authentication tabs">
-            </div>
-
-
-            <!-- Login Panel -->
-            <div id="login-panel">
-                <form id="login-form" novalidate autocomplete="off">
-                    <div class="field">
-                        <label class="inputLabel" for="username">Email</label>
-                        <input id="username" type="email" placeholder="e.g., staff@hospital.com" required
-                            autocomplete="username" />
-                    </div>
-
-                    <div class="field">
-                        <label class="inputLabel" for="password">Password</label>
-                        <input id="password" type="password" placeholder="Enter your account password" required
-                            autocomplete="current-password" />
-                    </div>
-
-                    <div class="actions">
-                        <button type="submit" class="btn" id="login-submit-btn">
-                            <span class="btn-spinner" aria-hidden="true"></span>
-                            <span class="btn-label">SIGN IN</span>
-                        </button>
-                    </div>
-                    <div id="login-error" class="note" aria-live="polite" style="display:none"></div>
-                </form>
-            </div>
-
-
-            <!-- Register Panel - MOVED TO DASHBOARD -->
-
-
+            <img src="./U-KonekLogo-transparent.png" alt="U-Konek+ Logo">
         </div>
     </div>
 
+    <div class="auth-split-layout">
+        <!-- Left Brand & Clinical Information Banner -->
+        <aside class="auth-banner-pane" aria-label="Hospital Information">
+            <div class="auth-banner-content">
+                <div class="auth-banner-header">
+                    <img class="auth-clinic-logo" src="./U-KonekLogo-transparent.png" alt="AFM Roquero Medical Clinic Logo" />
+                    <div class="auth-clinic-text">
+                        <h2>AFM Roquero Medical Clinic</h2>
+                        <span>U-Konek+ Healthcare Workspace</span>
+                    </div>
+                </div>
 
-    <!-- Registration modals MOVED TO DASHBOARD -->
+                <div class="auth-banner-body">
+                    <h1 class="auth-banner-headline">Electronic Health Records & Medical Workstation</h1>
+                    <p class="auth-banner-desc">
+                        A secure, unified hospital workspace designed for outpatient scheduling, clinical triage assessment, electronic consultations, and pharmacy stock dispensing.
+                    </p>
 
+                    <div class="auth-feature-pills">
+                        <div class="auth-feature-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            <span>Live Outpatient Queue & Consultation Workflow</span>
+                        </div>
+                        <div class="auth-feature-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            <span>Multi-Tier Role Access (Doctor, Nurse, Pharmacist, Admin)</span>
+                        </div>
+                        <div class="auth-feature-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            <span>Encrypted Medical Auditing & Pharmacy Inventory</span>
+                        </div>
+                    </div>
+                </div>
 
+                <div class="auth-banner-footer">
+                    <span>AFM Roquero Medical Clinic • Outpatient Department</span>
+                    <span>Emergency Hotline: (02) 8123-4567 • Mon-Fri 8:00 AM - 5:00 PM</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Sign-In Surface -->
+        <main class="auth-form-pane" role="main">
+            <div class="auth-form-container">
+                <div class="auth-form-head">
+                    <span class="auth-kicker">STAFF AUTHENTICATION</span>
+                    <h1 id="panel-title" class="auth-heading">Sign In</h1>
+                    <p id="panel-desc" class="auth-subheading">Enter your authorized clinical credentials to access your workspace.</p>
+                </div>
+
+                <!-- Hidden tabs container for JavaScript event compatibility -->
+                <div id="tab-login" class="tabs hidden" role="tablist" aria-label="Authentication tabs" style="display:none;"></div>
+
+                <!-- Login Panel -->
+                <div id="login-panel" class="auth-form-panel">
+                    <form id="login-form" novalidate autocomplete="off">
+                        <div class="field auth-field">
+                            <label class="inputLabel" for="username">Email Address</label>
+                            <div class="input-with-icon">
+                                <span class="field-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                        <polyline points="22,6 12,13 2,6"></polyline>
+                                    </svg>
+                                </span>
+                                <input id="username" type="email" placeholder="e.g. doctor@hospital.com" required autocomplete="username" />
+                            </div>
+                        </div>
+
+                        <div class="field auth-field">
+                            <label class="inputLabel" for="password">Password</label>
+                            <div class="input-with-icon">
+                                <span class="field-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                    </svg>
+                                </span>
+                                <input id="password" type="password" placeholder="Enter your password" required autocomplete="current-password" />
+                            </div>
+                        </div>
+
+                        <div class="actions auth-action-row">
+                            <button type="submit" class="btn btn-primary-auth" id="login-submit-btn">
+                                <span class="btn-spinner" aria-hidden="true"></span>
+                                <span class="btn-label">Sign In</span>
+                            </button>
+                        </div>
+                        <div id="login-error" class="note" aria-live="polite" style="display:none"></div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
     <script src="../src/js/runtime-config.js"></script>
     <script src="../src/js/script.js"></script>
 </body>

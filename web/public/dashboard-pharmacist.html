@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -8,7 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
-    /* ── Pharmacist-specific overrides ── */
+    /* ── Pharmacist-specific overrides (Apple HIG) ── */
     :root {
       --ph-green: #16a34a;
       --ph-green-light: #dcfce7;
@@ -19,6 +19,12 @@
       --ph-blue: #0369a1;
       --ph-blue-light: #e0f2fe;
       --ph-gray: #64748b;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     .ph-header {
@@ -32,16 +38,17 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      backdrop-filter: blur(20px) saturate(180%);
     }
     .ph-header-brand { display: flex; align-items: center; gap: 12px; }
     .ph-header-brand img { height: 40px; width: 40px; object-fit: contain; }
-    .ph-header-brand h1 { font-size: 18px; font-weight: 700; margin: 0; color: #fff; }
-    .ph-header-brand span { font-size: 12px; opacity: 0.8; display: block; }
+    .ph-header-brand h1 { font-size: 18px; font-weight: 700; margin: 0; color: #fff; letter-spacing: -0.02em; }
+    .ph-header-brand span { font-size: 12px; opacity: 0.85; display: block; font-weight: 400; }
     .ph-header-user { display: flex; align-items: center; gap: 12px; }
-    .ph-header-user .user-badge { font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 4px 14px; }
-    .ph-logout-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: background 0.2s; }
-    .ph-logout-btn:hover { background: rgba(255,255,255,0.25); }
+    .ph-header-user .user-badge { font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.15); border-radius: 9999px; padding: 5px 14px; }
+    .ph-logout-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; border-radius: 9999px; padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .ph-logout-btn:hover { background: rgba(255,255,255,0.25); transform: scale(1.02); }
 
     .ph-main { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
 
@@ -51,21 +58,25 @@
     @media (max-width: 500px) { .ph-stats { grid-template-columns: 1fr; } }
     .ph-card {
       background: #fff;
-      border-radius: 12px;
-      padding: 20px;
-      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      padding: 20px 22px;
+      border: 1px solid rgba(226, 232, 240, 0.8);
       display: flex;
       align-items: center;
       gap: 16px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ph-card:hover {
+      box-shadow: 0 8px 24px rgba(0,0,0,0.06);
     }
     .ph-card-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
     .ph-card-icon.green  { background: var(--ph-green-light); }
     .ph-card-icon.amber  { background: var(--ph-amber-light); }
     .ph-card-icon.red    { background: var(--ph-red-light); }
     .ph-card-icon.blue   { background: var(--ph-blue-light); }
-    .ph-card-label { font-size: 12px; color: var(--ph-gray); font-weight: 500; }
-    .ph-card-value { font-size: 28px; font-weight: 800; margin: 0; line-height: 1; }
+    .ph-card-label { font-size: 11px; color: var(--ph-gray); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+    .ph-card-value { font-size: 28px; font-weight: 800; margin: 0; line-height: 1.1; letter-spacing: -0.03em; }
     .ph-card-value.green { color: var(--ph-green); }
     .ph-card-value.amber { color: var(--ph-amber); }
     .ph-card-value.red   { color: var(--ph-red); }
@@ -74,9 +85,9 @@
     /* Panel */
     .ph-panel {
       background: #fff;
-      border-radius: 12px;
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      border-radius: 18px;
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
       margin-bottom: 24px;
       overflow: hidden;
     }
@@ -89,20 +100,21 @@
       flex-wrap: wrap;
       gap: 12px;
     }
-    .ph-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; color: #1e293b; }
+    .ph-panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; color: #1e293b; letter-spacing: -0.02em; }
     .ph-panel-head span { font-size: 13px; color: var(--ph-gray); display: block; }
     .ph-panel-body { padding: 20px 24px; }
 
     /* Toolbar */
     .ph-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    .ph-search { flex: 1; min-width: 180px; padding: 8px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; outline: none; }
-    .ph-search:focus { border-color: var(--ph-green); }
-    .ph-filter-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .ph-search { flex: 1; min-width: 180px; padding: 9px 14px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; outline: none; font-family: inherit; }
+    .ph-search:focus { border-color: var(--ph-green); box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15); }
+    .ph-filter-group { display: flex; gap: 6px; flex-wrap: wrap; }
     .ph-filter-btn {
-      padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer;
-      border: 1px solid #e2e8f0; background: #f8fafc; color: #475569; transition: all 0.15s;
+      padding: 7px 14px; border-radius: 9999px; font-size: 12px; font-weight: 600; cursor: pointer;
+      border: 1px solid #e2e8f0; background: #f8fafc; color: #475569; transition: all 0.18s ease; font-family: inherit;
     }
-    .ph-filter-btn:hover { background: #f1f5f9; }
+    .ph-filter-btn:hover { background: #f1f5f9; transform: scale(1.02); }
+    .ph-filter-btn:active { transform: scale(0.97); }
     .ph-filter-btn.active { background: var(--ph-green); color: #fff; border-color: var(--ph-green); }
     .ph-filter-btn.amber.active { background: var(--ph-amber); border-color: var(--ph-amber); }
     .ph-filter-btn.red.active   { background: var(--ph-red);   border-color: var(--ph-red); }
@@ -110,15 +122,15 @@
     /* Table */
     .ph-table-wrap { overflow-x: auto; }
     .ph-table { width: 100%; border-collapse: collapse; }
-    .ph-table th { background: #f8fafc; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 10px 14px; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
-    .ph-table td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; font-size: 14px; color: #1e293b; vertical-align: middle; }
+    .ph-table th { background: #f8fafc; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 11px 16px; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    .ph-table td { padding: 13px 16px; border-bottom: 1px solid #f1f5f9; font-size: 13.5px; color: #1e293b; vertical-align: middle; }
     .ph-table tr:last-child td { border-bottom: none; }
     .ph-table tr:hover td { background: #f8fafc; }
     .ph-table .empty-row td { text-align: center; color: #94a3b8; padding: 32px; }
 
     /* Status badges */
     .badge {
-      display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap;
+      display: inline-block; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; white-space: nowrap;
     }
     .badge-green   { background: var(--ph-green-light);  color: #166534; }
     .badge-amber   { background: var(--ph-amber-light);  color: #92400e; }
@@ -129,24 +141,25 @@
     /* Action buttons */
     .ph-btn {
       display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px;
-      border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
-      border: none; transition: opacity 0.15s;
+      border-radius: 9999px; font-size: 13px; font-weight: 600; cursor: pointer;
+      border: none; transition: all 0.18s ease; font-family: inherit;
     }
-    .ph-btn:hover { opacity: 0.87; }
+    .ph-btn:hover { opacity: 0.92; transform: scale(1.02); }
+    .ph-btn:active { transform: scale(0.97); }
     .ph-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .ph-btn-primary { background: var(--ph-green); color: #fff; }
     .ph-btn-outline { background: transparent; border: 1px solid var(--ph-green); color: var(--ph-green); }
-    .ph-btn-sm { padding: 5px 11px; font-size: 12px; border-radius: 6px; }
+    .ph-btn-sm { padding: 5px 12px; font-size: 11.5px; border-radius: 9999px; }
     .ph-btn-edit   { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
     .ph-btn-delete { background: var(--ph-red-light); color: #991b1b; border: 1px solid #fecaca; }
 
     /* Add form inline panel */
     .ph-add-form { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 12px; align-items: end; }
     @media (max-width: 800px) { .ph-add-form { grid-template-columns: 1fr 1fr; } }
-    .ph-field label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+    .ph-field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #475569; margin-bottom: 4px; }
     .ph-field input, .ph-field textarea, .ph-field select {
-      width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
-      font-size: 14px; outline: none; box-sizing: border-box;
+      width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 12px;
+      font-size: 14px; outline: none; box-sizing: border-box; font-family: inherit;
     }
     .ph-field input:focus, .ph-field textarea:focus { border-color: var(--ph-green); }
     .ph-field input[type="date"] { color: #475569; }
@@ -190,6 +203,33 @@
 
     /* Confirm delete inline */
     .ph-confirm-row td { background: #fff5f5 !important; }
+
+    /* Stock Level Progress Bar */
+    .ph-stock-bar-wrap { min-width: 110px; max-width: 140px; display: flex; flex-direction: column; gap: 4px; }
+    .ph-stock-qty-text { font-size: 13px; color: #1e293b; display: flex; align-items: baseline; justify-content: space-between; }
+    .ph-stock-unit { font-size: 11px; color: #64748b; font-weight: 500; }
+    .ph-stock-bar-track { width: 100%; height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+    .ph-stock-bar-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+    .ph-stock-fill-healthy  { background: linear-gradient(90deg, #10b981, #059669); }
+    .ph-stock-fill-low      { background: linear-gradient(90deg, #f59e0b, #d97706); }
+    .ph-stock-fill-critical { background: linear-gradient(90deg, #ef4444, #dc2626); }
+    .ph-stock-fill-empty    { background: #ef4444; }
+
+    /* Expiration Countdown Badges */
+    .ph-expiry-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .ph-expiry-expired  { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .ph-expiry-critical { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; animation: pulseCritical 1.8s infinite; }
+    .ph-expiry-warning  { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .ph-expiry-good     { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+
+    @keyframes pulseCritical {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+
+    /* Filter Counter Pills */
+    .filter-count-badge { background: rgba(0, 0, 0, 0.08); padding: 1px 6px; border-radius: 10px; font-size: 10px; margin-left: 4px; }
+    .ph-filter-btn.active .filter-count-badge { background: rgba(255, 255, 255, 0.3); color: #fff; }
   </style>
 </head>
 <body>
@@ -433,10 +473,10 @@
             <option value="expiry-desc">Expiry (Latest)</option>
           </select>
           <div class="ph-filter-group">
-            <button class="ph-filter-btn active" data-filter="all">All</button>
-            <button class="ph-filter-btn amber" data-filter="low">Low Stock</button>
-            <button class="ph-filter-btn red" data-filter="expired">Expired</button>
-            <button class="ph-filter-btn amber" data-filter="expiring">Expiring Soon</button>
+            <button class="ph-filter-btn active" data-filter="all">All <span class="filter-count-badge" id="ph-count-all">0</span></button>
+            <button class="ph-filter-btn amber" data-filter="low">Low Stock <span class="filter-count-badge" id="ph-count-low">0</span></button>
+            <button class="ph-filter-btn red" data-filter="expired">Expired <span class="filter-count-badge" id="ph-count-expired">0</span></button>
+            <button class="ph-filter-btn amber" data-filter="expiring">Expiring Soon <span class="filter-count-badge" id="ph-count-expiring">0</span></button>
           </div>
           <button id="ph-csv-import-btn" class="ph-btn ph-btn-outline ph-btn-sm" style="border-color:#16a34a;color:#16a34a;">Import CSV</button>
           <button id="ph-csv-export-btn" class="ph-btn ph-btn-outline ph-btn-sm">Export CSV</button>
@@ -599,7 +639,7 @@
     <div class="ph-modal-box" style="max-width: 400px; padding: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <h3 style="margin: 0;">Scan Prescription QR</h3>
-        <button id="scanner-close-x" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #64748b;">✕</button>
+        <button id="scanner-close-x" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;" aria-label="Close modal">&times;</button>
       </div>
       <div id="qr-reader" style="width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; background: #f8fafc;"></div>
       <div style="margin-top: 16px; font-size: 13px; color: #64748b; text-align: center;">

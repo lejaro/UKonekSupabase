@@ -283,19 +283,57 @@ async function ensurePharmacistSession() {
 
 // ── Data helpers ──────────────────────────────────────────────────────────────
 function computeStockStatus(qty) {
-  if (qty === 0)             return { label: 'Out of Stock', cls: 'badge-red' };
-  if (qty <= LOW_STOCK_THRESHOLD) return { label: 'Low Stock',    cls: 'badge-amber' };
-  return                            { label: 'In Stock',     cls: 'badge-green' };
+  if (qty === 0) {
+    return { label: 'Out of Stock', cls: 'badge-red', fillCls: 'ph-stock-fill-empty', percent: 0 };
+  }
+  if (qty <= 10) {
+    return { label: 'Critical Low', cls: 'badge-red', fillCls: 'ph-stock-fill-critical', percent: Math.max(10, Math.min(100, (qty / 50) * 100)) };
+  }
+  if (qty <= LOW_STOCK_THRESHOLD) {
+    return { label: 'Low Stock', cls: 'badge-amber', fillCls: 'ph-stock-fill-low', percent: Math.min(100, (qty / 50) * 100) };
+  }
+  return { label: 'In Stock', cls: 'badge-green', fillCls: 'ph-stock-fill-healthy', percent: Math.min(100, (qty / 50) * 100) };
 }
 
 function computeExpiryStatus(expiryDate) {
-  if (!expiryDate) return { label: 'No Expiry Set', cls: 'badge-gray' };
+  if (!expiryDate) {
+    return {
+      label: 'No Expiry Set',
+      cls: 'badge-gray',
+      pillHtml: '<span class="badge badge-gray">No Expiry Set</span>'
+    };
+  }
   const today = new Date(); today.setHours(0,0,0,0);
   const exp   = new Date(expiryDate); exp.setHours(0,0,0,0);
   const diffDays = Math.floor((exp - today) / 86400000);
-  if (diffDays < 0)                      return { label: 'Expired',       cls: 'badge-red' };
-  if (diffDays <= EXPIRY_SOON_DAYS)      return { label: 'Expiring Soon', cls: 'badge-amber' };
-  return                                        { label: 'Valid',          cls: 'badge-green' };
+
+  if (diffDays < 0) {
+    return {
+      label: 'Expired',
+      cls: 'badge-red',
+      pillHtml: `<span class="ph-expiry-badge ph-expiry-expired">Expired (${Math.abs(diffDays)}d ago)</span>`
+    };
+  }
+  if (diffDays <= EXPIRY_SOON_DAYS) {
+    return {
+      label: 'Expiring Soon',
+      cls: 'badge-amber',
+      pillHtml: `<span class="ph-expiry-badge ph-expiry-critical">Expires in ${diffDays}d</span>`
+    };
+  }
+  if (diffDays <= 90) {
+    const mos = Math.ceil(diffDays / 30);
+    return {
+      label: 'Valid',
+      cls: 'badge-amber',
+      pillHtml: `<span class="ph-expiry-badge ph-expiry-warning">In ${mos} mos (${diffDays}d)</span>`
+    };
+  }
+  return {
+    label: 'Valid',
+    cls: 'badge-green',
+    pillHtml: `<span class="ph-expiry-badge ph-expiry-good">Good (${diffDays}d)</span>`
+  };
 }
 
 function formatDate(val) {
@@ -426,17 +464,27 @@ function renderMedicines() {
     if (expiry.label === 'Expired')        tr.style.background = '#fff5f5';
     else if (expiry.label === 'Expiring Soon') tr.style.background = '#fffbeb';
     else if (stock.label === 'Out of Stock')   tr.style.background = '#fff5f5';
-    else if (stock.label === 'Low Stock')      tr.style.background = '#fffbeb';
+    else if (stock.label === 'Low Stock' || stock.label === 'Critical Low') tr.style.background = '#fffbeb';
 
     tr.dataset.id = m.id;
     tr.innerHTML = `
       <td><strong>${escHtml(m.name)}</strong></td>
       <td style="color:#64748b;font-size:13px;">${escHtml(m.description) || '<em style="color:#cbd5e1">—</em>'}</td>
-      <td><strong>${m.qty}</strong></td>
+      <td>
+        <div class="ph-stock-bar-wrap">
+          <div class="ph-stock-qty-text">
+            <strong>${m.qty}</strong>
+            <span class="ph-stock-unit">${escHtml(m.unit) || ''}</span>
+          </div>
+          <div class="ph-stock-bar-track">
+            <div class="ph-stock-bar-fill ${stock.fillCls}" style="width:${stock.percent}%;"></div>
+          </div>
+        </div>
+      </td>
       <td style="color:#64748b;">${escHtml(m.unit) || '—'}</td>
       <td>${formatDate(m.expiry_date)}</td>
       <td><span class="badge ${stock.cls}">${stock.label}</span></td>
-      <td><span class="badge ${expiry.cls}">${expiry.label}</span></td>
+      <td>${expiry.pillHtml}</td>
       <td>
         <div style="display:flex; gap:6px;">
           <button class="ph-btn ph-btn-edit ph-btn-sm" data-action="edit" data-id="${m.id}">Edit</button>
@@ -458,22 +506,45 @@ function updateSubtitle(count) {
   listSubtitle.textContent = `${filterLabel[activeFilter] || 'All medicines'} — ${count} result${count !== 1 ? 's' : ''}`;
 }
 
-// ── Stats cards ────────────────────────────────────────────────────────────────
+// ── Stats cards & Filter Badges ────────────────────────────────────────────────
 function updateStats() {
   const total    = medicines.length;
   const inStock  = medicines.filter(m => m.qty > LOW_STOCK_THRESHOLD).length;
   const lowStock = medicines.filter(m => m.qty <= LOW_STOCK_THRESHOLD).length;
   const today    = new Date(); today.setHours(0,0,0,0);
+  
+  const expiredCount = medicines.filter(m => {
+    if (!m.expiry_date) return false;
+    return new Date(m.expiry_date) < today;
+  }).length;
+
   const expAlert = medicines.filter(m => {
     if (!m.expiry_date) return false;
     const exp = new Date(m.expiry_date); exp.setHours(0,0,0,0);
-    return Math.floor((exp - today) / 86400000) <= EXPIRY_SOON_DAYS;
+    const diff = Math.floor((exp - today) / 86400000);
+    return diff >= 0 && diff <= EXPIRY_SOON_DAYS;
   }).length;
 
-  document.getElementById('stat-total').textContent    = total;
-  document.getElementById('stat-in-stock').textContent  = inStock;
-  document.getElementById('stat-low').textContent       = lowStock;
-  document.getElementById('stat-expiry').textContent    = expAlert;
+  const statTotal = document.getElementById('stat-total');
+  const statInStock = document.getElementById('stat-in-stock');
+  const statLow = document.getElementById('stat-low');
+  const statExpiry = document.getElementById('stat-expiry');
+
+  if (statTotal) statTotal.textContent = total;
+  if (statInStock) statInStock.textContent = inStock;
+  if (statLow) statLow.textContent = lowStock;
+  if (statExpiry) statExpiry.textContent = expAlert + expiredCount;
+
+  // Update filter pill counts
+  const cAll = document.getElementById('ph-count-all');
+  const cLow = document.getElementById('ph-count-low');
+  const cExp = document.getElementById('ph-count-expired');
+  const cSoon = document.getElementById('ph-count-expiring');
+
+  if (cAll) cAll.textContent = total;
+  if (cLow) cLow.textContent = lowStock;
+  if (cExp) cExp.textContent = expiredCount;
+  if (cSoon) cSoon.textContent = expAlert;
 }
 
 // ── Save medicine (add or update) ─────────────────────────────────────────────
