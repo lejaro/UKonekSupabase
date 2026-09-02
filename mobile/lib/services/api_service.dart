@@ -222,6 +222,64 @@ class PrescriptionRecord {
   }
 }
 
+class PrescriptionDispenseLog {
+  final int dispenseId;
+  final int prescriptionId;
+  final String prescriptionCode;
+  final int prescriptionItemId;
+  final String medicineName;
+  final String dosage;
+  final int dispensedQuantity;
+  final String unit;
+  final String note;
+  final String pharmacistName;
+  final DateTime dispensedAt;
+
+  const PrescriptionDispenseLog({
+    required this.dispenseId,
+    required this.prescriptionId,
+    required this.prescriptionCode,
+    required this.prescriptionItemId,
+    required this.medicineName,
+    required this.dosage,
+    required this.dispensedQuantity,
+    required this.unit,
+    required this.note,
+    required this.pharmacistName,
+    required this.dispensedAt,
+  });
+
+  String get quantityLabel {
+    final normalizedUnit = unit.trim();
+    if (normalizedUnit.isEmpty) return dispensedQuantity.toString();
+    return '$dispensedQuantity $normalizedUnit';
+  }
+
+  factory PrescriptionDispenseLog.fromMap(Map<String, dynamic> m) {
+    DateTime parsedDate;
+    try {
+      final raw = m['dispensed_at']?.toString() ?? '';
+      parsedDate = DateTime.tryParse(raw)?.toLocal() ?? DateTime.now();
+    } catch (_) {
+      parsedDate = DateTime.now();
+    }
+
+    return PrescriptionDispenseLog(
+      dispenseId: (m['dispense_id'] as num?)?.toInt() ?? 0,
+      prescriptionId: (m['prescription_id'] as num?)?.toInt() ?? 0,
+      prescriptionCode: (m['prescription_code'] as String?) ?? '',
+      prescriptionItemId: (m['prescription_item_id'] as num?)?.toInt() ?? 0,
+      medicineName: (m['medicine_name'] as String?) ?? '',
+      dosage: (m['dosage'] as String?) ?? '',
+      dispensedQuantity: (m['dispensed_quantity'] as num?)?.toInt() ?? 0,
+      unit: (m['unit'] as String?) ?? '',
+      note: (m['note'] as String?) ?? '',
+      pharmacistName: (m['pharmacist_name'] as String?) ?? 'Pharmacist',
+      dispensedAt: parsedDate,
+    );
+  }
+}
+
 class ScheduledMedicine {
   final int prescriptionItemId;
   final int prescriptionId;
@@ -1358,6 +1416,27 @@ class ApiService {
       return rows.whereType<Map<String, dynamic>>().map(PrescriptionRecord.fromMap).toList();
     } catch (e) {
       debugPrint('Error fetching prescriptions: $e');
+      return [];
+    }
+  }
+
+  static Future<List<PrescriptionDispenseLog>> fetchPrescriptionDispenseLogs({
+    int? prescriptionId,
+    int limit = 50,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final params = <String, dynamic>{'p_limit': limit};
+      if (prescriptionId != null) {
+        params['p_prescription_id'] = prescriptionId;
+      }
+      final response = await _client.rpc('get_my_prescription_dispense_logs', params: params);
+      final rows = (response as List<dynamic>?) ?? const [];
+      return rows.whereType<Map<String, dynamic>>().map(PrescriptionDispenseLog.fromMap).toList();
+    } catch (e) {
+      debugPrint('Error fetching prescription dispense logs: $e');
       return [];
     }
   }
