@@ -509,6 +509,10 @@ textarea {
                 background var(--transition-fast, 0.18s ease);
 }
 
+textarea {
+    resize: none;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -4375,56 +4379,91 @@ body.dashboard-loading {
 }
 
 .consult-modal-topbar {
-    padding: 18px 24px;
-    background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+    padding: 16px 24px;
+    background: linear-gradient(135deg, #065f46 0%, #047857 50%, #0f766e 100%);
     color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 4px 12px rgba(6, 78, 59, 0.2);
     flex-shrink: 0;
 }
 
 .consult-modal-title-group {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
 }
 
 .consult-badge-pill {
-    font-size: 10px;
+    font-size: 10.5px;
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #86efac;
-    background: rgba(134, 239, 172, 0.15);
-    padding: 2px 8px;
+    color: #ffffff !important;
+    background: rgba(255, 255, 255, 0.22) !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    padding: 2px 9px;
     border-radius: var(--radius-full, 9999px);
     width: fit-content;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.consult-modal-topbar .modal-heading,
+.consult-modal-topbar h3 {
+    color: #ffffff !important;
+    font-size: 19px !important;
+    font-weight: 700 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-bottom: none !important;
+    letter-spacing: -0.01em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .consult-patient-meta-pill {
-    background: rgba(255, 255, 255, 0.12);
-    padding: 6px 14px;
+    background: rgba(0, 0, 0, 0.25) !important;
+    border: 1px solid rgba(255, 255, 255, 0.28) !important;
+    padding: 6px 16px;
     border-radius: var(--radius-full, 9999px);
-    color: #e2e8f0;
+    color: #ffffff !important;
     font-size: 13px;
     font-weight: 500;
 }
 
+.consult-patient-meta-pill .panel-hint,
+.consult-patient-meta-pill span {
+    color: #f1f5f9 !important;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.consult-patient-meta-pill #consult-display-id {
+    color: #fef08a !important;
+    font-weight: 700 !important;
+}
+
 .consult-modal-topbar .modal-close {
-    color: #ffffff;
-    font-size: 22px;
-    background: none;
-    border: none;
+    color: #ffffff !important;
+    font-size: 20px;
+    background: rgba(255, 255, 255, 0.18) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    opacity: 0.8;
-    transition: opacity var(--transition-fast, 0.18s ease);
+    opacity: 1 !important;
+    transition: all var(--transition-fast, 0.18s ease);
 }
 
 .consult-modal-topbar .modal-close:hover {
-    opacity: 1;
+    background: rgba(255, 255, 255, 0.35) !important;
+    transform: scale(1.08);
 }
 
 .consult-dual-pane-body {

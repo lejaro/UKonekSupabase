@@ -22,14 +22,15 @@ security definer
 set search_path = public
 as $$
 declare
-  v_citizen_id bigint;
+  v_citizen record;
   v_limit integer := greatest(1, least(coalesce(p_limit, 50), 100));
 begin
-  select c.id into v_citizen_id
+  select * into v_citizen
   from public.citizens c
-  where c.auth_user_id = auth.uid();
+  where c.auth_user_id = auth.uid()
+  limit 1;
 
-  if v_citizen_id is null then
+  if v_citizen.id is null then
     return;
   end if;
 
@@ -44,7 +45,11 @@ begin
     pid.dispensed_quantity,
     coalesce(pid.unit, pi.unit, '') as unit,
     coalesce(pid.note, '') as note,
-    coalesce(nullif(trim(concat_ws(' ', s.first_name, s.last_name)), ''), 'Pharmacist') as pharmacist_name,
+    coalesce(
+      nullif(trim(concat_ws(' ', s.first_name, s.last_name)), ''),
+      nullif(trim(concat_ws(' ', s.first_name, s.surname)), ''),
+      'Pharmacist'
+    ) as pharmacist_name,
     pid.dispensed_at
   from public.prescription_item_dispenses pid
   join public.prescription_headers ph on ph.id = pid.prescription_id
@@ -53,8 +58,11 @@ begin
   left join public.staff s on s.id = pid.dispensed_by_staff_id
   left join public.consultations con on con.id = ph.consultation_id
   where (
-    con.patient_citizen_id = v_citizen_id
-    or ph.patient_identifier = v_citizen_id::text
+    con.patient_citizen_id = v_citizen.id
+    or ph.patient_identifier = v_citizen.id::text
+    or ph.patient_identifier = ('CIT-' || v_citizen.id::text)
+    or (v_citizen.firstname is not null and length(trim(v_citizen.firstname)) > 1 and ph.patient_identifier ilike ('%' || trim(v_citizen.firstname) || '%'))
+    or (v_citizen.surname is not null and length(trim(v_citizen.surname)) > 1 and ph.patient_identifier ilike ('%' || trim(v_citizen.surname) || '%'))
   )
   and (p_prescription_id is null or ph.id = p_prescription_id)
   order by pid.dispensed_at desc

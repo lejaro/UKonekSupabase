@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>U-Konek+ — Dashboard</title>
-  <link rel="stylesheet" href="../src/css/style.css?v=20260503b" />
+  <link rel="stylesheet" href="../src/css/style.css?v=20260902d" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     .stats-chart-panel {
@@ -398,6 +398,21 @@
       background: #d1fae5;
       border-color: #34d399;
     }
+    .queue-ticket-btn.btn-consult {
+      background: #eff6ff;
+      border-color: #93c5fd;
+      color: #1d4ed8;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .queue-ticket-btn.btn-consult:hover {
+      background: #dbeafe;
+      border-color: #60a5fa;
+      color: #1e40af;
+      transform: translateY(-1px);
+    }
     .queue-vital-done-badge, .vitals-badge {
       display: inline-flex;
       align-items: center;
@@ -411,6 +426,81 @@
       padding: 2px 6px;
       text-transform: uppercase;
       line-height: 1.2;
+    }
+
+    /* High-contrast Clinical Consultation Header */
+    .consult-modal-topbar {
+      padding: 16px 24px;
+      background: linear-gradient(135deg, #065f46 0%, #047857 50%, #0f766e 100%) !important;
+      color: #ffffff !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.18) !important;
+      box-shadow: 0 4px 12px rgba(6, 78, 59, 0.2) !important;
+    }
+    .consult-badge-pill {
+      font-size: 10.5px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.06em !important;
+      text-transform: uppercase !important;
+      color: #ffffff !important;
+      background: rgba(255, 255, 255, 0.22) !important;
+      border: 1px solid rgba(255, 255, 255, 0.35) !important;
+      padding: 2px 10px !important;
+      border-radius: 9999px !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+    .consult-modal-topbar .modal-heading,
+    .consult-modal-topbar h3 {
+      color: #ffffff !important;
+      font-size: 19px !important;
+      font-weight: 700 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border-bottom: none !important;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
+    }
+    .consult-patient-meta-pill {
+      background: rgba(0, 0, 0, 0.25) !important;
+      border: 1px solid rgba(255, 255, 255, 0.28) !important;
+      padding: 6px 16px !important;
+      border-radius: 9999px !important;
+      color: #ffffff !important;
+    }
+    .consult-patient-meta-pill .panel-hint,
+    .consult-patient-meta-pill span {
+      color: #f1f5f9 !important;
+      font-size: 13px !important;
+      font-weight: 500 !important;
+    }
+    .consult-patient-meta-pill #consult-display-id {
+      color: #fef08a !important;
+      font-weight: 700 !important;
+    }
+    .consult-modal-topbar .modal-close {
+      color: #ffffff !important;
+      font-size: 20px !important;
+      background: rgba(255, 255, 255, 0.18) !important;
+      border: 1px solid rgba(255, 255, 255, 0.3) !important;
+      border-radius: 50% !important;
+      width: 32px !important;
+      height: 32px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      cursor: pointer !important;
+      opacity: 1 !important;
+      transition: all 0.18s ease !important;
+    }
+    .consult-modal-topbar .modal-close:hover {
+      background: rgba(255, 255, 255, 0.35) !important;
+      transform: scale(1.08) !important;
+    }
+
+    /* Prevent textareas from being expandable / resizable */
+    textarea,
+    .consult-dual-pane-modal textarea,
+    .consult-main-editor textarea,
+    .modal-box textarea {
+      resize: none !important;
     }
   </style>
 </head>
@@ -1528,6 +1618,10 @@
               <span id="queue-summary-badge" style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:12px;font-weight:700;">
                 Waiting: 0 | On Call: 0
               </span>
+              <button id="queue-consult-serving-btn" class="chip-btn" style="background:#0284c7;color:#fff;border-color:#0284c7;display:none;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px;margin-right:4px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                Consultation
+              </button>
               <button id="queue-refresh-btn" class="chip-btn">Refresh</button>
               <button id="open-tv-view-btn" class="chip-btn chip-btn-outline" type="button">TV View</button>
             </div>
@@ -1572,12 +1666,18 @@
         <div class="modal-box" style="max-width: 480px; text-align: left;">
           <h3 class="modal-heading">Queue Ticket Details</h3>
           <div id="queue-ticket-detail-body" class="modal-group"></div>
-          <div class="actions" style="justify-content:space-between; margin-top:14px;">
+          <div class="actions" style="justify-content:space-between; margin-top:14px; gap:8px; flex-wrap:wrap;">
             <button id="queue-ticket-delete-btn" type="button" class="btn" style="background:#ef4444; color:#fff; border:none;">
               <span class="btn-spinner" aria-hidden="true"></span>
               <span class="btn-label">Delete Ticket</span>
             </button>
-            <button id="queue-ticket-detail-close" type="button" class="btn btn-close">Close</button>
+            <div style="display:flex; gap:8px; margin-left:auto;">
+              <button id="queue-ticket-consult-btn" type="button" class="btn" style="background:#0284c7; color:#fff; border:none; display:none;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px; margin-right:4px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="btn-label">Start Consultation</span>
+              </button>
+              <button id="queue-ticket-detail-close" type="button" class="btn btn-close">Close</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1899,10 +1999,10 @@
           <div class="consult-modal-topbar">
             <div class="consult-modal-title-group">
               <div class="consult-badge-pill">Doctor Clinical Encounter</div>
-              <h3 class="modal-heading" style="margin:0; font-size:18px;">Clinical Consultation & EHR Workspace</h3>
+              <h3 class="modal-heading" style="margin:0; font-size:19px; color:#ffffff !important; border-bottom:none;">Clinical Consultation & EHR Workspace</h3>
             </div>
             <div class="consult-patient-meta-pill">
-              <span class="panel-hint">Patient ID: <span id="consult-display-id">—</span></span>
+              <span class="panel-hint" style="color:#f1f5f9 !important;">Patient ID: <span id="consult-display-id" style="color:#fef08a !important; font-weight:700;">—</span></span>
             </div>
             <button type="button" id="consult-modal-close-icon" class="modal-close" aria-label="Close modal">&times;</button>
           </div>

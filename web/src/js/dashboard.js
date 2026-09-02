@@ -6522,9 +6522,19 @@ function resolveCitizenIdFromIdentifier(patientIdentifier) {
   }
 
   // Pattern: 123
+  // Pattern: 123
   const numeric = Number(raw);
   if (Number.isFinite(numeric) && numeric > 0) {
     return numeric;
+  }
+
+  // Queue ticket code resolution: Q-20260902-MC-001 or QUEUE-123
+  if (raw.startsWith('Q-') || raw.startsWith('QUEUE-')) {
+    if (typeof tickets !== 'undefined' && Array.isArray(tickets)) {
+      const match = tickets.find(t => t.ticket_code === raw || `QUEUE-${t.id}` === raw);
+      if (match?.citizen_id) return Number(match.citizen_id);
+      if (match?.citizen?.id) return Number(match.citizen.id);
+    }
   }
 
   // Fallback: Search latestPatientsList for username or name match
@@ -7009,14 +7019,18 @@ async function createPrescriptionEntry({ patientId, consultationDbId, items }) {
     return pres;
   }
 
-  const doctorStaffId = Number(cachedSessionUser?.id) || null;
+  let doctorStaffId = Number(cachedSessionUser?.id) || null;
   if (!doctorStaffId) {
-    throw new Error('Unable to resolve the logged-in doctor account.');
+    const session = await ensureAuthenticatedSession().catch(() => null);
+    doctorStaffId = Number(session?.id || cachedSessionUser?.id) || null;
+  }
+  if (!doctorStaffId) {
+    throw new Error('Unable to resolve the logged-in doctor account. Please refresh and log in again.');
   }
 
   const { supabase } = await loadSupabaseModule();
   const headerPayload = {
-    consultation_id: Number.isFinite(Number(consultationDbId)) ? Number(consultationDbId) : null,
+    consultation_id: Number.isFinite(Number(consultationDbId)) && Number(consultationDbId) > 0 ? Number(consultationDbId) : null,
     patient_identifier: cleanPatientId,
     doctor_staff_id: doctorStaffId,
     issued_at: new Date().toISOString()
@@ -7037,21 +7051,40 @@ async function createPrescriptionEntry({ patientId, consultationDbId, items }) {
     throw new Error('Invalid prescription header ID.');
   }
 
-  const itemRows = normalizedItems.map((it) => ({
-    prescription_id: headerId,
-    medicine_name: it.name,
-    quantity: it.qty,
-    unit: it.unit || null,
-    dosage: it.dosage || null,
-    frequency: it.frequency || null,
-    duration: it.duration || null,
-    instructions: it.instructions || null,
-    additional_info: it.additionalInfo || null
-  }));
+  const itemRows = normalizedItems.map((it) => {
+    let medId = it.medicine_id || null;
+    if (!medId && Array.isArray(medicines)) {
+      const match = medicines.find(m => String(m.name || '').trim().toLowerCase() === String(it.name || '').trim().toLowerCase());
+      if (match) medId = match.id;
+    }
+    const row = {
+      prescription_id: headerId,
+      medicine_name: it.name,
+      quantity: it.qty,
+      unit: it.unit || null,
+      dosage: it.dosage || null,
+      frequency: it.frequency || null,
+      duration: it.duration || null,
+      instructions: it.instructions || null,
+      additional_info: it.additionalInfo || null
+    };
+    if (medId) row.medicine_id = medId;
+    return row;
+  });
 
-  const { error: itemsError } = await supabase
+  let { error: itemsError } = await supabase
     .from('prescription_items')
     .insert(itemRows);
+
+  // If the remote database does not have the medicine_id column yet, retry cleanly without it
+  if (itemsError && itemsError.message && itemsError.message.toLowerCase().includes('medicine_id')) {
+    console.warn('[Prescription] medicine_id column not found in database schema, falling back to standard schema.');
+    const fallbackRows = itemRows.map(({ medicine_id, ...rest }) => rest);
+    const { error: retryErr } = await supabase
+      .from('prescription_items')
+      .insert(fallbackRows);
+    itemsError = retryErr;
+  }
 
   if (itemsError) {
     throw new Error(itemsError.message || 'Unable to save prescription items.');
@@ -8484,7 +8517,7 @@ function displayPrescriptionData() {
               type="number"
               class="pharmacy-dispense-quantity"
               data-index="${index}"
-              min="1"
+              min="0"
               max="${maxDispense}"
               value="${maxDispense}"
               ${canSelect ? '' : 'disabled'}
@@ -8545,6 +8578,7 @@ async function dispenseSelectedMedicines() {
   }
 
   const selectedItems = [];
+  let totalSelectedQty = 0;
   for (const cb of checkboxes) {
     const index = parseInt(cb.dataset.index);
     const item = currentMedicineItems[index];
@@ -8552,11 +8586,17 @@ async function dispenseSelectedMedicines() {
     const quantity = parseInt(input?.value, 10);
     const remaining = item.remaining_quantity ?? (item.quantity - (item.dispensed_quantity ?? 0));
     const maximum = Math.min(remaining, item.currentStock);
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > maximum) {
-      showToast(`Enter a quantity from 1 to ${maximum} for ${item.medicine_name}.`, 'warning');
+    if (!Number.isInteger(quantity) || quantity < 0 || quantity > maximum) {
+      showToast(`Enter a quantity from 0 to ${maximum} for ${item.medicine_name}.`, 'warning');
       return;
     }
+    totalSelectedQty += quantity;
     selectedItems.push({ ...item, dispenseQuantity: quantity });
+  }
+
+  if (totalSelectedQty === 0) {
+    showToast('Please enter a quantity greater than 0 for at least one selected medicine.', 'warning');
+    return;
   }
 
   await dispenseMedicines(selectedItems);
@@ -8578,12 +8618,19 @@ async function dispenseAllMedicines() {
 }
 
 async function dispenseMedicines(items) {
-  if (!confirm(`Are you sure you want to dispense ${items.length} medicine(s)?`)) {
+  // Only items with quantity > 0 are dispatched for deduction & event recording
+  const itemsToDispense = items.filter(item => (item.dispenseQuantity ?? 1) > 0);
+  if (itemsToDispense.length === 0) {
+    showToast('No medicines with quantity greater than 0 to dispense', 'warning');
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to dispense ${itemsToDispense.length} medicine(s)?`)) {
     return;
   }
 
   // Build per-item payload using remaining_quantity (dispense remaining for selected items)
-  const dispensePayload = items.map(item => ({
+  const dispensePayload = itemsToDispense.map(item => ({
     prescription_item_id: item.id,
     quantity: item.dispenseQuantity ?? Math.min(
       item.remaining_quantity ?? (item.quantity - (item.dispensed_quantity ?? 0)),
@@ -9122,6 +9169,24 @@ const appointments = (() => {
     }
   };
 
+  const startConsultationFromTicket = (ticket) => {
+    if (!ticket) return;
+    if (!canConsultPatients()) {
+      showToast('Only doctors can conduct consultations.', 'warning');
+      return;
+    }
+    const citizen = ticket.citizen || {};
+    const fullName = `${citizen.firstname || ''} ${citizen.surname || ''}`.trim() || ticket.walkin_patient_name || 'Walk-in Patient';
+    openConsultationModal({
+      patientId: citizen.id ? String(citizen.id) : (ticket.walkin_patient_name || 'Walk-in Patient'),
+      patientName: fullName,
+      serviceLabel: ticket.service_label || 'General Consultation',
+      queueTicketId: ticket.id,
+      symptoms: ticket.symptoms || '',
+      notes: ticket.reason || ''
+    });
+  };
+
   const setupUI = () => {
     const refreshBtn = document.getElementById('queue-refresh-btn');
     if (refreshBtn && !refreshBtn.dataset.bound) {
@@ -9134,6 +9199,27 @@ const appointments = (() => {
         window.open('tv-view.html', '_blank', 'noopener,noreferrer');
       });
       tvBtn.dataset.bound = 'true';
+    }
+    const consultServingBtn = document.getElementById('queue-consult-serving-btn');
+    if (consultServingBtn && !consultServingBtn.dataset.bound) {
+      consultServingBtn.addEventListener('click', () => {
+        if (!canConsultPatients()) {
+          showToast('Only doctors can conduct consultations.', 'warning');
+          return;
+        }
+        const getStatus = (t) => String(t.status || '').trim().toLowerCase();
+        const serving = state.tickets.filter(t => getStatus(t) === 'serving');
+        if (serving.length === 0) {
+          showToast('No patients are currently in Now Serving.', 'warning');
+          return;
+        }
+        if (serving.length === 1) {
+          startConsultationFromTicket(serving[0]);
+        } else {
+          showToast('Multiple patients are being served. Click Consultation on the specific ticket card.', 'info');
+        }
+      });
+      consultServingBtn.dataset.bound = 'true';
     }
     const board = document.querySelector('.queue-board');
     if (board && !board.dataset.bound) {
@@ -9162,11 +9248,21 @@ const appointments = (() => {
         day: '2-digit'
       }).format(new Date());
 
+      // Include active tickets from today OR any unresolved active ticket from the past 24 hours (midnight rollover protection)
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const yesterdayStr = new Intl.DateTimeFormat('fr-CA', {
+        timeZone: 'Asia/Manila',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(yesterday);
+
       const { data, error } = await supabase
         .from('queue_tickets')
-        .select('id, queue_number, ticket_code, status, queue_date, citizen_type, service_label, citizen:citizens(id, firstname, surname), vitals:vital_signs(id)')
-        .eq('queue_date', manilaToday)
+        .select('id, queue_number, ticket_code, status, queue_date, citizen_type, service_label, symptoms, reason, citizen:citizens(id, firstname, surname, age, sex, contact_number), vitals:vital_signs(id)')
+        .gte('queue_date', yesterdayStr)
         .in('status', ['waiting', 'on_call', 'serving'])
+        .order('queue_date', { ascending: true })
         .order('queue_number', { ascending: true });
 
       if (error) throw error;
@@ -9216,6 +9312,20 @@ const appointments = (() => {
         servingBadge.textContent = 'Current serving: none';
       }
     }
+
+    // Toggle consultation button in queue header for doctors when tickets are in Now Serving
+    const consultServingBtn = document.getElementById('queue-consult-serving-btn');
+    if (consultServingBtn) {
+      if (lanes.serving.length > 0 && canConsultPatients()) {
+        consultServingBtn.style.display = 'inline-flex';
+        consultServingBtn.innerHTML = `
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px;margin-right:4px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          ${lanes.serving.length === 1 ? 'Consult Serving' : `Consult Serving (${lanes.serving.length})`}
+        `;
+      } else {
+        consultServingBtn.style.display = 'none';
+      }
+    }
   };
 
   const renderLane = (id, list) => {
@@ -9250,13 +9360,21 @@ const appointments = (() => {
           <span class="queue-ticket-code">${t.ticket_code}</span>
         </div>
         <div class="queue-ticket-name" style="display:flex;align-items:center;">
-          ${t.citizen?.firstname || ''} ${t.citizen?.surname || ''}
+          ${t.citizen?.firstname ? `${t.citizen.firstname} ${t.citizen.surname || ''}` : (t.walkin_patient_name || 'Walk-in Patient')}
+          ${!t.citizen?.firstname ? '<span style="background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px;">Walk-in</span>' : ''}
           ${getIndicatorHtml(t.citizen_type)}
         </div>
         <div class="queue-ticket-meta">${t.service_label}</div>
         <div class="queue-ticket-actions">
           ${getStatus(t) === 'waiting' ? '<button class="queue-ticket-btn" data-action="move" data-lane="on_call">On Call</button>' : ''}
           ${getStatus(t) === 'on_call' ? ((t.vitals && t.vitals.length > 0) ? '<button class="queue-ticket-btn" data-action="move" data-lane="serving">Serve</button>' : '') + '<button class="queue-ticket-btn btn-vital" data-action="vital">Vitals</button>' : ''}
+          ${getStatus(t) === 'serving' ? (canConsultPatients() ? `
+            <button class="queue-ticket-btn btn-consult" data-action="consult">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+              Consultation
+            </button>` : '') : ''}
         </div>
       </div>`).join('');
   };
@@ -9288,6 +9406,12 @@ const appointments = (() => {
             }
           }
           return;
+        } else if (action === 'consult') {
+          const ticket = state.tickets.find(t => String(t.id) === String(id));
+          if (ticket) {
+            startConsultationFromTicket(ticket);
+          }
+          return;
         }
         await refresh();
       } catch (err) {
@@ -9308,7 +9432,7 @@ const appointments = (() => {
     if (!modal || !body) return;
 
     const citizen = ticket.citizen || {};
-    const fullName = `${citizen.firstname || ''} ${citizen.surname || ''}`.trim() || 'Guest Patient';
+    const fullName = `${citizen.firstname || ''} ${citizen.surname || ''}`.trim() || ticket.walkin_patient_name || 'Walk-in Patient';
     const age = citizen.age ? `${citizen.age} yrs` : 'Age N/A';
     const gender = citizen.sex || 'Sex N/A';
     const phone = citizen.contact_number || 'No phone';
@@ -9316,7 +9440,10 @@ const appointments = (() => {
     body.innerHTML = `
       <div style="background:#f8fafc; border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #e2e8f0;">
         <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Patient Info</div>
-        <div style="font-size:18px; font-weight:800; color:#0f172a; margin-bottom:2px;">${fullName}</div>
+        <div style="font-size:18px; font-weight:800; color:#0f172a; margin-bottom:2px;">
+          ${fullName}
+          ${!citizen.firstname ? '<span style="background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;margin-left:6px;vertical-align:middle;">Walk-in Patient</span>' : ''}
+        </div>
         <div style="font-size:13px; color:#475569; font-weight:500;">${age} | ${gender} | ${phone}</div>
       </div>
       
@@ -9340,6 +9467,19 @@ const appointments = (() => {
     `;
 
     modal.classList.remove('hidden');
+
+    const consultDetailBtn = document.getElementById('queue-ticket-consult-btn');
+    if (consultDetailBtn) {
+      if (getStatus(ticket) === 'serving' && canConsultPatients()) {
+        consultDetailBtn.style.display = 'inline-flex';
+        consultDetailBtn.onclick = () => {
+          modal.classList.add('hidden');
+          startConsultationFromTicket(ticket);
+        };
+      } else {
+        consultDetailBtn.style.display = 'none';
+      }
+    }
 
     const closeBtn = document.getElementById('queue-ticket-detail-close');
     if (closeBtn) {

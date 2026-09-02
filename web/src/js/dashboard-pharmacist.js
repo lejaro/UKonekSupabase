@@ -207,6 +207,38 @@ const confirmAddExpiry   = document.getElementById('confirm-add-expiry');
 const confirmAddCancel   = document.getElementById('confirm-add-cancel-btn');
 const confirmAddSubmit   = document.getElementById('confirm-add-submit-btn');
 
+// Return modal DOM refs
+const returnModal       = document.getElementById('ph-return-modal');
+const returnMedName     = document.getElementById('return-modal-med-name');
+const returnMaxQty      = document.getElementById('return-modal-max-qty');
+const returnQtyInp      = document.getElementById('return-modal-qty');
+const returnReasonSel   = document.getElementById('return-modal-reason');
+const returnNotesInp    = document.getElementById('return-modal-notes');
+const returnCancelBtn   = document.getElementById('return-modal-cancel-btn');
+const returnConfirmBtn  = document.getElementById('return-modal-confirm-btn');
+
+let pendingReturnData = null;
+
+// OTC Dispensing DOM refs
+const openOtcDispenseBtn = document.getElementById('open-otc-dispense-btn');
+const otcModal           = document.getElementById('ph-otc-modal');
+const otcModalCloseIcon  = document.getElementById('otc-modal-close-icon');
+const otcPatientNameInp  = document.getElementById('otc-patient-name');
+const otcNotesInp        = document.getElementById('otc-notes');
+const otcItemsContainer  = document.getElementById('otc-items-container');
+const otcAddLineBtn      = document.getElementById('otc-add-line-btn');
+const otcSummaryCounter  = document.getElementById('otc-summary-counter');
+const otcCancelBtn       = document.getElementById('otc-cancel-btn');
+const otcSubmitBtn       = document.getElementById('otc-submit-btn');
+
+// OTC Receipt Modal refs
+const otcReceiptModal    = document.getElementById('ph-otc-receipt-modal');
+const otcReceiptRef      = document.getElementById('otc-receipt-ref');
+const otcReceiptPatient  = document.getElementById('otc-receipt-patient');
+const otcReceiptItems    = document.getElementById('otc-receipt-items');
+const otcReceiptCloseBtn = document.getElementById('otc-receipt-close-btn');
+
+let otcLineItems = [];
 let pendingAddData = null;
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -359,19 +391,20 @@ async function loadMedicines() {
     const sb = await getSupabase();
     const { data, error } = await sb
       .from('medicines')
-      .select('id, name, description, qty, unit, expiry_date, created_at, updated_at')
+      .select('id, name, description, qty, unit, expiry_date, drug_classification, created_at, updated_at')
       .is('archived_at', null)
       .order('name', { ascending: true });
     if (error) throw new Error(error.message);
     medicines = (data || []).map(row => ({
-      id:          row.id,
-      name:        row.name,
-      description: row.description || '',
-      qty:         Number(row.qty ?? 0),
-      unit:        row.unit || '',
-      expiry_date: row.expiry_date || null,
-      created_at:  row.created_at,
-      updated_at:  row.updated_at
+      id:                  row.id,
+      name:                row.name,
+      description:         row.description || '',
+      qty:                 Number(row.qty ?? 0),
+      unit:                row.unit || '',
+      expiry_date:         row.expiry_date || null,
+      drug_classification: (row.drug_classification || 'rx').toLowerCase(),
+      created_at:          row.created_at,
+      updated_at:          row.updated_at
     }));
   } catch (err) {
     console.error('Failed to load medicines:', err);
@@ -392,6 +425,9 @@ function getFilteredMedicines() {
   }
 
   switch (activeFilter) {
+    case 'otc':
+      rows = rows.filter(m => (m.drug_classification || '').toLowerCase() === 'otc');
+      break;
     case 'low':
       rows = rows.filter(m => m.qty <= LOW_STOCK_THRESHOLD);
       break;
@@ -467,8 +503,13 @@ function renderMedicines() {
     else if (stock.label === 'Low Stock' || stock.label === 'Critical Low') tr.style.background = '#fffbeb';
 
     tr.dataset.id = m.id;
+    const isOtc = (m.drug_classification || '').toLowerCase() === 'otc';
+    const classBadge = isOtc
+      ? '<span class="badge badge-otc" style="margin-left:6px;font-size:10px;font-weight:700;">OTC</span>'
+      : '<span class="badge badge-rx" style="margin-left:6px;font-size:10px;font-weight:700;">Rx</span>';
+
     tr.innerHTML = `
-      <td><strong>${escHtml(m.name)}</strong></td>
+      <td><strong>${escHtml(m.name)}</strong>${classBadge}</td>
       <td style="color:#64748b;font-size:13px;">${escHtml(m.description) || '<em style="color:#cbd5e1">—</em>'}</td>
       <td>
         <div class="ph-stock-bar-wrap">
@@ -502,7 +543,7 @@ function escHtml(str) {
 
 function updateSubtitle(count) {
   if (!listSubtitle) return;
-  const filterLabel = { all: 'All medicines', low: 'Low / Out of Stock', expired: 'Expired', expiring: 'Expiring within 30 days' };
+  const filterLabel = { all: 'All medicines', otc: 'Over-The-Counter (OTC)', low: 'Low / Out of Stock', expired: 'Expired', expiring: 'Expiring within 30 days' };
   listSubtitle.textContent = `${filterLabel[activeFilter] || 'All medicines'} — ${count} result${count !== 1 ? 's' : ''}`;
 }
 
@@ -537,18 +578,22 @@ function updateStats() {
 
   // Update filter pill counts
   const cAll = document.getElementById('ph-count-all');
+  const cOtc = document.getElementById('ph-count-otc');
   const cLow = document.getElementById('ph-count-low');
   const cExp = document.getElementById('ph-count-expired');
   const cSoon = document.getElementById('ph-count-expiring');
 
+  const otcCount = medicines.filter(m => (m.drug_classification || '').toLowerCase() === 'otc').length;
+
   if (cAll) cAll.textContent = total;
+  if (cOtc) cOtc.textContent = otcCount;
   if (cLow) cLow.textContent = lowStock;
   if (cExp) cExp.textContent = expiredCount;
   if (cSoon) cSoon.textContent = expAlert;
 }
 
 // ── Save medicine (add or update) ─────────────────────────────────────────────
-async function saveMedicine({ id = null, name, description, qty, unit, expiry_date }) {
+async function saveMedicine({ id = null, name, description, qty, unit, expiry_date, drug_classification = 'rx' }) {
   qty = Number(qty);
   if (qty < 0) throw new Error('Stock quantity cannot be negative.');
 
@@ -561,6 +606,7 @@ async function saveMedicine({ id = null, name, description, qty, unit, expiry_da
         qty,
         unit: (unit || '').trim(),
         expiry_date: expiry_date || null,
+        drug_classification: drug_classification || 'rx',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -570,7 +616,7 @@ async function saveMedicine({ id = null, name, description, qty, unit, expiry_da
     } else {
       const idx = medicines.findIndex(m => m.id === id);
       if (idx === -1) throw new Error('Medicine not found.');
-      medicines[idx] = { ...medicines[idx], description: (description || '').trim(), qty, expiry_date: expiry_date || null, updated_at: new Date().toISOString() };
+      medicines[idx] = { ...medicines[idx], description: (description || '').trim(), qty, expiry_date: expiry_date || null, drug_classification: drug_classification || medicines[idx].drug_classification, updated_at: new Date().toISOString() };
       localStorage.setItem('ukonek_medicines', JSON.stringify(medicines));
       return medicines[idx];
     }
@@ -579,16 +625,20 @@ async function saveMedicine({ id = null, name, description, qty, unit, expiry_da
   const sb = await getSupabase();
 
   if (id === null) {
-    // Step 1: INSERT with base columns (always in schema cache)
+    // Step 1: INSERT with base columns
     const { data, error } = await sb
       .from('medicines')
-      .insert({ name: name.trim(), qty, unit: unit ? unit.trim() : null })
+      .insert({
+        name: name.trim(),
+        qty,
+        unit: unit ? unit.trim() : null,
+        drug_classification: drug_classification || 'rx'
+      })
       .select('id')
       .single();
     if (error) throw new Error(error.message);
 
     // Step 2: UPDATE with extended columns (expiry_date, description)
-    // Done separately so a schema-cache miss on new columns doesn't fail the whole insert
     const extUpdates = {};
     if (expiry_date) extUpdates.expiry_date = expiry_date;
     if (description && description.trim()) extUpdates.description = description.trim();
@@ -597,8 +647,9 @@ async function saveMedicine({ id = null, name, description, qty, unit, expiry_da
     }
     return data;
   } else {
-    // UPDATE existing medicine (stock + expiry + description)
+    // UPDATE existing medicine (stock + expiry + description + classification)
     const updates = { qty };
+    if (drug_classification) updates.drug_classification = drug_classification;
     if (expiry_date !== undefined) updates.expiry_date = expiry_date || null;
     if (description !== undefined) updates.description = description ? description.trim() : null;
     const { error } = await sb
@@ -615,21 +666,29 @@ async function saveMedicine({ id = null, name, description, qty, unit, expiry_da
 if (addForm) {
   addForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const name   = document.getElementById('add-name').value.trim();
-    const qty    = Number(document.getElementById('add-qty').value);
-    const unit   = document.getElementById('add-unit').value.trim();
-    const expiry = document.getElementById('add-expiry').value || null;
-    const desc   = document.getElementById('add-desc').value.trim();
+    const name      = document.getElementById('add-name').value.trim();
+    const drugClass = document.getElementById('add-classification')?.value || 'rx';
+    const qty       = Number(document.getElementById('add-qty').value);
+    const unit      = document.getElementById('add-unit').value.trim();
+    const expiry    = document.getElementById('add-expiry').value || null;
+    const desc      = document.getElementById('add-desc').value.trim();
 
     if (!name) { showToast('Medicine name is required.', 'warning'); return; }
     if (qty < 0) { showToast('Stock quantity cannot be negative.', 'warning'); return; }
 
-    pendingAddData = { id: null, name, description: desc, qty, unit, expiry_date: expiry };
+    pendingAddData = { id: null, name, description: desc, qty, unit, expiry_date: expiry, drug_classification: drugClass };
     
     // Show confirmation modal
     if (confirmAddName) confirmAddName.textContent = name;
     if (confirmAddQty) confirmAddQty.textContent = `${qty} ${unit || ''}`.trim();
     if (confirmAddExpiry) confirmAddExpiry.textContent = expiry ? formatDate(expiry) : 'No expiration set';
+
+    const confirmAddBadge = document.getElementById('confirm-add-classification-badge');
+    if (confirmAddBadge) {
+      confirmAddBadge.innerHTML = drugClass === 'otc'
+        ? '<span class="badge badge-otc">OTC</span>'
+        : '<span class="badge badge-rx">Rx</span>';
+    }
     
     if (confirmAddModal) {
       confirmAddModal.classList.remove('hidden');
@@ -750,6 +809,8 @@ async function deleteMedicine(id) {
 function openEditModal(med) {
   editIdInput.value    = med.id;
   editNameDisp.value   = med.name;
+  const editClassInp   = document.getElementById('edit-classification');
+  if (editClassInp) editClassInp.value = (med.drug_classification || 'rx').toLowerCase();
   editDescInp.value    = med.description || '';
   editQtyInp.value     = med.qty;
   editExpiryInp.value  = med.expiry_date || '';
@@ -770,18 +831,19 @@ if (editModal) {
 
 if (editSaveBtn) {
   editSaveBtn.addEventListener('click', async () => {
-    const id     = Number(editIdInput.value);
-    const qty    = Number(editQtyInp.value);
-    const expiry = editExpiryInp.value || null;
-    const desc   = editDescInp.value.trim();
-    const med    = medicines.find(m => m.id === id);
+    const id        = Number(editIdInput.value);
+    const drugClass = document.getElementById('edit-classification')?.value || 'rx';
+    const qty       = Number(editQtyInp.value);
+    const expiry    = editExpiryInp.value || null;
+    const desc      = editDescInp.value.trim();
+    const med       = medicines.find(m => m.id === id);
 
     if (!med) { showToast('Medicine not found.', 'error'); return; }
     if (qty < 0) { showToast('Stock quantity cannot be negative.', 'warning'); return; }
 
     setLoading(editSaveBtn, true);
     try {
-      await saveMedicine({ id, description: desc, qty, expiry_date: expiry });
+      await saveMedicine({ id, description: desc, qty, expiry_date: expiry, drug_classification: drugClass });
       await loadMedicines();
       renderMedicines();
       closeEditModal();
@@ -909,6 +971,9 @@ function renderRxItems(items) {
       : (dispensedQty > 0
           ? '<span style="color:#d97706;font-weight:600;">Partial</span>'
           : '<span style="color:#64748b;">Pending</span>');
+    const returnBtnHtml = dispensedQty > 0
+      ? `<button type="button" class="rx-return-btn ph-btn ph-btn-sm" data-item-id="${it.id}" data-item-name="${escHtml(it.medicine_name)}" data-dispensed="${dispensedQty}" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;margin-top:4px;padding:2px 8px;font-size:11px;cursor:pointer;" title="Return dispensed units to inventory">&#x21a9; Return</button>`
+      : '';
     return `
       <tr>
         <td><strong>${escHtml(it.medicine_name)}</strong></td>
@@ -919,18 +984,21 @@ function renderRxItems(items) {
         <td>${escHtml(it.frequency) || '—'}</td>
         <td style="font-size:13px;color:#64748b;">${escHtml(it.instructions) || '—'}</td>
         <td style="text-align:center;">
-          ${isFullyDispensed
-            ? statusHtml
-            : `<input
-                type="number"
-                class="rx-dispense-qty-input"
-                data-item-id="${it.id}"
-                data-remaining="${remaining}"
-                min="1"
-                max="${remaining}"
-                value="${remaining}"
-                style="width:64px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;"
-              >`}
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+            ${isFullyDispensed
+              ? statusHtml
+              : `<input
+                  type="number"
+                  class="rx-dispense-qty-input"
+                  data-item-id="${it.id}"
+                  data-remaining="${remaining}"
+                  min="0"
+                  max="${remaining}"
+                  value="${remaining}"
+                  style="width:64px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;"
+                >`}
+            ${returnBtnHtml}
+          </div>
         </td>
       </tr>
     `;
@@ -1005,14 +1073,15 @@ async function confirmDispense() {
   const inputs = document.querySelectorAll('.rx-dispense-qty-input');
   const pendingItems = [];
   let hasError = false;
+  let totalDispenseQty = 0;
 
   inputs.forEach(input => {
     const itemId = parseInt(input.dataset.itemId, 10);
     const remaining = parseInt(input.dataset.remaining, 10);
     const qty = parseInt(input.value, 10);
 
-    if (isNaN(qty) || qty <= 0) {
-      showToast(`Enter a quantity greater than 0 for each item.`, 'warning');
+    if (isNaN(qty) || qty < 0) {
+      showToast(`Enter a valid quantity (0 or more) for each item.`, 'warning');
       hasError = true;
       return;
     }
@@ -1021,10 +1090,16 @@ async function confirmDispense() {
       hasError = true;
       return;
     }
+    totalDispenseQty += qty;
     pendingItems.push({ prescription_item_id: itemId, quantity: qty });
   });
 
   if (hasError || pendingItems.length === 0) return;
+
+  if (totalDispenseQty === 0) {
+    showToast('Please enter a quantity greater than 0 for at least one item to dispense.', 'warning');
+    return;
+  }
 
   // Stash on state for the confirm handler
   currentRxData._pendingDispenseItems = pendingItems;
@@ -1039,10 +1114,12 @@ async function confirmDispense() {
 async function handleActualDispense() {
   if (!currentRxData) return;
   const code = currentRxData.prescription_code;
-  const items = currentRxData._pendingDispenseItems;
+  const allItems = currentRxData._pendingDispenseItems || [];
+  // Only items with quantity > 0 are dispatched for deduction & event recording
+  const items = allItems.filter(it => it.quantity > 0);
 
   if (!items || items.length === 0) {
-    showToast('No items to dispense.', 'warning');
+    showToast('No items with quantity greater than 0 to dispense.', 'warning');
     return;
   }
 
@@ -1114,6 +1191,90 @@ if (dispenseCancelBtn) {
 }
 if (dispenseConfirmBtn) {
   dispenseConfirmBtn.addEventListener('click', handleActualDispense);
+}
+
+// ── Return & Restock Handlers ──────────────────────────────────────────────────
+function openReturnModal({ itemId, medicineName, dispensedQty }) {
+  if (!returnModal) return;
+  pendingReturnData = { itemId, medicineName, dispensedQty };
+  if (returnMedName) returnMedName.textContent = medicineName;
+  if (returnMaxQty) returnMaxQty.textContent = dispensedQty;
+  if (returnQtyInp) {
+    returnQtyInp.value = 1;
+    returnQtyInp.max = dispensedQty;
+  }
+  if (returnNotesInp) returnNotesInp.value = '';
+  returnModal.classList.remove('hidden');
+  returnModal.style.display = 'flex';
+}
+
+function closeReturnModal() {
+  if (!returnModal) return;
+  returnModal.classList.add('hidden');
+  returnModal.style.display = 'none';
+  pendingReturnData = null;
+}
+
+if (returnCancelBtn) returnCancelBtn.addEventListener('click', closeReturnModal);
+if (returnModal) {
+  returnModal.addEventListener('click', (e) => {
+    if (e.target === returnModal) closeReturnModal();
+  });
+}
+
+if (returnConfirmBtn) {
+  returnConfirmBtn.addEventListener('click', async () => {
+    if (!pendingReturnData) return;
+    const qty = parseInt(returnQtyInp?.value, 10);
+    const reasonCategory = returnReasonSel?.value || 'Other';
+    const notes = (returnNotesInp?.value || '').trim();
+    const fullReason = notes ? `${reasonCategory}: ${notes}` : reasonCategory;
+
+    if (isNaN(qty) || qty <= 0) {
+      showToast('Please enter a return quantity greater than 0.', 'warning');
+      return;
+    }
+
+    if (qty > pendingReturnData.dispensedQty) {
+      showToast(`Cannot return more than ${pendingReturnData.dispensedQty} units.`, 'warning');
+      return;
+    }
+
+    setLoading(returnConfirmBtn, true);
+    try {
+      const sb = await getSupabase();
+      const { data, error } = await sb.rpc('return_dispensed_prescription_item', {
+        p_prescription_item_id: pendingReturnData.itemId,
+        p_quantity: qty,
+        p_reason: fullReason
+      });
+
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+
+      showToast(data.message || 'Item restocked successfully.', 'success');
+      closeReturnModal();
+
+      await lookupPrescription();
+      await loadMedicines();
+      renderMedicines();
+    } catch (err) {
+      showToast(err.message || 'Failed to restock item.', 'error');
+    } finally {
+      setLoading(returnConfirmBtn, false);
+    }
+  });
+}
+
+if (rxItemsTbody) {
+  rxItemsTbody.addEventListener('click', (e) => {
+    const returnBtn = e.target.closest('.rx-return-btn');
+    if (!returnBtn) return;
+    const itemId = Number(returnBtn.dataset.itemId);
+    const medicineName = returnBtn.dataset.itemName;
+    const dispensedQty = parseInt(returnBtn.dataset.dispensed, 10);
+    openReturnModal({ itemId, medicineName, dispensedQty });
+  });
 }
 
 // ── QR Scanner Implementation ────────────────────────────────────────────────
@@ -1205,12 +1366,13 @@ const pdfExportBtn = document.getElementById('ph-pdf-export-btn');
 if (pdfExportBtn) {
   pdfExportBtn.addEventListener('click', () => {
     const listToExport = filteredMedicines.length > 0 ? filteredMedicines : medicines;
-    const headers = ['Medicine', 'Description', 'Quantity', 'Unit', 'Expiry Date', 'Status'];
+    const headers = ['Medicine', 'Classification', 'Description', 'Quantity', 'Unit', 'Expiry Date', 'Status'];
     const rows = listToExport.map(m => {
       const stock = computeStockStatus(m.qty);
       const expiry = computeExpiryStatus(m.expiry_date);
       return [
         m.name,
+        (m.drug_classification || 'rx').toUpperCase(),
         m.description || '—',
         m.qty,
         m.unit || '—',
@@ -1226,7 +1388,7 @@ const csvExportBtn = document.getElementById('ph-csv-export-btn');
 if (csvExportBtn) {
   csvExportBtn.addEventListener('click', () => {
     const listToExport = filteredMedicines.length > 0 ? filteredMedicines : medicines;
-    const headers = ['Medicine', 'Description', 'Quantity', 'Unit', 'Expiry Date', 'Stock Status', 'Expiry Status'];
+    const headers = ['Medicine', 'Classification', 'Description', 'Quantity', 'Unit', 'Expiry Date', 'Stock Status', 'Expiry Status'];
     let csvContent = headers.join(',') + '\n';
     
     listToExport.forEach(m => {
@@ -1234,6 +1396,7 @@ if (csvExportBtn) {
       const expiry = computeExpiryStatus(m.expiry_date);
       const row = [
         `"${m.name}"`,
+        `"${(m.drug_classification || 'rx').toUpperCase()}"`,
         `"${m.description || ''}"`,
         m.qty,
         `"${m.unit || ''}"`,
@@ -1291,6 +1454,248 @@ if (csvImportBtn && window.openCsvImport) {
         renderMedicines();
       }
     });
+  });
+}
+
+// ── OTC Dispensing Logic ──────────────────────────────────────────────────────
+
+function openOtcModal() {
+  if (!otcModal) return;
+  if (otcPatientNameInp) otcPatientNameInp.value = 'Walk-in Patient';
+  if (otcNotesInp) otcNotesInp.value = '';
+
+  const otcMeds = medicines.filter(m => (m.drug_classification || '').toLowerCase() === 'otc' && m.qty > 0);
+  if (otcMeds.length === 0) {
+    showToast('No Over-The-Counter (OTC) medicines with available stock found.', 'warning');
+    return;
+  }
+
+  otcLineItems = [
+    { medicineId: otcMeds[0].id, quantity: 1, instructions: '' }
+  ];
+
+  renderOtcLineItems();
+  otcModal.classList.remove('hidden');
+  otcModal.style.display = 'flex';
+}
+
+function closeOtcModal() {
+  if (!otcModal) return;
+  otcModal.classList.add('hidden');
+  otcModal.style.display = 'none';
+  otcLineItems = [];
+}
+
+function renderOtcLineItems() {
+  if (!otcItemsContainer) return;
+  const otcMeds = medicines.filter(m => (m.drug_classification || '').toLowerCase() === 'otc' && m.qty > 0);
+
+  if (otcLineItems.length === 0) {
+    otcItemsContainer.innerHTML = '<div style="color:#94a3b8; font-size:13px; text-align:center; padding:12px;">No medicines added yet. Click "+ Add Another Medicine" above.</div>';
+    if (otcSummaryCounter) otcSummaryCounter.textContent = '0 items selected';
+    return;
+  }
+
+  otcItemsContainer.innerHTML = otcLineItems.map((item, idx) => {
+    const selectedMed = medicines.find(m => m.id === item.medicineId) || otcMeds[0];
+    const maxQty = selectedMed ? selectedMed.qty : 1;
+
+    const optionsHtml = otcMeds.map(m => `
+      <option value="${m.id}" ${m.id === item.medicineId ? 'selected' : ''}>
+        ${escHtml(m.name)} (Stock: ${m.qty}${m.unit ? ' ' + escHtml(m.unit) : ''})
+      </option>
+    `).join('');
+
+    return `
+      <div class="otc-line-row" data-index="${idx}" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:10px; display:grid; grid-template-columns: 2fr 1fr 2fr auto; gap:8px; align-items:center;">
+        <div>
+          <label style="font-size:10px; color:#64748b; font-weight:700; text-transform:uppercase; display:block; margin-bottom:2px;">OTC Medicine</label>
+          <select class="otc-med-select" data-index="${idx}" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+            ${optionsHtml}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px; color:#64748b; font-weight:700; text-transform:uppercase; display:block; margin-bottom:2px;">Qty (${maxQty} max)</label>
+          <input type="number" class="otc-qty-input" data-index="${idx}" min="1" max="${maxQty}" value="${item.quantity}" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; text-align:center;" />
+        </div>
+        <div>
+          <label style="font-size:10px; color:#64748b; font-weight:700; text-transform:uppercase; display:block; margin-bottom:2px;">Instructions</label>
+          <input type="text" class="otc-inst-input" data-index="${idx}" value="${escHtml(item.instructions || '')}" placeholder="e.g. 1 tab 3x a day" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" />
+        </div>
+        <div style="padding-top:14px;">
+          <button type="button" class="otc-remove-line-btn ph-btn ph-btn-sm" data-index="${idx}" style="background:#fff1f2; color:#e11d48; border:1px solid #fecdd3; padding:5px 8px;" title="Remove line">✕</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (otcSummaryCounter) {
+    const totalQty = otcLineItems.reduce((acc, it) => acc + (parseInt(it.quantity, 10) || 0), 0);
+    otcSummaryCounter.textContent = `${otcLineItems.length} medicine${otcLineItems.length !== 1 ? 's' : ''} (${totalQty} units)`;
+  }
+}
+
+async function handleOtcDispenseSubmit() {
+  if (otcLineItems.length === 0) {
+    showToast('Add at least one medicine to dispense.', 'warning');
+    return;
+  }
+
+  const patientName = (otcPatientNameInp?.value || '').trim() || 'Walk-in Patient';
+  const notes = (otcNotesInp?.value || '').trim() || null;
+
+  const payloadItems = [];
+  const seenIds = new Set();
+
+  for (let i = 0; i < otcLineItems.length; i++) {
+    const it = otcLineItems[i];
+    const medId = Number(it.medicineId);
+    const qty = parseInt(it.quantity, 10);
+
+    if (!medId) {
+      showToast(`Please select a valid medicine for item #${i + 1}.`, 'warning');
+      return;
+    }
+    if (seenIds.has(medId)) {
+      showToast(`Duplicate medicine selected. Please combine quantities.`, 'warning');
+      return;
+    }
+    seenIds.add(medId);
+
+    const targetMed = medicines.find(m => m.id === medId);
+    if (!targetMed) {
+      showToast(`Medicine not found in inventory.`, 'error');
+      return;
+    }
+
+    if (isNaN(qty) || qty <= 0) {
+      showToast(`Enter a quantity greater than 0 for ${targetMed.name}.`, 'warning');
+      return;
+    }
+    if (qty > targetMed.qty) {
+      showToast(`Requested ${qty} for ${targetMed.name}, but only ${targetMed.qty} is in stock.`, 'warning');
+      return;
+    }
+
+    payloadItems.push({
+      medicine_id: medId,
+      quantity: qty,
+      instructions: (it.instructions || '').trim() || null
+    });
+  }
+
+  setLoading(otcSubmitBtn, true);
+  try {
+    const sb = await getSupabase();
+    const { data, error } = await sb.rpc('dispense_otc_medicines', {
+      p_citizen_id: null,
+      p_patient_name: patientName,
+      p_items: payloadItems,
+      p_notes: notes
+    });
+
+    if (error) throw new Error(error.message);
+    if (data?.error) throw new Error(data.error);
+
+    const refNo = data.reference_no || 'OTC-COMPLETED';
+    showToast(`OTC Dispense complete (${refNo}). Stock updated.`, 'success');
+
+    closeOtcModal();
+
+    if (otcReceiptRef) otcReceiptRef.textContent = refNo;
+    if (otcReceiptPatient) otcReceiptPatient.textContent = patientName;
+    if (otcReceiptItems) {
+      otcReceiptItems.innerHTML = payloadItems.map(p => {
+        const m = medicines.find(x => x.id === p.medicine_id);
+        return `<div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+          <span>• <strong>${escHtml(m?.name || 'Medicine')}</strong>${p.instructions ? ` <em>(${escHtml(p.instructions)})</em>` : ''}</span>
+          <span style="font-weight:700; color:#0369a1;">${p.quantity} ${escHtml(m?.unit || '')}</span>
+        </div>`;
+      }).join('');
+    }
+
+    if (otcReceiptModal) {
+      otcReceiptModal.classList.remove('hidden');
+      otcReceiptModal.style.display = 'flex';
+    }
+
+    await loadMedicines();
+    renderMedicines();
+
+  } catch (err) {
+    showToast(err.message || 'Failed to dispense OTC medicines.', 'error');
+  } finally {
+    setLoading(otcSubmitBtn, false);
+  }
+}
+
+// Wire OTC event listeners
+if (openOtcDispenseBtn) openOtcDispenseBtn.addEventListener('click', openOtcModal);
+if (otcCancelBtn) otcCancelBtn.addEventListener('click', closeOtcModal);
+if (otcModalCloseIcon) otcModalCloseIcon.addEventListener('click', closeOtcModal);
+if (otcModal) {
+  otcModal.addEventListener('click', (e) => {
+    if (e.target === otcModal) closeOtcModal();
+  });
+}
+if (otcAddLineBtn) {
+  otcAddLineBtn.addEventListener('click', () => {
+    const otcMeds = medicines.filter(m => (m.drug_classification || '').toLowerCase() === 'otc' && m.qty > 0);
+    if (otcMeds.length === 0) {
+      showToast('No in-stock OTC medicines available.', 'warning');
+      return;
+    }
+    const usedIds = new Set(otcLineItems.map(it => it.medicineId));
+    const nextMed = otcMeds.find(m => !usedIds.has(m.id)) || otcMeds[0];
+    otcLineItems.push({ medicineId: nextMed.id, quantity: 1, instructions: '' });
+    renderOtcLineItems();
+  });
+}
+if (otcSubmitBtn) otcSubmitBtn.addEventListener('click', handleOtcDispenseSubmit);
+if (otcReceiptCloseBtn) {
+  otcReceiptCloseBtn.addEventListener('click', () => {
+    if (otcReceiptModal) {
+      otcReceiptModal.classList.add('hidden');
+      otcReceiptModal.style.display = 'none';
+    }
+  });
+}
+
+if (otcItemsContainer) {
+  otcItemsContainer.addEventListener('change', (e) => {
+    const idx = parseInt(e.target.dataset.index, 10);
+    if (isNaN(idx) || !otcLineItems[idx]) return;
+
+    if (e.target.classList.contains('otc-med-select')) {
+      otcLineItems[idx].medicineId = Number(e.target.value);
+      renderOtcLineItems();
+    } else if (e.target.classList.contains('otc-qty-input')) {
+      otcLineItems[idx].quantity = Math.max(1, parseInt(e.target.value, 10) || 1);
+      renderOtcLineItems();
+    } else if (e.target.classList.contains('otc-inst-input')) {
+      otcLineItems[idx].instructions = e.target.value;
+    }
+  });
+
+  otcItemsContainer.addEventListener('input', (e) => {
+    const idx = parseInt(e.target.dataset.index, 10);
+    if (isNaN(idx) || !otcLineItems[idx]) return;
+
+    if (e.target.classList.contains('otc-inst-input')) {
+      otcLineItems[idx].instructions = e.target.value;
+    } else if (e.target.classList.contains('otc-qty-input')) {
+      otcLineItems[idx].quantity = parseInt(e.target.value, 10) || 0;
+    }
+  });
+
+  otcItemsContainer.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.otc-remove-line-btn');
+    if (!removeBtn) return;
+    const idx = parseInt(removeBtn.dataset.index, 10);
+    if (!isNaN(idx) && otcLineItems[idx]) {
+      otcLineItems.splice(idx, 1);
+      renderOtcLineItems();
+    }
   });
 }
 

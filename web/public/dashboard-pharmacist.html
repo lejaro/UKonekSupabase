@@ -137,6 +137,9 @@
     .badge-red     { background: var(--ph-red-light);    color: #991b1b; }
     .badge-gray    { background: #f1f5f9; color: #475569; }
     .badge-blue    { background: var(--ph-blue-light);   color: #0c4a6e; }
+    .badge-otc     { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-rx      { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+    .ph-filter-btn.green.active { background: #16a34a; border-color: #16a34a; }
 
     /* Action buttons */
     .ph-btn {
@@ -154,8 +157,8 @@
     .ph-btn-delete { background: var(--ph-red-light); color: #991b1b; border: 1px solid #fecaca; }
 
     /* Add form inline panel */
-    .ph-add-form { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 12px; align-items: end; }
-    @media (max-width: 800px) { .ph-add-form { grid-template-columns: 1fr 1fr; } }
+    .ph-add-form { display: grid; grid-template-columns: 2fr 1.2fr 1fr 1fr 1.2fr auto; gap: 12px; align-items: end; }
+    @media (max-width: 900px) { .ph-add-form { grid-template-columns: 1fr 1fr; } }
     .ph-field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #475569; margin-bottom: 4px; }
     .ph-field input, .ph-field textarea, .ph-field select {
       width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 12px;
@@ -298,6 +301,10 @@
           <h2>Dispense Prescription</h2>
           <span>Look up a prescription by ID, verify details, then confirm dispensing to deduct stock</span>
         </div>
+        <button class="ph-btn ph-btn-primary" id="open-otc-dispense-btn" type="button" style="background:#0284c7;display:inline-flex;align-items:center;gap:6px;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+          Dispense OTC (Walk-in)
+        </button>
       </div>
       <div class="ph-panel-body">
         <!-- Lookup form -->
@@ -423,6 +430,13 @@
               <input id="add-name" type="text" placeholder="e.g., Amoxicillin" required />
             </div>
             <div class="ph-field">
+              <label for="add-classification">Classification</label>
+              <select id="add-classification">
+                <option value="rx">Prescription Only (Rx)</option>
+                <option value="otc">Over-The-Counter (OTC)</option>
+              </select>
+            </div>
+            <div class="ph-field">
               <label for="add-qty">Stock Qty *</label>
               <input id="add-qty" type="number" min="0" value="0" required />
             </div>
@@ -474,6 +488,7 @@
           </select>
           <div class="ph-filter-group">
             <button class="ph-filter-btn active" data-filter="all">All <span class="filter-count-badge" id="ph-count-all">0</span></button>
+            <button class="ph-filter-btn green" data-filter="otc">OTC Only <span class="filter-count-badge" id="ph-count-otc">0</span></button>
             <button class="ph-filter-btn amber" data-filter="low">Low Stock <span class="filter-count-badge" id="ph-count-low">0</span></button>
             <button class="ph-filter-btn red" data-filter="expired">Expired <span class="filter-count-badge" id="ph-count-expired">0</span></button>
             <button class="ph-filter-btn amber" data-filter="expiring">Expiring Soon <span class="filter-count-badge" id="ph-count-expiring">0</span></button>
@@ -519,9 +534,12 @@
       </p>
       
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-        <div style="margin-bottom: 10px;">
-          <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase;">Name</div>
-          <div style="font-size: 15px; font-weight: 700; color: #1e293b;" id="confirm-add-name">—</div>
+        <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase;">Name</div>
+            <div style="font-size: 15px; font-weight: 700; color: #1e293b;" id="confirm-add-name">—</div>
+          </div>
+          <div id="confirm-add-classification-badge"></div>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div>
@@ -551,6 +569,13 @@
         <div class="ph-field">
           <label>Medicine Name</label>
           <input id="edit-name-display" type="text" disabled style="background:#f8fafc;color:#64748b;" />
+        </div>
+        <div class="ph-field">
+          <label for="edit-classification">Classification</label>
+          <select id="edit-classification">
+            <option value="rx">Prescription Only (Rx)</option>
+            <option value="otc">Over-The-Counter (OTC)</option>
+          </select>
         </div>
         <div class="ph-field">
           <label for="edit-desc">Description</label>
@@ -603,13 +628,55 @@
       <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
         <div style="font-size: 11px; color: #15803d; font-weight: 700; text-transform: uppercase; margin-bottom: 8px;">Important Reminder</div>
         <div style="font-size: 13px; color: #166534; line-height: 1.5;">
-          This action will automatically deduct the prescribed quantities from your current inventory levels. This cannot be undone once confirmed.
+          This action will automatically deduct the dispensed quantities from your current inventory levels. Items with quantity 0 will not be deducted. This cannot be undone once confirmed.
         </div>
       </div>
 
       <div class="ph-modal-actions">
         <button type="button" class="ph-btn ph-btn-outline" id="dispense-modal-cancel-btn">Cancel</button>
         <button type="button" class="ph-btn ph-btn-primary" id="dispense-modal-confirm-btn" style="background: #16a34a;">Confirm & Dispense</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Return / Restock Modal -->
+  <div id="ph-return-modal" class="ph-modal-overlay hidden">
+    <div class="ph-modal-box" style="max-width: 440px;">
+      <h3 style="display: flex; align-items: center; gap: 8px; color: #dc2626; margin-bottom: 8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Return & Restock Medicine
+      </h3>
+      <p style="font-size: 13px; color: #64748b; margin-bottom: 16px;">
+        Return unneeded, cancelled, or refunded items directly back into the active medicine inventory.
+      </p>
+
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin-bottom: 14px;">
+        <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase;">Medicine</div>
+        <div style="font-size: 15px; font-weight: 700; color: #1e293b;" id="return-modal-med-name">—</div>
+        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Currently Dispensed: <strong id="return-modal-max-qty">0</strong> units</div>
+      </div>
+
+      <div class="ph-field" style="margin-bottom: 12px;">
+        <label for="return-modal-qty">Quantity to Restock *</label>
+        <input id="return-modal-qty" type="number" min="1" value="1" required style="width: 100%;" />
+      </div>
+
+      <div class="ph-field" style="margin-bottom: 20px;">
+        <label for="return-modal-reason">Return Reason *</label>
+        <select id="return-modal-reason" style="width: 100%; margin-bottom: 8px;">
+          <option value="Patient changed mind / refused">Patient changed mind / refused</option>
+          <option value="Doctor cancelled / changed prescription">Doctor cancelled / changed prescription</option>
+          <option value="Patient unable to pay">Patient unable to pay</option>
+          <option value="Adverse reaction or contraindication">Adverse reaction or contraindication</option>
+          <option value="Incorrect item dispensed">Incorrect item dispensed</option>
+          <option value="Other">Other reason</option>
+        </select>
+        <input id="return-modal-notes" type="text" placeholder="Additional details..." style="width: 100%;" />
+      </div>
+
+      <div class="ph-modal-actions">
+        <button type="button" class="ph-btn ph-btn-outline" id="return-modal-cancel-btn">Cancel</button>
+        <button type="button" class="ph-btn ph-btn-primary" id="return-modal-confirm-btn" style="background: #dc2626;">Confirm Return & Restock</button>
       </div>
     </div>
   </div>
@@ -645,6 +712,79 @@
       <div style="margin-top: 16px; font-size: 13px; color: #64748b; text-align: center;">
         Point your camera at the prescription QR code.
       </div>
+    </div>
+  <!-- OTC Dispense Modal -->
+  <div id="ph-otc-modal" class="ph-modal-overlay hidden">
+    <div class="ph-modal-box" style="max-width: 620px; text-align: left;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+        <div>
+          <h3 style="display: flex; align-items: center; gap: 8px; color: #0284c7; margin: 0 0 4px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+            Dispense Over-The-Counter (OTC)
+          </h3>
+          <span style="font-size: 13px; color: #64748b;">Directly dispense OTC medicines to walk-in patients without requiring a doctor's prescription.</span>
+        </div>
+        <button type="button" class="ph-btn-sm ph-btn-outline" id="otc-modal-close-icon" style="padding: 4px 8px; border-radius: 8px; font-size: 14px; cursor: pointer;">✕</button>
+      </div>
+
+      <!-- Patient Info Input -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+        <div class="ph-field" style="margin-bottom: 0;">
+          <label for="otc-patient-name" style="font-weight: 700; color: #334155; font-size: 11px; text-transform: uppercase;">Patient Name / Identifier</label>
+          <input id="otc-patient-name" type="text" value="Walk-in Patient" placeholder="e.g., Juan Dela Cruz or Walk-in Patient" style="background:#fff;" />
+        </div>
+      </div>
+
+      <!-- Items to dispense -->
+      <div style="margin-bottom: 16px;">
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <label style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase;">Medicines to Dispense</label>
+          <button type="button" id="otc-add-line-btn" class="ph-btn ph-btn-outline ph-btn-sm" style="color: #0284c7; border-color: #bae6fd;">
+            + Add Another Medicine
+          </button>
+        </div>
+        <div id="otc-items-container" style="display:flex; flex-direction:column; gap:10px; max-height: 240px; overflow-y: auto; padding-right: 4px;">
+          <!-- Populated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Optional Notes -->
+      <div class="ph-field" style="margin-bottom: 16px;">
+        <label for="otc-notes">Dispensing Notes (Optional)</label>
+        <input id="otc-notes" type="text" placeholder="e.g., Minor headache, advised 1 tablet every 6 hours" />
+      </div>
+
+      <div class="ph-modal-actions" style="justify-content: space-between; align-items: center;">
+        <span id="otc-summary-counter" style="font-size: 13px; color: #64748b; font-weight: 600;">0 items selected</span>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="ph-btn ph-btn-outline" id="otc-cancel-btn">Cancel</button>
+          <button type="button" class="ph-btn ph-btn-primary" id="otc-submit-btn" style="background: #0284c7; min-width: 140px;">
+            Confirm & Dispense
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OTC Success Receipt Modal -->
+  <div id="ph-otc-receipt-modal" class="ph-modal-overlay hidden">
+    <div class="ph-modal-box" style="max-width: 440px; text-align: center;">
+      <div style="width: 52px; height: 52px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; color: #16a34a;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <h3 style="color: #1e293b; margin-bottom: 4px; font-size: 18px;">OTC Dispense Confirmed</h3>
+      <p style="font-size: 13px; color: #64748b; margin-bottom: 16px;">
+        Stock has been deducted from inventory and logged.
+      </p>
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 18px; text-align: left;">
+        <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase;">Transaction Reference</div>
+        <div id="otc-receipt-ref" style="font-size: 18px; font-weight: 800; color: #0284c7; font-family: monospace; margin-bottom: 8px;">—</div>
+        <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase;">Patient</div>
+        <div id="otc-receipt-patient" style="font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 8px;">—</div>
+        <div style="font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase;">Dispensed Medicines</div>
+        <div id="otc-receipt-items" style="font-size: 13px; color: #334155; line-height: 1.4;">—</div>
+      </div>
+      <button type="button" class="ph-btn ph-btn-primary" id="otc-receipt-close-btn" style="width: 100%; justify-content: center;">Done</button>
     </div>
   </div>
 
