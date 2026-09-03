@@ -3960,6 +3960,92 @@ body.dashboard-loading {
     }
 }
 
+/* Dashboard Stat & Profile Skeleton Loaders */
+.stat-skeleton {
+    width: 52px;
+    height: 30px;
+    border-radius: 6px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.user-name-skeleton {
+    width: 64px;
+    height: 14px;
+    border-radius: 4px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.user-pos-skeleton {
+    width: 44px;
+    height: 11px;
+    border-radius: 3px;
+    display: inline-block;
+    vertical-align: middle;
+    margin-top: 2px;
+}
+
+.user-fullname-skeleton {
+    width: 120px;
+    height: 16px;
+    border-radius: 4px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.role-logo-skeleton {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-block;
+    border: none !important;
+}
+
+.title-skeleton {
+    width: 220px;
+    height: 26px;
+    border-radius: 6px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.breadcrumb-skeleton {
+    width: 150px;
+    height: 15px;
+    border-radius: 4px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.queue-count-skeleton {
+    width: 20px;
+    height: 16px;
+    border-radius: 4px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* Metric pop-in transition when data is loaded */
+@keyframes metric-load-fade {
+    0% {
+        opacity: 0.2;
+        transform: translateY(3px) scale(0.97);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.stat-value {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.stat-value.data-loaded {
+    animation: metric-load-fade 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Text & Title Placeholders */
 .skeleton-text {
     height: 12px;

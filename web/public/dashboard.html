@@ -634,8 +634,7 @@
           </div>
 
           <div class="nav-item dropdown full-access">
-            <button class="nav-btn" aria-label="Reports menu" title="Reports" data-section="reports-section"
-              data-tab="tab-announcements">
+            <button class="nav-btn" aria-label="Reports menu" title="Reports & Feedbacks" data-section="announcements-section">
               <span class="nav-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16l4-3 4 3 4-3 4 3V8z" />
@@ -646,8 +645,10 @@
               <span class="arrow">▾</span>
             </button>
             <div class="dropdown-menu hidden">
-              <a href="#" class="dropdown-item full-access" data-section="reports-section" data-tab="tab-announcements">Announcements</a>
-              <a href="#" class="dropdown-item full-access" data-section="reports-section" data-tab="tab-feedback">Feedbacks</a>
+              <a href="#" class="dropdown-item full-access" data-section="announcements-section">Announcements</a>
+              <a href="#" class="dropdown-item full-access" data-section="feedback-section">Feedback</a>
+              <a href="#" class="dropdown-item full-access" data-section="stats-section">Clinical Stats</a>
+              <a href="#" class="dropdown-item full-access" data-section="reports-section">System Reports</a>
             </div>
           </div>
 
@@ -672,7 +673,7 @@
           <div class="topbar-breadcrumbs">
             <span class="breadcrumb-root">AFM Roquero Medical Clinic</span>
             <span class="breadcrumb-sep">/</span>
-            <span class="breadcrumb-current" id="main-topbar-title">Doctor Systems Overview</span>
+            <span class="breadcrumb-current" id="main-topbar-title"><span class="skeleton-shimmer breadcrumb-skeleton"></span></span>
           </div>
         </div>
 
@@ -688,20 +689,20 @@
 
           <div class="user-profile-menu-container">
             <button id="user-profile-trigger" class="user-profile-chip" aria-haspopup="true" aria-expanded="false" title="User account options">
-              <div id="topbar-role-logo" class="role-logo role-logo-doctor" title="Doctor" aria-label="User role icon">D</div>
+              <div id="topbar-role-logo" class="role-logo role-logo-skeleton skeleton-shimmer" title="Loading..." aria-label="User role icon"></div>
               <div class="user-info">
-                <div class="user-name">User</div>
-                <div class="user-pos">Doctor</div>
+                <div class="user-name"><span class="skeleton-shimmer user-name-skeleton"></span></div>
+                <div class="user-pos"><span class="skeleton-shimmer user-pos-skeleton"></span></div>
               </div>
               <span class="profile-arrow" aria-hidden="true">▾</span>
             </button>
 
             <div id="user-profile-popover" class="user-profile-popover hidden" role="menu">
               <div class="popover-user-header">
-                <div class="popover-user-name user-name-full">Clinical Personnel</div>
+                <div class="popover-user-name user-name-full"><span class="skeleton-shimmer user-fullname-skeleton"></span></div>
                 <div class="popover-user-meta">
                   <span class="duty-badge"><span class="status-pulse-dot" style="width:6px;height:6px;margin-right:4px;"></span> On Duty</span>
-                  <span class="user-role-label user-pos">Doctor</span>
+                  <span class="user-role-label user-pos"><span class="skeleton-shimmer user-pos-skeleton"></span></span>
                 </div>
               </div>
               <div class="popover-divider"></div>
@@ -734,7 +735,7 @@
         <div class="dashboard-hero fade-in-up">
           <div>
             <p class="section-kicker">Operations Overview</p>
-            <h2 class="section-title" id="main-dashboard-title">Doctor Dashboard</h2>
+            <h2 class="section-title" id="main-dashboard-title"><span class="skeleton-shimmer title-skeleton"></span></h2>
             <p class="section-subtitle">Monitor registrations, manage staff access, and keep onboarding flowing smoothly.</p>
           </div>
           <div class="hero-actions">
@@ -755,7 +756,7 @@
               </span>
               <div>
                 <p class="stat-label">Total Staff</p>
-                <p id="stat-total-staff" class="stat-value">0</p>
+                <p id="stat-total-staff" class="stat-value"><span class="skeleton-shimmer stat-skeleton"></span></p>
               </div>
             </div>
             <p class="stat-foot">All onboarded personnel</p>
@@ -772,7 +773,7 @@
               </span>
               <div>
                 <p class="stat-label">Active Staff</p>
-                <p id="stat-active-staff" class="stat-value">0</p>
+                <p id="stat-active-staff" class="stat-value"><span class="skeleton-shimmer stat-skeleton"></span></p>
               </div>
             </div>
             <p class="stat-foot stat-success">Currently logged in</p>
@@ -790,7 +791,7 @@
               </span>
               <div>
                 <p class="stat-label">Doctors Onboarded</p>
-                <p id="stat-doctors" class="stat-value">0</p>
+                <p id="stat-doctors" class="stat-value"><span class="skeleton-shimmer stat-skeleton"></span></p>
               </div>
             </div>
             <p class="stat-foot">Licensed specialists</p>
@@ -808,7 +809,7 @@
               </span>
               <div>
                 <p class="stat-label">Announcements Sent</p>
-                <p id="stat-announcements" class="stat-value">0</p>
+                <p id="stat-announcements" class="stat-value"><span class="skeleton-shimmer stat-skeleton"></span></p>
               </div>
             </div>
             <p class="stat-foot">City-wide updates</p>
@@ -824,7 +825,7 @@
               </span>
               <div>
                 <p class="stat-label">Feedback Reports</p>
-                <p id="stat-reports" class="stat-value">0</p>
+                <p id="stat-reports" class="stat-value"><span class="skeleton-shimmer stat-skeleton"></span></p>
               </div>
             </div>
             <p class="stat-foot">Citizen responses</p>
@@ -842,7 +843,7 @@
               </span>
               <div>
                 <p class="stat-label">Registered Citizens</p>
-                <p id="stat-citizens" class="stat-value">0</p>
+                <p id="stat-citizens" class="stat-value"><span class="skeleton-shimmer stat-skeleton"></span></p>
               </div>
             </div>
             <p class="stat-foot">Resident accounts</p>
@@ -881,7 +882,11 @@
                   <th class="table-header-cell">Registered</th>
                 </tr>
               </thead>
-              <tbody id="dashboard-active-preview"></tbody>
+              <tbody id="dashboard-active-preview">
+                <tr class="skeleton-row"><td class="table-cell"><div class="skeleton-shimmer skeleton-text" style="width:70%;height:12px;margin:4px 0;border-radius:4px;"></div></td><td class="table-cell"><div class="skeleton-shimmer skeleton-text" style="width:50%;height:12px;margin:4px 0;border-radius:4px;"></div></td><td class="table-cell"><div class="skeleton-shimmer skeleton-text" style="width:60%;height:12px;margin:4px 0;border-radius:4px;"></div></td><td class="table-cell"><div class="skeleton-shimmer skeleton-text" style="width:40%;height:12px;margin:4px 0;border-radius:4px;"></div></td></tr>
+                <tr class="skeleton-row"><td class="table-cell"><div class="skeleton-shimmer skeleton-text" style="width:60%;height:12px;margin:4px 0;border-radius:4px;"></div></td><td class="table-cell"><div class="skeleton-shimmer skeleton-text" style="width:55%;height:12px;margin:4px 0;border-radius:4px;"></div></td><td class="table-cell"><div class="skeleton-shimmer skeleton-text" style="width:50%;height:12px;margin:4px 0;border-radius:4px;"></div></td><td class="table-cell"><div class="skeleton-shimmer skeleton-text" style="width:45%;height:12px;margin:4px 0;border-radius:4px;"></div></td></tr>
+                <tr class="skeleton-row"><td class="table-cell"><div class="skeleton-shimmer skeleton-text" style="width:75%;height:12px;margin:4px 0;border-radius:4px;"></div></td><td class="table-cell"><div class="skeleton-shimmer skeleton-text" style="width:45%;height:12px;margin:4px 0;border-radius:4px;"></div></td><td class="table-cell"><div class="skeleton-shimmer skeleton-text" style="width:65%;height:12px;margin:4px 0;border-radius:4px;"></div></td><td class="table-cell"><div class="skeleton-shimmer skeleton-text" style="width:50%;height:12px;margin:4px 0;border-radius:4px;"></div></td></tr>
+              </tbody>
             </table>
           </div>
         </div>
@@ -1213,24 +1218,19 @@
         </div>
       </section>
 
-      <section id="reports-section" class="section-top hidden full-access">
+      <!-- Announcements Section -->
+      <section id="announcements-section" class="section-top hidden full-access">
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>Reports</h3>
-              <span class="panel-hint">Announcements and feedback management.</span>
+              <h3>Announcements</h3>
+              <span class="panel-hint">Clinic public announcements, health bulletins, and citizen notices.</span>
             </div>
             <div class="management-actions">
-              <button id="reports-refresh-btn" class="chip-btn">Refresh</button>
+              <button id="announcements-refresh-btn" class="chip-btn">Refresh</button>
               <button id="announcement-csv-import-btn" class="chip-btn chip-btn-outline">Import CSV</button>
               <button id="create-announcement-topright" class="chip-btn">New Announcement</button>
             </div>
-          </div>
-          <div class="tabs">
-            <button id="tab-announcements" class="tab active">Announcements</button>
-            <button id="tab-feedback" class="tab">Feedback</button>
-            <button id="tab-stats" class="tab">Clinical Stats</button>
-            <button id="tab-exports" class="tab admin-only">CSV Exports</button>
           </div>
           <div id="announcements-pane">
             <div class="table-wrap">
@@ -1247,7 +1247,22 @@
               </table>
             </div>
           </div>
-          <div id="feedback-pane" class="hidden">
+        </div>
+      </section>
+
+      <!-- Feedback Section -->
+      <section id="feedback-section" class="section-top hidden full-access">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Feedback & Inquiries</h3>
+              <span class="panel-hint">Review patient service ratings, comments, and inquiries.</span>
+            </div>
+            <div class="management-actions">
+              <button id="feedback-refresh-btn" class="chip-btn">Refresh</button>
+            </div>
+          </div>
+          <div id="feedback-pane">
             <div class="table-wrap">
               <table class="accounts-table">
                 <thead>
@@ -1262,35 +1277,62 @@
               </table>
             </div>
           </div>
+        </div>
+      </section>
 
-          <div id="stats-pane" class="hidden">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
-              <div class="panel" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px;">
-                <h4 style="margin-bottom: 15px;">Top 5 Diagnoses</h4>
+      <!-- Clinical Stats Section -->
+      <section id="stats-section" class="section-top hidden full-access">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Clinical Statistics & Analytics</h3>
+              <span class="panel-hint">Top diagnoses, consultation volumes, and vital signs telemetry.</span>
+            </div>
+            <div class="management-actions">
+              <button id="stats-refresh-btn" class="chip-btn">Refresh Stats</button>
+            </div>
+          </div>
+          <div id="stats-pane">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 10px;">
+              <div class="panel" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px;">
+                <h4 style="margin-bottom: 15px; font-size: 15px; font-weight: 700; color: #1e293b;">Top 5 Diagnoses</h4>
                 <canvas id="diagnoses-chart"></canvas>
               </div>
-              <div class="panel" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px;">
-                <h4 style="margin-bottom: 15px;">Consultations (Daily)</h4>
+              <div class="panel" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px;">
+                <h4 style="margin-bottom: 15px; font-size: 15px; font-weight: 700; color: #1e293b;">Consultations (Daily - Last 7 Days)</h4>
                 <canvas id="consults-chart"></canvas>
               </div>
-              <div class="panel" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px;">
-                <h4 style="margin-bottom: 15px;">Vitals Overview</h4>
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                  <div class="stat-card" style="padding: 10px; background: white; border-radius: 8px;">
-                    <span style="font-size: 12px; color: #64748b;">Average Temperature</span>
-                    <div id="avg-temp" style="font-size: 20px; font-weight: 700; color: #1e293b;">—</div>
+              <div class="panel" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px;">
+                <h4 style="margin-bottom: 15px; font-size: 15px; font-weight: 700; color: #1e293b;">Vitals Overview</h4>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                  <div class="stat-card" style="padding: 14px; background: white; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <span style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Average Temperature</span>
+                    <div id="avg-temp" style="font-size: 24px; font-weight: 800; color: #1e293b; margin-top: 4px;"><span class="skeleton-shimmer stat-skeleton"></span></div>
                   </div>
-                  <div class="stat-card" style="padding: 10px; background: white; border-radius: 8px;">
-                    <span style="font-size: 12px; color: #64748b;">Hypertensive Patients</span>
-                    <div id="hypertension-count" style="font-size: 20px; font-weight: 700; color: #e11d48;">—</div>
+                  <div class="stat-card" style="padding: 14px; background: white; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <span style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Hypertensive Patients (BP ≥ 140/90)</span>
+                    <div id="hypertension-count" style="font-size: 24px; font-weight: 800; color: #e11d48; margin-top: 4px;"><span class="skeleton-shimmer stat-skeleton"></span></div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      </section>
 
-          <!-- CSV Exports Tab -->
-          <div id="exports-pane" class="hidden admin-only" style="padding:24px;">
+      <!-- System Reports Section -->
+      <section id="reports-section" class="section-top hidden full-access">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>System Reports & CSV Exports</h3>
+              <span class="panel-hint">Export system data within a specified time period and review staff authentication logs.</span>
+            </div>
+            <div class="management-actions">
+              <button id="reports-refresh-btn" class="chip-btn">Refresh</button>
+            </div>
+          </div>
+          <div id="exports-pane" style="padding:24px;">
             <h4 style="margin:0 0 8px 0;font-size:16px;color:#1e293b;">System Reports - CSV Export</h4>
             <p style="margin:0 0 24px 0;font-size:13px;color:#64748b;">Export system data within a specified time period. Leave dates empty to export all data.</p>
             
@@ -1633,7 +1675,7 @@
                   <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;flex-shrink:0;"></span>
                   <h4>Waiting</h4>
                 </div>
-                <span id="queue-waiting-count" class="queue-lane-count queue-lane-count--waiting">0</span>
+                <span id="queue-waiting-count" class="queue-lane-count queue-lane-count--waiting"><span class="skeleton-shimmer queue-count-skeleton"></span></span>
               </div>
               <div id="queue-waiting-list" class="queue-card-list" data-lane="waiting"></div>
             </div>
@@ -1643,7 +1685,7 @@
                   <span style="width:8px;height:8px;border-radius:50%;background:#8b5cf6;display:inline-block;flex-shrink:0;"></span>
                   <h4>On Call</h4>
                 </div>
-                <span id="queue-oncall-count" class="queue-lane-count queue-lane-count--oncall">0</span>
+                <span id="queue-oncall-count" class="queue-lane-count queue-lane-count--oncall"><span class="skeleton-shimmer queue-count-skeleton"></span></span>
               </div>
               <div id="queue-oncall-list" class="queue-card-list" data-lane="on_call"></div>
             </div>
@@ -1653,7 +1695,7 @@
                   <span style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block;flex-shrink:0;box-shadow:0 0 0 3px rgba(22,163,74,0.2);"></span>
                   <h4>Now Serving</h4>
                 </div>
-                <span id="queue-serving-count" class="queue-lane-count queue-lane-count--serving">0</span>
+                <span id="queue-serving-count" class="queue-lane-count queue-lane-count--serving"><span class="skeleton-shimmer queue-count-skeleton"></span></span>
               </div>
               <div id="queue-serving-list" class="queue-card-list" data-lane="serving"></div>
             </div>

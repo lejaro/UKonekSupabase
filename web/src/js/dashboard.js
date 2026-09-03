@@ -141,6 +141,9 @@ function renderTableSkeleton(tbody, columnCount, rowCount = 5) {
 /**
  * Render shimmery statistics placeholder inside text nodes.
  */
+/**
+ * Render shimmery statistics placeholder inside text nodes.
+ */
 function toggleStatsSkeleton(isLoading) {
   const statIds = [
     'stat-total-staff', 'stat-doctors', 'stat-active-staff',
@@ -150,17 +153,37 @@ function toggleStatsSkeleton(isLoading) {
     const el = document.getElementById(id);
     if (!el) return;
     if (isLoading) {
-      if (!el.dataset.originalText) {
-        el.dataset.originalText = el.textContent || '—';
-      }
-      el.innerHTML = `<span class="skeleton-shimmer" style="width: 50px; height: 28px; border-radius: 6px; display: inline-block;"></span>`;
-    } else {
-      if (el.dataset.originalText && el.querySelector('.skeleton-shimmer')) {
-        el.textContent = el.dataset.originalText;
-        delete el.dataset.originalText;
-      }
+      el.classList.remove('data-loaded');
+      el.innerHTML = '<span class="skeleton-shimmer stat-skeleton" aria-hidden="true"></span>';
     }
   });
+}
+
+/**
+ * Render shimmery user profile and breadcrumb placeholders during authentication / user load.
+ */
+function toggleUserSkeleton(isLoading) {
+  const nameNodes = document.querySelectorAll('.user-name');
+  const posNodes = document.querySelectorAll('.user-pos');
+  const fullNodes = document.querySelectorAll('.user-name-full');
+  const logoNode = document.getElementById('topbar-role-logo');
+
+  if (isLoading) {
+    nameNodes.forEach(node => {
+      node.innerHTML = '<span class="skeleton-shimmer user-name-skeleton" aria-hidden="true"></span>';
+    });
+    posNodes.forEach(node => {
+      node.innerHTML = '<span class="skeleton-shimmer user-pos-skeleton" aria-hidden="true"></span>';
+    });
+    fullNodes.forEach(node => {
+      node.innerHTML = '<span class="skeleton-shimmer user-fullname-skeleton" aria-hidden="true"></span>';
+    });
+    if (logoNode) {
+      logoNode.className = 'role-logo role-logo-skeleton skeleton-shimmer';
+      logoNode.textContent = '';
+      logoNode.title = 'Loading user...';
+    }
+  }
 }
 
 
@@ -758,6 +781,9 @@ function isFullAccessUser(user) {
 const SECTION_ROLE_RULES = {
   'dashboard-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
   'users-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
+  'announcements-section': ['admin', 'doctor', 'nurse'],
+  'feedback-section': ['admin', 'doctor', 'nurse'],
+  'stats-section': ['admin', 'doctor', 'nurse'],
   'reports-section': ['admin', 'doctor', 'nurse'],
   'medicine-section': ['doctor', 'nurse', 'pharmacist'],
   'consultation-section': ['doctor', 'nurse', 'pharmacist'],
@@ -1362,11 +1388,29 @@ async function showSection(sectionId, options = {}) {
         }
         renderDashboardInsights();
         break;
+      case 'announcements-section':
+        initReportsSection();
+        refreshAnnouncementsData();
+        break;
+      case 'feedback-section':
+        initReportsSection();
+        refreshFeedbackData();
+        break;
+      case 'stats-section':
+        renderClinicalStats();
+        break;
       case 'reports-section':
         initReportsSection();
-        const subTab = options.tab || 'tab-announcements';
+        const subTab = options.tab || '';
         if (subTab === 'tab-stats') {
-          renderClinicalStats();
+          navigateToSection('stats-section');
+          return;
+        } else if (subTab === 'tab-feedback') {
+          navigateToSection('feedback-section');
+          return;
+        } else if (subTab === 'tab-announcements') {
+          navigateToSection('announcements-section');
+          return;
         }
         break;
       case 'lab-section':
@@ -2796,6 +2840,14 @@ if (scheduleSuccessOkBtn) {
 
 async function initializeDashboard() {
   try {
+    // Show immediate skeleton animations across the dashboard while data is being fetched
+    toggleStatsSkeleton(true);
+    toggleUserSkeleton(true);
+    toggleChartSkeleton('dashboard-chart', true);
+    if (dashboardActivePreview) {
+      renderTableSkeleton(dashboardActivePreview, 4, 3);
+    }
+
     // Master init - parallelize independent data loads for faster startup
     await Promise.all([
       initProfileAndSchedule().catch(e => console.error('Profile init failed:', e)),
@@ -3402,7 +3454,10 @@ const SECTION_BREADCRUMBS = {
   'consultation-section': 'Consultation & Clinical Notes',
   'medicine-section': 'Pharmacy Inventory & Stock',
   'users-section': 'Personnel & Citizen Directory',
-  'reports-section': 'Analytics, Announcements & Feedbacks',
+  'announcements-section': 'Clinic Announcements',
+  'feedback-section': 'Patient & Citizen Feedback',
+  'stats-section': 'Clinical Statistics & Analytics',
+  'reports-section': 'System Reports & CSV Exports',
   'profile-section': 'Profile & Account Security'
 };
 
@@ -3424,7 +3479,17 @@ function navigateToSection(sectionId, options = {}) {
   if (targetSection) targetSection.classList.remove('hidden');
   showSection(allowedTarget, options);
   const navMatch = document.querySelector(`.nav [data-section="${allowedTarget}"]`);
-  if (navMatch) navMatch.classList.add('is-active');
+  if (navMatch) {
+    navMatch.classList.add('is-active');
+    const parentDropdown = navMatch.closest('.nav-item.dropdown');
+    if (parentDropdown) {
+      parentDropdown.classList.add('open');
+      const menu = parentDropdown.querySelector('.dropdown-menu');
+      if (menu) menu.classList.remove('hidden');
+      const parentBtn = parentDropdown.querySelector('.nav-btn');
+      if (parentBtn) parentBtn.classList.add('is-active');
+    }
+  }
   setSectionHash(allowedTarget);
 
   const topbarTitleNode = document.getElementById('main-topbar-title');
@@ -3496,6 +3561,22 @@ if (tabFeedback && tabAnnouncements && feedbackPane && announcementsPane) {
     });
   }
 }
+
+// Section refresh buttons
+document.getElementById('announcements-refresh-btn')?.addEventListener('click', async () => {
+  await refreshAnnouncementsData();
+  showToast('Announcements refreshed.', 'info');
+});
+
+document.getElementById('feedback-refresh-btn')?.addEventListener('click', async () => {
+  await refreshFeedbackData();
+  showToast('Feedback data refreshed.', 'info');
+});
+
+document.getElementById('stats-refresh-btn')?.addEventListener('click', async () => {
+  await renderClinicalStats();
+  showToast('Clinical stats refreshed.', 'info');
+});
 
 // Reports refresh button
 const reportsRefreshBtn = document.getElementById('reports-refresh-btn');
@@ -4473,26 +4554,26 @@ function handleAutoLogoutOnClose() {
 }
 
 function renderDashboardInsights() {
-  // Dismiss skeletons once data is ready to render
-  toggleStatsSkeleton(false);
-  toggleChartSkeleton('dashboard-chart', false);
+  const updateMetric = (el, val) => {
+    if (!el) return;
+    el.textContent = String(val);
+    el.classList.remove('data-loaded');
+    void el.offsetWidth; // Trigger reflow for smooth re-animation
+    el.classList.add('data-loaded');
+  };
 
-  if (statTotalStaff) statTotalStaff.textContent = String(latestStaffList.length);
-
-  const announcementsCount = latestAnnouncementsList.length || 0;
-  if (statAnnouncements) statAnnouncements.textContent = String(announcementsCount);
-
-  const feedbackCount = latestFeedbackList.length || 0;
-  if (statReports) statReports.textContent = String(feedbackCount);
-
-  // Citizens count
-  if (statPatients) statPatients.textContent = String(latestPatientsList.length || 0);
+  updateMetric(statTotalStaff, latestStaffList.length);
+  updateMetric(statAnnouncements, latestAnnouncementsList.length || 0);
+  updateMetric(statReports, latestFeedbackList.length || 0);
+  updateMetric(statPatients, latestPatientsList.length || 0);
 
   const doctorsCount = latestStaffList.filter((user) => isDoctorRole(user?.role)).length;
-  if (statDoctors) statDoctors.textContent = String(doctorsCount);
+  updateMetric(statDoctors, doctorsCount);
 
   const activeCount = latestStaffList.filter(isCurrentlyLoggedInStaffAccount).length;
-  if (statActiveStaff) statActiveStaff.textContent = String(activeCount);
+  updateMetric(statActiveStaff, activeCount);
+
+  toggleChartSkeleton('dashboard-chart', false);
 
   if (dashboardActivePreview) {
     const rows = latestStaffList.slice(0, 5);
@@ -4767,6 +4848,7 @@ async function loadPatientData() {
   });
 
     applyCitizensFinder();
+    renderDashboardInsights();
 }
 
 // --- Vitals Assessment (QR Scanning & Recording) ---
@@ -5369,6 +5451,10 @@ let consultsChart = null;
 async function renderClinicalStats() {
   toggleChartSkeleton('diagnoses-chart', true);
   toggleChartSkeleton('consults-chart', true);
+  const avgTempEl = document.getElementById('avg-temp');
+  const hyperEl = document.getElementById('hypertension-count');
+  if (avgTempEl) avgTempEl.innerHTML = '<span class="skeleton-shimmer stat-skeleton" aria-hidden="true"></span>';
+  if (hyperEl) hyperEl.innerHTML = '<span class="skeleton-shimmer stat-skeleton" aria-hidden="true"></span>';
   try {
     const { supabase } = await loadSupabaseModule();
     
@@ -5522,6 +5608,9 @@ if (dashRefreshBtn) {
     if (manualRefreshInFlight) return;
     manualRefreshInFlight = true;
     try {
+      toggleStatsSkeleton(true);
+      toggleChartSkeleton('dashboard-chart', true);
+      if (dashboardActivePreview) renderTableSkeleton(dashboardActivePreview, 4, 3);
       storedAccounts.clear();
       await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData(), refreshFeedbackData()]);
       showToast('Dashboard data refreshed.', 'info');
@@ -9238,6 +9327,14 @@ const appointments = (() => {
     if (document.querySelector('.queue-ticket-card.dragging')) return;
 
     state.loading = true;
+    const waitCountEl = document.getElementById('queue-waiting-count');
+    const oncallCountEl = document.getElementById('queue-oncall-count');
+    const serveCountEl = document.getElementById('queue-serving-count');
+    if (!state.tickets || state.tickets.length === 0) {
+      if (waitCountEl) waitCountEl.innerHTML = '<span class="skeleton-shimmer queue-count-skeleton"></span>';
+      if (oncallCountEl) oncallCountEl.innerHTML = '<span class="skeleton-shimmer queue-count-skeleton"></span>';
+      if (serveCountEl) serveCountEl.innerHTML = '<span class="skeleton-shimmer queue-count-skeleton"></span>';
+    }
     try {
       const { supabase } = await loadSupabaseModule();
       
@@ -9290,7 +9387,12 @@ const appointments = (() => {
 
     const updateText = (id, val) => {
       const el = document.getElementById(id);
-      if (el) el.textContent = val;
+      if (el) {
+        el.textContent = val;
+        el.classList.remove('data-loaded');
+        void el.offsetWidth;
+        el.classList.add('data-loaded');
+      }
     };
 
     updateText('queue-waiting-count', lanes.waiting.length);
@@ -9395,9 +9497,26 @@ const appointments = (() => {
       try {
         const { supabase } = await loadSupabaseModule();
         if (action === 'move') {
-          await supabase.from('queue_tickets').update({ status: lane }).eq('id', id);
+          const ticket = state.tickets.find(t => String(t.id) === String(id));
+          if (ticket) {
+            const { data, error } = await supabase.from('queue_tickets')
+              .update({ status: lane })
+              .eq('id', id)
+              .eq('status', ticket.status)
+              .select();
+            if (!error && (!data || data.length === 0)) {
+              alert('This ticket was already processed by another staff member.');
+            }
+          }
         } else if (action === 'complete') {
-          await supabase.from('queue_tickets').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', id);
+          const ticket = state.tickets.find(t => String(t.id) === String(id));
+          if (ticket) {
+            await supabase.from('queue_tickets')
+              .update({ status: 'completed', completed_at: new Date().toISOString() })
+              .eq('id', id)
+              .eq('status', ticket.status);
+          }
+
         } else if (action === 'vital') {
           const ticket = state.tickets.find(t => String(t.id) === String(id));
           if (ticket) {
