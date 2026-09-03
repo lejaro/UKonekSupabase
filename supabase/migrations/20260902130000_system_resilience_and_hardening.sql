@@ -308,9 +308,10 @@ $$;
 
 -- ── 6. Hardened OTC Dispensing RPC with Expiration Safety ─────────────────────
 create or replace function public.dispense_otc_medicines(
-  p_citizen_id bigint default null,
-  p_patient_name text default null,
   p_items jsonb default '[]'::jsonb,
+  p_citizen_id bigint default null,
+  p_walkin_name text default null,
+  p_patient_name text default null,
   p_notes text default null
 )
 returns json
@@ -360,7 +361,7 @@ begin
   ) values (
     v_ref_no,
     p_citizen_id,
-    trim(coalesce(nullif(p_patient_name, ''), 'Walk-in Patient')),
+    trim(coalesce(nullif(p_patient_name, ''), nullif(p_walkin_name, ''), 'Walk-in Patient')),
     v_staff_id,
     now(),
     p_notes

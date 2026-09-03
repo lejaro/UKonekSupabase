@@ -170,18 +170,23 @@ function toggleUserSkeleton(isLoading) {
 
   if (isLoading) {
     nameNodes.forEach(node => {
-      node.innerHTML = '<span class="skeleton-shimmer user-name-skeleton" aria-hidden="true"></span>';
+      if (!node.querySelector('.skeleton-shimmer')) {
+        node.innerHTML = '<span class="skeleton-shimmer user-name-skeleton" aria-hidden="true"></span>';
+      }
     });
     posNodes.forEach(node => {
-      node.innerHTML = '<span class="skeleton-shimmer user-pos-skeleton" aria-hidden="true"></span>';
+      if (!node.querySelector('.skeleton-shimmer')) {
+        node.innerHTML = '<span class="skeleton-shimmer user-pos-skeleton" aria-hidden="true"></span>';
+      }
     });
     fullNodes.forEach(node => {
-      node.innerHTML = '<span class="skeleton-shimmer user-fullname-skeleton" aria-hidden="true"></span>';
+      if (!node.querySelector('.skeleton-shimmer')) {
+        node.innerHTML = '<span class="skeleton-shimmer user-fullname-skeleton" aria-hidden="true"></span>';
+      }
     });
+  } else {
     if (logoNode) {
-      logoNode.className = 'role-logo role-logo-skeleton skeleton-shimmer';
-      logoNode.textContent = '';
-      logoNode.title = 'Loading user...';
+      logoNode.classList.remove('role-logo-skeleton', 'skeleton-shimmer');
     }
   }
 }
@@ -940,7 +945,9 @@ function applyRoleLogos(roleValue) {
     'role-logo-pharmacist',
     'role-logo-staff',
     'role-logo-citizen',
-    'role-logo-default'
+    'role-logo-default',
+    'role-logo-skeleton',
+    'skeleton-shimmer'
   ];
 
   targets.forEach((node) => {
@@ -1027,6 +1034,7 @@ function applyRoleAccess(user) {
   syncRoleNavigationAccess(role);
 
   sessionUserRole = role || sessionUserRole;
+  toggleUserSkeleton(false);
 
   const userNameNodes = document.querySelectorAll('.user-name');
   userNameNodes.forEach(node => {

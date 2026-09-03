@@ -1459,12 +1459,16 @@ if (csvImportBtn && window.openCsvImport) {
 
 // ── OTC Dispensing Logic ──────────────────────────────────────────────────────
 
-function openOtcModal() {
+async function openOtcModal() {
   if (!otcModal) return;
   if (otcPatientNameInp) otcPatientNameInp.value = 'Walk-in Patient';
   if (otcNotesInp) otcNotesInp.value = '';
 
-  const otcMeds = medicines.filter(m => (m.drug_classification || '').toLowerCase() === 'otc' && m.qty > 0);
+  if (!Array.isArray(medicines) || medicines.length === 0) {
+    await loadMedicines();
+  }
+
+  const otcMeds = medicines.filter(m => (m.drug_classification || '').toLowerCase() === 'otc' && Number(m.qty) > 0);
   if (otcMeds.length === 0) {
     showToast('No Over-The-Counter (OTC) medicines with available stock found.', 'warning');
     return;
@@ -1588,9 +1592,10 @@ async function handleOtcDispenseSubmit() {
   try {
     const sb = await getSupabase();
     const { data, error } = await sb.rpc('dispense_otc_medicines', {
-      p_citizen_id: null,
-      p_patient_name: patientName,
       p_items: payloadItems,
+      p_citizen_id: null,
+      p_walkin_name: patientName,
+      p_patient_name: patientName,
       p_notes: notes
     });
 
