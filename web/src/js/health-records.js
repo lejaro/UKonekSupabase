@@ -2,11 +2,12 @@
 // Dynamically fetches and displays patient data from Consultations, Vitals, and Prescriptions
 
 function formatPhysicalExam(physicalExam) {
-  if (!physicalExam) return '—';
+  if (!physicalExam) return 'None';
   
   let examObj = physicalExam;
   if (typeof physicalExam === 'string') {
     const trimmed = physicalExam.trim();
+    if (!trimmed || trimmed === '—' || trimmed === '-' || trimmed === 'null' || trimmed === 'None') return 'None';
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       try {
         examObj = JSON.parse(trimmed);
@@ -32,38 +33,80 @@ function formatPhysicalExam(physicalExam) {
     
     const lines = [];
     for (const [key, value] of Object.entries(examObj)) {
-      if (value && String(value).trim() !== '') {
+      const vStr = String(value || '').trim();
+      if (vStr !== '' && vStr !== '—' && vStr !== 'null') {
         const label = keyLabels[key.toLowerCase()] || (key.charAt(0).toUpperCase() + key.slice(1));
-        lines.push(`${label}: ${String(value).trim()}`);
+        lines.push(`${label}: ${vStr}`);
       }
     }
     
-    return lines.length > 0 ? lines.join('\n') : '—';
+    return lines.length > 0 ? lines.join('\n') : 'None';
   }
   
   return String(physicalExam);
 }
 
+function cleanNone(val) {
+  const s = String(val || '').trim();
+  return (!s || s === '—' || s === '-' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') ? 'None' : s;
+}
+
 // Helper function to show detailed record information
 function showDataDetail(title, details) {
+  const items = Object.entries(details || {}).map(([key, value]) => ({
+    label: key,
+    value: value
+  }));
+
+  const tLower = (title || '').toLowerCase();
+  let tag = 'Clinical Record';
+  if (tLower.includes('consultation')) tag = 'Consultation Details';
+  else if (tLower.includes('vital')) tag = 'Vital Signs Assessment';
+  else if (tLower.includes('prescription')) tag = 'Prescription Details';
+  else if (tLower.includes('lab')) tag = 'Laboratory Order';
+
+  const openFn = (typeof window !== 'undefined' && typeof window.openDataDetail === 'function')
+    ? window.openDataDetail
+    : (typeof openDataDetail === 'function' ? openDataDetail : null);
+
+  if (openFn) {
+    openFn({
+      title: title || 'Clinical Record',
+      tag: tag,
+      items: items
+    });
+    return;
+  }
+
   const modal = document.getElementById('data-detail-modal');
   const titleEl = document.getElementById('data-detail-title');
+  const cardsEl = document.getElementById('data-detail-cards');
   const listEl = document.getElementById('data-detail-list');
   const dismissBtn = document.getElementById('data-detail-dismiss');
 
-  if (!modal || !titleEl || !listEl) return;
+  if (!modal) return;
+  if (titleEl) titleEl.textContent = title || 'Record Details';
 
-  titleEl.textContent = title;
-  listEl.innerHTML = Object.entries(details).map(([key, value]) => `
-    <dt style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;margin:0;">${key}</dt>
-    <dd style="font-size:14px;color:#1e293b;margin:0;white-space:pre-wrap;">${value}</dd>
-  `).join('');
+  if (cardsEl) {
+    cardsEl.innerHTML = items.map(it => `
+      <div class="data-detail-card ${String(it.value).length > 35 ? 'full-span' : ''}">
+        <div class="data-detail-label">${it.label}</div>
+        <div class="data-detail-value-wrapper">
+          <span class="data-detail-value">${it.value}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+  if (listEl) {
+    listEl.innerHTML = items.map(it => `<dt>${it.label}</dt><dd>${it.value}</dd>`).join('');
+  }
 
   modal.classList.remove('hidden');
+  if (dismissBtn) dismissBtn.onclick = () => modal.classList.add('hidden');
+}
 
-  if (dismissBtn) {
-    dismissBtn.onclick = () => modal.classList.add('hidden');
-  }
+if (typeof window !== 'undefined') {
+  window.showDataDetail = showDataDetail;
 }
 
 function buildStaffLookup(staffRows) {
@@ -317,16 +360,16 @@ function renderConsultationsTab(rows, error, staffLookup) {
       
       tr.addEventListener('click', () => {
         const details = {
-          'Consultation Date': date ? date.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' }) : '—',
-          'Attending Doctor': doctor,
+          'Consultation Date': date ? date.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' }) : 'None',
+          'Attending Doctor': doctor || 'None',
           'Status': status.toUpperCase(),
-          'Chief Complaint / Symptoms': r.chief_complaint || r.symptoms || '—',
-          'Diagnosis': r.diagnosis || '—',
-          'History of Present Illness (HPI)': r.hpi || '—',
-          'Past Medical History (PMH)': r.pmh || '—',
-          'Allergies': r.allergies || '—',
+          'Chief Complaint / Symptoms': cleanNone(r.chief_complaint || r.symptoms),
+          'Diagnosis': cleanNone(r.diagnosis),
+          'History of Present Illness (HPI)': cleanNone(r.hpi),
+          'Past Medical History (PMH)': cleanNone(r.pmh),
+          'Allergies': cleanNone(r.allergies),
           'Physical Examination': formatPhysicalExam(r.physical_exam),
-          'Clinical Notes / Plan': r.notes || '—'
+          'Clinical Notes / Plan': cleanNone(r.notes)
         };
         showDataDetail('Consultation Record', details);
       });

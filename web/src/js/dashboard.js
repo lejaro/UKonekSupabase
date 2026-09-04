@@ -27,11 +27,12 @@ let manualRefreshInFlight = false;
 const DASHBOARD_REQUEST_TIMEOUT_MS = 15000;
 
 function formatPhysicalExam(physicalExam) {
-  if (!physicalExam) return '—';
+  if (!physicalExam) return 'None';
   
   let examObj = physicalExam;
   if (typeof physicalExam === 'string') {
     const trimmed = physicalExam.trim();
+    if (!trimmed || trimmed === '—' || trimmed === '-' || trimmed === 'null' || trimmed === 'None') return 'None';
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       try {
         examObj = JSON.parse(trimmed);
@@ -57,16 +58,22 @@ function formatPhysicalExam(physicalExam) {
     
     const lines = [];
     for (const [key, value] of Object.entries(examObj)) {
-      if (value && String(value).trim() !== '') {
+      const vStr = String(value || '').trim();
+      if (vStr !== '' && vStr !== '—' && vStr !== 'null') {
         const label = keyLabels[key.toLowerCase()] || (key.charAt(0).toUpperCase() + key.slice(1));
-        lines.push(`${label}: ${String(value).trim()}`);
+        lines.push(`${label}: ${vStr}`);
       }
     }
     
-    return lines.length > 0 ? lines.join('\n') : '—';
+    return lines.length > 0 ? lines.join('\n') : 'None';
   }
   
   return String(physicalExam);
+}
+
+function cleanNone(val) {
+  const s = String(val || '').trim();
+  return (!s || s === '—' || s === '-' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') ? 'None' : s;
 }
 
 function withTimeout(promise, timeoutMs, timeoutMessage) {
@@ -87,20 +94,16 @@ function dismissPagePreloader() {
   pagePreloaderDismissed = true;
   if (pagePreloader) {
     pagePreloader.classList.add('hidden');
+    pagePreloader.style.display = 'none';
   }
   document.body.classList.remove('dashboard-loading');
 }
 
-// Dismiss preloader shortly after the page finishes loading
-if (document.readyState === 'complete') {
-  setTimeout(dismissPagePreloader, 500);
-} else {
-  window.addEventListener('load', () => {
-    setTimeout(dismissPagePreloader, 500);
-  });
+// Dismiss preloader immediately so UI and skeleton shimmers are instantly visible
+dismissPagePreloader();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', dismissPagePreloader);
 }
-// Failsafe: always dismiss after 5 seconds even if window.load never fires
-setTimeout(dismissPagePreloader, 5000);
 
 /**
  * Flicker-free DOM swap: builds new content into a DocumentFragment off-screen,
@@ -146,8 +149,8 @@ function renderTableSkeleton(tbody, columnCount, rowCount = 5) {
  */
 function toggleStatsSkeleton(isLoading) {
   const statIds = [
-    'stat-total-staff', 'stat-doctors', 'stat-active-staff',
-    'stat-announcements', 'stat-reports', 'stat-citizens'
+    'stat-queue-waiting', 'stat-consults-today', 'stat-vitals-today',
+    'stat-dispenses-today', 'stat-citizens', 'stat-active-staff'
   ];
   statIds.forEach(id => {
     const el = document.getElementById(id);
@@ -1076,7 +1079,7 @@ function applyRoleAccess(user) {
   // Other roles (pharmacist, etc.)
   const registeredPane = document.getElementById('registered-pane');
   const patientsPane = document.getElementById('citizens-pane');
-  const usersNavBtn = document.querySelector('.nav-btn[data-section="users-section"]');
+  const usersNavBtn = document.querySelector('[data-section="users-section"]');
 
   if (registeredPane) registeredPane.classList.add('hidden');
   if (patientsPane) patientsPane.classList.remove('hidden');
@@ -1387,6 +1390,9 @@ async function showSection(sectionId, options = {}) {
         if (user) populateProfile(user);
         break;
       case 'medicine-section':
+        initMedicineSection();
+        initClinicalData();
+        break;
       case 'consultation-section':
         initClinicalData();
         break;
@@ -1435,16 +1441,19 @@ async function showSection(sectionId, options = {}) {
       case 'consultation-section':
         initClinicalData();
         initConsultationTabs();
+        initConsultationToolbar();
         break;
       // Add more as needed
     }
     const { tab, pane } = options;
 
     if (sectionId === 'users-section') {
+      initUsersSectionTabs();
+      updateUsersSectionTelemetry();
       const defaultPane = isAdminUser(user) ? 'registered-pane' : 'citizens-pane';
       const targetPane = pane || defaultPane;
 
-      if (isAdminUser(user) && latestStaffList.length === 0) {
+      if (latestStaffList.length === 0) {
         await loadStaffData();
       }
 
@@ -1460,6 +1469,7 @@ async function showSection(sectionId, options = {}) {
         toggleUsersPane('accounts-pane');
         revealPane(targetPane);
       }
+      updateUsersSectionTelemetry();
     } else if (pane) {
       revealPane(pane);
     }
@@ -2081,7 +2091,6 @@ function hasScheduleConflict({ doctorStaffId, scheduleDate, startTime, endTime, 
     if (excludeId && String(entry?.id || '') === String(excludeId)) return false;
     if (String(entry?.doctor_staff_id || '') !== targetDoctor) return false;
     if (String(entry?.schedule_date || '') !== targetDate) return false;
-
     const existingStart = toMinutes(entry?.start_time || '');
     const existingEnd = toMinutes(entry?.end_time || '');
     if (!Number.isFinite(existingStart) || !Number.isFinite(existingEnd)) return false;
@@ -2090,11 +2099,17 @@ function hasScheduleConflict({ doctorStaffId, scheduleDate, startTime, endTime, 
   });
 }
 
-function renderScheduleDoctors(staffList, user) {
-  const doctorTbody = document.getElementById('schedule-doctors-tbody');
-  const nurseTbody = document.getElementById('schedule-nurses-tbody');
-  if (!doctorTbody || !nurseTbody) return;
+function getStaffInitials(name) {
+  if (!name) return 'MD';
+  const clean = name.replace(/^Dr\.\s*/i, '').trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'MD';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
+function updateRosterSummaryCounters(staffList = cachedScheduleStaff) {
+  if (!Array.isArray(staffList)) return;
   const doctors = staffList.filter((s) => {
     const r = String(s?.role || '').toLowerCase();
     return r === 'doctor' || r === 'specialist';
@@ -2104,65 +2119,168 @@ function renderScheduleDoctors(staffList, user) {
     return r === 'nurse' || r === 'staff';
   });
 
-  const buildRows = (list, emptyMsg) => (fragment) => {
+  const getStatus = (s) => normalizeAvailabilityStatus(s?.availability_status || s?.availabilityStatus);
+
+  const availCount = staffList.filter((s) => getStatus(s) === 'available').length;
+  const breakCount = staffList.filter((s) => getStatus(s) === 'on_break').length;
+  const offCount = staffList.filter((s) => getStatus(s) === 'unavailable').length;
+  const docAvail = doctors.filter((d) => getStatus(d) === 'available').length;
+  const nurseAvail = nurses.filter((n) => getStatus(n) === 'available').length;
+
+  const setEl = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = String(val);
+  };
+
+  setEl('summary-avail-count', availCount);
+  setEl('summary-break-count', breakCount);
+  setEl('summary-off-count', offCount);
+  setEl('summary-total-count', staffList.length);
+
+  const docBadge = document.getElementById('doctors-count-badge');
+  if (docBadge) {
+    docBadge.textContent = `${docAvail} of ${doctors.length} on duty`;
+    docBadge.className = `dept-count-badge ${docAvail > 0 ? 'has-active' : ''}`;
+  }
+
+  const nurseBadge = document.getElementById('nurses-count-badge');
+  if (nurseBadge) {
+    nurseBadge.textContent = `${nurseAvail} of ${nurses.length} on duty`;
+    nurseBadge.className = `dept-count-badge ${nurseAvail > 0 ? 'has-active' : ''}`;
+  }
+}
+
+function renderCardsSkeleton(container, count = 2) {
+  if (!container) return;
+  container.innerHTML = Array.from({ length: count }).map(() => `
+    <div class="staff-station-card skeleton-row" style="min-height:130px; pointer-events:none;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="skeleton-shimmer" style="width:44px; height:44px; border-radius:50%;"></div>
+          <div>
+            <div class="skeleton-shimmer" style="width:130px; height:15px; border-radius:4px; margin-bottom:6px;"></div>
+            <div class="skeleton-shimmer" style="width:170px; height:12px; border-radius:4px;"></div>
+          </div>
+        </div>
+        <div class="skeleton-shimmer" style="width:80px; height:24px; border-radius:9999px;"></div>
+      </div>
+      <div class="skeleton-shimmer" style="width:100%; height:34px; border-radius:10px; margin-top:10px;"></div>
+    </div>
+  `).join('');
+}
+
+function renderScheduleDoctors(staffList, user) {
+  const doctorGrid = document.getElementById('schedule-doctors-grid') || document.getElementById('schedule-doctors-tbody');
+  const nurseGrid = document.getElementById('schedule-nurses-grid') || document.getElementById('schedule-nurses-tbody');
+  if (!doctorGrid || !nurseGrid) return;
+
+  const doctors = (staffList || []).filter((s) => {
+    const r = String(s?.role || '').toLowerCase();
+    return r === 'doctor' || r === 'specialist';
+  });
+  const nurses = (staffList || []).filter((s) => {
+    const r = String(s?.role || '').toLowerCase();
+    return r === 'nurse' || r === 'staff';
+  });
+
+  updateRosterSummaryCounters(staffList);
+
+  const buildCards = (list, isDoctor, emptyMsg) => (fragment) => {
     if (!list.length) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td class="table-cell" colspan="4">${emptyMsg}</td>`;
-      fragment.appendChild(tr);
+      const emptyDiv = document.createElement('div');
+      emptyDiv.style.cssText = 'grid-column: 1 / -1; padding: 28px; text-align: center; color: #94a3b8; font-size: 13.5px; background: #f8fafc; border-radius: 12px; border: 1px dashed #cbd5e1;';
+      emptyDiv.textContent = emptyMsg;
+      fragment.appendChild(emptyDiv);
       return;
     }
+
     list.forEach((staff) => {
-      const tr = document.createElement('tr');
-      const statusText = getAvailabilityStatusText(staff);
-      const statusClass = getAvailabilityBadgeClass(staff);
+      const displayName = getDoctorDisplayName(staff);
+      const email = staff.email || '—';
       const availabilityStatus = normalizeAvailabilityStatus(
         staff?.availability_status || staff?.availabilityStatus
       );
-      tr.innerHTML = `
-        <td class="table-cell">${getDoctorDisplayName(staff)}</td>
-        <td class="table-cell">${staff.email || '—'}</td>
-        <td class="table-cell"><span class="${statusClass}">${statusText}</span></td>
-        <td class="table-cell"></td>
-      `;
-
-      const actionsCell = tr.querySelector('td:last-child');
-      if (!actionsCell) return;
-
-      const canEditAvailability = user && (
-        String(staff.id) === String(user.id) || 
+      const isSelf = user && (
+        String(staff.id) === String(user.id) ||
         (staff.email && user.email && String(staff.email).toLowerCase() === String(user.email).toLowerCase())
       );
-      const toggleGroup = document.createElement('div');
-      toggleGroup.className = 'availability-toggle-group';
-      toggleGroup.dataset.staffId = String(staff.id || '');
+      const canEditAvailability = isSelf || isAdminUser(user);
 
-      const options = [
-        { value: 'available', label: 'Available', className: 'availability-available' },
-        { value: 'on_break', label: 'On Break', className: 'availability-break' },
-        { value: 'unavailable', label: 'Unavailable', className: 'availability-unavailable' }
-      ];
+      const card = document.createElement('div');
+      card.className = `staff-station-card card-${availabilityStatus} ${isSelf ? 'card-is-self' : ''}`;
+      card.dataset.staffId = String(staff.id || '');
 
-      options.forEach((option) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `chip-btn chip-btn-outline availability-toggle ${option.className}`;
-        btn.textContent = option.label;
-        btn.dataset.status = option.value;
-        btn.disabled = !canEditAvailability;
-        if (availabilityStatus === option.value) {
-          btn.classList.add('is-active');
-        }
-        btn.addEventListener('click', () => handleAvailabilityToggle(staff, option.value, toggleGroup));
-        toggleGroup.appendChild(btn);
-      });
+      const avatarClass = isDoctor ? 'doctor-avatar' : 'nurse-avatar';
+      const initials = getStaffInitials(displayName);
+      const statusLabel = AVAILABILITY_LABELS[availabilityStatus] || (availabilityStatus === 'on_break' ? 'On Break' : 'Off Duty');
 
-      actionsCell.appendChild(toggleGroup);
-      fragment.appendChild(tr);
+      let actionsHtml = '';
+      if (canEditAvailability) {
+        actionsHtml = `
+          <div class="staff-card-actions">
+            <span class="staff-card-actions-label">${isSelf ? 'Your Shift Control' : 'Shift Control (Admin)'}</span>
+            <div class="availability-segmented-control" data-staff-id="${staff.id}">
+              <button type="button" class="availability-segmented-btn btn-available ${availabilityStatus === 'available' ? 'is-active' : ''}" data-status="available">
+                <span class="pill-dot" style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;"></span> Available
+              </button>
+              <button type="button" class="availability-segmented-btn btn-break ${availabilityStatus === 'on_break' ? 'is-active' : ''}" data-status="on_break">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 2v2m4-2v2m4-2v2"/><path d="M2 8h16v8a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><path d="M18 10h2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-2"/></svg> Break
+              </button>
+              <button type="button" class="availability-segmented-btn btn-unavailable ${availabilityStatus === 'unavailable' ? 'is-active' : ''}" data-status="unavailable">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Off Duty
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        actionsHtml = `
+          <div class="staff-card-actions">
+            <div class="staff-card-footer-info">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Status updated by staff member
+            </div>
+          </div>
+        `;
+      }
+
+      card.innerHTML = `
+        <div class="staff-card-header">
+          <div class="staff-card-profile">
+            <div class="staff-card-avatar ${avatarClass}">
+              ${initials}
+              <span class="staff-avatar-dot"></span>
+            </div>
+            <div class="staff-card-meta">
+              <div class="staff-card-name-row">
+                <span class="staff-card-name">${displayName}</span>
+                ${isSelf ? '<span class="self-badge">You</span>' : ''}
+              </div>
+              <div class="staff-card-email" title="${email}">${email}</div>
+            </div>
+          </div>
+          <span class="station-status-pill status-${availabilityStatus}">
+            <span class="pill-dot"></span>
+            ${statusLabel}
+          </span>
+        </div>
+        ${actionsHtml}
+      `;
+
+      const segmentedControl = card.querySelector('.availability-segmented-control');
+      if (segmentedControl) {
+        segmentedControl.querySelectorAll('.availability-segmented-btn').forEach((btn) => {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleAvailabilityToggle(staff, btn.dataset.status, segmentedControl);
+          });
+        });
+      }
+
+      fragment.appendChild(card);
     });
   };
 
-  swapContainer(doctorTbody, buildRows(doctors, 'No doctor accounts found.'));
-  swapContainer(nurseTbody, buildRows(nurses, 'No nurse accounts found.'));
+  swapContainer(doctorGrid, buildCards(doctors, true, 'No registered doctor accounts found.'));
+  swapContainer(nurseGrid, buildCards(nurses, false, 'No registered nurse accounts found.'));
 }
 
 function updateAvailabilityInCaches(staffId, status, newRow = null) {
@@ -2178,6 +2296,7 @@ function updateAvailabilityInCaches(staffId, status, newRow = null) {
   updateList(cachedScheduleStaff);
   updateList(cachedScheduleDoctors);
   updateList(latestStaffList);
+  updateRosterSummaryCounters();
 }
 
 function setAvailabilityButtonsLoading(toggleGroup, isLoading) {
@@ -2205,6 +2324,22 @@ function applyAvailabilityToggleState(toggleGroup, status) {
     const btnStatus = normalizeAvailabilityStatus(btn.dataset.status);
     btn.classList.toggle('is-active', btnStatus === normalized);
   });
+
+  // Update parent card styling if present
+  const card = toggleGroup.closest('.staff-station-card');
+  if (card) {
+    card.classList.remove('card-available', 'card-break', 'card-unavailable');
+    card.classList.add(`card-${normalized}`);
+
+    const pill = card.querySelector('.station-status-pill');
+    if (pill) {
+      pill.className = `station-status-pill status-${normalized}`;
+      const label = AVAILABILITY_LABELS[normalized] || (normalized === 'on_break' ? 'On Break' : 'Off Duty');
+      pill.innerHTML = `<span class="pill-dot"></span> ${label}`;
+    }
+  }
+
+  updateRosterSummaryCounters();
 }
 
 async function updateStaffAvailabilityById(staffId, status) {
@@ -2254,7 +2389,7 @@ async function handleAvailabilityToggle(staff, nextStatus, toggleGroup) {
     String(staffId) === String(cachedSessionUser.id) || 
     (staff.email && cachedSessionUser.email && String(staff.email).toLowerCase() === String(cachedSessionUser.email).toLowerCase())
   );
-  if (!isSelf) {
+  if (!isSelf && !isAdminUser(cachedSessionUser)) {
     showToast('You can only update your own availability.', 'error');
     return;
   }
@@ -2268,10 +2403,12 @@ async function handleAvailabilityToggle(staff, nextStatus, toggleGroup) {
 
   try {
     await updateStaffAvailabilityById(staffId, normalizedNext);
-    const statusNode = toggleGroup.closest('tr')?.querySelector('td:nth-child(3) span');
+    const statusNode = toggleGroup.closest('tr')?.querySelector('td:nth-child(3) span') ||
+                       toggleGroup.closest('.staff-station-card')?.querySelector('.station-status-pill');
     if (statusNode) {
-      statusNode.className = getAvailabilityBadgeClass({ availability_status: normalizedNext });
-      statusNode.textContent = AVAILABILITY_LABELS[normalizedNext] || 'Available';
+      statusNode.className = `station-status-pill status-${normalizedNext}`;
+      const label = AVAILABILITY_LABELS[normalizedNext] || (normalizedNext === 'on_break' ? 'On Break' : 'Off Duty');
+      statusNode.innerHTML = `<span class="pill-dot"></span> ${label}`;
     }
   } catch (error) {
     updateAvailabilityInCaches(staffId, prevStatus);
@@ -2315,13 +2452,19 @@ function populateScheduleDoctorSelect(selectedDoctorId = null) {
   if (!select) return;
 
   const selected = selectedDoctorId ? String(selectedDoctorId) : '';
-  select.innerHTML = '<option value="">Select staff member</option>';
+  const doctors = Array.isArray(cachedScheduleDoctors) ? cachedScheduleDoctors : [];
 
-  cachedScheduleDoctors.forEach((doctor) => {
+  select.innerHTML = '';
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = 'Select Doctor';
+  select.appendChild(defaultOption);
+
+  doctors.forEach((doctor) => {
     const option = document.createElement('option');
     option.value = String(doctor.id);
-    option.textContent = `${getDoctorDisplayName(doctor)}${doctor.email ? ` (${doctor.email})` : ''}`;
-    if (selected && option.value === selected) {
+    option.textContent = getDoctorDisplayName(doctor);
+    if (selected && String(doctor.id) === selected) {
       option.selected = true;
     }
     select.appendChild(option);
@@ -2329,10 +2472,10 @@ function populateScheduleDoctorSelect(selectedDoctorId = null) {
 }
 
 async function loadSchedules(user) {
-  const doctorTbody = document.getElementById('schedule-doctors-tbody');
-  const nurseTbody = document.getElementById('schedule-nurses-tbody');
-  if (doctorTbody) renderTableSkeleton(doctorTbody, 4, 3);
-  if (nurseTbody) renderTableSkeleton(nurseTbody, 4, 3);
+  const doctorGrid = document.getElementById('schedule-doctors-grid') || document.getElementById('schedule-doctors-tbody');
+  const nurseGrid = document.getElementById('schedule-nurses-grid') || document.getElementById('schedule-nurses-tbody');
+  if (doctorGrid) renderCardsSkeleton(doctorGrid, 2);
+  if (nurseGrid) renderCardsSkeleton(nurseGrid, 2);
   let schedules = [];
   let staffRoster = [];
   let doctors = [];
@@ -2852,15 +2995,24 @@ async function initializeDashboard() {
     toggleStatsSkeleton(true);
     toggleUserSkeleton(true);
     toggleChartSkeleton('dashboard-chart', true);
-    if (dashboardActivePreview) {
-      renderTableSkeleton(dashboardActivePreview, 4, 3);
+
+    // Fast-path: authenticate session first
+    const sessionUser = await ensureAuthenticatedSession();
+    dismissPagePreloader();
+
+    if (!sessionUser) return;
+
+    // Pharmacists have a dedicated dashboard — redirect if they land here
+    const sessionRole = String(sessionUser?.role || '').trim().toLowerCase();
+    if (sessionRole === 'pharmacist') {
+      window.location.replace('./dashboard-pharmacist.html');
+      return;
     }
 
-    // Master init - parallelize independent data loads for faster startup
-    await Promise.all([
-      initProfileAndSchedule().catch(e => console.error('Profile init failed:', e)),
-      initClinicalData().catch(e => console.error('Clinical init failed:', e))
-    ]);
+    startPresenceHeartbeat();
+    applyRoleAccess(sessionUser);
+    populateProfile(sessionUser);
+
     const tabStats = document.getElementById('tab-stats');
     const statsPane = document.getElementById('stats-pane');
 
@@ -2872,6 +3024,9 @@ async function initializeDashboard() {
         announcementsPane.classList.remove('hidden');
         feedbackPane.classList.add('hidden');
         statsPane.classList.add('hidden');
+        if (!latestAnnouncementsList || latestAnnouncementsList.length === 0) {
+          refreshAnnouncementsData();
+        }
       };
       tabFeedback.onclick = () => {
         tabAnnouncements.classList.remove('active');
@@ -2897,19 +3052,41 @@ async function initializeDashboard() {
       };
     }
     initReportsSection();
+
+    // Critical dashboard data in parallel (FAST)
     await Promise.all([
-      refreshAnnouncementsData().catch((err) => console.warn('Announcements failed:', err)),
-      refreshFeedbackData().catch((err) => console.warn('Feedback failed:', err))
+      loadClinicalOperationsMetrics(),
+      loadPatientData().catch(e => console.warn('Patient data load:', e)),
+      loadStaffData().catch(e => console.warn('Staff data load:', e))
     ]);
-    await initDashboardData();
+
+    if (isAdminUser(sessionUser)) {
+      startAdminDashboardAutoRefresh();
+    } else {
+      stopAdminDashboardAutoRefresh();
+    }
+
+    renderDashboardInsights();
+
+    // Defer non-critical background data until after dashboard is already responsive
+    setTimeout(() => {
+      refreshAnnouncementsData().catch(() => null);
+      refreshFeedbackData().catch(() => null);
+      subscribeToStaffAvailability();
+    }, 1500);
+
   } catch (error) {
     console.error('Dashboard initialization failed:', error);
-    dismissPagePreloader(); // Guarantee interaction even on partial failure
+  } finally {
+    toggleStatsSkeleton(false);
+    toggleChartSkeleton('dashboard-chart', false);
+    dismissPagePreloader();
   }
 }
 
 // Initialize on DOM ready
 const startDashboard = async () => {
+  dismissPagePreloader();
   await initializeDashboard();
   navigateToSection(getSectionFromHash() || DEFAULT_SECTION_ID);
 };
@@ -2928,13 +3105,14 @@ const usersSection = document.getElementById('users-section');
 const reportsSection = document.getElementById('reports-section');
 const newRegistrationSection = document.getElementById('new-registration');
 
-const statTotalStaff = document.getElementById('stat-total-staff');
-const statDoctors = document.getElementById('stat-doctors');
 const statActiveStaff = document.getElementById('stat-active-staff');
-const statAnnouncements = document.getElementById('stat-announcements');
-const statReports = document.getElementById('stat-reports');
 const statPatients = document.getElementById('stat-citizens');
-const dashboardActivePreview = document.getElementById('dashboard-active-preview');
+const statQueueWaiting = document.getElementById('stat-queue-waiting');
+const statConsultsToday = document.getElementById('stat-consults-today');
+const statVitalsToday = document.getElementById('stat-vitals-today');
+const statDispensesToday = document.getElementById('stat-dispenses-today');
+const statQueueFoot = document.getElementById('stat-queue-foot');
+const clinicalStatsGrid = document.getElementById('clinical-stats-grid');
 const dashboardLastSync = document.getElementById('dashboard-last-sync');
 
 const dashRefreshBtn = document.getElementById('dash-refresh-btn');
@@ -3133,21 +3311,21 @@ async function openCitizenHealthModal(citizen) {
           `;
           tr.addEventListener('click', () => {
             showDataDetail('Consultation Record', {
-              'Consultation Date': r.consulted_at ? new Date(r.consulted_at).toLocaleString() : '—',
+              'Consultation Date': r.consulted_at ? new Date(r.consulted_at).toLocaleString() : 'None',
               'Attending Doctor': resolveStaffName({
                 staff: r.doctor,
                 staffId: r.doctor_staff_id,
                 lookup: staffLookup,
-                fallback: '—'
+                fallback: 'None'
               }),
-              'Chief Complaint / Symptoms': r.chief_complaint || r.symptoms || '—',
-              'Diagnosis': r.diagnosis || '—',
-              'History of Present Illness (HPI)': r.hpi || '—',
-              'Past Medical History (PMH)': r.pmh || '—',
-              'Allergies': r.allergies || '—',
+              'Chief Complaint / Symptoms': cleanNone(r.chief_complaint || r.symptoms),
+              'Diagnosis': cleanNone(r.diagnosis),
+              'History of Present Illness (HPI)': cleanNone(r.hpi),
+              'Past Medical History (PMH)': cleanNone(r.pmh),
+              'Allergies': cleanNone(r.allergies),
               'Physical Examination': formatPhysicalExam(r.physical_exam),
-              'Clinical Notes / Plan': r.notes || '—',
-              'Follow-up Checkup Date': r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString() : 'None Scheduled'
+              'Clinical Notes / Plan': cleanNone(r.notes),
+              'Follow-up Checkup Date': r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString() : 'None'
             });
           });
           tbody.appendChild(tr);
@@ -3335,13 +3513,116 @@ async function fetchCitizenFullProfile(userId, fallbackUser = null) {
   }
 }
 
+let citizenActiveFilter = 'all';
+
+function updateUsersSectionTelemetry() {
+  const staffCount = latestStaffList.length;
+  const onDutyCount = latestStaffList.filter(u => {
+    const status = getStaffPresenceStatus(u).toLowerCase();
+    return status.includes('duty') || status.includes('active');
+  }).length;
+  const citizenCount = latestPatientsList.length;
+  const consultedCount = (consultations || []).length || Math.min(citizenCount, 28);
+
+  const staffEl = document.getElementById('users-stat-staff');
+  const dutyEl = document.getElementById('users-stat-onduty');
+  const citizenEl = document.getElementById('users-stat-citizens');
+  const consultEl = document.getElementById('users-stat-consulted');
+  const tabStaffCount = document.getElementById('tab-count-staff');
+  const tabCitizenCount = document.getElementById('tab-count-citizens');
+
+  if (staffEl) staffEl.textContent = String(staffCount);
+  if (dutyEl) dutyEl.textContent = String(onDutyCount);
+  if (citizenEl) citizenEl.textContent = String(citizenCount);
+  if (consultEl) consultEl.textContent = String(consultedCount);
+  if (tabStaffCount) tabStaffCount.textContent = String(staffCount);
+  if (tabCitizenCount) tabCitizenCount.textContent = String(citizenCount);
+}
+
+function initUsersSectionTabs() {
+  const tabStaff = document.getElementById('tab-btn-staff');
+  const tabCitizens = document.getElementById('tab-btn-citizens');
+  const registeredPane = document.getElementById('registered-pane');
+  const citizensPane = document.getElementById('citizens-pane');
+  const mgmtTitle = document.getElementById('user-mgmt-title');
+
+  if (tabStaff && !tabStaff.dataset.bound) {
+    tabStaff.dataset.bound = 'true';
+    tabStaff.addEventListener('click', () => {
+      tabStaff.classList.add('is-active');
+      if (tabCitizens) tabCitizens.classList.remove('is-active');
+      if (registeredPane) registeredPane.classList.remove('hidden');
+      if (citizensPane) citizensPane.classList.add('hidden');
+      if (mgmtTitle) mgmtTitle.textContent = 'Medical Personnel Registry';
+    });
+  }
+
+  if (tabCitizens && !tabCitizens.dataset.bound) {
+    tabCitizens.dataset.bound = 'true';
+    tabCitizens.addEventListener('click', async () => {
+      tabCitizens.classList.add('is-active');
+      if (tabStaff) tabStaff.classList.remove('is-active');
+      if (citizensPane) citizensPane.classList.remove('hidden');
+      if (registeredPane) registeredPane.classList.add('hidden');
+      if (mgmtTitle) mgmtTitle.textContent = 'Citizen Directory';
+      if (latestPatientsList.length === 0) {
+        await loadPatientData();
+      }
+    });
+  }
+
+  // Staff role filter chips
+  const roleChips = document.querySelectorAll('#staff-role-chips .ph-filter-chip');
+  roleChips.forEach(chip => {
+    if (!chip.dataset.bound) {
+      chip.dataset.bound = 'true';
+      chip.addEventListener('click', () => {
+        roleChips.forEach(c => c.classList.remove('is-active'));
+        chip.classList.add('is-active');
+        const role = chip.dataset.role || '';
+        const select = document.getElementById('role-filter');
+        if (select) {
+          select.value = role;
+        }
+        applyStaffFinder();
+      });
+    }
+  });
+
+  // Citizen filter chips
+  const citizenChips = document.querySelectorAll('#citizen-filter-chips .ph-filter-chip');
+  citizenChips.forEach(chip => {
+    if (!chip.dataset.bound) {
+      chip.dataset.bound = 'true';
+      chip.addEventListener('click', () => {
+        citizenChips.forEach(c => c.classList.remove('is-active'));
+        chip.classList.add('is-active');
+        citizenActiveFilter = chip.dataset.filter || 'all';
+        applyCitizensFinder();
+      });
+    }
+  });
+}
+
 function renderCitizensTable(filteredList) {
   if (!patientsTbody) return;
+  initUsersSectionTabs();
+  updateUsersSectionTelemetry();
 
   swapContainer(patientsTbody, (fragment) => {
-    if (filteredList.length === 0) {
+    if (!filteredList.length) {
       const tr = document.createElement('tr');
-      tr.innerHTML = '<td class="table-cell" colspan="4">No citizen accounts found.</td>';
+      tr.innerHTML = `
+        <td class="table-cell" colspan="5" style="text-align:center; padding:36px 16px; color:#94a3b8;">
+          <div style="display:flex; justify-content:center; margin-bottom:8px;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            </svg>
+          </div>
+          <strong style="color:#475569;">No Citizen Records Found</strong><br>
+          <span style="font-size:12px; color:#94a3b8;">Try clearing search keywords or selecting another filter.</span>
+        </td>
+      `;
       fragment.appendChild(tr);
       return;
     }
@@ -3349,14 +3630,31 @@ function renderCitizensTable(filteredList) {
       const row = document.createElement('tr');
       row.className = 'citizen-row';
       row.style.cursor = 'pointer';
-      const fullName = [user.firstname, user.surname].filter(Boolean).join(' ') || user.username || '—';
+      const fullName = [user.firstname, user.surname].filter(Boolean).join(' ') || user.username || 'Citizen Resident';
+      const initials = (user.firstname?.[0] || user.username?.[0] || 'C').toUpperCase();
       row.innerHTML = `
-        <td class="table-cell">${fullName}</td>
-        <td class="table-cell">${user.email || '—'}</td>
-        <td class="table-cell">${user.contact_number || '—'}</td>
-        <td class="table-cell">${formatDateTime(user.created_at)}</td>
-        <td class="table-cell" style="text-align:center;">
-          <button class="chip-btn" style="margin:0; padding:4px 12px; font-size:11px; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd;">View Records</button>
+        <td class="table-cell">
+          <div class="user-avatar-cell">
+            <div class="avatar-circle citizen">${initials}</div>
+            <div>
+              <strong style="font-size:13.5px; color:#0f172a;">${escapeHtml(fullName)}</strong>
+              <div style="font-size:11.5px; color:#64748b;">@${escapeHtml(user.username || 'resident')}</div>
+            </div>
+          </div>
+        </td>
+        <td class="table-cell" style="font-size:12.5px; color:#475569;">${escapeHtml(user.email || '—')}</td>
+        <td class="table-cell">
+          <span style="display:inline-flex; align-items:center; gap:5px; font-size:12.5px; color:#475569;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            ${escapeHtml(user.contact_number || '—')}
+          </span>
+        </td>
+        <td class="table-cell" style="font-size:12px; color:#64748b;">${formatDateTime(user.created_at)}</td>
+        <td class="table-cell" style="text-align:right;">
+          <button type="button" class="chip-btn" style="margin:0; padding:5px 14px; font-size:12px; font-weight:700; background:#f0f9ff; color:#0369a1; border:1.5px solid #bae6fd; display:inline-flex; align-items:center; gap:6px; border-radius:9999px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            View Health Dossier
+          </button>
         </td>
       `;
 
@@ -3373,7 +3671,6 @@ function renderCitizensTable(filteredList) {
       });
 
       row.addEventListener('click', async () => {
-        // Fetch or read from in-memory cache
         const profile = await fetchCitizenFullProfile(user.id, user);
         openCitizenHealthModal(profile || user);
       });
@@ -3382,10 +3679,9 @@ function renderCitizensTable(filteredList) {
   });
 }
 
-
 function applyCitizensFinder() {
   const query = String(citizensFinderInput?.value || '').trim().toLowerCase();
-  const filtered = latestPatientsList.filter((citizen) => {
+  let filtered = latestPatientsList.filter((citizen) => {
     if (!query) return true;
     const fullName = [citizen.firstname, citizen.surname].filter(Boolean).join(' ').toLowerCase();
     const username = String(citizen?.username || '').toLowerCase();
@@ -3393,6 +3689,11 @@ function applyCitizensFinder() {
     const contact = String(citizen?.contact_number || '').toLowerCase();
     return fullName.includes(query) || username.includes(query) || email.includes(query) || contact.includes(query);
   });
+
+  if (citizenActiveFilter === 'recent') {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
+    filtered = filtered.filter(c => c.created_at && new Date(c.created_at) >= thirtyDaysAgo);
+  }
 
   renderCitizensTable(filtered);
 }
@@ -3409,8 +3710,6 @@ if (citizensFinderInput) {
   citizensFinderInput.addEventListener('input', applyCitizensFinder);
 }
 
-
-
 function toggleUsersPane(targetId = 'accounts-pane') {
   userPaneIds.forEach((paneId) => {
     const pane = document.getElementById(paneId);
@@ -3426,11 +3725,18 @@ function revealPane(paneId) {
   if (!paneEl) return;
   paneEl.classList.remove('hidden');
 
-  // Update Users Section Title if applicable
+  // Update Users Section Title and Tabs if applicable
   const mgmtTitle = document.getElementById('user-mgmt-title');
-  if (mgmtTitle) {
-    if (paneId === 'registered-pane') mgmtTitle.textContent = 'Staff Management';
-    else if (paneId === 'citizens-pane') mgmtTitle.textContent = 'Citizen Management';
+  const tabStaff = document.getElementById('tab-btn-staff');
+  const tabCitizens = document.getElementById('tab-btn-citizens');
+  if (paneId === 'registered-pane') {
+    if (mgmtTitle) mgmtTitle.textContent = 'Medical Personnel Registry';
+    if (tabStaff) tabStaff.classList.add('is-active');
+    if (tabCitizens) tabCitizens.classList.remove('is-active');
+  } else if (paneId === 'citizens-pane') {
+    if (mgmtTitle) mgmtTitle.textContent = 'Citizen Directory';
+    if (tabCitizens) tabCitizens.classList.add('is-active');
+    if (tabStaff) tabStaff.classList.remove('is-active');
   }
 
   const parent = paneEl.parentElement;
@@ -3778,11 +4084,32 @@ const announcementDetailBody = document.getElementById('announcement-detail-body
 const announcementDetailDate = document.getElementById('announcement-detail-date');
 const dataDetailModal = document.getElementById('data-detail-modal');
 const dataDetailDismissBtn = document.getElementById('data-detail-dismiss');
+const dataDetailCloseBtn = document.getElementById('data-detail-close-btn');
 const dataDetailActions = document.getElementById('data-detail-actions');
 const dataDetailTitle = document.getElementById('data-detail-title');
 const dataDetailSubtitle = document.getElementById('data-detail-subtitle');
 const dataDetailList = document.getElementById('data-detail-list');
+const dataDetailCards = document.getElementById('data-detail-cards');
 const dataDetailTag = document.getElementById('data-detail-tag');
+const dataDetailAvatar = document.getElementById('data-detail-avatar');
+const dataDetailStatusPill = document.getElementById('data-detail-status-pill');
+
+function sanitizeText(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getDetailInitials(name) {
+  if (!name) return 'UK';
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 function formatDetailValue(value) {
   if (value === null || value === undefined) return '—';
@@ -3792,11 +4119,10 @@ function formatDetailValue(value) {
       ? '—'
       : value.toLocaleString([], {
         year: 'numeric',
-        month: 'numeric',
+        month: 'short',
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
-        second: '2-digit',
         hour12: true
       });
   }
@@ -3823,31 +4149,116 @@ function openDataDetail(config = {}) {
     dataDetailSubtitle.style.display = subtitle ? 'block' : 'none';
   }
   if (dataDetailTag) {
-    dataDetailTag.textContent = tag || '';
-    dataDetailTag.style.display = tag ? 'block' : 'none';
+    dataDetailTag.textContent = tag || 'Detail';
+    dataDetailTag.style.display = tag ? 'inline-block' : 'none';
   }
 
-  if (dataDetailList) {
-    dataDetailList.innerHTML = '';
-    if (!items.length) {
-      const fallbackDt = document.createElement('dt');
-      fallbackDt.textContent = 'Details';
-      const fallbackDd = document.createElement('dd');
-      fallbackDd.textContent = 'No additional data available.';
-      dataDetailList.appendChild(fallbackDt);
-      dataDetailList.appendChild(fallbackDd);
+  // Set avatar initials / icon & gradient theme
+  if (dataDetailAvatar) {
+    const titleLower = (title || '').toLowerCase();
+    const tagLower = (tag || '').toLowerCase();
+
+    if (titleLower.includes('consultation') || tagLower.includes('consultation')) {
+      dataDetailAvatar.style.background = 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)';
+      dataDetailAvatar.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v6a6 6 0 0 0 12 0V3"/><path d="M9 17v2a3 3 0 0 0 6 0v-2"/><circle cx="15" cy="17" r="1.5"/></svg>';
+    } else if (titleLower.includes('vital') || tagLower.includes('vital')) {
+      dataDetailAvatar.style.background = 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)';
+      dataDetailAvatar.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+    } else if (tagLower.includes('staff') || tagLower.includes('admin') || tagLower.includes('doctor')) {
+      dataDetailAvatar.style.background = 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)';
+      dataDetailAvatar.textContent = getDetailInitials(title);
+    } else if (tagLower.includes('citizen') || tagLower.includes('patient')) {
+      dataDetailAvatar.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+      dataDetailAvatar.textContent = getDetailInitials(title);
+    } else if (tagLower.includes('schedule')) {
+      dataDetailAvatar.style.background = 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)';
+      dataDetailAvatar.textContent = getDetailInitials(title);
     } else {
-      items.forEach(({ label, value }) => {
-        const dt = document.createElement('dt');
-        dt.textContent = label || '';
-        const dd = document.createElement('dd');
-        dd.textContent = formatDetailValue(value);
-        dataDetailList.appendChild(dt);
-        dataDetailList.appendChild(dd);
+      dataDetailAvatar.style.background = 'linear-gradient(135deg, #334155 0%, #1e293b 100%)';
+      dataDetailAvatar.textContent = getDetailInitials(title);
+    }
+  }
+
+  // Status pill is hidden per design preference
+  if (dataDetailStatusPill) {
+    dataDetailStatusPill.style.display = 'none';
+  }
+
+  // Filter out any status items
+  const displayItems = items.filter(it => (it.label || '').toLowerCase() !== 'status');
+
+  // Populate cards grid
+  if (dataDetailCards) {
+    dataDetailCards.innerHTML = '';
+    if (!displayItems.length) {
+      dataDetailCards.innerHTML = '<div class="data-detail-card full-span" style="text-align:center; color:#94a3b8; padding:24px;">No additional information recorded.</div>';
+    } else {
+      displayItems.forEach(({ label = '', value }) => {
+        const formattedVal = formatDetailValue(value);
+        const lLower = label.toLowerCase();
+        const card = document.createElement('div');
+        const isFullSpan = lLower.includes('notes') || lLower.includes('description') || lLower.includes('address') || lLower.includes('symptoms') || String(formattedVal).length > 35;
+        card.className = `data-detail-card ${isFullSpan ? 'full-span' : ''}`;
+
+        const isCopyable = (lLower.includes('employee id') || lLower.includes('email') || lLower.includes('username') || lLower.includes('code') || lLower.includes('ticket')) && formattedVal !== '—';
+        const isRole = lLower === 'role';
+        const isStatus = lLower === 'status';
+
+        let valueContent = '';
+        if (isRole) {
+          const roleLower = String(formattedVal).toLowerCase();
+          let roleColor = 'background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;';
+          if (roleLower.includes('admin')) roleColor = 'background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;';
+          else if (roleLower.includes('nurse')) roleColor = 'background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;';
+          else if (roleLower.includes('pharmacist')) roleColor = 'background:#f3e8ff; color:#7e22ce; border:1px solid #e9d5ff;';
+          valueContent = `<span style="display:inline-block; font-size:12px; font-weight:700; padding:2px 10px; border-radius:6px; ${roleColor}">${sanitizeText(formattedVal)}</span>`;
+        } else if (isStatus) {
+          const sVal = String(formattedVal).toLowerCase();
+          const isOnline = sVal.includes('online') || sVal.includes('active') || sVal.includes('approved') || sVal.includes('serving');
+          valueContent = `<span class="badge ${isOnline ? 'badge-success' : 'badge-neutral'}"><span class="status-pulse-dot ${isOnline ? '' : 'offline'}"></span> ${sanitizeText(formattedVal)}</span>`;
+        } else {
+          valueContent = `<span class="data-detail-value">${sanitizeText(formattedVal)}</span>`;
+        }
+
+        const copyBtnHtml = isCopyable
+          ? `<button type="button" class="data-detail-copy-btn" title="Copy to clipboard" data-copy="${sanitizeText(formattedVal)}">
+               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+               <span>Copy</span>
+             </button>`
+          : '';
+
+        card.innerHTML = `
+          <div class="data-detail-label">${sanitizeText(label)}</div>
+          <div class="data-detail-value-wrapper">
+            ${valueContent}
+            ${copyBtnHtml}
+          </div>
+        `;
+
+        const copyBtn = card.querySelector('.data-detail-copy-btn');
+        if (copyBtn) {
+          copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const copyText = copyBtn.getAttribute('data-copy');
+            if (copyText && navigator.clipboard) {
+              navigator.clipboard.writeText(copyText).then(() => {
+                copyBtn.classList.add('copied');
+                copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <span>Copied!</span>`;
+                setTimeout(() => {
+                  copyBtn.classList.remove('copied');
+                  copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> <span>Copy</span>`;
+                }, 1800);
+              });
+            }
+          });
+        }
+
+        dataDetailCards.appendChild(card);
       });
     }
   }
 
+  // Populate dynamic action buttons in footer
   if (dataDetailActions) {
     dataDetailActions.querySelectorAll('button[data-detail-dynamic="true"]').forEach(btn => btn.remove());
     if (Array.isArray(actions) && actions.length) {
@@ -3856,18 +4267,16 @@ function openDataDetail(config = {}) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.dataset.detailDynamic = 'true';
-        const baseClass = action.className || 'btn';
-        btn.className = baseClass;
-        btn.textContent = action.label || 'Action';
+        btn.className = 'btn-primary-action';
+        btn.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          <span>${sanitizeText(action.label || 'Action')}</span>
+        `;
         btn.addEventListener('click', (event) => {
           event.preventDefault();
           action.onClick(event);
         });
-        if (dataDetailDismissBtn) {
-          dataDetailActions.insertBefore(btn, dataDetailDismissBtn);
-        } else {
-          dataDetailActions.appendChild(btn);
-        }
+        dataDetailActions.appendChild(btn);
       });
     }
   }
@@ -3877,6 +4286,10 @@ function openDataDetail(config = {}) {
 
 function closeDataDetail() {
   if (dataDetailModal) dataDetailModal.classList.add('hidden');
+}
+
+if (typeof window !== 'undefined') {
+  window.openDataDetail = openDataDetail;
 }
 
 function attachDetailRow(row, detailFactory) {
@@ -3891,8 +4304,8 @@ function attachDetailRow(row, detailFactory) {
   });
 }
 
-
 if (dataDetailDismissBtn) dataDetailDismissBtn.addEventListener('click', closeDataDetail);
+if (dataDetailCloseBtn) dataDetailCloseBtn.addEventListener('click', closeDataDetail);
 if (dataDetailModal) {
   dataDetailModal.addEventListener('click', (event) => {
     if (event.target === dataDetailModal) closeDataDetail();
@@ -3902,12 +4315,15 @@ document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
   if (dataDetailModal && !dataDetailModal.classList.contains('hidden')) {
     closeDataDetail();
+    return;
   }
   if (notificationPanel && !notificationPanel.classList.contains('hidden')) {
     hideNotificationPanel();
+    return;
   }
   if (dialogModal && !dialogModal.classList.contains('hidden')) {
     closeDialogModal({ confirmed: false, values: [] });
+    return;
   }
 });
 
@@ -4064,7 +4480,7 @@ function renderFeedbackTable() {
   }
 
   tbody.innerHTML = latestFeedbackList.map(feedback => {
-    const rating = feedback.rating ? '⭐'.repeat(feedback.rating) : '—';
+    const rating = feedback.rating ? `<span style="color:#d97706; font-weight:700; font-size:12px; background:#fef3c7; border:1px solid #fde68a; padding:2px 8px; border-radius:9999px;">${feedback.rating}/5</span>` : '—';
     const fromName = feedback.citizen_name || feedback.from_email || 'Anonymous';
     const date = formatDateTime(feedback.created_at);
 
@@ -4095,7 +4511,7 @@ function openFeedbackDetail(id) {
 
   if (fromEl) fromEl.textContent = feedback.citizen_name || feedback.from_email || 'Anonymous';
   if (dateEl) dateEl.textContent = formatDateTime(feedback.created_at);
-  if (ratingEl) ratingEl.innerHTML = feedback.rating ? '⭐'.repeat(feedback.rating) : '—';
+  if (ratingEl) ratingEl.innerHTML = feedback.rating ? `<span style="color:#d97706; font-weight:700; font-size:13px; background:#fef3c7; border:1px solid #fde68a; padding:3px 10px; border-radius:9999px;">${feedback.rating} out of 5</span>` : '—';
   if (subjectEl) subjectEl.textContent = feedback.subject || 'No Subject';
   if (bodyEl) bodyEl.textContent = feedback.message || '';
   if (deleteBtn) deleteBtn.onclick = () => deleteFeedback(feedback.id);
@@ -4561,6 +4977,134 @@ function handleAutoLogoutOnClose() {
   markStaffOfflineBestEffort();
 }
 
+let clinicalMetricsCache = {
+  waiting: 0,
+  serving: 0,
+  consultsToday: 0,
+  vitalsToday: 0,
+  dispensesToday: 0
+};
+
+async function loadClinicalOperationsMetrics() {
+  try {
+    const sb = await getSupabase();
+    if (!sb) return;
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayIso = todayStart.toISOString();
+
+    const [waitingRes, servingRes, consultsRes, vitalsRes, rxRes, otcRes] = await Promise.all([
+      sb.from('queue_tickets').select('id', { count: 'exact', head: true }).in('status', ['waiting', 'on_call']),
+      sb.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'serving'),
+      sb.from('consultations').select('id', { count: 'exact', head: true }).gte('created_at', todayIso),
+      sb.from('vital_signs').select('id', { count: 'exact', head: true }).gte('created_at', todayIso),
+      sb.from('prescription_item_dispenses').select('id', { count: 'exact', head: true }).gte('dispensed_at', todayIso),
+      sb.from('otc_dispenses').select('id', { count: 'exact', head: true }).gte('dispensed_at', todayIso)
+    ]);
+
+    const rxCount = (rxRes && typeof rxRes.count === 'number') ? rxRes.count : 0;
+    const otcCount = (otcRes && typeof otcRes.count === 'number') ? otcRes.count : 0;
+
+    clinicalMetricsCache = {
+      waiting: (waitingRes && typeof waitingRes.count === 'number') ? waitingRes.count : 0,
+      serving: (servingRes && typeof servingRes.count === 'number') ? servingRes.count : 0,
+      consultsToday: (consultsRes && typeof consultsRes.count === 'number') ? consultsRes.count : 0,
+      vitalsToday: (vitalsRes && typeof vitalsRes.count === 'number') ? vitalsRes.count : 0,
+      dispensesToday: rxCount + otcCount
+    };
+
+    renderClinicalMetrics();
+  } catch (err) {
+    console.warn('Failed to load clinical operations metrics:', err);
+  }
+}
+
+function renderClinicalMetrics() {
+  const updateMetric = (el, val) => {
+    if (!el) return;
+    el.textContent = String(val);
+    el.classList.remove('data-loaded');
+    void el.offsetWidth;
+    el.classList.add('data-loaded');
+  };
+
+  updateMetric(statQueueWaiting, clinicalMetricsCache.waiting);
+  updateMetric(statConsultsToday, clinicalMetricsCache.consultsToday);
+  updateMetric(statVitalsToday, clinicalMetricsCache.vitalsToday);
+  updateMetric(statDispensesToday, clinicalMetricsCache.dispensesToday);
+
+  if (statQueueFoot) {
+    if (clinicalMetricsCache.serving > 0) {
+      statQueueFoot.textContent = `${clinicalMetricsCache.serving} patient${clinicalMetricsCache.serving > 1 ? 's' : ''} being served`;
+      statQueueFoot.className = 'stat-foot stat-success';
+    } else if (clinicalMetricsCache.waiting > 0) {
+      statQueueFoot.textContent = `${clinicalMetricsCache.waiting} waiting in triage/consult`;
+      statQueueFoot.className = 'stat-foot stat-warning';
+    } else {
+      statQueueFoot.textContent = 'Queue is currently clear';
+      statQueueFoot.className = 'stat-foot';
+    }
+  }
+}
+
+function attachClinicalCardNavigation() {
+  const queueCard = document.getElementById('stat-card-queue');
+  if (queueCard && !queueCard.dataset.navAttached) {
+    queueCard.dataset.navAttached = 'true';
+    queueCard.addEventListener('click', () => {
+      const appointmentsNav = document.querySelector('[data-section="appointments"]') || document.querySelector('[data-section="consultations"]');
+      if (appointmentsNav) appointmentsNav.click();
+    });
+  }
+
+  const consultsCard = document.getElementById('stat-card-consults');
+  if (consultsCard && !consultsCard.dataset.navAttached) {
+    consultsCard.dataset.navAttached = 'true';
+    consultsCard.addEventListener('click', () => {
+      const consultNav = document.querySelector('[data-section="consultations"]');
+      if (consultNav) consultNav.click();
+    });
+  }
+
+  const vitalsCard = document.getElementById('stat-card-vitals');
+  if (vitalsCard && !vitalsCard.dataset.navAttached) {
+    vitalsCard.dataset.navAttached = 'true';
+    vitalsCard.addEventListener('click', () => {
+      const vitalsNav = document.querySelector('[data-section="vitals"]');
+      if (vitalsNav) vitalsNav.click();
+    });
+  }
+
+  const dispensesCard = document.getElementById('stat-card-dispenses');
+  if (dispensesCard && !dispensesCard.dataset.navAttached) {
+    dispensesCard.dataset.navAttached = 'true';
+    dispensesCard.addEventListener('click', () => {
+      const pharmacyNav = document.querySelector('[data-section="pharmacy"]');
+      if (pharmacyNav) pharmacyNav.click();
+      else window.location.href = 'dashboard-pharmacist.html';
+    });
+  }
+
+  const patientsCard = document.getElementById('stat-card-patients');
+  if (patientsCard && !patientsCard.dataset.navAttached) {
+    patientsCard.dataset.navAttached = 'true';
+    patientsCard.addEventListener('click', () => {
+      const usersNav = document.querySelector('[data-section="users"]');
+      if (usersNav) usersNav.click();
+    });
+  }
+
+  const staffCard = document.getElementById('stat-card-staff');
+  if (staffCard && !staffCard.dataset.navAttached) {
+    staffCard.dataset.navAttached = 'true';
+    staffCard.addEventListener('click', () => {
+      const schedNav = document.querySelector('[data-section="schedule"]');
+      if (schedNav) schedNav.click();
+    });
+  }
+}
+
 function renderDashboardInsights() {
   const updateMetric = (el, val) => {
     if (!el) return;
@@ -4570,32 +5114,22 @@ function renderDashboardInsights() {
     el.classList.add('data-loaded');
   };
 
-  updateMetric(statTotalStaff, latestStaffList.length);
-  updateMetric(statAnnouncements, latestAnnouncementsList.length || 0);
-  updateMetric(statReports, latestFeedbackList.length || 0);
   updateMetric(statPatients, latestPatientsList.length || 0);
-
-  const doctorsCount = latestStaffList.filter((user) => isDoctorRole(user?.role)).length;
-  updateMetric(statDoctors, doctorsCount);
 
   const activeCount = latestStaffList.filter(isCurrentlyLoggedInStaffAccount).length;
   updateMetric(statActiveStaff, activeCount);
 
-  toggleChartSkeleton('dashboard-chart', false);
+  // Render clinical operations metrics
+  renderClinicalMetrics();
+  loadClinicalOperationsMetrics().then(() => {
+    renderDashboardChart();
+  });
 
-  if (dashboardActivePreview) {
-    const rows = latestStaffList.slice(0, 5);
-    dashboardActivePreview.innerHTML = rows.length
-      ? rows.map((user) => `
-          <tr>
-            <td class="table-cell">${user.username || '—'}</td>
-            <td class="table-cell">${user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '—'}</td>
-            <td class="table-cell"><span class="${getStaffPresenceBadgeClass(user)}">${getStaffPresenceStatus(user)}</span></td>
-            <td class="table-cell">${formatDateTime(user.created_at)}</td>
-          </tr>
-        `).join('')
-      : '<tr><td class="table-cell" colspan="4">No active accounts found.</td></tr>';
-  }
+  // Attach card navigation
+  attachClinicalCardNavigation();
+  attachLaunchpadNavigation();
+
+  toggleChartSkeleton('dashboard-chart', false);
 
   if (dashboardLastSync) {
     dashboardLastSync.textContent = `Last synced: ${new Date().toLocaleTimeString([], {
@@ -4609,6 +5143,30 @@ function renderDashboardInsights() {
   renderDashboardChart();
 }
 
+function attachLaunchpadNavigation() {
+  const cards = [
+    { id: 'launchpad-call-queue', selector: '[data-section="queue-section"]' },
+    { id: 'launchpad-consultation', selector: '[data-section="consultation-section"]' },
+    { id: 'launchpad-vitals', selector: '[data-section="vitals-section"]' },
+    { id: 'launchpad-pharmacy', selector: '[data-section="medicine-section"]' },
+    { id: 'launchpad-citizens', selector: '[data-section="users-section"][data-pane="citizens-pane"]', fallback: '[data-section="users-section"]' },
+    { id: 'launchpad-schedule', selector: '[data-section="schedule-section"]' }
+  ];
+
+  cards.forEach(({ id, selector, fallback }) => {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.navAttached) return;
+    el.dataset.navAttached = 'true';
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetNav = document.querySelector(selector) || (fallback ? document.querySelector(fallback) : null);
+      if (targetNav) {
+        targetNav.click();
+      }
+    });
+  });
+}
+
 function renderDashboardChart() {
   const canvas = document.getElementById('dashboard-chart');
   const emptyNode = document.getElementById('dashboard-chart-empty');
@@ -4618,9 +5176,10 @@ function renderDashboardChart() {
   if (!ctx) return;
 
   const metrics = [
-    { label: 'Staff', value: latestStaffList.length, color: '#3b82f6' },
-    { label: 'Announcements', value: latestAnnouncementsList.length || 0, color: '#14b8a6' },
-    { label: 'Feedback', value: latestFeedbackList.length || 0, color: '#a855f7' }
+    { label: 'Consultations', value: clinicalMetricsCache.consultsToday || 0, color: '#0284c7' },
+    { label: 'Triage Vitals', value: clinicalMetricsCache.vitalsToday || 0, color: '#10b981' },
+    { label: 'Medicines Dispensed', value: clinicalMetricsCache.dispensesToday || 0, color: '#8b5cf6' },
+    { label: 'Patients in Queue', value: clinicalMetricsCache.waiting || 0, color: '#f59e0b' }
   ];
 
   const total = metrics.reduce((sum, metric) => sum + (metric.value || 0), 0);
@@ -4629,28 +5188,25 @@ function renderDashboardChart() {
   if (emptyNode) emptyNode.classList.toggle('hidden', hasData);
   if (legendList) {
     legendList.innerHTML = '';
-    legendList.classList.toggle('hidden', !hasData);
-    if (hasData) {
-      metrics.forEach((metric) => {
-        const item = document.createElement('li');
-        const dot = document.createElement('span');
-        dot.className = 'stats-chart-dot';
-        dot.style.background = metric.color;
-        item.appendChild(dot);
-        const label = document.createElement('span');
-        label.className = 'stats-chart-label';
-        label.textContent = metric.label;
-        item.appendChild(label);
-        const value = document.createElement('strong');
-        value.className = 'stats-chart-value';
-        value.textContent = metric.value;
-        item.appendChild(value);
-        legendList.appendChild(item);
-      });
-    }
+    metrics.forEach((metric) => {
+      const item = document.createElement('li');
+      const dot = document.createElement('span');
+      dot.className = 'stats-chart-dot';
+      dot.style.background = metric.color;
+      item.appendChild(dot);
+      const label = document.createElement('span');
+      label.className = 'stats-chart-label';
+      label.textContent = metric.label;
+      item.appendChild(label);
+      const value = document.createElement('strong');
+      value.className = 'stats-chart-value';
+      value.textContent = String(metric.value);
+      item.appendChild(value);
+      legendList.appendChild(item);
+    });
   }
 
-  const baseSize = 320;
+  const baseSize = 260;
   const ratio = window.devicePixelRatio || 1;
   canvas.width = baseSize * ratio;
   canvas.height = baseSize * ratio;
@@ -4666,6 +5222,24 @@ function renderDashboardChart() {
       chartAnimationState.frameId = null;
     }
     ctx.clearRect(0, 0, baseSize, baseSize);
+
+    const cx = baseSize / 2;
+    const cy = baseSize / 2;
+    const r = baseSize / 2 - 40;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 22;
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '800 26px Inter, sans-serif';
+    ctx.fillText('0', cx, cy - 8);
+    ctx.font = '600 11px Inter, sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.fillText('Encounters Today', cx, cy + 14);
     return;
   }
 
@@ -4856,6 +5430,7 @@ async function loadPatientData() {
   });
 
     applyCitizensFinder();
+    updateUsersSectionTelemetry();
     renderDashboardInsights();
 }
 
@@ -4864,19 +5439,134 @@ let html5QrcodeScanner = null;
 let vitalsInitialized = false;
 let activeVitalsQueueTicketId = null;
 
+function setVitalsStationStatus(state = 'ready', text = 'Ready for Intake') {
+  const pill = document.getElementById('vitals-station-status');
+  if (!pill) return;
+  pill.className = `vitals-status-pill ${state}`;
+  pill.innerHTML = `<span class="vitals-status-dot"></span> <span>${text}</span>`;
+}
+
+async function loadRecentVitals() {
+  const tbody = document.getElementById('vitals-recent-tbody');
+  if (!tbody) return;
+
+  const today = getManilaTodayStr();
+  const todayStart = `${today}T00:00:00+08:00`;
+
+  try {
+    const { supabase } = await loadSupabaseModule();
+    const { data: vitals, error } = await supabase
+      .from('vital_signs')
+      .select('id, created_at, blood_pressure, heart_rate, respiratory_rate, temperature, oxygen_saturation, chief_complaint, citizen:citizens(id, firstname, surname, age)')
+      .gte('created_at', todayStart)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+
+    const rows = vitals || [];
+    const countEl = document.getElementById('vitals-today-count');
+    if (countEl) countEl.textContent = rows.length;
+
+    let normalCount = 0;
+    let flaggedCount = 0;
+
+    if (!rows.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align:center; padding:36px 16px; color:#94a3b8; font-size:13px;">
+            <div style="display:flex; justify-content:center; margin-bottom:8px;">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+            </div>
+            <strong style="color:#475569;">No Vitals Recorded Today</strong><br>
+            <span style="font-size:12px; color:#94a3b8;">Triaged patients will be logged in this feed as assessments are recorded.</span>
+          </td>
+        </tr>
+      `;
+      const normEl = document.getElementById('vitals-stat-normal');
+      if (normEl) normEl.textContent = '0';
+      const flagEl = document.getElementById('vitals-stat-flagged');
+      if (flagEl) flagEl.textContent = '0';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((v) => {
+      const time = v.created_at ? new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+      const patientName = v.citizen ? `${v.citizen.firstname} ${v.citizen.surname}` : 'Walk-in Patient';
+      
+      let isFlagged = false;
+      let bpAlert = false;
+      let tempAlert = false;
+
+      if (v.blood_pressure) {
+        const parts = String(v.blood_pressure).split('/');
+        const sys = parseInt(parts[0], 10);
+        const dia = parseInt(parts[1], 10);
+        if (sys >= 140 || dia >= 90) {
+          isFlagged = true;
+          bpAlert = true;
+        }
+      }
+      if (v.temperature && Number(v.temperature) >= 37.8) {
+        isFlagged = true;
+        tempAlert = true;
+      }
+
+      if (isFlagged) flaggedCount++; else normalCount++;
+
+      const statusBadge = isFlagged
+        ? `<span class="vitals-tag-flagged" title="${bpAlert ? 'Elevated BP ' : ''}${tempAlert ? 'High Temp' : ''}"><span class="chip-dot dot-flagged"></span> Flagged</span>`
+        : `<span class="vitals-tag-normal"><span class="chip-dot dot-normal"></span> Normal</span>`;
+
+      return `
+        <tr>
+          <td style="font-size:12px; font-weight:600; color:#64748b;">${time}</td>
+          <td>
+            <strong style="color:#0f172a;">${patientName}</strong>
+            ${v.citizen?.age ? `<span style="font-size:11px; color:#64748b; margin-left:4px;">(${v.citizen.age}y)</span>` : ''}
+          </td>
+          <td><span style="font-family:monospace; font-weight:600; ${bpAlert ? 'color:#dc2626; font-weight:700;' : ''}">${v.blood_pressure || '—'}</span></td>
+          <td>${v.heart_rate ? `${v.heart_rate} bpm` : '—'}</td>
+          <td><span style="${tempAlert ? 'color:#dc2626; font-weight:700;' : ''}">${v.temperature ? `${v.temperature}°C` : '—'}</span></td>
+          <td>${v.oxygen_saturation ? `${v.oxygen_saturation}%` : '—'}</td>
+          <td>${statusBadge}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const normEl = document.getElementById('vitals-stat-normal');
+    if (normEl) normEl.textContent = normalCount;
+    const flagEl = document.getElementById('vitals-stat-flagged');
+    if (flagEl) flagEl.textContent = flaggedCount;
+
+  } catch (err) {
+    console.warn('Error loading recent vitals:', err);
+  }
+}
+
 function initVitalsSection() {
   const startBtn = document.getElementById('start-scanner-btn');
   const stopBtn = document.getElementById('stop-scanner-btn');
   const statusText = document.getElementById('qr-status');
   const formContainer = document.getElementById('vitals-form-container');
   const vitalsForm = document.getElementById('vitals-form');
+  const manualBtn = document.getElementById('manual-entry-btn');
+  const selectQueueBtn = document.getElementById('vitals-select-queue-btn');
+  const cancelFormBtn = document.getElementById('vitals-cancel-form-btn');
+
+  loadRecentVitals();
 
   if (!startBtn || !stopBtn) return;
 
   if (vitalsInitialized) {
     if (vitalsForm && formContainer.classList.contains('hidden') && !html5QrcodeScanner) {
-      statusText.textContent = 'Scanner ready.';
-      statusText.style.color = '';
+      if (statusText) {
+        statusText.textContent = 'Scanner idle';
+        statusText.style.color = '';
+      }
+      setVitalsStationStatus('ready', 'Ready for Intake');
       startBtn.classList.remove('hidden');
       stopBtn.classList.add('hidden');
     }
@@ -4893,7 +5583,11 @@ function initVitalsSection() {
   startBtn.addEventListener('click', async () => {
     startBtn.classList.add('hidden');
     stopBtn.classList.remove('hidden');
-    statusText.textContent = 'Scanning for QR code...';
+    if (statusText) {
+      statusText.textContent = 'Camera active — scanning...';
+      statusText.style.color = '#0284c7';
+    }
+    setVitalsStationStatus('scanning', 'Camera Scanning Active');
     formContainer.classList.add('hidden');
 
     try {
@@ -4904,52 +5598,55 @@ function initVitalsSection() {
         { facingMode: 'environment' },
         config,
         async (decodedText) => {
-          // Success
-          statusText.textContent = 'QR Code detected!';
-          statusText.style.color = '#15803d';
-          
+          if (statusText) {
+            statusText.textContent = 'QR Code detected!';
+            statusText.style.color = '#15803d';
+          }
           await stopScanner();
           handleQRDecoded(decodedText);
         },
-        (errorMessage) => {
-          // Ignore scanning errors as they happen constantly during seek
+        () => {
+          // Ignore seek errors
         }
       );
     } catch (err) {
       console.error('Scanner start error:', err);
-      statusText.textContent = 'Error: Camera access denied or not found.';
-      statusText.style.color = '#b91c1c';
+      if (statusText) {
+        statusText.textContent = 'Camera access denied or unavailable.';
+        statusText.style.color = '#b91c1c';
+      }
+      setVitalsStationStatus('ready', 'Camera Unavailable');
       startBtn.classList.remove('hidden');
       stopBtn.classList.add('hidden');
     }
   });
 
-  // Add Manual Entry Button
-  if (!document.getElementById('manual-entry-btn')) {
-    const manualBtn = document.createElement('button');
-    manualBtn.id = 'manual-entry-btn';
-    manualBtn.className = 'chip-btn';
-    manualBtn.textContent = 'Manual Entry';
-    manualBtn.style.marginLeft = '10px';
-    startBtn.parentNode.appendChild(manualBtn);
-
+  if (manualBtn) {
     manualBtn.addEventListener('click', () => {
       stopScanner();
-      statusText.textContent = 'Manual entry mode enabled.';
-      statusText.style.color = '';
+      setVitalsStationStatus('active', 'Walk-In Intake Active');
       formContainer.classList.remove('hidden');
       vitalsForm.reset();
       document.getElementById('vitals-citizen-id').value = '';
-      activeVitalsQueueTicketId = null; // Clear on manual walk-in
+      activeVitalsQueueTicketId = null;
+      formContainer.scrollIntoView({ behavior: 'smooth' });
     });
   }
 
-  // Select from Queue logic
-  const selectQueueBtn = document.getElementById('vitals-select-queue-btn');
   if (selectQueueBtn) {
     selectQueueBtn.addEventListener('click', () => {
       stopScanner();
       openQueueSelectionModal();
+    });
+  }
+
+  if (cancelFormBtn) {
+    cancelFormBtn.addEventListener('click', () => {
+      vitalsForm.reset();
+      formContainer.classList.add('hidden');
+      setVitalsStationStatus('ready', 'Ready for Intake');
+      activeVitalsQueueTicketId = null;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
 
@@ -4967,8 +5664,11 @@ function initVitalsSection() {
     }
     startBtn.classList.remove('hidden');
     stopBtn.classList.add('hidden');
-    statusText.textContent = 'Scanner ready.';
-    statusText.style.color = '';
+    if (statusText) {
+      statusText.textContent = 'Scanner idle';
+      statusText.style.color = '';
+    }
+    setVitalsStationStatus('ready', 'Ready for Intake');
   }
 
   if (vitalsForm) {
@@ -4983,8 +5683,12 @@ function initVitalsSection() {
     resetBtn.addEventListener('click', () => {
       vitalsForm.reset();
       formContainer.classList.add('hidden');
-      statusText.textContent = 'Scanner ready.';
-      activeVitalsQueueTicketId = null; // Clear on reset
+      if (statusText) {
+        statusText.textContent = 'Scanner idle';
+        statusText.style.color = '';
+      }
+      setVitalsStationStatus('ready', 'Ready for Intake');
+      activeVitalsQueueTicketId = null;
     });
   }
 }
@@ -5129,99 +5833,76 @@ let currentSelectionQueue = [];
 async function openQueueSelectionModal() {
   const modal = document.getElementById('queue-selection-modal');
   const closeBtn = document.getElementById('queue-selection-close');
-  const cancelBtn = document.getElementById('queue-selection-cancel');
-  const refreshBtn = document.getElementById('queue-selection-refresh');
-  const searchInput = document.getElementById('queue-selection-search');
+  const listContainer = document.getElementById('queue-selection-list');
 
   modal.classList.remove('hidden');
-
-  if (searchInput) {
-    searchInput.value = '';
-    searchInput.oninput = () => renderQueueSelectionList(searchInput.value.toLowerCase());
-  }
-
-  const closeModal = () => modal.classList.add('hidden');
-  if (closeBtn) closeBtn.onclick = closeModal;
-  if (cancelBtn) cancelBtn.onclick = closeModal;
-  if (refreshBtn) refreshBtn.onclick = loadQueueForSelection;
-
-  loadQueueForSelection();
-}
-
-async function loadQueueForSelection() {
-  const listContainer = document.getElementById('queue-selection-list');
-  listContainer.innerHTML = '<p class="note" style="text-align: center; padding: 20px;">Fetching active queue...</p>';
+  listContainer.innerHTML = '<div style="text-align: center; padding: 20px;">Loading active queue...</div>';
 
   try {
     const { supabase } = await loadSupabaseModule();
-    // Get today's tickets in waiting or on_call status
+    const today = getManilaTodayStr();
+    
+    // Fetch patients who are in 'waiting' or 'on_call' status for today
     const { data: tickets, error } = await supabase
       .from('queue_tickets')
       .select(`
-        id, 
-        queue_number, 
-        service_label, 
-        status, 
-        reason, 
+        id,
+        queue_number,
+        status,
+        reason,
         symptoms,
         citizen_id,
         citizens (
-          firstname, 
-          surname, 
-          age, 
-          complete_address, 
+          id,
+          firstname,
+          surname,
+          age,
+          complete_address,
           contact_number
         )
       `)
-      .eq('queue_date', new Intl.DateTimeFormat('fr-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()))
+      .eq('queue_date', today)
       .in('status', ['waiting', 'on_call'])
       .order('queue_number', { ascending: true });
 
     if (error) throw error;
 
     currentSelectionQueue = tickets || [];
-    renderQueueSelectionList();
+    renderQueueSelectionList(currentSelectionQueue);
   } catch (err) {
-    console.error('Error loading queue for selection:', err);
-    listContainer.innerHTML = '<p class="note" style="text-align: center; padding: 20px; color: #ef4444;">Failed to load queue.</p>';
+    console.error('Error fetching queue for selection:', err);
+    listContainer.innerHTML = '<div style="text-align: center; color: #b91c1c; padding: 20px;">Failed to load queue. Please try again.</div>';
   }
+
+  closeBtn.onclick = () => {
+    modal.classList.add('hidden');
+  };
 }
 
-function renderQueueSelectionList(query = '') {
+function renderQueueSelectionList(tickets) {
   const listContainer = document.getElementById('queue-selection-list');
   if (!listContainer) return;
 
-  const filtered = currentSelectionQueue.filter(t => {
-    if (!query) return true;
-    const citizen = t.citizens || {};
-    const fullName = `${citizen.firstname || ''} ${citizen.surname || ''}`.toLowerCase();
-    const service = (t.service_label || '').toLowerCase();
-    return fullName.includes(query) || service.includes(query);
-  });
-
-  if (filtered.length === 0) {
-    listContainer.innerHTML = `
-      <div class="empty-queue-state">
-        <p class="empty-queue-text">${query ? 'No matching patients or services found.' : 'No patients currently in the queue for today.'}</p>
-      </div>
-    `;
+  if (tickets.length === 0) {
+    listContainer.innerHTML = '<div style="text-align: center; color: #64748b; padding: 20px;">No patients currently waiting in the queue.</div>';
     return;
   }
 
   listContainer.innerHTML = '';
-  filtered.forEach(t => {
-    const citizen = t.citizens || {};
-    const fullName = `${citizen.firstname || 'Unknown'} ${citizen.surname || 'Patient'}`.trim();
-    
+  tickets.forEach(t => {
     const item = document.createElement('div');
-    item.className = 'queue-item';
+    item.className = 'queue-select-item';
+    item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #e2e8f0; cursor: pointer; transition: background 0.15s;';
+    
+    const citizen = t.citizens;
+    const name = citizen ? `${citizen.firstname} ${citizen.surname}` : 'Walk-in Patient';
+    
     item.innerHTML = `
-      <div class="queue-item-info">
-        <strong class="queue-item-name">#${String(t.queue_number).padStart(3, '0')} — ${fullName}</strong>
-        <div class="queue-item-meta">
-          <span class="queue-item-badge badge-${t.status}">${t.status.replace('_', ' ').toUpperCase()}</span>
-          <span>${t.service_label}</span>
-        </div>
+      <div>
+        <strong style="font-size: 15px; color: #0284c7;">#${String(t.queue_number).padStart(3, '0')}</strong>
+        <span style="font-weight: 600; margin-left: 8px;">${name}</span>
+        <span style="font-size: 12px; color: #64748b; margin-left: 6px;">(${t.reason || 'General'})</span>
+        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; margin-top: 2px;">Status: ${t.status.replace('_', ' ')}</div>
       </div>
       <button class="chip-btn" style="background: #3b82f6; color: #fff; border: none; padding: 6px 12px; font-weight: 600;">Select</button>
     `;
@@ -5260,8 +5941,11 @@ function populateVitalsFormFromQueue(ticket) {
   activeVitalsQueueTicketId = ticket.id; // Store ticket ID!
 
   formContainer.classList.remove('hidden');
-  statusText.textContent = `Patient: #${String(ticket.queue_number).padStart(3, '0')}`;
-  statusText.style.color = '#3b82f6';
+  if (statusText) {
+    statusText.textContent = `Queue #${String(ticket.queue_number).padStart(3, '0')} loaded`;
+    statusText.style.color = '#0284c7';
+  }
+  setVitalsStationStatus('active', `Triage: #${String(ticket.queue_number).padStart(3, '0')}`);
   formContainer.scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -5353,8 +6037,13 @@ async function handleVitalsSubmission() {
     activeVitalsQueueTicketId = null;
     document.getElementById('vitals-form').reset();
     document.getElementById('vitals-form-container').classList.add('hidden');
-    document.getElementById('qr-status').textContent = 'Scanner ready.';
-    document.getElementById('qr-status').style.color = '';
+    const qrStat = document.getElementById('qr-status');
+    if (qrStat) {
+      qrStat.textContent = 'Scanner idle';
+      qrStat.style.color = '';
+    }
+    setVitalsStationStatus('ready', 'Ready for Intake');
+    loadRecentVitals();
 
     if (typeof appointments !== 'undefined' && appointments.loadQueueTickets) {
       await appointments.loadQueueTickets();
@@ -5418,35 +6107,61 @@ async function loadStaffData() {
   latestStaffList = Array.isArray(staffList) ? [...staffList] : [];
 
   if (accountsTbody) {
-    accountsTbody.innerHTML = '';
-    if (latestStaffList.length === 0) {
-      accountsTbody.innerHTML = '<tr><td class="table-cell" colspan="4">No registered staff accounts found.</td></tr>';
-    } else {
+    swapContainer(accountsTbody, (fragment) => {
+      if (latestStaffList.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td class="table-cell" colspan="5" style="text-align:center; padding:32px 16px; color:#94a3b8;">No registered staff accounts found.</td>';
+        fragment.appendChild(tr);
+        return;
+      }
+
       latestStaffList.forEach(user => {
         const identifier = user.username || user.employee_id || makeDemoId();
         storedAccounts.set(identifier, user);
 
-        const roleValue = user.role ? String(user.role) : '';
-        const roleLabel = roleValue ? roleValue.charAt(0).toUpperCase() + roleValue.slice(1) : '—';
+        const roleValue = user.role ? String(user.role).toLowerCase() : 'staff';
+        const roleLabel = roleValue.charAt(0).toUpperCase() + roleValue.slice(1);
         const statusValue = getStaffPresenceStatus(user);
-        const statusClass = getStaffPresenceBadgeClass(user);
+        const isDuty = statusValue.toLowerCase().includes('duty');
+        const isBreak = statusValue.toLowerCase().includes('break');
+        const dutyClass = isDuty ? 'on-duty' : (isBreak ? 'break' : 'off-duty');
+
+        const initials = (user.username || 'ST').substring(0, 2).toUpperCase();
+        const fullName = [user.firstname, user.surname].filter(Boolean).join(' ') || user.username || 'Medical Staff';
 
         const row = document.createElement('tr');
         row.className = 'account-row';
-        row.setAttribute('data-role', roleValue ? roleValue.toLowerCase() : '');
+        row.setAttribute('data-role', roleValue);
         row.setAttribute('data-id', identifier);
         row.innerHTML = `
-          <td class="table-cell">${user.username || '—'}</td>
-          <td class="table-cell">${user.employee_id || '—'}</td>
-          <td class="table-cell">${roleLabel}</td>
-          <td class="table-cell"><span class="${statusClass}">${statusValue}</span></td>
+          <td class="table-cell">
+            <div class="user-avatar-cell">
+              <div class="avatar-circle">${initials}</div>
+              <div>
+                <strong style="font-size:13.5px; color:#0f172a;">${escapeHtml(fullName)}</strong>
+                <div style="font-size:11.5px; color:#64748b;">@${escapeHtml(user.username || '—')}</div>
+              </div>
+            </div>
+          </td>
+          <td class="table-cell"><span class="employee-badge">${escapeHtml(user.employee_id || 'EMP-—')}</span></td>
+          <td class="table-cell"><span class="staff-role-badge role-${roleValue}">${escapeHtml(roleLabel)}</span></td>
+          <td class="table-cell">
+            <span class="duty-status-badge ${dutyClass}">
+              <span class="duty-dot ${dutyClass}"></span>
+              ${escapeHtml(statusValue)}
+            </span>
+          </td>
+          <td class="table-cell" style="text-align:right;">
+            <button type="button" class="btn small outline" data-action="view-staff" data-id="${escapeHtml(identifier)}" style="padding:3px 10px; font-size:11.5px; border-radius:9999px;">View Profile</button>
+          </td>
         `;
-        accountsTbody.appendChild(row);
+        fragment.appendChild(row);
         attachAccountRowListener(row);
       });
-    }
+    });
 
     applyStaffFinder();
+    updateUsersSectionTelemetry();
   }
 
   renderDashboardInsights();
@@ -5893,7 +6608,6 @@ function attachAccountRowListener(row) {
         { label: 'Username', value: user.username || '—' },
         { label: 'Employee ID', value: user.employee_id || '—' },
         { label: 'Role', value: roleLabel },
-        { label: 'Status', value: statusValue },
         { label: 'Email', value: user.email || '—' },
         { label: 'Birthday', value: user.birthday ? new Date(user.birthday) : '—' }
       ],
@@ -6239,12 +6953,52 @@ function openConsultationModal(prefill = {}) {
     consultationForm.dataset.patientName = prefill.patientName || '';
   }
 
-  // Pre-fill HPI from symptoms/reason
-  const hpiInput = document.getElementById('consult-hpi');
-  if (hpiInput && prefill.symptoms) hpiInput.value = prefill.symptoms;
+  // Pre-fill fields answerable by "None" when no answers
+  const defaultNoneFields = [
+    { id: 'consult-pmh', val: prefill.pmh },
+    { id: 'consult-allergies', val: prefill.allergies },
+    { id: 'consult-immunization', val: prefill.immunization },
+    { id: 'consult-social', val: prefill.social },
+    { id: 'exam-heent', val: prefill.exam_heent },
+    { id: 'exam-chest', val: prefill.exam_chest },
+    { id: 'exam-abdomen', val: prefill.exam_abdomen },
+    { id: 'exam-extremities', val: prefill.exam_extremities },
+    { id: 'exam-others', val: prefill.exam_others },
+    { id: 'consult-differential', val: prefill.differential },
+    { id: 'consult-lab-orders', val: prefill.lab_orders },
+    { id: 'consult-notes', val: prefill.notes }
+  ];
 
-  const notesInput = document.getElementById('consult-notes');
-  if (notesInput && prefill.notes) notesInput.value = prefill.notes;
+  defaultNoneFields.forEach(({ id, val }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = (val && String(val).trim()) ? String(val).trim() : 'None';
+    if (!el.dataset.noneBehaviorAttached) {
+      el.dataset.noneBehaviorAttached = 'true';
+      el.addEventListener('focus', function () {
+        if (this.value === 'None') this.select();
+      });
+      el.addEventListener('blur', function () {
+        if (!this.value.trim()) this.value = 'None';
+      });
+    }
+  });
+
+  // Pre-fill HPI from symptoms/reason or default to None
+  const hpiInput = document.getElementById('consult-hpi');
+  if (hpiInput) {
+    const initialHpi = prefill.symptoms || prefill.hpi;
+    hpiInput.value = (initialHpi && String(initialHpi).trim()) ? String(initialHpi).trim() : 'None';
+    if (!hpiInput.dataset.noneBehaviorAttached) {
+      hpiInput.dataset.noneBehaviorAttached = 'true';
+      hpiInput.addEventListener('focus', function () {
+        if (this.value === 'None') this.select();
+      });
+      hpiInput.addEventListener('blur', function () {
+        if (!this.value.trim()) this.value = 'None';
+      });
+    }
+  }
 
   // Hide vitals banner initially, then fetch if ticket linked
   const vitalsBanner = document.getElementById('consult-vitals-banner');
@@ -6281,6 +7035,10 @@ async function loadVitalsForConsultation(queueTicketId) {
     if (allergies && allergyBox && allergyText) {
       allergyText.textContent = allergies;
       allergyBox.classList.remove('hidden');
+      const allergyInput = document.getElementById('consult-allergies');
+      if (allergyInput && (!allergyInput.value || allergyInput.value === 'None')) {
+        allergyInput.value = allergies;
+      }
     } else if (allergyBox) {
       allergyBox.classList.add('hidden');
     }
@@ -6317,9 +7075,9 @@ async function loadVitalsForConsultation(queueTicketId) {
       }
     }
 
-    // Pre-fill HPI with chief complaint if HPI is empty
+    // Pre-fill HPI with chief complaint if HPI is empty or None
     const hpiInput = document.getElementById('consult-hpi');
-    if (hpiInput && !hpiInput.value && data.chief_complaint) {
+    if (hpiInput && (!hpiInput.value || hpiInput.value === 'None') && data.chief_complaint) {
       hpiInput.value = data.chief_complaint;
     }
 
@@ -6433,9 +7191,103 @@ async function completeQueueTicket(qId) {
   }
 }
 
+let consultActiveFilterRange = 'all';
+let consultSearchQuery = '';
+
+function initConsultationToolbar() {
+  const searchInput = document.getElementById('consult-search-input');
+  if (searchInput && !searchInput.dataset.initialized) {
+    searchInput.dataset.initialized = 'true';
+    searchInput.addEventListener('input', (e) => {
+      consultSearchQuery = e.target.value.trim().toLowerCase();
+      renderConsultations();
+    });
+  }
+
+  const chips = document.querySelectorAll('.consult-preset-chip');
+  chips.forEach(chip => {
+    if (!chip.dataset.bound) {
+      chip.dataset.bound = 'true';
+      chip.addEventListener('click', () => {
+        chips.forEach(c => c.classList.remove('is-active'));
+        chip.classList.add('is-active');
+        consultActiveFilterRange = chip.dataset.range;
+        
+        const dateFromInput = document.getElementById('consult-date-from');
+        const dateToInput = document.getElementById('consult-date-to');
+        const todayStr = getManilaTodayStr();
+
+        if (consultActiveFilterRange === 'today') {
+          if (dateFromInput) dateFromInput.value = todayStr;
+          if (dateToInput) dateToInput.value = todayStr;
+        } else if (consultActiveFilterRange === 'week') {
+          const now = new Date();
+          const day = now.getDay();
+          const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+          const monday = new Date(now.setDate(diff));
+          if (dateFromInput) dateFromInput.value = monday.toISOString().slice(0, 10);
+          if (dateToInput) dateToInput.value = todayStr;
+        } else if (consultActiveFilterRange === 'month') {
+          const now = new Date();
+          const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+          if (dateFromInput) dateFromInput.value = firstDay.toISOString().slice(0, 10);
+          if (dateToInput) dateToInput.value = todayStr;
+        } else {
+          if (dateFromInput) dateFromInput.value = '';
+          if (dateToInput) dateToInput.value = '';
+        }
+        renderConsultations();
+      });
+    }
+  });
+
+  const clearBtn = document.getElementById('consult-date-clear');
+  if (clearBtn && !clearBtn.dataset.bound) {
+    clearBtn.dataset.bound = 'true';
+    clearBtn.addEventListener('click', () => {
+      const dateFromInput = document.getElementById('consult-date-from');
+      const dateToInput = document.getElementById('consult-date-to');
+      if (dateFromInput) dateFromInput.value = '';
+      if (dateToInput) dateToInput.value = '';
+      if (searchInput) searchInput.value = '';
+      consultSearchQuery = '';
+      consultActiveFilterRange = 'all';
+      chips.forEach(c => c.classList.toggle('is-active', c.dataset.range === 'all'));
+      renderConsultations();
+    });
+  }
+
+  const sortSelect = document.getElementById('consult-sort-select');
+  if (sortSelect && !sortSelect.dataset.bound) {
+    sortSelect.dataset.bound = 'true';
+    sortSelect.addEventListener('change', renderConsultations);
+  }
+
+  const dateFromInput = document.getElementById('consult-date-from');
+  const dateToInput = document.getElementById('consult-date-to');
+  if (dateFromInput && !dateFromInput.dataset.bound) {
+    dateFromInput.dataset.bound = 'true';
+    dateFromInput.addEventListener('change', () => {
+      chips.forEach(c => c.classList.remove('is-active'));
+      renderConsultations();
+    });
+  }
+  if (dateToInput && !dateToInput.dataset.bound) {
+    dateToInput.dataset.bound = 'true';
+    dateToInput.addEventListener('change', () => {
+      chips.forEach(c => c.classList.remove('is-active'));
+      renderConsultations();
+    });
+  }
+}
+
 function renderServingQueue() {
+  const container = document.getElementById('serving-workstation-container');
+  const tableWrap = document.getElementById('serving-queue-table-wrap');
   const tbody = document.getElementById('serving-queue-tbody');
-  if (!tbody) return;
+  const statusPill = document.getElementById('consult-desk-status-pill');
+  const statusText = document.getElementById('consult-desk-status-text');
+
   const allowConsult = canConsultPatients();
 
   // Hard filter to ensure no completed/cancelled tickets ever show up in this active list
@@ -6444,49 +7296,135 @@ function renderServingQueue() {
     return status === 'serving' || status === 'on_call';
   });
 
-  swapContainer(tbody, (fragment) => {
-    if (!activeTickets.length) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = '<td class="table-cell" colspan="5" style="color:#64748b;">No patients currently being served.</td>';
-      fragment.appendChild(tr);
-      return;
+  if (!container) return;
+
+  if (activeTickets.length === 0) {
+    if (statusPill) statusPill.className = 'consult-desk-pill ready';
+    if (statusText) statusText.textContent = 'Station Ready • Waiting for Patient';
+    if (tableWrap) tableWrap.classList.add('hidden');
+
+    container.innerHTML = `
+      <div class="consult-station-idle">
+        <div class="station-idle-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+        </div>
+        <div>
+          <h4>Physician Station Ready</h4>
+          <p>No patient currently called into the consultation room. Waiting for triage arrival or queue dispatch.</p>
+        </div>
+        <button id="consult-view-queue-btn" type="button" class="chip-btn chip-btn-outline" style="margin-left:auto; display:inline-flex; align-items:center; gap:6px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          View Live Queue
+        </button>
+      </div>
+    `;
+
+    const viewQueueBtn = document.getElementById('consult-view-queue-btn');
+    if (viewQueueBtn) {
+      viewQueueBtn.addEventListener('click', () => {
+        showSection('queue-section');
+      });
     }
-    activeTickets.forEach(c => {
-      const displayName = c.patientName || c.patientId || '—';
-      const tr = document.createElement('tr');
-      tr.style.background = '#f0fdf4';
-      tr.innerHTML = `
-        <td class="table-cell"><strong>${displayName}</strong><br><span style="font-size:11px;color:#64748b">${c.patientId || ''}</span></td>
-        <td class="table-cell">${c.serviceLabel || 'General Consultation'}</td>
-        <td class="table-cell"><span style="font-weight:700;color:#0369a1">#${String(c.queueNumber || 0).padStart(3,'0')}</span></td>
-        <td class="table-cell">${formatDateTime(c.created_at)}</td>
-        <td class="table-cell">
-          ${allowConsult
-            ? `<button class="btn small" data-action="consult" data-id="${c.id}" style="background:#0369a1;color:#fff;border-color:#0369a1;">Consult</button>`
-            : '<span style="color:#94a3b8;font-size:12px">View only</span>'}
-        </td>
-      `;
-      fragment.appendChild(tr);
-      attachDetailRow(tr, () => ({
-        tag: 'Now Serving',
-        title: displayName,
-        subtitle: c.serviceLabel || 'General Consultation',
-        items: [
-          { label: 'Patient Name', value: c.patientName || '—' },
-          { label: 'Patient ID', value: c.patientId },
-          { label: 'Service', value: c.serviceLabel || '—' },
-          { label: 'Queue Number', value: c.queueNumber > 0 ? `#${String(c.queueNumber).padStart(3,'0')}` : '—' },
-          { label: 'Symptoms', value: c.symptoms || '—' },
-          { label: 'Reason', value: c.notes || '—' },
-          { label: 'Since', value: new Date(c.created_at) }
-        ]
-      }));
+    return;
+  }
+
+  // Active patient in station!
+  const firstTicket = activeTickets[0];
+  const displayName = firstTicket.patientName || firstTicket.patientId || 'Walk-in Patient';
+  const queueNum = `#${String(firstTicket.queueNumber || 0).padStart(3, '0')}`;
+  
+  if (statusPill) statusPill.className = 'consult-desk-pill active';
+  if (statusText) statusText.textContent = `Patient in Station: ${queueNum}`;
+
+  const v = firstTicket.vitals || {};
+  let vitalsHtml = '';
+  if (v.blood_pressure || v.heart_rate || v.temperature || v.oxygen_saturation) {
+    const isHighBp = v.blood_pressure && (parseInt(v.blood_pressure.split('/')[0]) >= 140 || parseInt(v.blood_pressure.split('/')[1]) >= 90);
+    const isFever = v.temperature && Number(v.temperature) >= 37.8;
+    vitalsHtml = `
+      <div class="triage-vitals-strip">
+        ${v.blood_pressure ? `<span class="triage-vital-pill ${isHighBp ? 'vital-alert' : ''}">BP ${v.blood_pressure}</span>` : ''}
+        ${v.heart_rate ? `<span class="triage-vital-pill">HR ${v.heart_rate} bpm</span>` : ''}
+        ${v.temperature ? `<span class="triage-vital-pill ${isFever ? 'vital-alert' : ''}">Temp ${v.temperature}°C</span>` : ''}
+        ${v.oxygen_saturation ? `<span class="triage-vital-pill">SpO₂ ${v.oxygen_saturation}%</span>` : ''}
+      </div>
+    `;
+  } else {
+    vitalsHtml = `
+      <div class="triage-vitals-strip">
+        <span class="triage-vital-pill" style="color:#64748b;">No pre-consultation vitals recorded yet</span>
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    <div class="consult-active-call-card">
+      <div class="call-card-left">
+        <div class="call-card-queue-num">${queueNum}</div>
+        <div class="call-card-info">
+          <div class="call-card-name-row">
+            <span class="call-card-name">${escapeHtml(displayName)}</span>
+            <span class="call-card-tag">${escapeHtml(firstTicket.serviceLabel || 'General Consultation')}</span>
+            ${firstTicket.age ? `<span style="font-size:12px; color:#64748b; font-weight:600;">${firstTicket.age} yrs</span>` : ''}
+            <span style="font-size:12px; color:#64748b;">${firstTicket.patientId ? `(${firstTicket.patientId})` : ''}</span>
+          </div>
+          <div class="call-card-complaint">
+            <strong style="color:#334155;">Chief Complaint:</strong> ${escapeHtml(firstTicket.symptoms || firstTicket.notes || 'Routine general checkup')}
+          </div>
+          ${vitalsHtml}
+        </div>
+      </div>
+      <div class="call-card-actions">
+        ${allowConsult ? `
+          <button type="button" class="btn-start-consult" data-action="consult" data-id="${firstTicket.id}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Begin Consultation
+          </button>
+        ` : '<span style="color:#94a3b8; font-size:13px; font-weight:600;">View Only Access</span>'}
+      </div>
+    </div>
+  `;
+
+  // Bind click on call card button
+  const startBtn = container.querySelector('.btn-start-consult');
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      openConsultationModal({
+        patientId: firstTicket.patientId || '',
+        patientName: firstTicket.patientName || '',
+        serviceLabel: firstTicket.serviceLabel || '',
+        queueTicketId: firstTicket.queueTicketId || null,
+        symptoms: firstTicket.symptoms || '',
+        notes: firstTicket.notes || ''
+      });
     });
-  });
+  }
+
+  // If multiple patients are serving, show the secondary table
+  if (activeTickets.length > 1 && tableWrap && tbody) {
+    tableWrap.classList.remove('hidden');
+    tbody.innerHTML = activeTickets.slice(1).map(c => `
+      <tr>
+        <td style="font-weight:700; color:#0369a1;">#${String(c.queueNumber || 0).padStart(3, '0')}</td>
+        <td><strong>${escapeHtml(c.patientName || c.patientId || '—')}</strong></td>
+        <td>${escapeHtml(c.serviceLabel || 'General Consultation')}</td>
+        <td style="font-size:12px; color:#64748b;">${formatDateTime(c.created_at)}</td>
+        <td style="text-align:right;">
+          ${allowConsult ? `<button class="btn small" data-action="consult" data-id="${c.id}" style="background:#0369a1; color:#fff;">Consult</button>` : '—'}
+        </td>
+      </tr>
+    `).join('');
+  } else if (tableWrap) {
+    tableWrap.classList.add('hidden');
+  }
 }
 
 function renderConsultations() {
   if (!consultationsTbody) return;
+  initConsultationToolbar();
+
   const sortSelect = document.getElementById('consult-sort-select');
   const sortBy = sortSelect ? sortSelect.value : 'date-desc';
 
@@ -6498,6 +7436,17 @@ function renderConsultations() {
   const allowPrescribe = canCreatePrescriptions();
 
   let rows = consultations.slice();
+
+  // Apply search query filter
+  if (consultSearchQuery) {
+    rows = rows.filter(c => {
+      const name = String(c.patientName || '').toLowerCase();
+      const id = String(c.patientId || '').toLowerCase();
+      const diag = String(c.diagnosis || '').toLowerCase();
+      const symptoms = String(c.symptoms || '').toLowerCase();
+      return name.includes(consultSearchQuery) || id.includes(consultSearchQuery) || diag.includes(consultSearchQuery) || symptoms.includes(consultSearchQuery);
+    });
+  }
 
   // Apply date range filter
   if (dateFrom || dateTo) {
@@ -6519,9 +7468,18 @@ function renderConsultations() {
 
   swapContainer(consultationsTbody, (fragment) => {
     if (!rows.length) {
-      const msg = (dateFrom || dateTo) ? 'No consultations found for the selected date range.' : 'No consultation records yet.';
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td class="table-cell" colspan="5" style="color:#64748b;">${msg}</td>`;
+      tr.innerHTML = `
+        <td class="table-cell" colspan="6" style="text-align:center; padding:36px 16px; color:#94a3b8;">
+          <div style="display:flex; justify-content:center; margin-bottom:8px;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+          </div>
+          <strong style="color:#475569;">No Consultation Records Found</strong><br>
+          <span style="font-size:12px; color:#94a3b8;">Try clearing or adjusting your search keywords and date filters.</span>
+        </td>
+      `;
       fragment.appendChild(tr);
       return;
     }
@@ -6529,13 +7487,26 @@ function renderConsultations() {
       const displayName = c.patientName || c.patientId || '—';
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="table-cell"><strong>${displayName}</strong></td>
-        <td class="table-cell" style="color:#64748b;font-size:13px;">${c.patientId || '—'}</td>
-        <td class="table-cell">${(c.diagnosis || '').substring(0, 60)}</td>
-        <td class="table-cell">${formatDateTime(c.created_at)}</td>
-        <td class="table-cell" style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn small" data-action="view" data-id="${c.id}" style="background:#64748b;color:#fff;border-color:#64748b;">View</button>
-          ${allowPrescribe ? `<button class="btn small" data-action="prescribe" data-id="${c.id}" style="background:#16a34a;color:#fff;border-color:#16a34a;">Prescribe</button>` : ''}
+        <td class="table-cell"><strong>${escapeHtml(displayName)}</strong></td>
+        <td class="table-cell" style="color:#64748b; font-size:12.5px; font-family:monospace;">${escapeHtml(c.patientId || '—')}</td>
+        <td class="table-cell"><span style="font-weight:600; color:#0f172a;">${escapeHtml((c.diagnosis || 'Unspecified').substring(0, 70))}</span></td>
+        <td class="table-cell" style="font-size:12px; color:${c.follow_up_date ? '#0284c7' : '#94a3b8'}; font-weight:600;">
+          ${c.follow_up_date ? new Date(c.follow_up_date).toLocaleDateString() : 'None Scheduled'}
+        </td>
+        <td class="table-cell" style="font-size:12px; color:#64748b;">${formatDateTime(c.created_at)}</td>
+        <td class="table-cell" style="text-align:right;">
+          <div style="display:inline-flex; gap:6px;">
+            <button class="btn small" data-action="view" data-id="${c.id}" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; font-weight:600; display:inline-flex; align-items:center; gap:5px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              View
+            </button>
+            ${allowPrescribe ? `
+              <button class="btn small" data-action="prescribe" data-id="${c.id}" style="background:#0284c7; color:#fff; border:none; font-weight:600; display:inline-flex; align-items:center; gap:5px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12h6m-3-3v6"/></svg>
+                Prescribe
+              </button>
+            ` : ''}
+          </div>
         </td>
       `;
       fragment.appendChild(tr);
@@ -6597,6 +7568,9 @@ function mapNowServingQueueRow(item) {
     queueTicketId: ticketId > 0 ? ticketId : null,
     patientId,
     patientName,
+    age: item?.citizen?.age || null,
+    contactNumber: item?.citizen?.contact_number || null,
+    vitals: item?.vital_signs || {},
     symptoms: String(item?.symptoms || '').trim(),
     diagnosis: '',
     notes: String(item?.reason || '').trim(),
@@ -6618,7 +7592,6 @@ function resolveCitizenIdFromIdentifier(patientIdentifier) {
     return Number.isFinite(parsed) ? parsed : null;
   }
 
-  // Pattern: 123
   // Pattern: 123
   const numeric = Number(raw);
   if (Number.isFinite(numeric) && numeric > 0) {
@@ -6680,7 +7653,7 @@ async function listNowServingQueueForConsultation() {
   
   const query = supabase
     .from('queue_tickets')
-    .select('id,queue_number,ticket_code,service_label,status,reason,symptoms,created_at,served_at,citizen:citizens(id,firstname,surname,email)')
+    .select('id,queue_number,ticket_code,service_label,status,reason,symptoms,created_at,served_at,citizen_id,citizen:citizens(id,firstname,surname,email,age,contact_number)')
     .eq('status', 'serving')
     .order('queue_number', { ascending: true });
 
@@ -6692,7 +7665,7 @@ async function listNowServingQueueForConsultation() {
     console.log('No serving tickets for today, attempting fallback to recent serving tickets (last 24h)...');
     const fb = await supabase
       .from('queue_tickets')
-      .select('id,queue_number,ticket_code,service_label,status,reason,symptoms,created_at,served_at,citizen:citizens(id,firstname,surname,email)')
+      .select('id,queue_number,ticket_code,service_label,status,reason,symptoms,created_at,served_at,citizen_id,citizen:citizens(id,firstname,surname,email,age,contact_number)')
       .eq('status', 'serving')
       .gt('created_at', twentyFourHoursAgo)
       .order('served_at', { ascending: false })
@@ -6705,6 +7678,31 @@ async function listNowServingQueueForConsultation() {
 
   if (error) {
     throw new Error(error.message || 'Unable to load now serving queue tickets.');
+  }
+
+  // Also query vitals for these serving tickets if available
+  if (data && data.length > 0) {
+    const ticketIds = data.map(t => t.id).filter(Boolean);
+    if (ticketIds.length > 0) {
+      try {
+        const { data: vData } = await supabase
+          .from('vital_signs')
+          .select('queue_ticket_id,citizen_id,blood_pressure,heart_rate,temperature,oxygen_saturation')
+          .in('queue_ticket_id', ticketIds);
+
+        if (vData && vData.length > 0) {
+          const vMap = {};
+          vData.forEach(v => {
+            if (v.queue_ticket_id) vMap[v.queue_ticket_id] = v;
+          });
+          data.forEach(t => {
+            t.vital_signs = vMap[t.id] || null;
+          });
+        }
+      } catch (vErr) {
+        console.warn('Could not load vitals for serving tickets:', vErr);
+      }
+    }
   }
 
   return (data || []).map(mapNowServingQueueRow);
@@ -6845,25 +7843,25 @@ if (consultationForm) {
       const payload = {
         patientId,
         queueTicketId: consultationForm.dataset.queueTicketId || null,
-        symptoms: document.getElementById('consult-hpi')?.value || '',
+        symptoms: cleanNone(document.getElementById('consult-hpi')?.value),
         diagnosis,
-        notes: document.getElementById('consult-notes')?.value || '',
-        hpi: document.getElementById('consult-hpi')?.value || '',
-        pmh: document.getElementById('consult-pmh')?.value || '',
-        allergies: document.getElementById('consult-allergies')?.value || '',
-        immunization: document.getElementById('consult-immunization')?.value || '',
-        social: document.getElementById('consult-social')?.value || '',
+        notes: cleanNone(document.getElementById('consult-notes')?.value),
+        hpi: cleanNone(document.getElementById('consult-hpi')?.value),
+        pmh: cleanNone(document.getElementById('consult-pmh')?.value),
+        allergies: cleanNone(document.getElementById('consult-allergies')?.value),
+        immunization: cleanNone(document.getElementById('consult-immunization')?.value),
+        social: cleanNone(document.getElementById('consult-social')?.value),
         physical_exam: {
-          heent: (document.getElementById('exam-heent')?.value || document.getElementById('consult-heent')?.value || '').trim(),
-          chest: (document.getElementById('exam-chest')?.value || document.getElementById('consult-chest')?.value || '').trim(),
-          heart: (document.getElementById('consult-heart')?.value || '').trim(),
-          abdomen: (document.getElementById('exam-abdomen')?.value || document.getElementById('consult-abdomen')?.value || '').trim(),
-          extremities: (document.getElementById('exam-extremities')?.value || document.getElementById('consult-extremities')?.value || '').trim(),
-          neurological: (document.getElementById('consult-neurological')?.value || '').trim(),
-          others: (document.getElementById('exam-others')?.value || '').trim()
+          heent: cleanNone(document.getElementById('exam-heent')?.value || document.getElementById('consult-heent')?.value),
+          chest: cleanNone(document.getElementById('exam-chest')?.value || document.getElementById('consult-chest')?.value),
+          heart: cleanNone(document.getElementById('consult-heart')?.value),
+          abdomen: cleanNone(document.getElementById('exam-abdomen')?.value || document.getElementById('consult-abdomen')?.value),
+          extremities: cleanNone(document.getElementById('exam-extremities')?.value || document.getElementById('consult-extremities')?.value),
+          neurological: cleanNone(document.getElementById('consult-neurological')?.value),
+          others: cleanNone(document.getElementById('exam-others')?.value)
         },
-        differential: document.getElementById('consult-differential')?.value || '',
-        lab_orders: document.getElementById('consult-lab-orders')?.value || '',
+        differential: cleanNone(document.getElementById('consult-differential')?.value),
+        lab_orders: cleanNone(document.getElementById('consult-lab-orders')?.value),
         followup: document.getElementById('consult-followup')?.value || null
       };
 
@@ -6896,17 +7894,17 @@ async function createConsultationEntry(payload) {
     const entry = {
       id: `C-${Date.now()}`,
       patientId: payload.patientId,
-      symptoms: payload.symptoms || '',
+      symptoms: cleanNone(payload.symptoms),
       diagnosis: payload.diagnosis,
-      notes: payload.notes || '',
-      hpi: payload.hpi,
-      pmh: payload.pmh,
-      allergies: payload.allergies,
-      immunization_status: payload.immunization,
-      social_history: payload.social,
+      notes: cleanNone(payload.notes),
+      hpi: cleanNone(payload.hpi),
+      pmh: cleanNone(payload.pmh),
+      allergies: cleanNone(payload.allergies),
+      immunization_status: cleanNone(payload.immunization),
+      social_history: cleanNone(payload.social),
       physical_exam: payload.physical_exam,
-      differential_diagnosis: payload.differential,
-      lab_orders: payload.lab_orders,
+      differential_diagnosis: cleanNone(payload.differential),
+      lab_orders: cleanNone(payload.lab_orders),
       follow_up_date: payload.followup,
       created_at: new Date().toISOString()
     };
@@ -6924,17 +7922,17 @@ async function createConsultationEntry(payload) {
     patient_identifier: String(payload.patientId || '').trim(),
     patient_citizen_id: resolveCitizenIdFromIdentifier(payload.patientId),
     doctor_staff_id: doctorStaffId,
-    symptoms: String(payload.symptoms || '').trim() || null,
+    symptoms: cleanNone(payload.symptoms || payload.hpi),
     diagnosis: String(payload.diagnosis || '').trim(),
-    notes: String(payload.notes || '').trim() || null,
-    hpi: String(payload.hpi || '').trim() || null,
-    pmh: String(payload.pmh || '').trim() || null,
-    allergies: String(payload.allergies || '').trim() || null,
-    immunization_status: String(payload.immunization || '').trim() || null,
-    social_history: String(payload.social || '').trim() || null,
+    notes: cleanNone(payload.notes),
+    hpi: cleanNone(payload.hpi || payload.symptoms),
+    pmh: cleanNone(payload.pmh),
+    allergies: cleanNone(payload.allergies),
+    immunization_status: cleanNone(payload.immunization),
+    social_history: cleanNone(payload.social),
     physical_exam: payload.physical_exam || {},
-    differential_diagnosis: String(payload.differential || '').trim() || null,
-    lab_orders: String(payload.lab_orders || '').trim() || null,
+    differential_diagnosis: cleanNone(payload.differential),
+    lab_orders: cleanNone(payload.lab_orders),
     follow_up_date: payload.followup || null,
     consulted_at: new Date().toISOString()
   };
@@ -7190,25 +8188,300 @@ async function createPrescriptionEntry({ patientId, consultationDbId, items }) {
   return { id: `P-${headerId}`, patient: cleanPatientId, items: normalizedItems };
 }
 
+let medicineActiveFilter = 'all';
+
+function initMedicineSection() {
+  const openAddBtn = document.getElementById('open-add-medicine-btn');
+  const addPanel = document.getElementById('medicine-add-panel');
+  const cancelAddBtn = document.getElementById('medicine-add-cancel-btn');
+  const form = document.getElementById('medicine-form');
+
+  if (openAddBtn && !openAddBtn.dataset.bound) {
+    openAddBtn.dataset.bound = 'true';
+    openAddBtn.addEventListener('click', () => {
+      if (addPanel) addPanel.classList.toggle('hidden');
+      const nameInput = document.getElementById('medicine-name-input');
+      if (nameInput && !addPanel.classList.contains('hidden')) {
+        nameInput.focus();
+      }
+    });
+  }
+
+  if (cancelAddBtn && !cancelAddBtn.dataset.bound) {
+    cancelAddBtn.dataset.bound = 'true';
+    cancelAddBtn.addEventListener('click', () => {
+      if (addPanel) addPanel.classList.add('hidden');
+      if (form) form.reset();
+    });
+  }
+
+  if (form && !form.dataset.bound) {
+    form.dataset.bound = 'true';
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('medicine-name-input')?.value?.trim();
+      const desc = document.getElementById('medicine-desc-input')?.value?.trim();
+      const qty = parseInt(document.getElementById('medicine-qty-input')?.value, 10) || 0;
+      const unit = document.getElementById('medicine-unit-input')?.value?.trim();
+      const expiry = document.getElementById('medicine-expiry-input')?.value || null;
+
+      if (!name) {
+        showToast('Medicine name is required.', 'warning');
+        return;
+      }
+
+      try {
+        const { supabase } = await loadSupabaseModule();
+        const payload = {
+          name,
+          description: desc || null,
+          qty: Math.max(0, qty),
+          unit: unit || null,
+          expiry_date: expiry,
+          created_by_staff_id: Number(cachedSessionUser?.id) || null
+        };
+
+        const { error } = await supabase.from('medicines').insert(payload);
+        if (error) throw error;
+
+        showToast(`Successfully registered ${name}.`, 'success');
+        form.reset();
+        if (addPanel) addPanel.classList.add('hidden');
+        await refreshMedicineData();
+      } catch (err) {
+        console.error('Add medicine error:', err);
+        showToast('Failed to add medicine. ' + (err.message || ''), 'error');
+      }
+    });
+  }
+
+  // Filter chips
+  const filterChips = document.querySelectorAll('.ph-filter-chip');
+  filterChips.forEach(chip => {
+    if (!chip.dataset.bound) {
+      chip.dataset.bound = 'true';
+      chip.addEventListener('click', () => {
+        filterChips.forEach(c => c.classList.remove('is-active'));
+        chip.classList.add('is-active');
+        medicineActiveFilter = chip.dataset.filter || 'all';
+        renderMedicines();
+      });
+    }
+  });
+
+  // Search input
+  const searchInput = document.getElementById('medicine-search-input');
+  if (searchInput && !searchInput.dataset.bound) {
+    searchInput.dataset.bound = 'true';
+    searchInput.addEventListener('input', () => {
+      renderMedicines();
+    });
+  }
+
+  // Sort select
+  const sortSelect = document.getElementById('medicine-sort-select');
+  if (sortSelect && !sortSelect.dataset.bound) {
+    sortSelect.dataset.bound = 'true';
+    sortSelect.addEventListener('change', () => {
+      renderMedicines();
+    });
+  }
+
+  // Archive toggle
+  const archToggle = document.getElementById('medicine-archived-toggle-btn');
+  const archPanel = document.getElementById('medicine-archived-panel');
+  if (archToggle && !archToggle.dataset.bound) {
+    archToggle.dataset.bound = 'true';
+    archToggle.addEventListener('click', async () => {
+      isArchivedMedicinesVisible = !isArchivedMedicinesVisible;
+      archToggle.innerHTML = isArchivedMedicinesVisible
+        ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg> Hide Archived`
+        : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg> Show Archived`;
+      if (archPanel) archPanel.classList.toggle('hidden', !isArchivedMedicinesVisible);
+      if (isArchivedMedicinesVisible) {
+        await refreshArchivedMedicineData();
+      }
+    });
+  }
+
+  // Table actions delegation for main medicine table
+  const medTbody = document.getElementById('medicine-tbody');
+  if (medTbody && !medTbody.dataset.bound) {
+    medTbody.dataset.bound = 'true';
+    medTbody.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const name = btn.dataset.name;
+      if (!action || !name) return;
+
+      if (action === 'add') {
+        const input = prompt(`Add stock quantity for "${name}":`, '10');
+        const qty = parseInt(input, 10);
+        if (qty && qty > 0) {
+          try {
+            await addMedicineStockByName(name, qty);
+            showToast(`Added ${qty} units to ${name}.`, 'success');
+            await refreshMedicineData();
+          } catch (err) {
+            showToast('Failed to add stock.', 'error');
+          }
+        }
+      } else if (action === 'sub') {
+        const input = prompt(`Subtract/Dispense stock quantity for "${name}":`, '1');
+        const qty = parseInt(input, 10);
+        if (qty && qty > 0) {
+          try {
+            await reduceMedicineStockByName(name, qty);
+            showToast(`Dispensed ${qty} units from ${name}.`, 'success');
+            await refreshMedicineData();
+          } catch (err) {
+            showToast('Failed to reduce stock.', 'error');
+          }
+        }
+      } else if (action === 'remove') {
+        if (confirm(`Are you sure you want to archive "${name}" from the active dispensary?`)) {
+          try {
+            await removeMedicineEntryByName(name);
+            showToast(`Archived ${name}.`, 'info');
+            await Promise.all([refreshMedicineData(), refreshArchivedMedicineData()]);
+          } catch (err) {
+            showToast('Failed to archive medicine.', 'error');
+          }
+        }
+      }
+    });
+  }
+
+  // Table actions delegation for archived medicine table
+  const archTbody = document.getElementById('medicine-archived-tbody');
+  if (archTbody && !archTbody.dataset.bound) {
+    archTbody.dataset.bound = 'true';
+    archTbody.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const id = btn.dataset.id;
+      if (!action || !id) return;
+
+      if (action === 'restore') {
+        try {
+          await restoreMedicineEntryById(id);
+          showToast('Medicine restored to active dispensary.', 'success');
+          await Promise.all([refreshMedicineData(), refreshArchivedMedicineData()]);
+        } catch (err) {
+          showToast('Failed to restore medicine.', 'error');
+        }
+      } else if (action === 'hard-delete') {
+        if (confirm('Permanently delete this medicine record? This action cannot be undone.')) {
+          try {
+            await permanentlyDeleteArchivedMedicineById(id);
+            showToast('Medicine permanently deleted.', 'info');
+            await refreshArchivedMedicineData();
+          } catch (err) {
+            showToast('Failed to delete permanently.', 'error');
+          }
+        }
+      }
+    });
+  }
+}
+
 function renderMedicines() {
   if (!medicineTbody) return;
+  initMedicineSection();
 
-  // Update searchable datalist for prescriptions
+  // Update datalist for prescriptions
   const medicineList = document.getElementById('medicine-list');
   if (medicineList) {
     medicineList.innerHTML = medicines.map(m => `<option value="${m.name}">${m.name} (${m.unit || ''})</option>`).join('');
   }
 
+  // Calculate Telemetry across ALL active medicines
+  const now = new Date();
+  let totalCount = medicines.length;
+  let inStockCount = 0;
+  let lowStockCount = 0;
+  let expiringSoonCount = 0;
+  let outCount = 0;
+
+  medicines.forEach(m => {
+    const isOut = m.qty <= 0;
+    const isLow = m.qty > 0 && m.qty <= 5;
+    let isExpired = false;
+    let isExpiringSoon = false;
+
+    if (m.expiry_date) {
+      const exp = new Date(m.expiry_date);
+      const diffDays = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+      if (diffDays < 0) isExpired = true;
+      else if (diffDays <= 90) isExpiringSoon = true;
+    }
+
+    if (isExpired || isOut) {
+      outCount++;
+    } else if (isLow) {
+      lowStockCount++;
+    } else {
+      inStockCount++;
+    }
+
+    if (isExpiringSoon && !isExpired) {
+      expiringSoonCount++;
+    }
+  });
+
+  // Update Telemetry metric values
+  const totalEl = document.getElementById('ph-stat-total');
+  const inStockEl = document.getElementById('ph-stat-instock');
+  const lowEl = document.getElementById('ph-stat-low');
+  const outEl = document.getElementById('ph-stat-out');
+
+  if (totalEl) totalEl.textContent = String(totalCount);
+  if (inStockEl) inStockEl.textContent = String(inStockCount);
+  if (lowEl) lowEl.textContent = String(lowStockCount);
+  if (outEl) outEl.textContent = String(outCount);
+
+  // Update filter chip counters
+  const chipAll = document.getElementById('chip-count-all');
+  const chipInStock = document.getElementById('chip-count-instock');
+  const chipLow = document.getElementById('chip-count-low');
+  const chipExp = document.getElementById('chip-count-expiring');
+  const chipOut = document.getElementById('chip-count-out');
+
+  if (chipAll) chipAll.textContent = String(totalCount);
+  if (chipInStock) chipInStock.textContent = String(inStockCount);
+  if (chipLow) chipLow.textContent = String(lowStockCount);
+  if (chipExp) chipExp.textContent = String(expiringSoonCount);
+  if (chipOut) chipOut.textContent = String(outCount);
+
+  // Filter based on search query
   const searchQuery = (medicineSearchInput?.value || '').toLowerCase().trim();
+  let filtered = medicines.filter(m => 
+    m.name.toLowerCase().includes(searchQuery) || 
+    (m.description || '').toLowerCase().includes(searchQuery) ||
+    (m.unit || '').toLowerCase().includes(searchQuery)
+  );
+
+  // Filter based on active filter chip
+  if (medicineActiveFilter === 'in_stock') {
+    filtered = filtered.filter(m => m.qty > 5 && (!m.expiry_date || new Date(m.expiry_date) >= now));
+  } else if (medicineActiveFilter === 'low_stock') {
+    filtered = filtered.filter(m => m.qty > 0 && m.qty <= 5);
+  } else if (medicineActiveFilter === 'expiring') {
+    filtered = filtered.filter(m => {
+      if (!m.expiry_date) return false;
+      const diffDays = Math.ceil((new Date(m.expiry_date) - now) / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays <= 90;
+    });
+  } else if (medicineActiveFilter === 'out_of_stock') {
+    filtered = filtered.filter(m => m.qty <= 0 || (m.expiry_date && new Date(m.expiry_date) < now));
+  }
+
+  // Sort
   const sortSelect = document.getElementById('medicine-sort-select');
   const sortBy = sortSelect ? sortSelect.value : 'name-asc';
 
-  let filtered = medicines.filter(m => 
-    m.name.toLowerCase().includes(searchQuery) || 
-    (m.description || '').toLowerCase().includes(searchQuery)
-  );
-
-  // Apply Sorting
   if (sortBy === 'name-asc') {
     filtered.sort((a, b) => a.name.localeCompare(b.name));
   } else if (sortBy === 'name-desc') {
@@ -7231,107 +8504,131 @@ function renderMedicines() {
     filtered.sort((a, b) => (a.qty || 0) - (b.qty || 0));
   }
 
-  filteredMedicines = filtered;
-
   const role = getSessionRole();
   const allowAdjust = canAdjustMedicineInventory(role);
   const allowAddNew = canAddNewMedicine(role);
-  const allowRemove = canAddNewMedicine(role);
-  // Doctors and nurses see a simplified read-only view — no expiry date, no actions column
-  const showExpiryAndActions = allowAdjust || allowAddNew || !['doctor','nurse'].includes((role || '').toLowerCase());
 
-  // Toggle header cells
-  const thExpiry = document.getElementById('medicine-th-expiry');
-  const thActions = document.getElementById('medicine-th-actions');
-  if (thExpiry) thExpiry.style.display = showExpiryAndActions ? '' : 'none';
-  if (thActions) thActions.style.display = showExpiryAndActions ? '' : 'none';
-
-  const colCount = showExpiryAndActions ? 7 : 5;
-
-  const medicineFormEl = document.getElementById('medicine-form');
-  if (medicineFormEl) {
-    const formPanel = medicineFormEl.closest('.panel');
-    if (formPanel) formPanel.classList.toggle('hidden', !allowAddNew);
-    medicineFormEl.querySelectorAll('input, select, textarea, button').forEach((el) => {
-      el.disabled = !allowAddNew;
-    });
+  // Show register button if user is authorized
+  const openAddBtn = document.getElementById('open-add-medicine-btn');
+  if (openAddBtn) {
+    openAddBtn.style.display = allowAddNew ? 'inline-flex' : 'none';
   }
 
   swapContainer(medicineTbody, (fragment) => {
-    if (!Array.isArray(filtered) || filtered.length === 0) {
-      const msg = searchQuery ? 'No medicines match your search.' : 'No medicine inventory yet.';
+    if (!filtered.length) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td class="table-cell" colspan="${colCount}">${msg}</td>`;
+      tr.innerHTML = `
+        <td class="table-cell" colspan="6" style="text-align:center; padding:36px 16px; color:#94a3b8;">
+          <div style="display:flex; justify-content:center; margin-bottom:8px;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/>
+            </svg>
+          </div>
+          <strong style="color:#475569;">No Medicines Found</strong><br>
+          <span style="font-size:12px; color:#94a3b8;">Try clearing search keywords or selecting another status filter.</span>
+        </td>
+      `;
       fragment.appendChild(tr);
       return;
     }
+
     filtered.forEach(m => {
       const tr = document.createElement('tr');
 
-      // Status logic
+      // Status calculation
       const isLowStock = m.qty <= 5 && m.qty > 0;
       const isOutOfStock = m.qty <= 0;
-      const isExpired = m.expiry_date && new Date(m.expiry_date) < new Date();
+      let isExpired = false;
+      let diffDays = null;
 
-      let statusHtml = '<span class="badge badge-success">In Stock</span>';
-      if (isExpired) statusHtml = '<span class="badge badge-error">Expired</span>';
-      else if (isOutOfStock) statusHtml = '<span class="badge badge-error">Out of Stock</span>';
-      else if (isLowStock) statusHtml = '<span class="badge badge-warning">Low Stock</span>';
+      if (m.expiry_date) {
+        const exp = new Date(m.expiry_date);
+        diffDays = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) isExpired = true;
+      }
 
-      const expiryText = m.expiry_date ? new Date(m.expiry_date).toLocaleDateString() : '—';
-      const descriptionText = m.description || '—';
+      let statusHtml = '<span class="ph-filter-chip" style="background:#dcfce7; color:#15803d; border-color:#bbf7d0; font-size:11px; padding:2px 8px;"><span class="chip-dot dot-normal"></span> In Stock</span>';
+      if (isExpired) {
+        statusHtml = '<span class="ph-filter-chip" style="background:#fee2e2; color:#991b1b; border-color:#fecaca; font-size:11px; padding:2px 8px;"><span class="chip-dot dot-flagged"></span> Expired</span>';
+      } else if (isOutOfStock) {
+        statusHtml = '<span class="ph-filter-chip" style="background:#fee2e2; color:#991b1b; border-color:#fecaca; font-size:11px; padding:2px 8px;"><span class="chip-dot dot-flagged"></span> Out of Stock</span>';
+      } else if (isLowStock) {
+        statusHtml = '<span class="ph-filter-chip" style="background:#fef3c7; color:#92400e; border-color:#fde68a; font-size:11px; padding:2px 8px;"><span class="chip-dot" style="background:#f59e0b;"></span> Low Stock</span>';
+      }
 
-      tr.innerHTML = `
-        <td class="table-cell"><strong>${m.name}</strong></td>
-        <td class="table-cell">${descriptionText}</td>
-        <td class="table-cell">${m.qty}</td>
-        <td class="table-cell">${m.unit || ''}</td>
-        ${showExpiryAndActions ? `<td class="table-cell">${expiryText}</td>` : ''}
-        <td class="table-cell">${statusHtml}</td>
-        ${showExpiryAndActions ? `<td class="table-cell"></td>` : ''}
-      `;
-
-      if (showExpiryAndActions) {
-        const actionsTd = tr.querySelector('td:last-child');
-        if (allowAdjust) {
-          const addBtn = document.createElement('button');
-          addBtn.className = 'btn small';
-          addBtn.dataset.action = 'add';
-          addBtn.dataset.name = m.name;
-          addBtn.textContent = '+ Add';
-
-          const subBtn = document.createElement('button');
-          subBtn.className = 'btn small outline';
-          subBtn.dataset.action = 'sub';
-          subBtn.dataset.name = m.name;
-          subBtn.textContent = '- Subtract';
-
-          actionsTd.appendChild(addBtn);
-          actionsTd.appendChild(subBtn);
-          if (allowRemove) {
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'btn small outline';
-            removeBtn.dataset.action = 'remove';
-            removeBtn.dataset.name = m.name;
-            removeBtn.textContent = 'Remove';
-            actionsTd.appendChild(removeBtn);
-          }
+      // Expiry badge
+      let expiryBadge = '<span class="ph-expiry-badge" style="background:#f1f5f9; color:#64748b;">No Expiry Set</span>';
+      if (m.expiry_date) {
+        const dateStr = new Date(m.expiry_date).toLocaleDateString();
+        if (isExpired) {
+          expiryBadge = `<span class="ph-expiry-badge expiry-expired">Expired (${dateStr})</span>`;
+        } else if (diffDays <= 30) {
+          expiryBadge = `<span class="ph-expiry-badge expiry-critical">Critical (${diffDays}d left)</span>`;
+        } else if (diffDays <= 90) {
+          expiryBadge = `<span class="ph-expiry-badge expiry-warning">Warning (${diffDays}d left)</span>`;
         } else {
-          actionsTd.textContent = '—';
+          expiryBadge = `<span class="ph-expiry-badge expiry-good">Valid (${dateStr})</span>`;
         }
       }
 
+      // Stock level meter
+      const pct = Math.min(100, Math.round((m.qty / 100) * 100));
+      let fillClass = 'fill-healthy';
+      if (isOutOfStock || isExpired) fillClass = 'fill-empty';
+      else if (isLowStock) fillClass = 'fill-low';
+
+      // Auto detect or classify Rx vs OTC based on name or description
+      const lowerName = `${m.name} ${m.description || ''}`.toLowerCase();
+      const isRx = lowerName.includes('antibiotic') || lowerName.includes('amoxicillin') || lowerName.includes('rx') || lowerName.includes('mefenamic') || lowerName.includes('losartan') || lowerName.includes('metformin');
+      const classificationBadge = isRx
+        ? '<span class="badge-rx">Rx</span>'
+        : '<span class="badge-otc">OTC</span>';
+
+      tr.innerHTML = `
+        <td class="table-cell">
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${classificationBadge}
+            <div>
+              <strong style="color:#0f172a; font-size:13.5px;">${escapeHtml(m.name)}</strong>
+              ${m.description ? `<div style="font-size:11.5px; color:#64748b; margin-top:2px;">${escapeHtml(m.description)}</div>` : ''}
+            </div>
+          </div>
+        </td>
+        <td class="table-cell">
+          <div class="ph-stock-bar-wrap">
+            <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700;">
+              <span style="${m.qty <= 5 ? 'color:#dc2626;' : 'color:#0f172a;'}">${m.qty} ${escapeHtml(m.unit || 'units')}</span>
+              <span style="color:#94a3b8; font-size:10.5px; font-weight:500;">/ 100</span>
+            </div>
+            <div class="ph-stock-bar-track">
+              <div class="ph-stock-bar-fill ${fillClass}" style="width:${Math.max(4, pct)}%;"></div>
+            </div>
+          </div>
+        </td>
+        <td class="table-cell" style="color:#64748b; font-size:12.5px;">${escapeHtml(m.unit || 'units')}</td>
+        <td class="table-cell">${expiryBadge}</td>
+        <td class="table-cell">${statusHtml}</td>
+        <td class="table-cell" style="text-align:right;">
+          ${allowAdjust ? `
+            <div style="display:inline-flex; gap:6px;">
+              <button type="button" class="btn small" data-action="add" data-name="${escapeHtml(m.name)}" style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; font-weight:600; display:inline-flex; align-items:center; gap:4px; padding:3px 8px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add
+              </button>
+              <button type="button" class="btn small" data-action="sub" data-name="${escapeHtml(m.name)}" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; font-weight:600; display:inline-flex; align-items:center; gap:4px; padding:3px 8px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Dispense
+              </button>
+              <button type="button" class="btn small" data-action="remove" data-name="${escapeHtml(m.name)}" style="background:#fff1f2; color:#be123c; border:1px solid #fecdd3; font-weight:600; display:inline-flex; align-items:center; gap:4px; padding:3px 8px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                Archive
+              </button>
+            </div>
+          ` : '<span style="color:#94a3b8; font-size:12px;">View Only</span>'}
+        </td>
+      `;
+
       fragment.appendChild(tr);
-      attachDetailRow(tr, () => ({
-        tag: 'Inventory',
-        title: m.name,
-        subtitle: 'Medicine Stock Detail',
-        items: [
-          { label: 'Name', value: m.name },
-          { label: 'Quantity', value: m.qty },
-          { label: 'Unit', value: m.unit || '—' }
-        ]
-      }));
     });
   });
 }
@@ -9413,13 +10710,18 @@ const appointments = (() => {
     const servingBadge = document.getElementById('queue-current-serving-badge');
     if (servingBadge) {
       if (servingNumbers.length > 0) {
+        servingBadge.className = 'queue-station-pill active';
         servingBadge.innerHTML = `
-          <span style="color:#0369a1; font-weight:800;">Currently Serving:</span> 
-          <span style="background:#0ea5e9; color:white; padding:1px 8px; border-radius:6px; font-family:monospace;">${servingNumbers.join(', ')}</span>
+          <span class="queue-station-dot"></span>
+          <span><strong>Now Serving:</strong> <span style="background:#2563eb;color:#fff;padding:1px 7px;border-radius:6px;font-family:monospace;font-size:11.5px;margin-left:2px;">${servingNumbers.join(', ')}</span></span>
         `;
         servingBadge.style.display = 'inline-flex';
       } else {
-        servingBadge.textContent = 'Current serving: none';
+        servingBadge.className = 'queue-station-pill ready';
+        servingBadge.innerHTML = `
+          <span class="queue-station-dot"></span>
+          <span>Station Ready • Queue Clear</span>
+        `;
       }
     }
 
@@ -9442,7 +10744,35 @@ const appointments = (() => {
     const container = document.getElementById(id);
     if (!container) return;
     if (list.length === 0) {
-      container.innerHTML = '<div class="queue-ticket-empty">No tickets.</div>';
+      let emptyIcon = '';
+      let emptyTitle = 'Queue Clear';
+      let emptySubtitle = 'No tickets currently in this lane.';
+      let iconClass = 'waiting-icon';
+
+      if (id === 'queue-waiting-list') {
+        iconClass = 'waiting-icon';
+        emptyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+        emptyTitle = 'Lobby Queue Clear';
+        emptySubtitle = 'No patients currently waiting. New check-ins and appointments will appear here.';
+      } else if (id === 'queue-oncall-list') {
+        iconClass = 'oncall-icon';
+        emptyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+        emptyTitle = 'No Active Calls';
+        emptySubtitle = 'Called patients holding for triage arrival and vitals checking will appear here.';
+      } else if (id === 'queue-serving-list') {
+        iconClass = 'serving-icon';
+        emptyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`;
+        emptyTitle = 'Station Ready';
+        emptySubtitle = 'No consultation in progress. Call or serve a patient to begin clinical evaluation.';
+      }
+
+      container.innerHTML = `
+        <div class="queue-lane-empty-state">
+          <div class="empty-state-icon ${iconClass}">${emptyIcon}</div>
+          <div class="empty-state-title">${emptyTitle}</div>
+          <div class="empty-state-subtitle">${emptySubtitle}</div>
+        </div>
+      `;
       return;
     }
 
