@@ -148,8 +148,8 @@
       font-weight: 700;
       padding: 3.5px 10px;
       border-radius: 9999px;
-      background: #e0f2fe;
-      color: #0369a1;
+      background: #dcfce7;
+      color: #166534;
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -159,7 +159,7 @@
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: #0284c7;
+      background: #16a34a;
       animation: launchpadPulse 2s infinite;
     }
 
@@ -239,7 +239,7 @@
     }
 
     .launchpad-action-card:hover .launchpad-card-arrow {
-      color: #0284c7;
+      color: #16a34a;
       transform: translateX(3px);
     }
 
@@ -269,7 +269,7 @@
 
     .notif-panel {
       position: fixed;
-      top: 84px;
+      top: 64px;
       right: 32px;
       width: 320px;
       max-height: 420px;
@@ -312,7 +312,7 @@
       font-size: 11px;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: #3b82f6;
+      color: #15803d;
       display: inline-block;
       margin-bottom: 2px;
     }
@@ -413,9 +413,9 @@
     }
 
     .queue-card-list.is-drop-target {
-      background: rgba(14, 165, 233, 0.06);
+      background: rgba(22, 163, 74, 0.06);
       border-radius: 12px;
-      outline: 2px dashed #0284c7;
+      outline: 2px dashed #16a34a;
       outline-offset: -4px;
     }
 
@@ -497,10 +497,10 @@
     }
 
     .queue-station-pill.active {
-      background: #eff6ff;
-      color: #1d4ed8;
-      border: 1px solid #bfdbfe;
-      box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
+      background: #f0fdf4;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+      box-shadow: 0 0 10px rgba(22, 163, 74, 0.15);
     }
 
     .queue-station-dot {
@@ -512,8 +512,8 @@
     }
 
     .queue-station-pill.active .queue-station-dot {
-      background: #3b82f6;
-      box-shadow: 0 0 6px rgba(59, 130, 246, 0.8);
+      background: #16a34a;
+      box-shadow: 0 0 6px rgba(22, 163, 74, 0.8);
     }
 
     .queue-summary-pill {
@@ -574,7 +574,7 @@
     .queue-ticket-queue {
       font-size: 15px;
       font-weight: 800;
-      color: #0369a1;
+      color: #15803d;
     }
 
     .queue-ticket-name {
@@ -649,12 +649,12 @@
     .queue-ticket-card.dragging {
       opacity: 0.4;
       transform: scale(0.95);
-      border: 2px dashed #0369a1;
+      border: 2px dashed #16a34a;
     }
 
     .queue-card-list.drag-over {
-      background: rgba(3, 105, 161, 0.08) !important;
-      outline: 2px dashed #0369a1;
+      background: rgba(22, 163, 74, 0.08) !important;
+      outline: 2px dashed #16a34a;
       outline-offset: -4px;
       border-radius: 12px;
     }
@@ -670,18 +670,18 @@
       border-color: #34d399;
     }
     .queue-ticket-btn.btn-consult {
-      background: #eff6ff;
-      border-color: #93c5fd;
-      color: #1d4ed8;
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+      color: #15803d;
       font-weight: 700;
       display: inline-flex;
       align-items: center;
       gap: 5px;
     }
     .queue-ticket-btn.btn-consult:hover {
-      background: #dbeafe;
-      border-color: #60a5fa;
-      color: #1e40af;
+      background: #dcfce7;
+      border-color: #86efac;
+      color: #166534;
       transform: translateY(-1px);
     }
     .queue-vital-done-badge, .vitals-badge {
@@ -905,7 +905,7 @@
             <span class="label">Reports & Feedback</span>
           </a>
 
-          <a href="#" class="nav-item" data-section="profile-section" title="Profile">
+          <a href="#" class="nav-item" data-section="profile-section" title="Profile & Security">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3" />
@@ -962,8 +962,12 @@
               </div>
               <div class="popover-divider"></div>
               <a href="#" class="popover-item nav-item" data-section="profile-section" role="menuitem">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-.33-1 1.65 1.65 0 0 0-1-.6 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1-.33H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1-.33 1.65 1.65 0 0 0 .6-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .33-1V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 .33 1 1.65 1.65 0 0 0 1 .6 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.13.32.2.66.2 1s-.07.68-.2 1z"/></svg>
-                Account Settings
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                My Profile
+              </a>
+              <a href="#" class="popover-item nav-item" data-section="security-section" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Change Password
               </a>
               <a href="#" class="popover-item nav-item full-access" data-section="schedule-section" role="menuitem">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
@@ -1113,7 +1117,7 @@
               <div class="launchpad-header">
                 <div class="launchpad-title-group">
                   <h4>
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                     Clinical Station Shortcuts
                   </h4>
                   <p>1-click launchpad to active healthcare workstations & patient queues.</p>
@@ -1123,7 +1127,7 @@
 
               <div class="clinical-launchpad-grid">
                 <div class="launchpad-action-card" id="launchpad-call-queue" title="Open live queue management">
-                  <div class="launchpad-card-icon" style="background:#e0f2fe; color:#0284c7;">
+                  <div class="launchpad-card-icon" style="background:#dcfce7; color:#15803d;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
                   </div>
                   <div class="launchpad-card-info">
@@ -1262,7 +1266,7 @@
               <div class="triage-intake-card card-queue">
                 <div class="triage-card-header">
                   <div class="triage-card-icon queue-icon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/>
                     </svg>
                   </div>
@@ -1310,7 +1314,7 @@
             <div id="vitals-recent-container" class="vitals-recent-block">
               <div class="vitals-recent-header">
                 <div style="display:flex; align-items:center; gap:10px;">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                   </svg>
                   <div>
@@ -1432,36 +1436,213 @@
 
       <section id="profile-section" class="section-top hidden">
         <div class="panel">
-          <div class="panel-head">
-            <h3>My Profile</h3>
-            <span class="panel-hint">Edit your profile details.</span>
+          <div class="panel-head" style="margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid #f1f5f9;">
+            <div>
+              <h3 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 4px;">Profile & Security</h3>
+              <span class="panel-hint" style="font-size: 13px; color: #64748b;">Manage your clinician identity details and account password credentials.</span>
+            </div>
           </div>
-          <div class="table-wrap">
-            <form id="profile-form" class="p-20" novalidate autocomplete="off">
-              <div class="field">
-                <label class="inputLabel" for="profile-name">Display Name</label>
-                <input id="profile-name" type="text" />
+
+          <!-- Hidden compatibility elements for dashboard.js state bindings -->
+          <span id="profile-hero-email" style="display: none;"></span>
+          <span id="profile-scope-display" style="display: none;"></span>
+          <span id="profile-hero-duty-badge" style="display: none;"><span id="profile-hero-duty-text"></span></span>
+
+          <!-- Clean Segmented Module Switcher -->
+          <div class="personnel-tabs-wrap" id="profile-tabs" style="margin-bottom: 22px;">
+            <div class="personnel-tabs-group">
+              <button type="button" class="personnel-tab-btn is-active" id="profile-tab-details" data-pane="profile-pane-details">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Personal Profile
+              </button>
+              <button type="button" class="personnel-tab-btn" id="profile-tab-security" data-pane="profile-pane-security">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Change Password
+              </button>
+            </div>
+          </div>
+
+          <!-- Module 1: Personal Profile Details -->
+          <div id="profile-pane-details" class="profile-subpane">
+            <div style="width: 100%; box-sizing: border-box; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 26px 28px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+              <!-- Identity Header Bar -->
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                  <div style="position: relative; flex-shrink: 0;">
+                    <div id="profile-hero-avatar" style="width: 54px; height: 54px; border-radius: 50%; background: #ecfdf5; color: #059669; font-size: 19px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2.5px solid #a7f3d0; box-shadow: 0 2px 6px rgba(5,150,105,0.12);">
+                      MD
+                    </div>
+                    <div id="profile-role-logo" class="role-logo role-logo-doctor" style="position: absolute; bottom: -2px; right: -2px; width: 22px; height: 22px; font-size: 11px; border: 2px solid #ffffff;" title="Role Badge" aria-label="Role icon">D</div>
+                  </div>
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                      <h4 id="profile-hero-name" style="margin: 0; font-size: 17px; font-weight: 700; color: #0f172a;">Clinician Profile</h4>
+                      <span id="profile-hero-role-badge" class="staff-role-badge role-doctor" style="font-size: 11.5px; padding: 2px 9px;">Attending Physician</span>
+                    </div>
+                    <div style="margin-top: 4px; font-size: 12.5px; color: #64748b; display: flex; align-items: center; gap: 8px;">
+                      <span>Staff ID:</span>
+                      <span id="profile-hero-emp-id" style="font-family: 'JetBrains Mono', monospace; background: #f1f5f9; padding: 2px 7px; border-radius: 4px; font-size: 12px; color: #334155; font-weight: 600; border: 1px solid #e2e8f0;">ID: #STF-DOC-01</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                  <span style="display: inline-flex; align-items: center; gap: 7px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 9999px;">
+                    <span style="width: 7px; height: 7px; border-radius: 50%; background: #16a34a;"></span>
+                    Active Workstation Session
+                  </span>
+                </div>
               </div>
-              <div class="field">
-                <label class="inputLabel" for="profile-email">Email</label>
-                <input id="profile-email" type="email" readonly />
+
+              <!-- Profile Form Grid (2 Columns on Desktop) -->
+              <form id="profile-form" novalidate autocomplete="off">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px 24px; margin-bottom: 24px;">
+                  <div class="field" style="margin: 0;">
+                    <label class="inputLabel" for="profile-name" style="display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; color: #334155; margin-bottom: 6px;">
+                      <span>Display Name</span>
+                      <span style="font-size: 11px; color: #059669; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 2px 7px; border-radius: 4px; font-weight: 600;">Editable</span>
+                    </label>
+                    <input id="profile-name" type="text" placeholder="Enter your full name" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; box-sizing: border-box;" />
+                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Your public clinician name shown across consultation records and logs.</span>
+                  </div>
+
+                  <div class="field" style="margin: 0;">
+                    <label class="inputLabel" for="profile-email" style="display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; color: #334155; margin-bottom: 6px;">
+                      <span>Email Address</span>
+                      <span style="font-size: 11px; color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 2px 7px; border-radius: 4px; font-weight: 500;">Read-only</span>
+                    </label>
+                    <input id="profile-email" type="email" readonly style="width: 100%; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; cursor: not-allowed; box-sizing: border-box;" />
+                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Primary authentication email registered for system notifications.</span>
+                  </div>
+
+                  <div class="field" style="margin: 0;">
+                    <label class="inputLabel" for="profile-role" style="display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; color: #334155; margin-bottom: 6px;">
+                      <span>Medical System Role</span>
+                      <span style="font-size: 11px; color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 2px 7px; border-radius: 4px; font-weight: 500;">System Assigned</span>
+                    </label>
+                    <input id="profile-role" type="text" readonly style="width: 100%; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; cursor: not-allowed; text-transform: capitalize; box-sizing: border-box;" />
+                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Determines clinical workflow access, patient triage privileges, and prescription scope.</span>
+                  </div>
+
+                  <div class="field" style="margin: 0;">
+                    <label class="inputLabel" for="profile-employee-id" style="display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; color: #334155; margin-bottom: 6px;">
+                      <span>Staff Employee ID</span>
+                      <span style="font-size: 11px; color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 2px 7px; border-radius: 4px; font-weight: 500;">System Assigned</span>
+                    </label>
+                    <input id="profile-employee-id" type="text" readonly value="STF-DOC-01" style="width: 100%; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #334155; font-family: 'JetBrains Mono', monospace; font-weight: 600; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; cursor: not-allowed; box-sizing: border-box;" />
+                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Unique clinical employee identifier maintained by facility administration.</span>
+                  </div>
+                </div>
+
+                <!-- Footer Action Bar -->
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+                  <div style="font-size: 12.5px; color: #64748b; display: flex; align-items: center; gap: 8px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    <span>Display name updates will reflect immediately across all active consultations and audit logs.</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <button type="button" id="profile-cancel-btn" class="chip-btn" style="border-radius: 8px; padding: 9px 20px; font-size: 13px; min-width: 90px; display: inline-flex; align-items: center; justify-content: center; text-align: center;">
+                      Reset
+                    </button>
+                    <button type="submit" id="profile-save-btn" class="btn" style="width: auto; border-radius: 8px; padding: 9px 24px; font-size: 13px; font-weight: 600; min-width: 150px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-align: center;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Module 2: Change Password Subpane -->
+          <div id="profile-pane-security" class="profile-subpane hidden">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px; align-items: start; width: 100%; box-sizing: border-box;">
+              <!-- Left Column: Password Update Form -->
+              <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 26px 28px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                <div style="margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid #f1f5f9;">
+                  <h4 style="margin: 0 0 4px; font-size: 16px; font-weight: 700; color: #0f172a;">Update Password</h4>
+                  <p style="margin: 0; font-size: 13px; color: #64748b;">Set a strong, secure password for your clinician login account.</p>
+                </div>
+
+                <form id="profile-password-form" novalidate autocomplete="off">
+                  <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <div class="field" style="margin: 0;">
+                      <label class="inputLabel" for="profile-new-password" style="font-weight: 600; font-size: 13px; color: #334155; margin-bottom: 7px;">New Password</label>
+                      <input id="profile-new-password" type="password" placeholder="Enter new password (min. 8 characters)" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; box-sizing: border-box;" autocomplete="new-password" />
+                    </div>
+
+                    <!-- Password strength meter -->
+                    <div>
+                      <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+                        <span style="color: #64748b; font-weight: 500;">Password Strength:</span>
+                        <strong id="password-strength-label" style="color: #94a3b8; font-weight: 700;">None</strong>
+                      </div>
+                      <div style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
+                        <div id="password-strength-meter" style="width: 0%; height: 100%; background: #ef4444; transition: all 0.25s ease;"></div>
+                      </div>
+                    </div>
+
+                    <div class="field" style="margin: 0;">
+                      <label class="inputLabel" for="profile-confirm-password" style="font-weight: 600; font-size: 13px; color: #334155; margin-bottom: 7px;">Confirm New Password</label>
+                      <input id="profile-confirm-password" type="password" placeholder="Re-enter new password to confirm" style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; box-sizing: border-box;" autocomplete="new-password" />
+                    </div>
+
+                    <div style="padding-top: 14px; border-top: 1px solid #f1f5f9; margin-top: 4px;">
+                      <button type="button" id="profile-update-password-btn" class="btn" style="width: 100%; border-radius: 8px; padding: 11px 20px; font-size: 13.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-align: center;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        Update Password
+                      </button>
+                    </div>
+                  </div>
+                </form>
               </div>
-              <div class="field">
-                <label class="inputLabel" for="profile-role">Role</label>
-                <input id="profile-role" type="text" readonly />
+
+              <!-- Right Column: Password Requirements & Clinical Security Guidelines -->
+              <div style="display: flex; flex-direction: column; gap: 18px;">
+                <!-- Criteria Checklist Card -->
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                  <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+                    <div style="width: 32px; height: 32px; border-radius: 8px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <div>
+                      <h5 style="margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;">Password Requirements</h5>
+                      <span style="font-size: 12px; color: #64748b;">Must satisfy all live criteria before submission:</span>
+                    </div>
+                  </div>
+
+                  <ul style="margin: 0; padding-left: 20px; font-size: 12.5px; color: #64748b; line-height: 1.9;">
+                    <li id="rule-length" style="transition: color 0.2s ease, font-weight 0.2s ease;">Minimum 8 characters length</li>
+                    <li id="rule-complexity" style="transition: color 0.2s ease, font-weight 0.2s ease;">Combination of letters and numbers</li>
+                    <li id="rule-match" style="transition: color 0.2s ease, font-weight 0.2s ease;">Passwords match exactly</li>
+                  </ul>
+                </div>
+
+                <!-- Security Guidance Card -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 22px;">
+                  <h5 style="margin: 0 0 12px; font-size: 13px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 8px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                    Clinical Security Standards
+                  </h5>
+                  <div style="display: flex; flex-direction: column; gap: 10px; font-size: 12px; color: #64748b; line-height: 1.55;">
+                    <div>
+                      <strong style="color: #0f172a; display: block; margin-bottom: 2px;">Dedicated Credentials</strong>
+                      Do not reuse passwords from personal emails or third-party websites for your medical workstation access.
+                    </div>
+                    <div style="border-top: 1px solid #e2e8f0; padding-top: 8px;">
+                      <strong style="color: #0f172a; display: block; margin-bottom: 2px;">Session Safety</strong>
+                      Always lock or log out of your workstation when stepping away from the consultation desk or ward terminal.
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="field">
-                <label class="inputLabel">Role Icon</label>
-                <div id="profile-role-logo" class="role-logo role-logo-doctor role-logo-lg" title="Doctor" aria-label="Role icon">D</div>
-              </div>
-              <div class="actions">
-                <button type="button" id="profile-save-btn" class="btn">Save Profile</button>
-                <button type="button" id="profile-cancel-btn" class="chip-btn">Cancel</button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       </section>
+
+      <!-- Backward compatibility alias anchor for security-section -->
+      <div id="security-section" class="hidden" style="display:none;" aria-hidden="true"></div>
 
       <section id="schedule-section" class="section-top hidden full-access">
         <div class="panel">
@@ -1533,7 +1714,7 @@
               <span class="panel-hint" style="font-size:13px; color:#64748b;">Manage medical staff accounts, duty presence, and citizen health records.</span>
             </div>
             <div class="management-actions">
-              <button id="staff-register-btn" class="chip-btn admin-only" type="button" style="background:#0284c7; color:#fff; border-color:#0284c7; display:inline-flex; align-items:center; gap:6px;">
+              <button id="staff-register-btn" class="chip-btn admin-only" type="button" style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 + Register Staff
               </button>
@@ -1714,7 +1895,7 @@
           <div class="panel-head" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px;">
             <div>
               <h3 id="reports-hub-title" style="margin:0 0 4px; font-size:18px; font-weight:700; color:#0f172a;">Reports, Analytics & Communications</h3>
-              <span class="panel-hint" style="font-size:13px; color:#64748b;">Manage clinic announcements, citizen service feedback, clinical analytics, and system audit exports.</span>
+              <span class="panel-hint" id="reports-hub-hint" style="font-size:13px; color:#64748b;">Manage clinic announcements, citizen service feedback, clinical analytics, and system audit exports.</span>
             </div>
             <div class="management-actions" id="reports-hub-actions">
               <button id="reports-hub-refresh-btn" class="chip-btn" type="button" style="display:inline-flex; align-items:center; gap:6px;">
@@ -1724,101 +1905,107 @@
             </div>
           </div>
 
-          <!-- In-Page Segmented Tab Switcher -->
-          <div class="personnel-tabs-wrap" id="reports-hub-tabs" style="margin: 14px 20px 0;">
-            <button type="button" class="personnel-tab-btn is-active" id="hub-tab-announcements" data-pane="announcements-pane">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-              Announcements (<span id="hub-count-announcements">0</span>)
-            </button>
-            <button type="button" class="personnel-tab-btn" id="hub-tab-feedback" data-pane="feedback-pane">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              Citizen Feedback (<span id="hub-count-feedback">0</span>)
-            </button>
-            <button type="button" class="personnel-tab-btn" id="hub-tab-stats" data-pane="stats-pane">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-              Clinical Analytics
-            </button>
-            <button type="button" class="personnel-tab-btn" id="hub-tab-exports" data-pane="exports-pane">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Data Export Center
-            </button>
-          </div>
-
-          <!-- Pane 1: Announcements -->
-          <div id="announcements-pane" class="hub-content-pane">
-            <div class="ph-toolbar" style="margin:16px 20px 12px; gap:12px; flex-wrap:wrap; justify-content:space-between;">
-              <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:280px;">
-                <div class="ph-search-wrap" style="flex:1;">
-                  <span class="ph-search-icon">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                  </span>
-                  <input type="text" id="announcements-search-input" class="ph-search-input" placeholder="Search announcements..." />
-                </div>
-                <div class="ph-filter-chips" id="announcement-filter-chips">
-                  <button type="button" class="ph-filter-chip is-active" data-filter="all">All <span class="chip-count" id="ann-count-all">0</span></button>
-                  <button type="button" class="ph-filter-chip" data-filter="all_users">Public <span class="chip-count" id="ann-count-public">0</span></button>
-                  <button type="button" class="ph-filter-chip" data-filter="citizen">Citizens Only <span class="chip-count" id="ann-count-citizens">0</span></button>
-                </div>
-              </div>
-              <div style="display:flex; gap:8px;">
-                <button id="announcement-csv-import-btn" class="chip-btn chip-btn-outline" type="button" style="display:inline-flex; align-items:center; gap:6px;">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  Import CSV
+          <div class="p-20" style="padding-top:14px;">
+            <!-- In-Page Segmented Tab Switcher -->
+            <div class="personnel-tabs-wrap" id="reports-hub-tabs">
+              <div class="personnel-tabs-group">
+                <button type="button" class="personnel-tab-btn is-active" id="hub-tab-announcements" data-pane="announcements-pane">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                  Announcements <span class="tab-badge" id="hub-count-announcements">0</span>
                 </button>
-                <button id="create-announcement-topright" class="chip-btn" type="button" style="background:#0284c7; color:#fff; border-color:#0284c7; display:inline-flex; align-items:center; gap:6px;">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  New Announcement
+                <button type="button" class="personnel-tab-btn" id="hub-tab-feedback" data-pane="feedback-pane">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  Citizen Feedback <span class="tab-badge" id="hub-count-feedback">0</span>
+                </button>
+                <button type="button" class="personnel-tab-btn" id="hub-tab-stats" data-pane="stats-pane">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                  Clinical Analytics
+                </button>
+                <button type="button" class="personnel-tab-btn" id="hub-tab-exports" data-pane="exports-pane">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Data Export Center
                 </button>
               </div>
             </div>
-            <div class="table-wrap" style="padding:0 20px 20px;">
-              <table class="accounts-table">
-                <thead>
-                  <tr class="table-header-row">
-                    <th class="table-header-cell" style="text-align:left;">Announcement Title</th>
-                    <th class="table-header-cell" style="width:140px; text-align:center;">Target Audience</th>
-                    <th class="table-header-cell" style="width:180px; text-align:center;">Date Posted</th>
-                    <th class="table-header-cell" style="width:110px; text-align:right;">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="announcements-tbody"></tbody>
-              </table>
-            </div>
-          </div>
 
-          <!-- Pane 2: Citizen Feedback -->
-          <div id="feedback-pane" class="hub-content-pane hidden">
-            <div class="ph-toolbar" style="margin:16px 20px 12px; gap:12px; flex-wrap:wrap; justify-content:space-between;">
-              <div class="ph-search-wrap" style="flex:1; min-width:260px;">
-                <span class="ph-search-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                </span>
-                <input type="text" id="feedback-search-input" class="ph-search-input" placeholder="Search feedback or sender..." />
+            <!-- Pane 1: Announcements -->
+            <div id="announcements-pane" class="hub-content-pane">
+              <div class="hub-toolbar" style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:280px; flex-wrap:wrap;">
+                  <div class="consult-search-box" style="max-width:320px; flex:1; min-width:220px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2">
+                      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input type="search" id="announcements-search-input" class="search-input" placeholder="Search announcements..." aria-label="Search announcements" />
+                  </div>
+                  <div class="ph-filter-chips" id="announcement-filter-chips" style="margin-bottom:0;">
+                    <button type="button" class="ph-filter-chip is-active" data-filter="all">All <span class="chip-count" id="ann-count-all">0</span></button>
+                    <button type="button" class="ph-filter-chip" data-filter="all_users">Public <span class="chip-count" id="ann-count-public">0</span></button>
+                    <button type="button" class="ph-filter-chip" data-filter="citizen">Citizens Only <span class="chip-count" id="ann-count-citizens">0</span></button>
+                    <button type="button" class="ph-filter-chip" data-filter="staff">Staff Only <span class="chip-count" id="ann-count-staff">0</span></button>
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                  <button id="announcement-csv-import-btn" class="chip-btn chip-btn-outline" type="button" style="display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Import CSV
+                  </button>
+                  <button id="create-announcement-topright" class="chip-btn" type="button" style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    New Announcement
+                  </button>
+                </div>
               </div>
-              <div class="ph-filter-chips" id="feedback-filter-chips">
-                <button type="button" class="ph-filter-chip is-active" data-rating="all">All Feedback</button>
-                <button type="button" class="ph-filter-chip" data-rating="5">5/5 Excellent</button>
-                <button type="button" class="ph-filter-chip" data-rating="4">4/5 Good</button>
-                <button type="button" class="ph-filter-chip" data-rating="3">≤ 3/5 Needs Attention</button>
+              <div class="table-wrap">
+                <table class="accounts-table">
+                  <thead>
+                    <tr class="table-header-row">
+                      <th class="table-header-cell" style="text-align:left;">Announcement Title</th>
+                      <th class="table-header-cell" style="width:140px; text-align:center;">Target Audience</th>
+                      <th class="table-header-cell" style="width:180px; text-align:center;">Date Posted</th>
+                      <th class="table-header-cell" style="width:110px; text-align:right;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="announcements-tbody"></tbody>
+                </table>
               </div>
             </div>
-            <div class="table-wrap" style="padding:0 20px 20px;">
-              <table class="accounts-table">
-                <thead>
-                  <tr class="table-header-row">
-                    <th class="table-header-cell" style="width:240px; text-align:left;">Sender / Citizen</th>
-                    <th class="table-header-cell" style="text-align:center; width:130px;">Service Rating</th>
-                    <th class="table-header-cell" style="width:180px; text-align:center;">Date Received</th>
-                    <th class="table-header-cell" style="width:100px; text-align:right;">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="feedback-tbody"></tbody>
-              </table>
-            </div>
-          </div>
 
-          <!-- Pane 3: Clinical Analytics -->
-          <div id="stats-pane" class="hub-content-pane hidden" style="padding: 16px 20px 24px;">
+            <!-- Pane 2: Citizen Feedback -->
+            <div id="feedback-pane" class="hub-content-pane hidden">
+              <div class="hub-toolbar" style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:280px; flex-wrap:wrap;">
+                  <div class="consult-search-box" style="max-width:320px; flex:1; min-width:220px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2">
+                      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input type="search" id="feedback-search-input" class="search-input" placeholder="Search feedback or sender..." aria-label="Search feedback" />
+                  </div>
+                  <div class="ph-filter-chips" id="feedback-filter-chips" style="margin-bottom:0;">
+                    <button type="button" class="ph-filter-chip is-active" data-rating="all">All Feedback</button>
+                    <button type="button" class="ph-filter-chip" data-rating="5">5/5 Excellent</button>
+                    <button type="button" class="ph-filter-chip" data-rating="4">4/5 Good</button>
+                    <button type="button" class="ph-filter-chip" data-rating="3">≤ 3/5 Needs Attention</button>
+                  </div>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="accounts-table">
+                  <thead>
+                    <tr class="table-header-row">
+                      <th class="table-header-cell" style="width:240px; text-align:left;">Sender / Citizen</th>
+                      <th class="table-header-cell" style="text-align:center; width:130px;">Service Rating</th>
+                      <th class="table-header-cell" style="width:180px; text-align:center;">Date Received</th>
+                      <th class="table-header-cell" style="width:100px; text-align:right;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="feedback-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Pane 3: Clinical Analytics -->
+            <div id="stats-pane" class="hub-content-pane hidden">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
               <div class="panel" style="background: #ffffff; border: 1.5px solid #e2e8f0; padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px;">
@@ -1849,7 +2036,7 @@
                       <span style="font-size: 11.5px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing:0.04em;">Average Body Temp</span>
                       <div id="avg-temp" style="font-size: 26px; font-weight: 800; color: #0f172a; margin-top: 4px;"><span class="skeleton-shimmer stat-skeleton"></span></div>
                     </div>
-                    <div style="width:42px; height:42px; border-radius:10px; background:#e0f2fe; color:#0284c7; display:flex; align-items:center; justify-content:center;">
+                    <div style="width:42px; height:42px; border-radius:10px; background:#dcfce7; color:#15803d; display:flex; align-items:center; justify-content:center;">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
                     </div>
                   </div>
@@ -1868,14 +2055,14 @@
           </div>
 
           <!-- Pane 4: System Reports & CSV Exports -->
-          <div id="exports-pane" class="hub-content-pane hidden" style="padding:16px 20px 24px;">
+          <div id="exports-pane" class="hub-content-pane hidden">
             <div style="margin-bottom:20px; padding:16px 20px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:12px;">
               <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
                 <div>
                   <h4 style="margin:0 0 4px; font-size:15px; font-weight:700; color:#0f172a;">Audit Period Filter</h4>
                   <p style="margin:0; font-size:12.5px; color:#64748b;">Specify a custom date range or select a preset. Leave blank to export complete historical records.</p>
                 </div>
-                <div class="ph-filter-chips" id="export-presets">
+                <div class="ph-filter-chips" id="export-presets" style="margin-bottom:0;">
                   <button type="button" class="ph-filter-chip is-active" data-preset="all">All Time</button>
                   <button type="button" class="ph-filter-chip" data-preset="today">Today</button>
                   <button type="button" class="ph-filter-chip" data-preset="month">This Month</button>
@@ -1900,7 +2087,7 @@
               <!-- Patient Report -->
               <div class="export-card" style="border:1.5px solid #e2e8f0; border-radius:12px; padding:20px; background:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
                 <div style="display:flex; align-items:start; gap:12px; margin-bottom:14px;">
-                  <div style="width:42px; height:42px; border-radius:10px; background:#dbeafe; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#2563eb;">
+                  <div style="width:42px; height:42px; border-radius:10px; background:#dcfce7; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#15803d;">
                     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   </div>
                   <div style="flex:1;">
@@ -2042,7 +2229,8 @@
             </div>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
       <!-- Backward compatibility aliases -->
       <div id="announcements-section" class="hidden" style="display:none;" aria-hidden="true"></div>
@@ -2065,7 +2253,7 @@
                 <span class="consult-desk-dot"></span>
                 <span id="consult-desk-status-text">Station Ready • Waiting for Patient</span>
               </span>
-              <button id="open-consult-modal-btn" class="chip-btn" style="background:#0284c7; color:#fff; border-color:#0284c7; display:inline-flex; align-items:center; gap:6px;">
+              <button id="open-consult-modal-btn" class="chip-btn" style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 New Consultation Form
               </button>
@@ -2231,7 +2419,7 @@
               <span class="panel-hint" style="font-size:13px; color:#64748b;">Real-time pharmaceutical supplies, batch telemetry, and dispensation controls.</span>
             </div>
             <div class="management-actions">
-              <button id="open-add-medicine-btn" class="chip-btn" style="background:#0284c7; color:#fff; border-color:#0284c7; display:inline-flex; align-items:center; gap:6px;">
+              <button id="open-add-medicine-btn" class="chip-btn" style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 + Register Medicine
               </button>
@@ -2259,7 +2447,7 @@
             <div id="medicine-add-panel" class="ph-add-form-panel hidden">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
                 <div style="display:flex; align-items:center; gap:8px;">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
                   <h4 style="margin:0; font-size:15px; font-weight:700; color:#0f172a;">Register New Medicine</h4>
                 </div>
                 <button type="button" id="medicine-add-cancel-btn" class="btn btn-sm btn-secondary" style="font-size:12px; padding:4px 10px;">Cancel</button>
@@ -2287,7 +2475,7 @@
                     <input id="medicine-expiry-input" type="date" />
                   </div>
                   <div>
-                    <button type="submit" class="btn" style="background:#0284c7; color:#fff; border:none; padding:9px 16px; font-weight:700;">
+                    <button type="submit" class="btn" style="background:#16a34a; color:#fff; border:none; padding:9px 16px; font-weight:700;">
                       Save Medicine
                     </button>
                   </div>
@@ -2387,7 +2575,7 @@
               <span id="queue-summary-badge" class="queue-summary-pill">
                 Waiting: 0 | On Call: 0 | Serving: 0
               </span>
-              <button id="queue-consult-serving-btn" class="chip-btn" style="background:#0284c7;color:#fff;border-color:#0284c7;display:none;">
+              <button id="queue-consult-serving-btn" class="chip-btn" style="background:#16a34a;color:#fff;border-color:#16a34a;display:none;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px;margin-right:4px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                 Consultation
               </button>
@@ -2456,7 +2644,7 @@
               <span class="btn-label">Delete Ticket</span>
             </button>
             <div style="display:flex; gap:8px; margin-left:auto;">
-              <button id="queue-ticket-consult-btn" type="button" class="btn" style="background:#0284c7; color:#fff; border:none; display:none;">
+              <button id="queue-ticket-consult-btn" type="button" class="btn" style="background:#16a34a; color:#fff; border:none; display:none;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px; margin-right:4px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                 <span class="btn-label">Start Consultation</span>
               </button>
@@ -3127,10 +3315,10 @@
               }
               .chr-tab-content h4 { 
                 display: block !important;
-                border-bottom: 2px solid #0369a1; 
+                border-bottom: 2px solid #16a34a; 
                 padding-bottom: 8px; 
                 margin-bottom: 16px; 
-                color: #0369a1; 
+                color: #16a34a; 
                 font-size: 18px;
               }
 
@@ -3168,7 +3356,7 @@
 
           <!-- Tabs -->
           <div style="padding:0 28px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;gap:0;overflow-x:auto;">
-            <button class="chr-tab active" data-chr-tab="chr-tab-consultations" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#0369a1;border-bottom:2px solid #0369a1;cursor:pointer;white-space:nowrap;">Consultations</button>
+            <button class="chr-tab active" data-chr-tab="chr-tab-consultations" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#16a34a;border-bottom:2px solid #16a34a;cursor:pointer;white-space:nowrap;">Consultations</button>
             <button class="chr-tab" data-chr-tab="chr-tab-vitals" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Vitals</button>
             <button class="chr-tab" data-chr-tab="chr-tab-prescriptions" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Prescriptions</button>
             <button class="chr-tab" data-chr-tab="chr-tab-laborders" style="padding:12px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Lab Orders</button>
@@ -3274,7 +3462,11 @@
             <span id="announcement-detail-visibility"></span>
           </div>
           <div id="announcement-detail-body" class="detail-body"></div>
-          <div class="actions" style="margin-top:24px; justify-content:flex-end; border-top:1px solid #f1f5f9; padding-top:16px;">
+          <div class="actions" style="margin-top:24px; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:16px;">
+            <button id="announcement-detail-edit-btn" type="button" class="btn" style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              Edit Announcement
+            </button>
             <button id="announcement-detail-delete-btn" type="button" class="btn btn-delete">Delete Announcement</button>
           </div>
         </div>

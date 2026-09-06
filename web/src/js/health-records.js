@@ -151,8 +151,8 @@ async function openCitizenHealthModal(citizen) {
   // Reset tabs to first
   citizenHealthModal.querySelectorAll('.chr-tab').forEach((t, i) => {
     const active = i === 0;
-    t.style.color = active ? '#0369a1' : '#64748b';
-    t.style.borderBottomColor = active ? '#0369a1' : 'transparent';
+    t.style.color = active ? '#16a34a' : '#64748b';
+    t.style.borderBottomColor = active ? '#16a34a' : 'transparent';
     t.classList.toggle('active', active);
   });
   citizenHealthModal.querySelectorAll('.chr-tab-content').forEach((c, i) => {
