@@ -29,6 +29,20 @@ export async function updateStaffById(id, payload) {
 }
 
 export async function deleteStaffById(id) {
+  const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+  const currentAuthUser = authData?.user;
+  if (currentAuthUser) {
+    const { data: staffRecord } = await supabase
+      .from('staff')
+      .select('id, auth_user_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (staffRecord && String(staffRecord.auth_user_id) === String(currentAuthUser.id)) {
+      throw new Error('Guardrail Active: You cannot delete your own account.');
+    }
+  }
+
   const { error } = await supabase
     .from('staff')
     .delete()
@@ -40,9 +54,27 @@ export async function deleteStaffById(id) {
 }
 
 export async function deleteStaffAccount(staffId) {
+  const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+  const currentAuthUser = authData?.user;
+  if (currentAuthUser) {
+    const { data: staffRecord } = await supabase
+      .from('staff')
+      .select('id, auth_user_id')
+      .eq('id', staffId)
+      .maybeSingle();
+
+    if (staffRecord && String(staffRecord.auth_user_id) === String(currentAuthUser.id)) {
+      throw new Error('Guardrail Active: You cannot delete your own account.');
+    }
+  }
+
   const { error } = await supabase.rpc('delete_staff_member', { target_staff_id: staffId });
   if (error) {
-    throw new Error(error.message || 'Failed to delete account.');
+    const msg = error.message || 'Failed to delete account.';
+    if (/forbidden.*admin role required/i.test(msg)) {
+      throw new Error('Forbidden: admin role required. Please run migration 20260907001500_fix_is_admin_and_schedule_rpcs.sql in your Supabase SQL Editor to grant admin account permissions.');
+    }
+    throw new Error(msg);
   }
 }
 
@@ -53,10 +85,17 @@ export async function resetStaffPassword(staffId, newPassword) {
   });
 
   if (error) {
-    throw new Error(error.message || 'Failed to reset password.');
+    const msg = error.message || 'Failed to reset password.';
+    if (/forbidden.*admin role required/i.test(msg)) {
+      throw new Error('Forbidden: admin role required. Please run migration 20260907001500_fix_is_admin_and_schedule_rpcs.sql in your Supabase SQL Editor to grant admin account permissions.');
+    }
+    throw new Error(msg);
   }
 
   if (data && data.error) {
+    if (/forbidden.*admin role required/i.test(data.error)) {
+      throw new Error('Forbidden: admin role required. Please run migration 20260907001500_fix_is_admin_and_schedule_rpcs.sql in your Supabase SQL Editor to grant admin account permissions.');
+    }
     throw new Error(data.error);
   }
 

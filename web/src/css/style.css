@@ -167,8 +167,15 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 html,
@@ -184,7 +191,12 @@ body {
     line-height: 1.5;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
     font-family: var(--font-sans);
     letter-spacing: -0.025em;
     font-weight: 700;
@@ -210,6 +222,7 @@ body.auth-page {
     .auth-split-layout {
         grid-template-columns: 1fr;
     }
+
     .auth-banner-pane {
         padding: 40px 24px !important;
     }
@@ -505,8 +518,8 @@ textarea {
     background: #ffffff;
     box-sizing: border-box;
     transition: border-color var(--transition-fast, 0.18s ease),
-                box-shadow var(--transition-fast, 0.18s ease),
-                background var(--transition-fast, 0.18s ease);
+        box-shadow var(--transition-fast, 0.18s ease),
+        background var(--transition-fast, 0.18s ease);
 }
 
 textarea {
@@ -650,6 +663,34 @@ textarea:focus {
 .btn:focus {
     outline: 0;
     box-shadow: 0 0 0 4px var(--accent-glow);
+}
+
+.btn-secondary,
+.btn.btn-secondary {
+    background: #ffffff;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    width: auto;
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.btn-secondary:hover,
+.btn.btn-secondary:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+    border-color: #94a3b8;
+    filter: none;
+    transform: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.btn-sm,
+.btn.btn-sm {
+    padding: 6px 14px;
+    font-size: 12.5px;
+    width: auto;
 }
 
 .link {
@@ -866,6 +907,48 @@ textarea:focus {
         transform: translateY(0) scale(1);
         opacity: 1;
     }
+}
+
+/* Vitals Walk-In / Manual Triage Assessment Pop-up Modal */
+.modal-box.vitals-triage-modal {
+    max-width: 680px;
+    width: 95%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+    text-align: left;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 25px 65px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.06);
+}
+
+.vitals-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1.5px solid #e2e8f0;
+    background: #f8fafc;
+    flex-shrink: 0;
+}
+
+.vitals-modal-body {
+    padding: 22px 26px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.vitals-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1.5px solid #e2e8f0;
+    background: #f8fafc;
+    flex-shrink: 0;
 }
 
 @keyframes slideIn {
@@ -1222,7 +1305,8 @@ textarea:focus {
     gap: 6px;
 }
 
-.label-svg, .vital-metric-svg {
+.label-svg,
+.vital-metric-svg {
     width: 14px;
     height: 14px;
     stroke: #16a34a;
@@ -1393,29 +1477,29 @@ textarea:focus {
     .vital-modal-header {
         padding: 20px 24px;
     }
-    
+
     .vital-modal-title h3 {
         font-size: 1.25rem;
     }
-    
+
     .vital-form {
         padding: 20px 24px 28px;
     }
-    
+
     .vital-patient-banner {
         margin: 20px 24px;
         padding: 16px 20px;
     }
-    
+
     .vital-signs-grid {
         grid-template-columns: 1fr;
         gap: 16px;
     }
-    
+
     .vital-actions {
         flex-direction: column;
     }
-    
+
     .vital-btn {
         width: 100%;
         justify-content: center;
@@ -1978,7 +2062,7 @@ textarea:focus {
     color: #ffffff !important;
     font-weight: 700 !important;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15),
-                inset 3px 0 0 0 var(--accent-light, #81C784) !important;
+        inset 3px 0 0 0 var(--accent-light, #81C784) !important;
     border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
@@ -2182,10 +2266,12 @@ textarea:focus {
         transform: scale(0.95);
         box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7);
     }
+
     70% {
         transform: scale(1);
         box-shadow: 0 0 0 6px rgba(22, 163, 74, 0);
     }
+
     100% {
         transform: scale(0.95);
         box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
@@ -2289,7 +2375,7 @@ textarea:focus {
     border: 1px solid var(--border, #e2e8f0);
     border-radius: var(--radius-md, 14px);
     box-shadow: 0 20px 45px rgba(15, 23, 42, 0.14),
-                0 0 0 1px rgba(15, 23, 42, 0.04);
+        0 0 0 1px rgba(15, 23, 42, 0.04);
     padding: 8px;
     z-index: 1000;
     animation: popoverFadeSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -2300,6 +2386,7 @@ textarea:focus {
         opacity: 0;
         transform: translateY(-8px) scale(0.96);
     }
+
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
@@ -4395,6 +4482,7 @@ body.dashboard-loading {
     0% {
         background-position: 200% 0;
     }
+
     100% {
         background-position: -200% 0;
     }
@@ -4411,9 +4499,11 @@ body.dashboard-loading {
     0% {
         background-color: #f1f5f9;
     }
+
     50% {
         background-color: #cbd5e1;
     }
+
     100% {
         background-color: #f1f5f9;
     }
@@ -4491,6 +4581,7 @@ body.dashboard-loading {
         opacity: 0.2;
         transform: translateY(3px) scale(0.97);
     }
+
     100% {
         opacity: 1;
         transform: translateY(0) scale(1);
@@ -4557,7 +4648,7 @@ body.dashboard-loading {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .skeleton-stat-card-header {
@@ -4698,6 +4789,7 @@ body.dashboard-loading {
         opacity: 0;
         transform: translateY(-6px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -4705,9 +4797,21 @@ body.dashboard-loading {
 }
 
 @keyframes validationShake {
-    0%, 100% { transform: translateX(0); }
-    20%, 60% { transform: translateX(-4px); }
-    40%, 80% { transform: translateX(4px); }
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    20%,
+    60% {
+        transform: translateX(-4px);
+    }
+
+    40%,
+    80% {
+        transform: translateX(4px);
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -4860,9 +4964,12 @@ body.dashboard-loading {
 }
 
 @keyframes pulseCrisis {
-    0%, 100% {
+
+    0%,
+    100% {
         box-shadow: 0 0 0 0 rgba(153, 27, 27, 0.5);
     }
+
     50% {
         box-shadow: 0 0 0 4px rgba(153, 27, 27, 0.2);
     }
@@ -4902,10 +5009,25 @@ body.dashboard-loading {
     letter-spacing: -0.01em;
 }
 
-.bmi-underweight { background: #e0f2fe; color: #0369a1; }
-.bmi-normal      { background: #dcfce7; color: #15803d; }
-.bmi-overweight  { background: #fef3c7; color: #b45309; }
-.bmi-obese       { background: #fee2e2; color: #b91c1c; }
+.bmi-underweight {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.bmi-normal {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.bmi-overweight {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.bmi-obese {
+    background: #fee2e2;
+    color: #b91c1c;
+}
 
 /* 2. Split-Screen Dual-Pane Doctor Consultation Workspace */
 .consult-dual-pane-modal {
@@ -6279,10 +6401,21 @@ body.dashboard-loading {
     color: #0f172a;
 }
 
-.ph-telemetry-val.blue  { color: #0284c7; }
-.ph-telemetry-val.green { color: #16a34a; }
-.ph-telemetry-val.amber { color: #d97706; }
-.ph-telemetry-val.red   { color: #dc2626; }
+.ph-telemetry-val.blue {
+    color: #0284c7;
+}
+
+.ph-telemetry-val.green {
+    color: #16a34a;
+}
+
+.ph-telemetry-val.amber {
+    color: #d97706;
+}
+
+.ph-telemetry-val.red {
+    color: #dc2626;
+}
 
 .ph-telemetry-sub {
     font-size: 11.5px;
@@ -6641,9 +6774,18 @@ body.dashboard-loading {
     border-radius: 50%;
 }
 
-.duty-dot.on-duty  { background: #16a34a; box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2); }
-.duty-dot.break    { background: #d97706; }
-.duty-dot.off-duty { background: #94a3b8; }
+.duty-dot.on-duty {
+    background: #16a34a;
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+}
+
+.duty-dot.break {
+    background: #d97706;
+}
+
+.duty-dot.off-duty {
+    background: #94a3b8;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    REPORTS, ANALYTICS & COMMUNICATIONS HUB TOOLBAR & SPACING
@@ -6738,4 +6880,3 @@ body.dashboard-loading {
     border-color: #16a34a;
     box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
 }
-

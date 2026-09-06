@@ -427,6 +427,8 @@ function loadAuthSessionModule() {
 
 if (burger) {
   burger.addEventListener('click', () => {
+    // Admin workstation: sidebar must never collapse
+    if (document.body.getAttribute('data-role') === 'admin') return;
     if (window.innerWidth <= 900) {
       sidebar.classList.toggle('slid');
       sidebar.classList.remove('collapsed');
@@ -786,6 +788,34 @@ function isFullAccessUser(user) {
   return isAdminUser(user) || isClinicalStaff(user);
 }
 
+function isSelfUser(user) {
+  if (!user || !cachedSessionUser) return false;
+
+  // Match by primary key id (number or string)
+  if (user.id && cachedSessionUser.id && String(user.id) === String(cachedSessionUser.id)) {
+    return true;
+  }
+  // Match by auth user UUID
+  const userAuthId = user.auth_user_id || user.user_id;
+  const sessionAuthId = cachedSessionUser.auth_user_id || cachedSessionUser.user_id;
+  if (userAuthId && sessionAuthId && String(userAuthId) === String(sessionAuthId)) {
+    return true;
+  }
+  // Match by email
+  if (user.email && cachedSessionUser.email && String(user.email).trim().toLowerCase() === String(cachedSessionUser.email).trim().toLowerCase()) {
+    return true;
+  }
+  // Match by username
+  if (user.username && cachedSessionUser.username && String(user.username).trim().toLowerCase() === String(cachedSessionUser.username).trim().toLowerCase()) {
+    return true;
+  }
+  // Match by employee_id if both are valid
+  if (user.employee_id && cachedSessionUser.employee_id && String(user.employee_id).trim().toLowerCase() === String(cachedSessionUser.employee_id).trim().toLowerCase()) {
+    return true;
+  }
+  return false;
+}
+
 const SECTION_ROLE_RULES = {
   'dashboard-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
   'users-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
@@ -799,7 +829,7 @@ const SECTION_ROLE_RULES = {
   'vitals-section': ['doctor', 'nurse', 'pharmacist'],
   'queue-section': ['doctor', 'nurse', 'pharmacist'],
 
-  'profile-section': ['doctor', 'nurse', 'pharmacist'],
+  'profile-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
   'security-section': ['admin', 'doctor', 'nurse', 'pharmacist']
 };
 
@@ -998,7 +1028,22 @@ function applyRoleAccess(user) {
   const isAdmin = isAdminUser(user);
   const isClinical = isClinicalStaff(user);
   const hasFullAccess = isFullAccessUser(user);
-  
+
+  // Set body data-role attribute for CSS-driven role rules (e.g. hiding sidebar burger for admin)
+  document.body.setAttribute('data-role', role);
+  document.body.classList.toggle('role-admin', isAdmin);
+
+  // Admin workstation: remove minimize sidebar button and force sidebar expanded
+  const burgerBtn = document.getElementById('burger');
+  if (isAdmin) {
+    if (burgerBtn) burgerBtn.style.display = 'none';
+    if (sidebar) {
+      sidebar.classList.remove('collapsed');
+    }
+  } else {
+    if (burgerBtn) burgerBtn.style.display = '';
+  }
+
   // Handle .admin-only elements (for true admins only)
   document.querySelectorAll('.admin-only').forEach((element) => {
     const isSectionContainer = element.classList.contains('section-top');
@@ -1592,10 +1637,17 @@ async function createStaffAccountDirect(payload) {
     });
 
     if (error) {
-      throw new Error(error.message || 'Unable to create account.');
+      const errorMsg = error.message || 'Unable to create account.';
+      if (/forbidden.*admin role required/i.test(errorMsg)) {
+        throw new Error('Forbidden: admin role required. Please run migration 20260907001500_fix_is_admin_and_schedule_rpcs.sql in your Supabase SQL Editor to grant admin account permissions.');
+      }
+      throw new Error(errorMsg);
     }
 
     if (data && data.error) {
+      if (/forbidden.*admin role required/i.test(data.error)) {
+        throw new Error('Forbidden: admin role required. Please run migration 20260907001500_fix_is_admin_and_schedule_rpcs.sql in your Supabase SQL Editor to grant admin account permissions.');
+      }
       throw new Error(data.error);
     }
   } catch (err) {
@@ -5828,7 +5880,7 @@ function renderDashboardChart() {
     });
   }
 
-  const baseSize = 260;
+  const baseSize = 200;
   const ratio = window.devicePixelRatio || 1;
   canvas.width = baseSize * ratio;
   canvas.height = baseSize * ratio;
@@ -5847,21 +5899,21 @@ function renderDashboardChart() {
 
     const cx = baseSize / 2;
     const cy = baseSize / 2;
-    const r = baseSize / 2 - 40;
+    const r = 70;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 22;
+    ctx.lineWidth = 20;
     ctx.stroke();
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#94a3b8';
-    ctx.font = '800 26px Inter, sans-serif';
-    ctx.fillText('0', cx, cy - 8);
+    ctx.font = '800 24px Inter, sans-serif';
+    ctx.fillText('0', cx, cy - 7);
     ctx.font = '600 11px Inter, sans-serif';
     ctx.fillStyle = '#64748b';
-    ctx.fillText('Encounters Today', cx, cy + 14);
+    ctx.fillText('Encounters Today', cx, cy + 13);
     return;
   }
 
@@ -5886,8 +5938,8 @@ function renderDashboardChart() {
     baseSize,
     centerX: baseSize / 2,
     centerY: baseSize / 2,
-    radius: baseSize / 2 - 50, // Reduced from -28 to -50 to make the radius smaller and more balanced
-    ringWidth: 32 // Slightly thinner for an elegant, premium look
+    radius: 70,
+    ringWidth: 22
   };
 
   const duration = 900;
@@ -5952,7 +6004,7 @@ function drawDashboardPie(ctx, segments, dimensions, progress, total) {
 
   ctx.shadowBlur = 0;
 
-  // Perfectly align the inner white circle with the inner boundary of the ring (radius - ringWidth / 2 = 113px)
+  // Perfectly align the inner white circle with the inner boundary of the ring
   const innerRadius = radius - ringWidth / 2;
   ctx.beginPath();
   ctx.fillStyle = '#ffffff';
@@ -5968,12 +6020,12 @@ function drawDashboardPie(ctx, segments, dimensions, progress, total) {
   ctx.fillStyle = '#0f172a';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '600 28px "Inter", "Segoe UI", -apple-system, sans-serif';
-  ctx.fillText(String(total), centerX, centerY - 8);
+  ctx.font = '700 24px "Inter", "Segoe UI", -apple-system, sans-serif';
+  ctx.fillText(String(total), centerX, centerY - 7);
   
   ctx.fillStyle = '#64748b';
-  ctx.font = '500 11px "Inter", "Segoe UI", -apple-system, sans-serif';
-  ctx.fillText('TOTAL ITEMS', centerX, centerY + 14);
+  ctx.font = '600 10.5px "Inter", "Segoe UI", -apple-system, sans-serif';
+  ctx.fillText('TOTAL ITEMS', centerX, centerY + 13);
 }
 
 function easeOutCubic(value) {
@@ -6251,7 +6303,9 @@ function initVitalsSection() {
       vitalsForm.reset();
       document.getElementById('vitals-citizen-id').value = '';
       activeVitalsQueueTicketId = null;
-      formContainer.scrollIntoView({ behavior: 'smooth' });
+      setTimeout(() => {
+        document.getElementById('vitals-name')?.focus();
+      }, 100);
     });
   }
 
@@ -6262,13 +6316,33 @@ function initVitalsSection() {
     });
   }
 
+  const cancelModalBtn = document.getElementById('vitals-cancel-modal-btn');
+  if (cancelModalBtn) {
+    cancelModalBtn.addEventListener('click', () => {
+      cancelFormBtn?.click();
+    });
+  }
+
   if (cancelFormBtn) {
     cancelFormBtn.addEventListener('click', () => {
       vitalsForm.reset();
       formContainer.classList.add('hidden');
       setVitalsStationStatus('ready', 'Ready for Intake');
       activeVitalsQueueTicketId = null;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  if (formContainer) {
+    formContainer.addEventListener('click', (e) => {
+      if (e.target === formContainer) {
+        cancelFormBtn?.click();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !formContainer.classList.contains('hidden')) {
+        cancelFormBtn?.click();
+      }
     });
   }
 
@@ -6442,7 +6516,6 @@ async function handleQRDecoded(decodedText) {
     formContainer.classList.remove('hidden');
     statusText.textContent = 'Patient data loaded successfully.';
     statusText.style.color = '#15803d';
-    formContainer.scrollIntoView({ behavior: 'smooth' });
   } catch (err) {
     console.error('QR handle error:', err);
     statusText.textContent = 'Error processing patient data.';
@@ -6568,7 +6641,6 @@ function populateVitalsFormFromQueue(ticket) {
     statusText.style.color = '#15803d';
   }
   setVitalsStationStatus('active', `Triage: #${String(ticket.queue_number).padStart(3, '0')}`);
-  formContainer.scrollIntoView({ behavior: 'smooth' });
 }
 
 async function handleVitalsSubmission() {
@@ -6738,8 +6810,11 @@ async function loadStaffData() {
       }
 
       latestStaffList.forEach(user => {
-        const identifier = user.username || user.employee_id || makeDemoId();
+        const identifier = String(user.id || user.username || user.employee_id || makeDemoId());
         storedAccounts.set(identifier, user);
+        if (user.username) storedAccounts.set(String(user.username), user);
+        if (user.id) storedAccounts.set(String(user.id), user);
+        if (user.employee_id) storedAccounts.set(String(user.employee_id), user);
 
         const roleValue = user.role ? String(user.role).toLowerCase() : 'staff';
         const roleLabel = roleValue.charAt(0).toUpperCase() + roleValue.slice(1);
@@ -6750,6 +6825,10 @@ async function loadStaffData() {
 
         const initials = (user.username || 'ST').substring(0, 2).toUpperCase();
         const fullName = [user.firstname, user.surname].filter(Boolean).join(' ') || user.username || 'Medical Staff';
+        const isSelf = isSelfUser(user);
+        const youBadge = isSelf
+          ? ` <span class="self-account-badge" style="display:inline-flex; align-items:center; gap:3px; font-size:10.5px; font-weight:700; color:#059669; background:#ecfdf5; border:1px solid #a7f3d0; padding:1px 7px; border-radius:9999px; margin-left:4px; vertical-align:middle;">You</span>`
+          : '';
 
         const row = document.createElement('tr');
         row.className = 'account-row';
@@ -6760,7 +6839,7 @@ async function loadStaffData() {
             <div class="user-avatar-cell">
               <div class="avatar-circle">${initials}</div>
               <div>
-                <strong style="font-size:13.5px; color:#0f172a;">${escapeHtml(fullName)}</strong>
+                <strong style="font-size:13.5px; color:#0f172a;">${escapeHtml(fullName)}</strong>${youBadge}
                 <div style="font-size:11.5px; color:#64748b;">@${escapeHtml(user.username || '—')}</div>
               </div>
             </div>
@@ -7212,6 +7291,25 @@ function openAccountModal(user) {
     if (el) el.textContent = user[field] || '—';
   });
 
+  const modalDeleteBtn = document.getElementById('modal-delete-btn');
+  const modalSelfNotice = document.getElementById('modal-self-notice');
+  const isSelf = isSelfUser(user);
+
+  if (modalSelfNotice) {
+    modalSelfNotice.style.display = isSelf ? 'flex' : 'none';
+    modalSelfNotice.classList.toggle('hidden', !isSelf);
+  }
+
+  if (modalDeleteBtn) {
+    if (isSelf) {
+      modalDeleteBtn.style.display = 'none';
+      modalDeleteBtn.disabled = true;
+    } else {
+      modalDeleteBtn.style.display = '';
+      modalDeleteBtn.disabled = false;
+    }
+  }
+
   if (confirmSection) confirmSection.style.display = 'none';
   if (modalActions) modalActions.style.display = 'flex';
 
@@ -7221,10 +7319,33 @@ function openAccountModal(user) {
 
 // Account row click handler -> shared detail modal
 function attachAccountRowListener(row) {
+  if (!row) return;
+
+  const identifier = row.getAttribute('data-id');
+  const viewBtn = row.querySelector('[data-action="view-staff"]');
+  if (viewBtn) {
+    viewBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const id = viewBtn.getAttribute('data-id') || identifier;
+      const user = storedAccounts.get(id) || latestStaffList?.find(u => 
+        String(u.id) === String(id) || 
+        String(u.username) === String(id) || 
+        String(u.employee_id) === String(id)
+      );
+      if (!user) return;
+      openAccountModal(user);
+    });
+  }
+
   if (!dataDetailModal) {
-    row.addEventListener('click', () => {
-      const identifier = row.getAttribute('data-id');
-      const user = storedAccounts.get(identifier);
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('button, a, input, textarea, select, label')) return;
+      const user = storedAccounts.get(identifier) || latestStaffList?.find(u => 
+        String(u.id) === String(identifier) || 
+        String(u.username) === String(identifier) || 
+        String(u.employee_id) === String(identifier)
+      );
       if (!user) return;
       openAccountModal(user);
     });
@@ -7232,19 +7353,23 @@ function attachAccountRowListener(row) {
   }
 
   attachDetailRow(row, () => {
-    const identifier = row.getAttribute('data-id');
-    const user = storedAccounts.get(identifier);
+    const user = storedAccounts.get(identifier) || latestStaffList?.find(u => 
+      String(u.id) === String(identifier) || 
+      String(u.username) === String(identifier) || 
+      String(u.employee_id) === String(identifier)
+    );
     if (!user) return null;
 
-    const firstName = String(user.first_name || '').trim();
-    const lastName = String(user.last_name || '').trim();
+    const firstName = String(user.first_name || user.firstname || '').trim();
+    const lastName = String(user.last_name || user.surname || '').trim();
     const fullName = `${firstName} ${lastName}`.replace(/\s+/g, ' ').trim();
     const statusValue = getStaffPresenceStatus(user);
     const roleLabel = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '—';
+    const isSelf = isSelfUser(user);
 
     const actions = document.getElementById('account-modal') ? [
       {
-        label: 'Manage Account',
+        label: isSelf ? 'Manage My Account' : 'Manage Account',
         className: 'btn',
         onClick: () => {
           closeDataDetail();
@@ -7268,6 +7393,24 @@ function attachAccountRowListener(row) {
     };
   });
 }
+
+// Global delegated click listener for any [data-action="view-staff"] button
+document.addEventListener('click', (event) => {
+  const viewStaffBtn = event.target.closest('[data-action="view-staff"]');
+  if (!viewStaffBtn) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const id = viewStaffBtn.getAttribute('data-id') || viewStaffBtn.closest('tr')?.getAttribute('data-id');
+  if (!id) return;
+  const user = storedAccounts.get(id) || latestStaffList?.find(u => 
+    String(u.id) === String(id) || 
+    String(u.username) === String(id) || 
+    String(u.employee_id) === String(id)
+  );
+  if (user) {
+    openAccountModal(user);
+  }
+});
 
 // Attach listeners to existing account rows
 document.querySelectorAll('.account-row').forEach(attachAccountRowListener);
@@ -7294,6 +7437,10 @@ if (editBtn) {
 const deleteBtn = document.getElementById('modal-delete-btn');
 if (deleteBtn) {
   deleteBtn.addEventListener('click', () => {
+    if (isSelfUser(currentAccountData)) {
+      showToast('Guardrail Active: You cannot delete your own account.', 'warning');
+      return;
+    }
     currentAction = 'delete';
     document.getElementById('modal-confirm-text').textContent = 'Are you sure you want to delete this account? This action cannot be undone.';
     document.getElementById('modal-actions').style.display = 'none';
@@ -7361,6 +7508,14 @@ if (confirmBtn) {
           return;
         }
 
+        if (isSelfUser(currentAccountData)) {
+          showToast('Guardrail Active: You cannot delete your own account.', 'warning');
+          document.getElementById('modal-confirm-section').style.display = 'none';
+          document.getElementById('modal-actions').style.display = 'flex';
+          currentAction = null;
+          return;
+        }
+
         if (isApiMode) {
           const response = await fetch(`${API_BASE}/api/staff/${currentAccountData.id}`, {
             method: 'DELETE',
@@ -7385,7 +7540,7 @@ if (confirmBtn) {
         showToast('Account deleted successfully.', 'success');
       } catch (error) {
         console.error('Delete account error:', error);
-        showToast('Server error during deletion.', 'error');
+        showToast(error?.message || 'Server error during deletion.', 'error');
       }
     }
   });
