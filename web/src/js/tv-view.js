@@ -98,8 +98,9 @@ const tvView = (() => {
             await loadQueueData();
             setupRealtimeListener();
             
-            // Polling fallback (60 seconds is plenty since realtime handles instant updates)
-            setInterval(loadQueueData, 60000);
+            // No unconditional polling — Realtime handles instant updates.
+            // Fallback polling is activated only when the WebSocket channel disconnects
+            // (see setupRealtimeListener for CHANNEL_ERROR/CLOSED handling).
             
             console.log('[TV View] Ready');
         } catch (err) {
@@ -141,6 +142,22 @@ const tvView = (() => {
         });
     };
 
+    let fallbackPollInterval = null;
+
+    const startFallbackPolling = () => {
+        if (fallbackPollInterval) return;
+        console.log('[TV View] Starting fallback polling (60s) while Realtime is disconnected.');
+        fallbackPollInterval = setInterval(loadQueueData, 60000);
+    };
+
+    const stopFallbackPolling = () => {
+        if (fallbackPollInterval) {
+            clearInterval(fallbackPollInterval);
+            fallbackPollInterval = null;
+            console.log('[TV View] Stopped fallback polling — Realtime is connected.');
+        }
+    };
+
     const setupRealtimeListener = () => {
         const client = getSupabaseClient();
         if (!client) return;
@@ -162,7 +179,10 @@ const tvView = (() => {
             })
             .subscribe((status) => {
                 console.log('[TV View] Realtime status:', status);
-                if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+                if (status === 'SUBSCRIBED') {
+                    stopFallbackPolling();
+                } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+                    startFallbackPolling();
                     console.log('[TV View] Reconnecting realtime in 5s...');
                     setTimeout(setupRealtimeListener, 5000);
                 }

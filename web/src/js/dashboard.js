@@ -150,7 +150,7 @@ function renderTableSkeleton(tbody, columnCount, rowCount = 5) {
 function toggleStatsSkeleton(isLoading) {
   const statIds = [
     'stat-queue-waiting', 'stat-consults-today', 'stat-vitals-today',
-    'stat-dispenses-today', 'stat-citizens', 'stat-active-staff'
+    'stat-dispenses-today', 'stat-citizens'
   ];
   statIds.forEach(id => {
     const el = document.getElementById(id);
@@ -1441,9 +1441,6 @@ async function showSection(sectionId, options = {}) {
         initClinicalData();
         break;
       case 'dashboard-section':
-        if (isAdminUser(user) && latestStaffList.length === 0) {
-          await Promise.all([loadStaffData(), loadPatientData(), refreshAnnouncementsData(), refreshFeedbackData()]);
-        }
         renderDashboardInsights();
         break;
       case 'announcements-section':
@@ -2374,15 +2371,16 @@ async function purgePastSchedules(records, user, source = 'doctor_schedules') {
 
   try {
     if (isApiMode || source === 'api') {
-      await Promise.all(expiredIds.map(async (id) => {
-        const response = await fetch(`${API_BASE}/api/schedules/${id}`, {
-          method: 'DELETE',
-          credentials: 'include'
-        });
-        if (!response.ok) {
-          throw new Error(`Failed to auto-delete schedule ${id}`);
-        }
-      }));
+      // Batch delete expired schedules in a single request instead of N individual DELETE calls
+      const response = await fetch(`${API_BASE}/api/schedules/batch-delete`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: expiredIds })
+      });
+      if (!response.ok) {
+        throw new Error('Failed to batch-delete expired schedules');
+      }
     } else {
       const { supabase } = await loadSupabaseModule();
       const tableName = source === 'schedules' ? 'schedules' : 'doctor_schedules';
@@ -3375,15 +3373,8 @@ async function initializeDashboard() {
     // Critical dashboard data in parallel (FAST)
     await Promise.all([
       loadClinicalOperationsMetrics(),
-      loadPatientData().catch(e => console.warn('Patient data load:', e)),
-      loadStaffData().catch(e => console.warn('Staff data load:', e))
+      loadPatientData().catch(e => console.warn('Patient data load:', e))
     ]);
-
-    if (isAdminUser(sessionUser)) {
-      startAdminDashboardAutoRefresh();
-    } else {
-      stopAdminDashboardAutoRefresh();
-    }
 
     renderDashboardInsights();
 
@@ -3424,7 +3415,6 @@ const usersSection = document.getElementById('users-section');
 const reportsSection = document.getElementById('reports-section');
 const newRegistrationSection = document.getElementById('new-registration');
 
-const statActiveStaff = document.getElementById('stat-active-staff');
 const statPatients = document.getElementById('stat-citizens');
 const statQueueWaiting = document.getElementById('stat-queue-waiting');
 const statConsultsToday = document.getElementById('stat-consults-today');
@@ -5332,13 +5322,15 @@ function initReportsSection() {
             visibility: ['all', 'staff', 'citizen', 'all_users']
           },
           onImport: async (rows) => {
-            for (const row of rows) {
-              await createAnnouncementEntry({
-                title: row.title,
-                content: row.content,
-                visibility: row.visibility || 'all'
-              });
-            }
+            // Bulk insert all rows in a single request instead of N sequential roundtrips
+            const sb = await getSupabase();
+            const batch = rows.map(row => ({
+              title: row.title,
+              content: row.content,
+              visibility: row.visibility || 'all'
+            }));
+            const { error } = await sb.from('announcements').insert(batch);
+            if (error) throw error;
           },
           onSuccess: async () => {
             showToast('Announcements successfully imported.', 'success');
@@ -5498,24 +5490,7 @@ function stopPresenceHeartbeat() {
 let staffRealtimeChannel = null;
 
 async function setupStaffRealtimeSubscription() {
-  if (isDemoMode || staffRealtimeChannel) return;
-  try {
-    const { supabase } = await loadSupabaseModule();
-    staffRealtimeChannel = supabase
-      .channel('staff-account-updates')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'staff'
-      }, () => {
-        if (document.visibilityState === 'visible') {
-          loadStaffData().catch(() => {});
-        }
-      })
-      .subscribe();
-  } catch (err) {
-    console.warn('Staff realtime setup error:', err);
-  }
+  // Staff account updates subscription disabled to reduce unnecessary background requests.
 }
 
 function stopAdminDashboardAutoRefresh() {
@@ -5523,40 +5498,14 @@ function stopAdminDashboardAutoRefresh() {
     clearInterval(adminDashboardRefreshTimer);
     adminDashboardRefreshTimer = null;
   }
-  if (staffRealtimeChannel) {
-    try {
-      loadSupabaseModule().then(({ supabase }) => supabase.removeChannel(staffRealtimeChannel));
-    } catch (_) {}
-    staffRealtimeChannel = null;
-  }
 }
 
 function startAdminDashboardAutoRefresh() {
-  setupStaffRealtimeSubscription();
-  if (adminDashboardRefreshTimer) return;
-
-  const runRefresh = async () => {
-    // Only poll if tab is actively visible to prevent background battery/network drain
-    if (document.visibilityState !== 'visible') return;
-    if (adminDashboardRefreshInFlight) return;
-    adminDashboardRefreshInFlight = true;
-    try {
-      await loadStaffData();
-    } catch (_) {
-      // Keep auto-refresh resilient.
-    } finally {
-      adminDashboardRefreshInFlight = false;
-    }
-  };
-
-  adminDashboardRefreshTimer = setInterval(runRefresh, ADMIN_DASHBOARD_REFRESH_MS);
+  // Active staff polling disabled to reduce data requests.
 }
 
 function startPresenceHeartbeat() {
-  if (isDemoMode || presenceHeartbeatTimer) return;
-
-  pushPresenceHeartbeat();
-  presenceHeartbeatTimer = setInterval(pushPresenceHeartbeat, STAFF_PRESENCE_HEARTBEAT_MS);
+  // Presence heartbeat disabled to reduce data requests.
 }
 
 async function markStaffOfflineBestEffort() {
@@ -5660,29 +5609,45 @@ async function loadClinicalOperationsMetrics() {
     const sb = await getSupabase();
     if (!sb) return;
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayIso = todayStart.toISOString();
+    // Single consolidated RPC replaces 6 concurrent HEAD count queries
+    const { data, error } = await sb.rpc('get_clinical_operations_metrics');
 
-    const [waitingRes, servingRes, consultsRes, vitalsRes, rxRes, otcRes] = await Promise.all([
-      sb.from('queue_tickets').select('id', { count: 'exact', head: true }).in('status', ['waiting', 'on_call']),
-      sb.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'serving'),
-      sb.from('consultations').select('id', { count: 'exact', head: true }).gte('created_at', todayIso),
-      sb.from('vital_signs').select('id', { count: 'exact', head: true }).gte('created_at', todayIso),
-      sb.from('prescription_item_dispenses').select('id', { count: 'exact', head: true }).gte('dispensed_at', todayIso),
-      sb.from('otc_dispenses').select('id', { count: 'exact', head: true }).gte('dispensed_at', todayIso)
-    ]);
+    if (error) {
+      console.warn('RPC get_clinical_operations_metrics failed, falling back to individual queries:', error);
+      // Fallback to original individual queries if RPC not yet deployed
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayIso = todayStart.toISOString();
 
-    const rxCount = (rxRes && typeof rxRes.count === 'number') ? rxRes.count : 0;
-    const otcCount = (otcRes && typeof otcRes.count === 'number') ? otcRes.count : 0;
+      const [waitingRes, servingRes, consultsRes, vitalsRes, rxRes, otcRes] = await Promise.all([
+        sb.from('queue_tickets').select('id', { count: 'exact', head: true }).in('status', ['waiting', 'on_call']),
+        sb.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'serving'),
+        sb.from('consultations').select('id', { count: 'exact', head: true }).gte('created_at', todayIso),
+        sb.from('vital_signs').select('id', { count: 'exact', head: true }).gte('created_at', todayIso),
+        sb.from('prescription_item_dispenses').select('id', { count: 'exact', head: true }).gte('dispensed_at', todayIso),
+        sb.from('otc_dispenses').select('id', { count: 'exact', head: true }).gte('dispensed_at', todayIso)
+      ]);
 
-    clinicalMetricsCache = {
-      waiting: (waitingRes && typeof waitingRes.count === 'number') ? waitingRes.count : 0,
-      serving: (servingRes && typeof servingRes.count === 'number') ? servingRes.count : 0,
-      consultsToday: (consultsRes && typeof consultsRes.count === 'number') ? consultsRes.count : 0,
-      vitalsToday: (vitalsRes && typeof vitalsRes.count === 'number') ? vitalsRes.count : 0,
-      dispensesToday: rxCount + otcCount
-    };
+      const rxCount = (rxRes && typeof rxRes.count === 'number') ? rxRes.count : 0;
+      const otcCount = (otcRes && typeof otcRes.count === 'number') ? otcRes.count : 0;
+
+      clinicalMetricsCache = {
+        waiting: (waitingRes && typeof waitingRes.count === 'number') ? waitingRes.count : 0,
+        serving: (servingRes && typeof servingRes.count === 'number') ? servingRes.count : 0,
+        consultsToday: (consultsRes && typeof consultsRes.count === 'number') ? consultsRes.count : 0,
+        vitalsToday: (vitalsRes && typeof vitalsRes.count === 'number') ? vitalsRes.count : 0,
+        dispensesToday: rxCount + otcCount
+      };
+    } else {
+      // Use consolidated RPC response
+      clinicalMetricsCache = {
+        waiting: data?.waiting || 0,
+        serving: data?.serving || 0,
+        consultsToday: data?.consults_today || 0,
+        vitalsToday: data?.vitals_today || 0,
+        dispensesToday: data?.dispenses_today || 0
+      };
+    }
 
     renderClinicalMetrics();
   } catch (err) {
@@ -5760,17 +5725,9 @@ function attachClinicalCardNavigation() {
   if (patientsCard && !patientsCard.dataset.navAttached) {
     patientsCard.dataset.navAttached = 'true';
     patientsCard.addEventListener('click', () => {
-      const usersNav = document.querySelector('[data-section="users"]');
+      const usersNav = document.querySelector('[data-section="users-section"]');
       if (usersNav) usersNav.click();
-    });
-  }
-
-  const staffCard = document.getElementById('stat-card-staff');
-  if (staffCard && !staffCard.dataset.navAttached) {
-    staffCard.dataset.navAttached = 'true';
-    staffCard.addEventListener('click', () => {
-      const schedNav = document.querySelector('[data-section="schedule"]');
-      if (schedNav) schedNav.click();
+      else navigateToSection('users-section', { pane: 'citizens-pane' });
     });
   }
 }
@@ -5785,9 +5742,6 @@ function renderDashboardInsights() {
   };
 
   updateMetric(statPatients, latestPatientsList.length || 0);
-
-  const activeCount = latestStaffList.filter(isCurrentlyLoggedInStaffAccount).length;
-  updateMetric(statActiveStaff, activeCount);
 
   // Render clinical operations metrics
   renderClinicalMetrics();
@@ -6890,11 +6844,13 @@ async function renderClinicalStats() {
         const { data: consults } = await supabase
           .from('consultations')
           .select('diagnosis, consulted_at')
-          .gte('consulted_at', thirtyDaysAgo);
+          .gte('consulted_at', thirtyDaysAgo)
+          .limit(500);
         const { data: vitals } = await supabase
           .from('vital_signs')
           .select('temperature, blood_pressure, created_at')
-          .gte('created_at', thirtyDaysAgo);
+          .gte('created_at', thirtyDaysAgo)
+          .limit(500);
 
         if (Array.isArray(consults)) consultList = consults;
         if (Array.isArray(vitals)) vitalList = vitals;

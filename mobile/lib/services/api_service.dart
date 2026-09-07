@@ -1196,13 +1196,19 @@ class ApiService {
   }
 
   static Future<List<DoctorStatus>> listDoctorStatus() async {
+    const cacheKey = 'doctor_status_list';
+    final cached = _getCached<List<DoctorStatus>>(cacheKey);
+    if (cached != null) return cached;
+
     final response = await _client.rpc('list_staff_accounts');
     final rows = (response as List<dynamic>?) ?? const [];
-    return rows
+    final result = rows
         .whereType<Map<String, dynamic>>()
         .where((row) => (row['role']?.toString().toLowerCase() ?? '') == 'doctor')
         .map(DoctorStatus.fromMap)
         .toList(growable: false);
+    _setCache(cacheKey, result, const Duration(minutes: 5));
+    return result;
   }
 
   static Future<List<DoctorSchedule>> listAvailableDoctorSchedules({DateTime? from, DateTime? to}) async {
@@ -1309,18 +1315,8 @@ class ApiService {
     final rows = (response as List<dynamic>?) ?? const [];
     if (rows.isEmpty || rows.first is! Map<String, dynamic>) return QueueDashboardSnapshot.empty;
     final map = rows.first as Map<String, dynamic>;
-    final queueId = ((map['r_queue_id'] ?? map['queue_id']) as num?)?.toInt();
-    bool hasVitals = false;
-    if (queueId != null) {
-      try {
-        final vitalsCheck = await _client
-            .from('vital_signs')
-            .select('id')
-            .eq('queue_ticket_id', queueId)
-            .maybeSingle();
-        hasVitals = vitalsCheck != null;
-      } catch (_) {}
-    }
+    // Read has_vitals directly from the RPC response (eliminates secondary query)
+    final hasVitals = map['has_vitals'] == true;
     return QueueDashboardSnapshot.fromMap(map, hasVitals: hasVitals);
   }
 

@@ -1438,16 +1438,18 @@ if (csvImportBtn && window.openCsvImport) {
         expiry_date: 'date' 
       },
       onImport: async (rows) => {
-        for (const row of rows) {
-          await saveMedicine({
-            id: null,
-            name: row.name,
-            description: row.description,
-            qty: row.qty,
-            unit: row.unit,
-            expiry_date: row.expiry_date
-          });
-        }
+        // Bulk insert all rows in a single request instead of N sequential roundtrips
+        const sb = await getSupabase();
+        const batch = rows.map(row => ({
+          name: (row.name || '').trim(),
+          qty: Number(row.qty) || 0,
+          unit: (row.unit || '').trim() || null,
+          description: (row.description || '').trim() || null,
+          expiry_date: row.expiry_date || null,
+          drug_classification: 'rx'
+        }));
+        const { error } = await sb.from('medicines').insert(batch);
+        if (error) throw error;
       },
       onSuccess: async () => {
         await loadMedicines();

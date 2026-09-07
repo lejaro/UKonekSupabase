@@ -129,7 +129,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadAllData(isInitial: true);
-    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 180), (_) {
       _loadAllData(isInitial: false);
     });
     SystemChrome.setSystemUIOverlayStyle(
@@ -164,7 +164,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         ApiService.fetchPrescriptions(limit: 10),
         ApiService.fetchAnnouncements(),
         SharedPreferences.getInstance(),
-        ApiService.getTvQueueDisplay(),
       ]);
       
       if (mounted) {
@@ -221,7 +220,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
           _prescribedMedicines = results[2] as List<PrescriptionRecord>;
           _announcements = announcements;
           _hasUnseenNotifications = unseen;
-          _tvQueueDisplay = (results[5] as Map<String, dynamic>?) ?? {};
           _isInitialLoading = false;
         });
       }

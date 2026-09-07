@@ -103,7 +103,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
 
   void _startRefreshTimer() {
     _refreshTimer?.cancel();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshDashboard());
+    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) => _refreshDashboard());
   }
 
   void _stopRefreshTimer() {

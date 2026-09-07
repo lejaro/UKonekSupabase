@@ -304,7 +304,7 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
       { data: allConsultations },
       { data: allPrescriptions },
       { data: allSchedules }
-    ] = await Promise.all([consultQuery, rxQuery, schedQuery]);
+    ] = await Promise.all([consultQuery.limit(5000), rxQuery.limit(5000), schedQuery.limit(5000)]);
 
     // Group by doctor ID in memory
     const consultsByDoctor = {};
@@ -492,194 +492,81 @@ export async function exportSystemUsageReport(startDate = null, endDate = null) 
     
     console.log('[Reports] Generating System Usage Report...');
     
-    // Fetch various system metrics
-    const metrics = [];
-    
-    // 1. Total Users
-    const { count: totalStaff } = await supabase
-      .from('staff')
-      .select('*', { count: 'exact', head: true });
-    
-    const { count: totalCitizens } = await supabase
-      .from('citizens')
-      .select('*', { count: 'exact', head: true });
-    
-    metrics.push({
-      'Metric': 'Total Staff Accounts',
-      'Value': totalStaff || 0,
-      'Category': 'Users'
-    });
-    
-    metrics.push({
-      'Metric': 'Total Citizen Accounts',
-      'Value': totalCitizens || 0,
-      'Category': 'Users'
-    });
-    
-    // 2. Active Users
-    const { count: activeStaff } = await supabase
-      .from('staff')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'Active');
-    
-    metrics.push({
-      'Metric': 'Active Staff Accounts',
-      'Value': activeStaff || 0,
-      'Category': 'Users'
-    });
-    
-    // 3. Online Users
-    const { count: onlineStaff } = await supabase
-      .from('staff')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_online', true);
-    
-    metrics.push({
-      'Metric': 'Currently Online Staff',
-      'Value': onlineStaff || 0,
-      'Category': 'Activity'
-    });
-    
-    // 4. Consultations
-    let consultQuery = supabase
-      .from('consultations')
-      .select('*', { count: 'exact', head: true });
-    
+    // Build all count queries
+    let consultQuery = supabase.from('consultations').select('*', { count: 'exact', head: true });
     if (startDate) consultQuery = consultQuery.gte('consulted_at', startDate);
     if (endDate) consultQuery = consultQuery.lte('consulted_at', endDate);
-    
-    const { count: consultations } = await consultQuery;
-    
-    metrics.push({
-      'Metric': 'Total Consultations',
-      'Value': consultations || 0,
-      'Category': 'Clinical Activity'
-    });
-    
-    // 5. Prescriptions
-    let rxQuery = supabase
-      .from('prescription_headers')
-      .select('*', { count: 'exact', head: true });
-    
+
+    let rxQuery = supabase.from('prescription_headers').select('*', { count: 'exact', head: true });
     if (startDate) rxQuery = rxQuery.gte('issued_at', startDate);
     if (endDate) rxQuery = rxQuery.lte('issued_at', endDate);
-    
-    const { count: prescriptions } = await rxQuery;
-    
-    metrics.push({
-      'Metric': 'Total Prescriptions',
-      'Value': prescriptions || 0,
-      'Category': 'Clinical Activity'
-    });
-    
-    // 6. Queue Tickets
-    let queueQuery = supabase
-      .from('queue_tickets')
-      .select('*', { count: 'exact', head: true });
-    
+
+    let queueQuery = supabase.from('queue_tickets').select('*', { count: 'exact', head: true });
     if (startDate) queueQuery = queueQuery.gte('queue_date', startDate);
     if (endDate) queueQuery = queueQuery.lte('queue_date', endDate);
-    
-    const { count: queueTickets } = await queueQuery;
-    
-    metrics.push({
-      'Metric': 'Total Queue Tickets',
-      'Value': queueTickets || 0,
-      'Category': 'Queue Activity'
-    });
-    
-    // 7. Completed Queue Tickets
-    let completedQuery = supabase
-      .from('queue_tickets')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'completed');
-    
+
+    let completedQuery = supabase.from('queue_tickets').select('*', { count: 'exact', head: true }).eq('status', 'completed');
     if (startDate) completedQuery = completedQuery.gte('queue_date', startDate);
     if (endDate) completedQuery = completedQuery.lte('queue_date', endDate);
-    
-    const { count: completedTickets } = await completedQuery;
-    
-    metrics.push({
-      'Metric': 'Completed Queue Tickets',
-      'Value': completedTickets || 0,
-      'Category': 'Queue Activity'
-    });
-    
-    // 8. Appointments
-    let apptQuery = supabase
-      .from('appointments')
-      .select('*', { count: 'exact', head: true });
-    
-    if (startDate) apptQuery = apptQuery.gte('appointment_date', startDate);
-    if (endDate) apptQuery = apptQuery.lte('appointment_date', endDate);
-    
-    const { count: appointments } = await apptQuery;
-    
-    metrics.push({
-      'Metric': 'Total Appointments',
-      'Value': appointments || 0,
-      'Category': 'Appointments'
-    });
-    
-    // 9. Announcements
-    let annQuery = supabase
-      .from('announcements')
-      .select('*', { count: 'exact', head: true });
-    
-    if (startDate) annQuery = annQuery.gte('created_at', startDate);
-    if (endDate) annQuery = annQuery.lte('created_at', endDate);
-    
-    const { count: announcements } = await annQuery;
-    
-    metrics.push({
-      'Metric': 'Total Announcements',
-      'Value': announcements || 0,
-      'Category': 'Communication'
-    });
-    
-    // 10. Feedbacks
-    let feedbackQuery = supabase
-      .from('feedbacks')
-      .select('*', { count: 'exact', head: true });
-    
+
+    let labQuery = supabase.from('lab_orders').select('*', { count: 'exact', head: true });
+    if (startDate) labQuery = labQuery.gte('created_at', startDate);
+    if (endDate) labQuery = labQuery.lte('created_at', endDate);
+
+    let feedbackQuery = supabase.from('feedbacks').select('*', { count: 'exact', head: true });
     if (startDate) feedbackQuery = feedbackQuery.gte('created_at', startDate);
     if (endDate) feedbackQuery = feedbackQuery.lte('created_at', endDate);
-    
-    const { count: feedbacks } = await feedbackQuery;
-    
-    metrics.push({
-      'Metric': 'Total Feedbacks',
-      'Value': feedbacks || 0,
-      'Category': 'Communication'
-    });
-    
-    // 11. Medicines
-    const { count: medicines } = await supabase
-      .from('medicines')
-      .select('*', { count: 'exact', head: true })
-      .is('archived_at', null);
-    
-    metrics.push({
-      'Metric': 'Active Medicines in Inventory',
-      'Value': medicines || 0,
-      'Category': 'Inventory'
-    });
-    
-    // 12. Doctor Schedules
-    let schedQuery = supabase
-      .from('doctor_schedules')
-      .select('*', { count: 'exact', head: true });
-    
+
+    let schedQuery = supabase.from('doctor_schedules').select('*', { count: 'exact', head: true });
     if (startDate) schedQuery = schedQuery.gte('schedule_date', startDate);
     if (endDate) schedQuery = schedQuery.lte('schedule_date', endDate);
-    
-    const { count: schedules } = await schedQuery;
-    
-    metrics.push({
-      'Metric': 'Doctor Schedule Slots',
-      'Value': schedules || 0,
-      'Category': 'Scheduling'
-    });
+
+    // Execute ALL count queries in parallel instead of 11 sequential roundtrips
+    const [
+      { count: totalStaff },
+      { count: totalCitizens },
+      { count: activeStaff },
+      { count: onlineStaff },
+      { count: consultations },
+      { count: prescriptions },
+      { count: queueTickets },
+      { count: completedTickets },
+      { count: labOrders },
+      { count: announcements },
+      { count: feedbacks },
+      { count: medicines },
+      { count: schedules }
+    ] = await Promise.all([
+      supabase.from('staff').select('*', { count: 'exact', head: true }),
+      supabase.from('citizens').select('*', { count: 'exact', head: true }),
+      supabase.from('staff').select('*', { count: 'exact', head: true }).eq('status', 'Active'),
+      supabase.from('staff').select('*', { count: 'exact', head: true }).eq('is_online', true),
+      consultQuery,
+      rxQuery,
+      queueQuery,
+      completedQuery,
+      labQuery,
+      supabase.from('announcements').select('*', { count: 'exact', head: true }),
+      feedbackQuery,
+      supabase.from('medicines').select('*', { count: 'exact', head: true }).is('archived_at', null),
+      schedQuery
+    ]);
+
+    const metrics = [
+      { 'Metric': 'Total Staff Accounts', 'Value': totalStaff || 0, 'Category': 'Users' },
+      { 'Metric': 'Total Citizen Accounts', 'Value': totalCitizens || 0, 'Category': 'Users' },
+      { 'Metric': 'Active Staff Accounts', 'Value': activeStaff || 0, 'Category': 'Users' },
+      { 'Metric': 'Currently Online Staff', 'Value': onlineStaff || 0, 'Category': 'Activity' },
+      { 'Metric': 'Total Consultations', 'Value': consultations || 0, 'Category': 'Clinical Activity' },
+      { 'Metric': 'Total Prescriptions', 'Value': prescriptions || 0, 'Category': 'Clinical Activity' },
+      { 'Metric': 'Total Queue Tickets', 'Value': queueTickets || 0, 'Category': 'Queue Activity' },
+      { 'Metric': 'Completed Queue Tickets', 'Value': completedTickets || 0, 'Category': 'Queue Activity' },
+      { 'Metric': 'Total Lab Orders', 'Value': labOrders || 0, 'Category': 'Clinical Activity' },
+      { 'Metric': 'Total Announcements', 'Value': announcements || 0, 'Category': 'Communication' },
+      { 'Metric': 'Total Feedbacks', 'Value': feedbacks || 0, 'Category': 'Communication' },
+      { 'Metric': 'Active Medicines in Inventory', 'Value': medicines || 0, 'Category': 'Inventory' },
+      { 'Metric': 'Doctor Schedule Slots', 'Value': schedules || 0, 'Category': 'Scheduling' }
+    ];
     
     // Add report metadata
     const reportMetadata = [
@@ -733,22 +620,17 @@ export async function fetchStaffLoginLogs(startDate = null, endDate = null, sear
     if (endDate) {
       query = query.lte('logged_at', `${endDate}T23:59:59Z`);
     }
+
+    // Push search filtering to the database instead of client-side .filter()
+    if (searchTerm) {
+      const term = searchTerm.trim();
+      query = query.or(`username.ilike.%${term}%,email.ilike.%${term}%,role.ilike.%${term}%,action.ilike.%${term}%`);
+    }
     
     const { data, error } = await query.limit(1000);
     if (error) throw error;
     
-    let logs = data || [];
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase().trim();
-      logs = logs.filter(log => 
-        String(log.username || '').toLowerCase().includes(term) ||
-        String(log.email || '').toLowerCase().includes(term) ||
-        String(log.role || '').toLowerCase().includes(term) ||
-        String(log.action || '').toLowerCase().includes(term)
-      );
-    }
-    
-    return logs;
+    return data || [];
   } catch (error) {
     console.error('[Reports] Fetch Staff Login Logs error:', error);
     throw error;
@@ -759,6 +641,12 @@ export async function exportStaffLoginLogsReport(startDate = null, endDate = nul
   try {
     const { supabase } = await loadSupabaseModule();
     console.log('[Reports] Generating Staff Login Logs Report...');
+
+    // Default to current month if no dates provided to prevent unbounded full-table scan
+    if (!startDate && !endDate) {
+      const now = new Date();
+      startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    }
     
     let query = supabase
       .from('staff_login_logs')
@@ -772,7 +660,7 @@ export async function exportStaffLoginLogsReport(startDate = null, endDate = nul
       query = query.lte('logged_at', `${endDate}T23:59:59Z`);
     }
     
-    const { data, error } = await query;
+    const { data, error } = await query.limit(5000);
     if (error) {
       throw new Error(`Failed to fetch staff login logs data: ${error.message}`);
     }

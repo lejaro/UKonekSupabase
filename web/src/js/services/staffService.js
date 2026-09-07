@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient.js';
 export async function listStaff() {
   const { data, error } = await supabase
     .from('staff')
-    .select('*')
+    .select('id, first_name, last_name, email, role, status, employee_id, doctor_specialization, is_online, last_seen, auth_user_id, availability_status')
     .order('id', { ascending: false });
 
   if (error) {
