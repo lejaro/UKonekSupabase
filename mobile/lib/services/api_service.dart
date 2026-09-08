@@ -337,10 +337,10 @@ class ScheduledMedicine {
     // Check specific frequency patterns with word boundaries
     if (RegExp(r'\b(q2h|every\s*2\s*h(ours?)?)\b').hasMatch(f)) return 12;
     if (RegExp(r'\b(q4h|every\s*4\s*h(ours?)?)\b').hasMatch(f)) return 6;
-    if (RegExp(r'\b(qid|q6h|every\s*6\s*h(ours?)?|4\s*times?\s*(a|per)?\s*day|four\s*times?\s*(a|per)?\s*day)\b').hasMatch(f)) return 4;
-    if (RegExp(r'\b(tid|thrice|q8h|every\s*8\s*h(ours?)?|3\s*times?\s*(a|per)?\s*day|three\s*times?\s*(a|per)?\s*day)\b').hasMatch(f)) return 3;
-    if (RegExp(r'\b(bid|twice|q12h|every\s*12\s*h(ours?)?|2\s*times?\s*(a|per)?\s*day|two\s*times?\s*(a|per)?\s*day)\b').hasMatch(f)) return 2;
-    if (RegExp(r'\b(od|om|on|hs|once|daily|once\s*(a|per)?\s*day|every\s*day|q24h)\b').hasMatch(f)) return 1;
+    if (RegExp(r'\b(qid|q6h|every\s*6\s*h(ours?)?|4\s*times?\s*(a|per)?\s*(day|daily)?|four\s*times?\s*(a|per)?\s*(day|daily)?)\b').hasMatch(f)) return 4;
+    if (RegExp(r'\b(tid|thrice|q8h|every\s*8\s*h(ours?)?|3\s*times?\s*(a|per)?\s*(day|daily)?|three\s*times?\s*(a|per)?\s*(day|daily)?)\b').hasMatch(f)) return 3;
+    if (RegExp(r'\b(bid|twice|q12h|every\s*12\s*h(ours?)?|2\s*times?\s*(a|per)?\s*(day|daily)?|two\s*times?\s*(a|per)?\s*(day|daily)?)\b').hasMatch(f)) return 2;
+    if (RegExp(r'\b(od|om|on|hs|once|daily|once\s*(a|per)?\s*(day|daily)?|every\s*day|q24h)\b').hasMatch(f)) return 1;
 
     final xday = RegExp(r'(\d+)\s*x').firstMatch(f);
     if (xday != null) return int.tryParse(xday.group(1)!) ?? 1;
@@ -390,10 +390,64 @@ class ScheduledMedicine {
   int get doseIntervalMinutes {
     final count = dailyDoseCount;
     if (count <= 1) return 0;
+    final f = frequency.toLowerCase().trim();
+    if (RegExp(r'\b(q8h|every\s*8\s*h(ours?)?)\b').hasMatch(f)) return 8 * 60;
+    if (RegExp(r'\b(q6h|every\s*6\s*h(ours?)?)\b').hasMatch(f)) return 6 * 60;
+    if (RegExp(r'\b(q4h|every\s*4\s*h(ours?)?)\b').hasMatch(f)) return 4 * 60;
     if (count == 2) return 12 * 60; // 12 hours (e.g. 8:00 AM, 8:00 PM)
-    if (count == 3) return 6 * 60;  // 6 hours (e.g. 8:00 AM, 2:00 PM, 8:00 PM)
-    if (count == 4) return 5 * 60;  // 5 hours (e.g. 7:00 AM, 12:00 PM, 5:00 PM, 10:00 PM)
+    if (count == 3) return 5 * 60;  // 5-6 hours daytime interval (e.g. 8:00 AM, 1:00 PM, 7:00 PM)
+    if (count == 4) return 5 * 60;  // 4-5 hours daytime interval (e.g. 7:00 AM, 12:00 PM, 5:00 PM, 9:00 PM)
     return (24 * 60) ~/ count;
+  }
+
+  /// Calculates cascading dose times in minutes from midnight given a custom starting dose time.
+  List<int> calculateDoseMinutesFromStart(int startMinutes) {
+    final count = dailyDoseCount;
+    if (count <= 1) return [startMinutes];
+
+    final f = frequency.toLowerCase().trim();
+    final isQ8h = RegExp(r'\b(q8h|every\s*8\s*h(ours?)?)\b').hasMatch(f);
+    final isQ6h = RegExp(r'\b(q6h|every\s*6\s*h(ours?)?)\b').hasMatch(f);
+    final isQ4h = RegExp(r'\b(q4h|every\s*4\s*h(ours?)?)\b').hasMatch(f);
+
+    if (count == 2) {
+      return [startMinutes, (startMinutes + 12 * 60) % 1440];
+    } else if (count == 3) {
+      if (isQ8h) {
+        return [
+          startMinutes,
+          (startMinutes + 8 * 60) % 1440,
+          (startMinutes + 16 * 60) % 1440,
+        ];
+      }
+      // Routine meal times: Breakfast (start), Lunch (+5h), Dinner (+11h)
+      return [
+        startMinutes,
+        (startMinutes + 5 * 60) % 1440,
+        (startMinutes + 11 * 60) % 1440,
+      ];
+    } else if (count == 4) {
+      if (isQ6h) {
+        return [
+          startMinutes,
+          (startMinutes + 6 * 60) % 1440,
+          (startMinutes + 12 * 60) % 1440,
+          (startMinutes + 18 * 60) % 1440,
+        ];
+      }
+      // Routine: Morning (start), Noon (+5h), Evening (+10h), Bedtime (+14h)
+      return [
+        startMinutes,
+        (startMinutes + 5 * 60) % 1440,
+        (startMinutes + 10 * 60) % 1440,
+        (startMinutes + 14 * 60) % 1440,
+      ];
+    } else if (isQ4h && count == 6) {
+      return List.generate(count, (i) => (startMinutes + i * 4 * 60) % 1440);
+    }
+
+    final intervalMins = (24 * 60) ~/ count;
+    return List.generate(count, (i) => (startMinutes + i * intervalMins) % 1440);
   }
 
   List<String> get doseTimes {
@@ -416,8 +470,18 @@ class ScheduledMedicine {
 
     if (count == 1) return ['08:00 AM'];
     if (count == 2) return ['08:00 AM', '08:00 PM'];
-    if (count == 3) return ['08:00 AM', '01:00 PM', '07:00 PM'];
-    if (count == 4) return ['07:00 AM', '12:00 PM', '05:00 PM', '09:00 PM'];
+    if (count == 3) {
+      if (RegExp(r'\b(q8h|every\s*8\s*h(ours?)?)\b').hasMatch(f)) {
+        return ['08:00 AM', '04:00 PM', '12:00 AM'];
+      }
+      return ['08:00 AM', '01:00 PM', '07:00 PM'];
+    }
+    if (count == 4) {
+      if (RegExp(r'\b(q6h|every\s*6\s*h(ours?)?)\b').hasMatch(f)) {
+        return ['06:00 AM', '12:00 PM', '06:00 PM', '12:00 AM'];
+      }
+      return ['07:00 AM', '12:00 PM', '05:00 PM', '09:00 PM'];
+    }
 
     final intervalHours = 24 ~/ count;
     return List.generate(count, (i) {

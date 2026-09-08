@@ -18,7 +18,12 @@ class NotificationService {
 
     tz.initializeTimeZones();
     try {
-      tz.setLocalLocation(tz.getLocation('Asia/Manila'));
+      final tzName = DateTime.now().timeZoneName;
+      try {
+        tz.setLocalLocation(tz.getLocation(tzName));
+      } catch (_) {
+        tz.setLocalLocation(tz.getLocation('Asia/Manila'));
+      }
     } catch (_) {
       try {
         tz.setLocalLocation(tz.local);
@@ -112,21 +117,25 @@ class NotificationService {
     required int minute,
     DateTimeComponents? matchDateTimeComponents = DateTimeComponents.time,
     String? payload,
+    DateTime? startDate,
   }) async {
     if (kIsWeb) return;
     if (Platform.isLinux) return; // Linux has no real scheduling support
 
     final now = tz.TZDateTime.now(tz.local);
+    final baseDate = startDate != null
+        ? tz.TZDateTime.from(startDate, tz.local)
+        : now;
     var scheduledDate = tz.TZDateTime(
       tz.local,
-      now.year,
-      now.month,
-      now.day,
+      baseDate.year,
+      baseDate.month,
+      baseDate.day,
       hour,
       minute,
     );
 
-    if (scheduledDate.isBefore(now)) {
+    if (startDate == null && scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
 

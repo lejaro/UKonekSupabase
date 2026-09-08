@@ -44,6 +44,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   List<Consultation> _consultations = [];
   final Set<String> _takenDoses = {};
   final Map<String, String> _customDoseTimes = {};
+  final Set<String> _manuallySetDoseTimes = {};
   final Map<String, DateTime> _takenTimestamps = {};
   final List<Map<String, dynamic>> _manualIntakes = [];
   bool _notificationsEnabled = true;
@@ -90,6 +91,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     if (cachedMeds != null && cachedMeds.isNotEmpty && mounted) {
       _persistedStartTimes.clear();
       _customDoseTimes.clear();
+      _manuallySetDoseTimes.clear();
       _takenDoses.clear();
       _takenTimestamps.clear();
 
@@ -99,6 +101,10 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           _persistedStartTimes[med.prescriptionItemId] = start;
         }
         for (int i = 0; i < med.doseTimes.length; i++) {
+          final isManual = prefs.getBool('med_dose_manual_${med.prescriptionItemId}_$i') ?? false;
+          if (isManual) {
+            _manuallySetDoseTimes.add('${med.prescriptionItemId}_$i');
+          }
           final custom = prefs.getString('med_dose_${med.prescriptionItemId}_$i');
           if (custom != null) {
             _customDoseTimes['${med.prescriptionItemId}_$i'] = custom;
@@ -158,12 +164,17 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       if (mounted) {
         _persistedStartTimes.clear();
         _customDoseTimes.clear();
+        _manuallySetDoseTimes.clear();
         for (var med in meds) {
           final start = prefs.getString('med_start_${med.prescriptionItemId}');
           if (start != null) {
             _persistedStartTimes[med.prescriptionItemId] = start;
           }
           for (int i = 0; i < med.doseTimes.length; i++) {
+            final isManual = prefs.getBool('med_dose_manual_${med.prescriptionItemId}_$i') ?? false;
+            if (isManual) {
+              _manuallySetDoseTimes.add('${med.prescriptionItemId}_$i');
+            }
             final custom = prefs.getString('med_dose_${med.prescriptionItemId}_$i');
             if (custom != null) {
               _customDoseTimes['${med.prescriptionItemId}_$i'] = custom;
@@ -450,7 +461,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
 
   Future<void> _setupAndMarkTaken(ScheduledMedicine med, int doseIndex, TimeOfDay picked) async {
     _applyTimeChange(med, doseIndex, picked);
-    await _markAsTaken(med, doseIndex, picked.format(context));
+    await _markAsTaken(med, doseIndex, _formatTimeOfDay(picked.hour, picked.minute));
   }
 
   Future<void> _scheduleNotifications() async {
@@ -458,38 +469,51 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       // Only cancel medicine reminders, not clinic alerts
       await NotificationService.cancelMedicineReminders();
       // Always schedule alarms for today's active schedule regardless of selected date
-      final grouped = _getGroupedDosesForDate(DateTime.now());
+      final now = DateTime.now();
+      final grouped = _getGroupedDosesForDate(now);
       int id = NotificationService.medicineIdOffset;
       
       // Load today's actual intake keys so alarms are never desynced by viewing other dates
-      final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final todayKey = DateFormat('yyyy-MM-dd').format(now);
       final todayLogs = await MedicineCacheService.loadCachedIntakeLogs(widget.citizenId, todayKey);
       final todayTakenKeys = (todayLogs ?? []).map((l) => '${l['prescription_item_id']}_${l['dose_index']}').toSet();
+
+      final nowMins = now.hour * 60 + now.minute;
 
       for (var entry in grouped.entries) {
         final timeStr = entry.key;
         final items = entry.value;
         if (timeStr == 'Setup Required' || timeStr == 'As Needed') continue;
         
-        // ONLY schedule if there's at least one untaken med in this group today
-        final untaken = items.where((i) => 
+        // Doses that are untaken today
+        final untakenToday = items.where((i) => 
           !todayTakenKeys.contains('${(i['med'] as ScheduledMedicine).prescriptionItemId}_${i['doseIndex']}')
         ).toList();
         
-        if (untaken.isEmpty) continue;
-        
-        // Combine names of untaken meds
-        final medsStr = untaken.map((i) => (i['med'] as ScheduledMedicine).medicineName).join(', ');
-        final bodyStr = untaken.map((i) => '${(i['med'] as ScheduledMedicine).medicineName}: ${(i['med'] as ScheduledMedicine).dosage}').join('\n');
-        
         final t = _parseTime(timeStr);
+        final bool allTakenToday = untakenToday.isEmpty;
+        
+        // If all taken today, or the intake time + grace period (120 mins) has already passed today,
+        // we schedule daily recurring notifications starting tomorrow so taking today's dose never cancels tomorrow's alarms!
+        final DateTime? reminderStartDate = (allTakenToday || nowMins > t + 120)
+            ? DateTime(now.year, now.month, now.day).add(const Duration(days: 1))
+            : null;
 
-        // 1. 30-Minute Heads-up Reminder (only if scheduled for at least 30 mins after midnight)
-        if (t >= 30) {
-          if (id >= NotificationService.medicineIdOffset + NotificationService.maxMedicineNotifications) break;
-          final targetMins = t - 30;
+        final displayItems = (allTakenToday || reminderStartDate != null) ? items : untakenToday;
+        final medsStr = displayItems.map((i) => (i['med'] as ScheduledMedicine).medicineName).toSet().join(', ');
+        final bodyStr = displayItems.map((i) => '${(i['med'] as ScheduledMedicine).medicineName}: ${(i['med'] as ScheduledMedicine).dosage}').toSet().join('\n');
+
+        // 1. 30-Minute Heads-up Reminder (with midnight rollover support)
+        if (id < NotificationService.medicineIdOffset + NotificationService.maxMedicineNotifications) {
+          final targetMins = (t - 30 + 1440) % 1440;
           final h30 = (targetMins ~/ 60) % 24;
           final m30 = targetMins % 60;
+          
+          DateTime? headsUpStartDate = reminderStartDate;
+          if (reminderStartDate == null && nowMins > targetMins) {
+            // Heads-up time has already passed for today, begin recurring reminder starting tomorrow
+            headsUpStartDate = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+          }
 
           await NotificationService.scheduleMedicineReminder(
             id: id++,
@@ -497,23 +521,26 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
             body: 'Heads up! Your $timeStr intake is in 30 minutes:\n$bodyStr',
             hour: h30,
             minute: m30,
+            startDate: headsUpStartDate,
             payload: '{"action":"medicine","username":"${widget.username}","citizenId":"${widget.citizenId}"}',
           );
         }
 
         // 2. Exact Intake Time Reminder
-        if (id >= NotificationService.medicineIdOffset + NotificationService.maxMedicineNotifications) break;
-        final hExact = t ~/ 60;
-        final mExact = t % 60;
-        
-        await NotificationService.scheduleMedicineReminder(
-          id: id++,
-          title: 'Medication Time: $medsStr',
-          body: 'It is time for your $timeStr intake right now:\n$bodyStr',
-          hour: hExact,
-          minute: mExact,
-          payload: '{"action":"medicine","username":"${widget.username}","citizenId":"${widget.citizenId}"}',
-        );
+        if (id < NotificationService.medicineIdOffset + NotificationService.maxMedicineNotifications) {
+          final hExact = (t ~/ 60) % 24;
+          final mExact = t % 60;
+          
+          await NotificationService.scheduleMedicineReminder(
+            id: id++,
+            title: 'Medication Time: $medsStr',
+            body: 'It is time for your $timeStr intake right now:\n$bodyStr',
+            hour: hExact,
+            minute: mExact,
+            startDate: reminderStartDate,
+            payload: '{"action":"medicine","username":"${widget.username}","citizenId":"${widget.citizenId}"}',
+          );
+        }
       }
     } catch (e) {
       debugPrint('Error scheduling notifications: $e');
@@ -535,6 +562,12 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         // PRN (as-needed) medicines go into a separate group
         allDoses.add({'med': med, 'time': 'As Needed', 'doseIndex': 0, 'mins': 9999});
       } else {
+        final startSaved = _persistedStartTimes[med.prescriptionItemId];
+        List<int>? cascadedMinutes;
+        if (startSaved != null) {
+          cascadedMinutes = med.calculateDoseMinutesFromStart(_parseTime(startSaved));
+        }
+
         for (int i = 0; i < med.doseTimes.length; i++) {
           final key = '${med.prescriptionItemId}_$i';
           String time;
@@ -542,6 +575,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           if (_customDoseTimes.containsKey(key)) {
             time = _customDoseTimes[key]!;
             mins = _parseTime(time);
+          } else if (cascadedMinutes != null && i < cascadedMinutes.length) {
+            mins = cascadedMinutes[i];
+            time = _formatMinutes(mins);
           } else {
             time = med.doseTimes[i];
             mins = _parseTime(time);
@@ -605,6 +641,19 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     return sortedGroups;
   }
 
+  String _formatTimeOfDay(int hour, int minute) {
+    final h = (hour % 24 + 24) % 24;
+    final period = h >= 12 ? 'PM' : 'AM';
+    final displayHour = (h % 12 == 0) ? 12 : (h % 12);
+    final minuteStr = minute.toString().padLeft(2, '0');
+    return '$displayHour:$minuteStr $period';
+  }
+
+  String _formatMinutes(int minutes) {
+    final norm = (minutes % 1440 + 1440) % 1440;
+    return _formatTimeOfDay(norm ~/ 60, norm % 60);
+  }
+
   int _parseTime(String t) {
     try {
       final clean = t.trim().replaceAll('\u202f', ' ').replaceAll('\u00a0', ' ');
@@ -613,9 +662,12 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         int h = int.parse(match.group(1)!);
         final m = int.parse(match.group(2)!);
         final period = match.group(3)?.toUpperCase().replaceAll('.', '');
-        if ((period == 'PM' || period == 'P') && h != 12) h += 12;
-        if ((period == 'AM' || period == 'A') && h == 12) h = 0;
-        return h * 60 + m;
+        if (period == 'PM' || period == 'P') {
+          if (h != 12) h += 12;
+        } else if (period == 'AM' || period == 'A') {
+          if (h == 12) h = 0;
+        }
+        return (h % 24) * 60 + m;
       }
       final simpleMatch = RegExp(r'(\d{1,2})\s*([AP]M?|[ap]m?)', caseSensitive: false).firstMatch(clean);
       if (simpleMatch != null) {
@@ -623,7 +675,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         final period = simpleMatch.group(2)!.toUpperCase().replaceAll('.', '');
         if ((period == 'PM' || period == 'P') && h != 12) h += 12;
         if ((period == 'AM' || period == 'A') && h == 12) h = 0;
-        return h * 60;
+        return (h % 24) * 60;
       }
       return 0;
     } catch (_) {
@@ -791,21 +843,46 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   }
 
   Map<String, dynamic>? _getNextDose(Map<String, List<Map<String, dynamic>>> grouped) {
+    final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
+    Map<String, dynamic>? dueNowCandidate;
+    Map<String, dynamic>? overdueCandidate;
+    Map<String, dynamic>? upcomingCandidate;
+
     for (var entry in grouped.entries) {
-      if (entry.key == 'Setup Required') continue;
+      if (entry.key == 'Setup Required' || entry.key == 'As Needed') continue;
       final untaken = entry.value.where((d) => 
         !_takenDoses.contains('${(d['med'] as ScheduledMedicine).prescriptionItemId}_${d['doseIndex']}')
       ).toList();
       
-      if (untaken.isNotEmpty) {
-        return {
+      if (untaken.isEmpty) continue;
+
+      final tMins = _parseTime(entry.key);
+      if (nowMins >= tMins - 30 && nowMins <= tMins + 120) {
+        dueNowCandidate ??= {
           'time': entry.key,
           'items': entry.value,
           'untaken': untaken,
+          'status': 'DUE NOW',
+        };
+      } else if (nowMins > tMins + 120) {
+        overdueCandidate ??= {
+          'time': entry.key,
+          'items': entry.value,
+          'untaken': untaken,
+          'status': 'OVERDUE',
+        };
+      } else {
+        upcomingCandidate ??= {
+          'time': entry.key,
+          'items': entry.value,
+          'untaken': untaken,
+          'status': 'UPCOMING',
         };
       }
     }
-    return null;
+
+    // Priority: 1. Due Now, 2. Overdue, 3. Upcoming
+    return dueNowCandidate ?? overdueCandidate ?? upcomingCandidate;
   }
 
   double _getCompletionRate(Map<String, List<Map<String, dynamic>>> grouped) {
@@ -863,22 +940,62 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     final time = next['time'] as String;
     final items = next['items'] as List<Map<String, dynamic>>;
     final untaken = next['untaken'] as List<Map<String, dynamic>>;
+    final status = next['status'] as String? ?? 'UPCOMING';
     
     final medNames = untaken.map((i) => (i['med'] as ScheduledMedicine).medicineName).join(', ');
     final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
     // Only lock future dates. Today's doses are fully actionable even if taken early.
     final isLocked = !isToday;
 
+    Color badgeColor;
+    Color iconBgColor;
+    IconData headerIcon;
+    String badgeText;
+    String headline;
+    List<Color> gradientColors;
+    Color borderColor;
+
+    if (status == 'OVERDUE') {
+      badgeColor = Colors.orange.shade800;
+      iconBgColor = Colors.orange.shade700;
+      headerIcon = Icons.warning_amber_rounded;
+      badgeText = 'OVERDUE DOSE';
+      headline = 'Missed scheduled time for $medNames';
+      gradientColors = const [Color(0xFFFFF8E1), Color(0xFFFFFDF5)];
+      borderColor = Colors.orange.withOpacity(0.25);
+    } else if (status == 'DUE NOW') {
+      badgeColor = _primary;
+      iconBgColor = _primary;
+      headerIcon = Icons.access_time_filled_rounded;
+      badgeText = 'DUE NOW';
+      headline = 'Time to take your $medNames';
+      gradientColors = const [Color(0xFFEDFBF2), Color(0xFFF7FFF9)];
+      borderColor = _primary.withOpacity(0.12);
+    } else {
+      badgeColor = const Color(0xFF007BFF);
+      iconBgColor = const Color(0xFF007BFF);
+      headerIcon = Icons.schedule_rounded;
+      badgeText = 'UPCOMING DOSE';
+      headline = 'Next scheduled: $medNames';
+      gradientColors = const [Color(0xFFF0F7FF), Color(0xFFF9FBFF)];
+      borderColor = const Color(0xFF007BFF).withOpacity(0.15);
+    }
+
+    final buttonLabel = status == 'OVERDUE'
+        ? (untaken.length > 1 ? "Take all ${untaken.length} overdue meds" : "Take overdue dose")
+        : (untaken.length > 1 ? "Take all ${untaken.length} meds" : "I've taken it");
+    final buttonColor = status == 'OVERDUE' ? Colors.orange.shade800 : _primary;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFEDFBF2), Color(0xFFF7FFF9)],
+        gradient: LinearGradient(
+          colors: gradientColors,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _primary.withOpacity(0.1)),
+        border: Border.all(color: borderColor),
       ),
       child: Stack(
         children: [
@@ -887,14 +1004,14 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
             child: Container(
               width: 140, height: 140,
               decoration: BoxDecoration(
-                color: _primary.withOpacity(0.06),
+                color: badgeColor.withOpacity(0.06),
                 shape: BoxShape.circle,
               ),
               child: Center(
                 child: Icon(
                   Icons.medication_liquid_rounded,
                   size: 72,
-                  color: _primary.withOpacity(0.18),
+                  color: badgeColor.withOpacity(0.18),
                 ),
               ),
             ),
@@ -908,18 +1025,18 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                   children: [
                     Container(
                       padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(color: _primary, shape: BoxShape.circle),
-                      child: const Icon(Icons.access_time_filled_rounded, color: Colors.white, size: 14),
+                      decoration: BoxDecoration(color: iconBgColor, shape: BoxShape.circle),
+                      child: Icon(headerIcon, color: Colors.white, size: 14),
                     ),
                     const SizedBox(width: 8),
-                    const Text('NEXT DOSE', style: TextStyle(color: _primary, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5)),
+                    Text(badgeText, style: TextStyle(color: badgeColor, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5)),
                   ],
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
-                  width: 200,
-                  child: Text('Time to take your $medNames',
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _textDark, height: 1.2)),
+                  width: 220,
+                  child: Text(headline,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark, height: 1.2)),
                 ),
                 const SizedBox(height: 8),
                 InkWell(
@@ -943,9 +1060,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                     ElevatedButton.icon(
                       onPressed: isLocked ? null : () => _markAllAsTaken(untaken, time),
                       icon: const Icon(Icons.check_circle_rounded, size: 18),
-                      label: Text(untaken.length > 1 ? "Take all ${untaken.length} meds" : "I've taken it"),
+                      label: Text(buttonLabel),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _primary, 
+                        backgroundColor: buttonColor, 
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1135,13 +1252,22 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       status = 'UPCOMING';
       statusColor = const Color(0xFF007BFF);
       isLocked = true;
-    } else if (isPast || (isToday && nowMins > tMins + 240)) {
+    } else if (isPast) {
       status = 'LATE';
       statusColor = Colors.orange;
       isLocked = false;
     } else {
-      status = 'DUE';
-      statusColor = _primary;
+      // isToday: distinguish UPCOMING (< t - 30m), DUE (within [-30m, +120m]), and LATE (> t + 120m)
+      if (nowMins < tMins - 30) {
+        status = 'UPCOMING';
+        statusColor = const Color(0xFF007BFF);
+      } else if (nowMins <= tMins + 120) {
+        status = 'DUE';
+        statusColor = _primary;
+      } else {
+        status = 'LATE';
+        statusColor = Colors.orange;
+      }
       isLocked = false;
     }
 
@@ -1705,32 +1831,18 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   ));
 
   void _applyTimeChange(ScheduledMedicine med, int doseIndex, TimeOfDay picked) async {
-    final timeStr = picked.format(context);
-    final updatedCustomTimes = <String, String>{};
     final key = '${med.prescriptionItemId}_$doseIndex';
-    updatedCustomTimes[key] = timeStr;
-
-    final intervalMins = med.doseIntervalMinutes;
-    if (intervalMins > 0 && doseIndex == 0) {
-      int runningMins = picked.hour * 60 + picked.minute;
-      for (int i = 1; i < med.doseTimes.length; i++) {
-        final nextKey = '${med.prescriptionItemId}_$i';
-        runningMins += intervalMins;
-
-        // Only cascade to subsequent doses if the user hasn't explicitly set a custom time for them
-        if (!_customDoseTimes.containsKey(nextKey)) {
-          final nextH = (runningMins ~/ 60) % 24;
-          final nextM = runningMins % 60;
-          final nextTimeStr = TimeOfDay(hour: nextH, minute: nextM).format(context);
-          updatedCustomTimes[nextKey] = nextTimeStr;
-        }
-      }
-    }
+    final timeStr = _formatTimeOfDay(picked.hour, picked.minute);
+    _manuallySetDoseTimes.add(key);
 
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('med_dose_manual_${med.prescriptionItemId}_$doseIndex', true);
     await prefs.setString('med_dose_${med.prescriptionItemId}_$doseIndex', timeStr);
-    
-    // If it is the first dose, persist it as the global start time for this medication
+
+    final updatedCustomTimes = <String, String>{};
+    updatedCustomTimes[key] = timeStr;
+
+    // If doseIndex == 0, persist start time and cascade to uncustomized subsequent doses
     if (doseIndex == 0) {
       await prefs.setString('med_start_${med.prescriptionItemId}', timeStr);
       if (mounted) {
@@ -1738,8 +1850,21 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           _persistedStartTimes[med.prescriptionItemId] = timeStr;
         });
       }
+
+      final startMinutes = picked.hour * 60 + picked.minute;
+      final cascadedMinutes = med.calculateDoseMinutesFromStart(startMinutes);
+
+      for (int i = 1; i < med.doseTimes.length; i++) {
+        final nextKey = '${med.prescriptionItemId}_$i';
+        // Only cascade to subsequent doses if the user hasn't explicitly set a custom time for them
+        if (!_manuallySetDoseTimes.contains(nextKey)) {
+          final cascadedTimeStr = _formatMinutes(cascadedMinutes[i]);
+          updatedCustomTimes[nextKey] = cascadedTimeStr;
+          await prefs.setString('med_dose_${med.prescriptionItemId}_$i', cascadedTimeStr);
+        }
+      }
     }
-    
+
     for (final entry in updatedCustomTimes.entries) {
       final idx = entry.key.split('_')[1];
       await prefs.setString('med_dose_${med.prescriptionItemId}_$idx', entry.value);
