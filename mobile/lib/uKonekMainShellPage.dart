@@ -50,9 +50,10 @@ class uKonekMainShellPage extends StatefulWidget {
 }
 
 class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsBindingObserver {
-  static const Color _primaryMid = Color(0xFF1B5E20);
-  static const Color _textDark = Color(0xFF1B2E1E);
-  static const Color _shadow = Color(0x0D1B2E1E);
+  static const Color _primary      = Color(0xFF059669);
+  static const Color _primaryLight = Color(0xFFECFDF5);
+  static const Color _textDark     = Color(0xFF0F172A);
+  static const Color _shadow       = Color(0x0A0F172A);
 
   late int _selectedTab;
   late final List<Widget> _pages;
@@ -191,7 +192,7 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF1B2E1E),
+                    color: _textDark,
                     letterSpacing: -0.3,
                   ),
                 ),
@@ -201,7 +202,7 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF637367),
+                    color: Color(0xFF64748B),
                     height: 1.35,
                   ),
                 ),
@@ -321,7 +322,7 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
                                       style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
-                                        color: Color(0xFF1B2E1E),
+                                        color: _textDark,
                                       ),
                                     ),
                                     Text(
@@ -330,7 +331,7 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: 10,
-                                        color: Color(0xFF637367),
+                                        color: Color(0xFF64748B),
                                       ),
                                     ),
                                   ],
@@ -485,6 +486,9 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
           topLeft: Radius.circular(24),
           topRight: Radius.circular(24),
         ),
+        border: Border(
+          top: BorderSide(color: Color(0xFFF1F5F9), width: 1),
+        ),
         boxShadow: [
           BoxShadow(
             color: _shadow,
@@ -496,47 +500,40 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(tabs.length, (i) {
               final isSelected = _selectedTab == i;
-              return GestureDetector(
-                onTap: () => selectTab(i),
-                behavior: HitTestBehavior.opaque,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 240),
-                  curve: Curves.easeOutCubic,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isSelected ? 16 : 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? _primaryMid.withOpacity(0.10)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        tabs[i]['icon'] as IconData,
-                        color: isSelected ? _primaryMid : Colors.grey.shade400,
-                        size: 22,
-                      ),
-                      if (isSelected) ...[
-                        const SizedBox(height: 4),
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => selectTab(i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected ? _primaryLight : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          tabs[i]['icon'] as IconData,
+                          color: isSelected ? _primary : const Color(0xFF94A3B8),
+                          size: 22,
+                        ),
+                        const SizedBox(height: 3),
                         Text(
                           tabs[i]['label'] as String,
-                          style: const TextStyle(
-                            color: _primaryMid,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                          style: TextStyle(
+                            color: isSelected ? _primary : const Color(0xFF94A3B8),
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                           ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
                 ),
               );

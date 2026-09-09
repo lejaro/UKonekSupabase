@@ -4,14 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 
 class _C {
-  static const primary    = Color(0xFF1B5E20);
-  static const primaryMid = Color(0xFF28A745);
-  static const bg         = Color(0xFFF8FCF9);
+  static const primary    = Color(0xFF059669);
+  static const primaryMid = Color(0xFF064E3B);
+  static const bg         = Color(0xFFF8FAFC);
   static const surface    = Colors.white;
-  static const textDark   = Color(0xFF1B2E1E);
-  static const textMuted  = Color(0xFF637367);
-  static const divider    = Color(0xFFE2E9E3);
-  static const shadow     = Color(0x0A000000);
+  static const textDark   = Color(0xFF0F172A);
+  static const textMuted  = Color(0xFF64748B);
+  static const divider    = Color(0xFFE2E8F0);
+  static const shadow     = Color(0x080F172A);
 }
 
 class uKonekNotificationPage extends StatefulWidget {

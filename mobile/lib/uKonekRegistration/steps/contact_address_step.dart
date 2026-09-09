@@ -26,12 +26,12 @@ class uKonekContactStep extends StatelessWidget {
   });
 
   // ── Medical Green Design Tokens ──────────────────────────────
-  static const Color _primary = Color(0xFF28A745);     // Health Green[cite: 1]
-  static const Color _primary2 = Color(0xFF1B5E20);    // Forest Green[cite: 1]
-  static const Color _textDark = Color(0xFF1B2E1E);    // Dark Forest Charcoal[cite: 1]
-  static const Color _textMuted = Color(0xFF637367);   // Muted Sage[cite: 1]
-  static const Color _fieldBg = Color(0xFFF8FCF9);     // Mint-tinted Field[cite: 1]
-  static const Color _fieldBdr = Color(0xFFE2E9E3);    // Light Mist Border[cite: 1]
+  static const Color _primary = Color(0xFF059669);     // Emerald 600
+  static const Color _primary2 = Color(0xFF064E3B);    // Forest Emerald 900
+  static const Color _textDark = Color(0xFF0F172A);    // Slate 900
+  static const Color _textMuted = Color(0xFF64748B);   // Slate 500
+  static const Color _fieldBg = Color(0xFFF8FAFC);     // Slate Field
+  static const Color _fieldBdr = Color(0xFFE2E8F0);    // Slate Border
 
   @override
   Widget build(BuildContext context) {

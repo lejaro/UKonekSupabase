@@ -3,17 +3,17 @@ import 'services/api_service.dart';
 
 // ── Medical/Dental Green Design tokens ────────────────────────────────
 class _C {
-  static const primary    = Color(0xFF1B5E20);   // Deep Forest Green
-  static const primaryMid = Color(0xFF28A745);   // Vibrant Health Green
-  static const accent     = Color(0xFF20C997);   // Mint Accent
-  static const bg         = Color(0xFFF8FCF9);   // Mint-tinted Background
+  static const primary    = Color(0xFF059669);   // Emerald 600
+  static const primaryMid = Color(0xFF064E3B);   // Forest Emerald 900
+  static const accent     = Color(0xFF10B981);   // Mint Accent
+  static const bg         = Color(0xFFF8FAFC);   // Slate Background
   static const surface    = Colors.white;
-  static const textDark   = Color(0xFF1B2E1E);   // Dark Forest Charcoal
-  static const textMuted  = Color(0xFF637367);   // Muted Sage
-  static const divider    = Color(0xFFE2E9E3);   // Light Mist Divider
-  static const success    = Color(0xFF28A745);
+  static const textDark   = Color(0xFF0F172A);   // Slate 900
+  static const textMuted  = Color(0xFF64748B);   // Slate 500
+  static const divider    = Color(0xFFE2E8F0);   // Slate 200
+  static const success    = Color(0xFF10B981);
   static const warning    = Color(0xFFF59E0B);
-  static const shadow     = Color(0x0A000000);
+  static const shadow     = Color(0x080F172A);
 }
 
 class uKonekFeedbackPage extends StatefulWidget {

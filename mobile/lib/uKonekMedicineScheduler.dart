@@ -29,12 +29,12 @@ class uKonekMedicineSchedulerPage extends StatefulWidget {
 }
 
 class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPage> with WidgetsBindingObserver {
-  static const Color _primary    = Color(0xFF28A745);
-  static const Color _primaryMid = Color(0xFF1B5E20);
-  static const Color _bg         = Color(0xFFF8FCF9);
-  static const Color _textDark   = Color(0xFF1B2E1E);
-  static const Color _textMuted  = Color(0xFF637367);
-  static const Color _fieldBdr   = Color(0xFFE2E9E3);
+  static const Color _primary    = Color(0xFF059669);
+  static const Color _primaryMid = Color(0xFF064E3B);
+  static const Color _bg         = Color(0xFFF8FAFC);
+  static const Color _textDark   = Color(0xFF0F172A);
+  static const Color _textMuted  = Color(0xFF64748B);
+  static const Color _fieldBdr   = Color(0xFFE2E8F0);
 
   int _selectedTab = 1;
 

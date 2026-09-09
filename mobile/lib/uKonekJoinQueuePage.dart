@@ -14,18 +14,18 @@ import 'uKonekMainShellPage.dart';
 
 // ── Design Tokens ─────────────────────────────────────────────
 class _C {
-  static const primary     = Color(0xFF28A745);
-  static const primaryMid  = Color(0xFF1B5E20);
-  static const primaryLight= Color(0xFFE8F5E9);
-  static const bg          = Color(0xFFF4FAF5);
+  static const primary     = Color(0xFF059669);
+  static const primaryMid  = Color(0xFF064E3B);
+  static const primaryLight= Color(0xFFECFDF5);
+  static const bg          = Color(0xFFF8FAFC);
   static const surface     = Colors.white;
-  static const textDark    = Color(0xFF1B2E1E);
-  static const textMuted   = Color(0xFF637367);
-  static const fieldBorder = Color(0xFFDCEDDF);
-  static const success     = Color(0xFF28A745);
+  static const textDark    = Color(0xFF0F172A);
+  static const textMuted   = Color(0xFF64748B);
+  static const fieldBorder = Color(0xFFE2E8F0);
+  static const success     = Color(0xFF10B981);
   static const warning     = Color(0xFFF59E0B);
   static const danger      = Color(0xFFDC3545);
-  static const shadow      = Color(0x0D1B2E1E);
+  static const shadow      = Color(0x080F172A);
 }
 
 class uKonekJoinQueuePage extends StatefulWidget {
@@ -348,14 +348,14 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
                     width: 76,
                     height: 76,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
+                      color: _C.primaryLight,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFA5D6A7), width: 2),
+                      border: Border.all(color: const Color(0xFFA7F3D0), width: 2),
                     ),
                     child: const Center(
                       child: Icon(
                         Icons.check_circle_rounded,
-                        color: Color(0xFF2E7D32),
+                        color: _C.primary,
                         size: 46,
                       ),
                     ),
@@ -1291,9 +1291,9 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
       decoration: BoxDecoration(
         color: _C.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE8F5E9), width: 1.2),
+        border: Border.all(color: _C.fieldBorder, width: 1.2),
         boxShadow: const [
-          BoxShadow(color: Color(0x0C1B2E1E), blurRadius: 14, offset: Offset(0, 4)),
+          BoxShadow(color: _C.shadow, blurRadius: 14, offset: Offset(0, 4)),
         ],
       ),
       child: Column(

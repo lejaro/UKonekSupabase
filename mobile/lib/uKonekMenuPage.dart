@@ -69,9 +69,9 @@ class _uKonekMenuPageState extends State<uKonekMenuPage>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF0D1F14), // Deep Forest Green[cite: 1]
-                  Color(0xFF143323), // Emerald Shadow[cite: 1]
-                  Color(0xFF1B5E20), // Medical Success Green[cite: 1]
+                  Color(0xFF064E3B), // Forest Emerald 900
+                  Color(0xFF065F46), // Emerald 800
+                  Color(0xFF047857), // Emerald 700
                 ],
               ),
             ),
@@ -81,7 +81,7 @@ class _uKonekMenuPageState extends State<uKonekMenuPage>
           Positioned(
             top: -60,
             right: -60,
-            child: _glowOrb(200, const Color(0xFF2E7D32).withOpacity(0.4)),
+            child: _glowOrb(200, const Color(0xFF059669).withOpacity(0.35)),
           ),
           Positioned(
             top: size.height * 0.25,
@@ -184,13 +184,13 @@ class _uKonekMenuPageState extends State<uKonekMenuPage>
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: const LinearGradient(
-              colors: [Color(0xFF81C784), Color(0xFF2E7D32)], // Mint to Dark Green[cite: 1]
+              colors: [Color(0xFF34D399), Color(0xFF059669)], // Mint to Emerald
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF1B5E20).withOpacity(0.5),
+                color: const Color(0xFF059669).withOpacity(0.4),
                 blurRadius: 24,
                 spreadRadius: 2,
               ),
@@ -262,14 +262,14 @@ class _uKonekMenuPageState extends State<uKonekMenuPage>
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)], // Strong Forest Green[cite: 1]
+            colors: [Color(0xFF059669), Color(0xFF047857)], // Vibrant Emerald Gradient
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0D1F14).withOpacity(0.5),
+              color: const Color(0xFF064E3B).withOpacity(0.4),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),

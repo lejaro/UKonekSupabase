@@ -136,7 +136,7 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
         break;
       case 'available':
       default:
-        color = Colors.green;
+        color = const Color(0xFF059669);
         label = 'Available';
         break;
     }
@@ -164,7 +164,7 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Doctor Schedules'),
-        backgroundColor: const Color(0xFF1565C0),
+        backgroundColor: const Color(0xFF059669),
         foregroundColor: Colors.white,
       ),
       body: RefreshIndicator(
@@ -271,7 +271,7 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
                                           const SizedBox(height: 12),
                                           Row(
                                             children: [
-                                              const Icon(Icons.event_outlined, size: 18, color: Color(0xFF1565C0)),
+                                              const Icon(Icons.event_outlined, size: 18, color: Color(0xFF059669)),
                                               const SizedBox(width: 6),
                                               Text(_formatDate(item.scheduleDate)),
                                             ],
@@ -279,7 +279,7 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
                                           const SizedBox(height: 6),
                                           Row(
                                             children: [
-                                              const Icon(Icons.schedule_outlined, size: 18, color: Color(0xFF1565C0)),
+                                              const Icon(Icons.schedule_outlined, size: 18, color: Color(0xFF059669)),
                                               const SizedBox(width: 6),
                                               Text('${_formatTime(item.startTime)} - ${_formatTime(item.endTime)}'),
                                             ],

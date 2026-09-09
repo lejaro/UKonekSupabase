@@ -5,16 +5,16 @@ import 'services/api_service.dart';
 
 // ── Medical/Dental Green Design tokens ────────────────────────────────
 class _C {
-  static const primary    = Color(0xFF1B5E20);   // Deep Forest Green
-  static const primaryMid = Color(0xFF28A745);   // Vibrant Health Green
-  static const accent     = Color(0xFF20C997);   // Mint Accent
-  static const bg         = Color(0xFFF8FCF9);   // Mint-tinted Background
+  static const primary    = Color(0xFF059669);   // Emerald 600
+  static const primaryMid = Color(0xFF064E3B);   // Forest Emerald 900
+  static const accent     = Color(0xFF10B981);   // Mint Accent
+  static const bg         = Color(0xFFF8FAFC);   // Slate Background
   static const surface    = Colors.white;
-  static const textDark   = Color(0xFF1B2E1E);   // Dark Forest Charcoal
-  static const textMuted  = Color(0xFF637367);   // Muted Sage
-  static const divider    = Color(0xFFE2E9E3);   // Light Mist Divider
-  static const success    = Color(0xFF28A745);
-  static const shadow     = Color(0x0A000000);
+  static const textDark   = Color(0xFF0F172A);   // Slate 900
+  static const textMuted  = Color(0xFF64748B);   // Slate 500
+  static const divider    = Color(0xFFE2E8F0);   // Slate 200
+  static const success    = Color(0xFF10B981);
+  static const shadow     = Color(0x080F172A);
 }
 
 class uKonekHealthRecordsPage extends StatefulWidget {
@@ -331,9 +331,9 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
       decoration: BoxDecoration(
         color: _C.surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE8F5E9), width: 1.2),
+        border: Border.all(color: _C.divider, width: 1.2),
         boxShadow: const [
-          BoxShadow(color: Color(0x0C1B2E1E), blurRadius: 16, offset: Offset(0, 4)),
+          BoxShadow(color: _C.shadow, blurRadius: 16, offset: Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -456,11 +456,11 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? _C.primaryMid : _C.surface,
+          color: isSelected ? _C.primary : _C.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? _C.primaryMid : const Color(0xFFE8F5E9)),
+          border: Border.all(color: isSelected ? _C.primary : _C.divider),
           boxShadow: isSelected
-              ? [BoxShadow(color: _C.primaryMid.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 2))]
+              ? [BoxShadow(color: _C.primary.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 2))]
               : const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 2))],
         ),
         child: Text(
@@ -487,8 +487,8 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
         decoration: BoxDecoration(
           color: _C.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE8F5E9), width: 1),
-          boxShadow: const [BoxShadow(color: Color(0x0C1B2E1E), blurRadius: 12, offset: Offset(0, 4))],
+          border: Border.all(color: _C.divider, width: 1),
+          boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 12, offset: Offset(0, 4))],
         ),
         child: Column(children: [
           Container(

@@ -165,9 +165,9 @@ class _UKonekAppState extends State<UKonekApp> {
       theme: ThemeData(
         // Updated to Medical Green for the Dental Clinic theme
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF28A745), // Health Green
-          primary: const Color(0xFF1B5E20),   // Deep Forest
-          surface: const Color(0xFFF8FCF9),   // Mint-tinted Background
+          seedColor: const Color(0xFF059669), // Emerald 600
+          primary: const Color(0xFF059669),   // Emerald 600
+          surface: const Color(0xFFF8FAFC),   // Slate Background
         ),
         useMaterial3: true,
         fontFamily: 'Poppins',
@@ -269,7 +269,7 @@ class _RootHandlerState extends State<RootHandler> {
     return const Scaffold(
       body: Center(
         child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28A745)),
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF059669)),
         ),
       ),
     );

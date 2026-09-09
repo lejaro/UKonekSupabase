@@ -23,12 +23,12 @@ class _uKonekChangePasswordPageState
   bool _success = false;
 
   // ── Updated Medical Green Design Tokens ──────────────────────
-  static const _primary      = Color(0xFF28A745); // Health Green
-  static const _primary2     = Color(0xFF1B5E20); // Forest Green
-  static const _bg           = Color(0xFFF8FCF9); // Mint Background
-  static const _textDark     = Color(0xFF1B2E1E); // Dark Forest Charcoal
-  static const _textMuted    = Color(0xFF637367); // Muted Sage
-  static const _fieldBdr     = Color(0xFFE2E9E3); // Light Mist Border
+  static const _primary      = Color(0xFF059669); // Emerald 600
+  static const _primary2     = Color(0xFF064E3B); // Forest Emerald 900
+  static const _bg           = Color(0xFFF8FAFC); // Slate Background
+  static const _textDark     = Color(0xFF0F172A); // Slate 900
+  static const _textMuted    = Color(0xFF64748B); // Slate 500
+  static const _fieldBdr     = Color(0xFFE2E8F0); // Slate Border
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -372,10 +372,10 @@ class _uKonekChangePasswordPageState
         const SizedBox(height: 60),
         Container(
           width: 100, height: 100,
-          decoration: BoxDecoration(
-              color: Colors.green.shade50, shape: BoxShape.circle),
+          decoration: const BoxDecoration(
+              color: Color(0xFFECFDF5), shape: BoxShape.circle),
           child: const Icon(Icons.check_circle_rounded,
-              color: Colors.green, size: 56),
+              color: _primary, size: 56),
         ),
         const SizedBox(height: 24),
         const Text("Password Changed!",

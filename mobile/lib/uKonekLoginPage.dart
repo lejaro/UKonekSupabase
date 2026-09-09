@@ -32,12 +32,12 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
 
-  static const _primary   = Color(0xFF28A745);
-  static const _primary2  = Color(0xFF1B5E20);
-  static const _bg        = Color(0xFFF8FCF9);
-  static const _textDark  = Color(0xFF1B2E1E);
-  static const _textMuted = Color(0xFF637367);
-  static const _fieldBdr  = Color(0xFFE2E9E3);
+  static const _primary   = Color(0xFF059669);
+  static const _primary2  = Color(0xFF064E3B);
+  static const _bg        = Color(0xFFF8FAFC);
+  static const _textDark  = Color(0xFF0F172A);
+  static const _textMuted = Color(0xFF64748B);
+  static const _fieldBdr  = Color(0xFFE2E8F0);
 
   @override
   void initState() {
