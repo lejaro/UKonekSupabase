@@ -46,7 +46,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   final Map<String, String> _customDoseTimes = {};
   final Set<String> _manuallySetDoseTimes = {};
   final Map<String, DateTime> _takenTimestamps = {};
-  final List<Map<String, dynamic>> _manualIntakes = [];
+  final Map<String, String> _dateShiftedDoseTimes = {};
   bool _notificationsEnabled = true;
   DateTime _selectedDate = DateTime.now();
   final Map<int, String> _persistedStartTimes = {};
@@ -95,31 +95,51 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       _takenDoses.clear();
       _takenTimestamps.clear();
 
+      _dateShiftedDoseTimes.clear();
+
       for (var med in cachedMeds) {
-        final start = prefs.getString('med_start_${med.prescriptionItemId}');
+        String? start = prefs.getString('med_start_${med.prescriptionItemId}');
+        if (start == null) {
+          // Migration fallback: if user previously had a custom dose time saved
+          for (int i = 0; i < 4; i++) {
+            final oldCustom = prefs.getString('med_dose_${med.prescriptionItemId}_$i');
+            if (oldCustom != null) {
+              start = oldCustom;
+              prefs.setString('med_start_${med.prescriptionItemId}', start);
+              break;
+            }
+          }
+        }
         if (start != null) {
           _persistedStartTimes[med.prescriptionItemId] = start;
         }
-        for (int i = 0; i < med.doseTimes.length; i++) {
-          final isManual = prefs.getBool('med_dose_manual_${med.prescriptionItemId}_$i') ?? false;
-          if (isManual) {
-            _manuallySetDoseTimes.add('${med.prescriptionItemId}_$i');
-          }
-          final custom = prefs.getString('med_dose_${med.prescriptionItemId}_$i');
-          if (custom != null) {
-            _customDoseTimes['${med.prescriptionItemId}_$i'] = custom;
+        for (int i = 0; i < 12; i++) {
+          final shiftKey = '${med.prescriptionItemId}_${i}_$dateKey';
+          final shifted = prefs.getString('med_dose_shift_$shiftKey');
+          if (shifted != null) {
+            _dateShiftedDoseTimes[shiftKey] = shifted;
           }
         }
       }
 
       if (cachedLogs != null) {
         for (var log in cachedLogs) {
-          final key = '${log['prescription_item_id']}_${log['dose_index']}';
+          final pid = log['prescription_item_id'];
+          final doseIdx = log['dose_index'];
+          final key = '${pid}_$doseIdx';
           _takenDoses.add(key);
+          if (log['scheduled_time'] != null) {
+            _takenDoses.add('${pid}_${log['scheduled_time']}');
+          }
           final timeRaw = log['actual_time'] ?? log['created_at'];
           if (timeRaw != null) {
             final dt = DateTime.tryParse(timeRaw.toString())?.toLocal();
-            if (dt != null) _takenTimestamps[key] = dt;
+            if (dt != null) {
+              _takenTimestamps[key] = dt;
+              if (log['scheduled_time'] != null) {
+                _takenTimestamps['${pid}_${log['scheduled_time']}'] = dt;
+              }
+            }
           }
         }
       }
@@ -142,6 +162,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
             _consultations = consultations;
           });
         }
+        _loadDateLogs(_selectedDate, silent: true);
       } catch (_) {}
       return;
     }
@@ -165,19 +186,28 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         _persistedStartTimes.clear();
         _customDoseTimes.clear();
         _manuallySetDoseTimes.clear();
+        _dateShiftedDoseTimes.clear();
+        final dateKey = DateFormat('yyyy-MM-dd').format(_selectedDate);
         for (var med in meds) {
-          final start = prefs.getString('med_start_${med.prescriptionItemId}');
+          String? start = prefs.getString('med_start_${med.prescriptionItemId}');
+          if (start == null) {
+            for (int i = 0; i < 4; i++) {
+              final oldCustom = prefs.getString('med_dose_${med.prescriptionItemId}_$i');
+              if (oldCustom != null) {
+                start = oldCustom;
+                prefs.setString('med_start_${med.prescriptionItemId}', start);
+                break;
+              }
+            }
+          }
           if (start != null) {
             _persistedStartTimes[med.prescriptionItemId] = start;
           }
-          for (int i = 0; i < med.doseTimes.length; i++) {
-            final isManual = prefs.getBool('med_dose_manual_${med.prescriptionItemId}_$i') ?? false;
-            if (isManual) {
-              _manuallySetDoseTimes.add('${med.prescriptionItemId}_$i');
-            }
-            final custom = prefs.getString('med_dose_${med.prescriptionItemId}_$i');
-            if (custom != null) {
-              _customDoseTimes['${med.prescriptionItemId}_$i'] = custom;
+          for (int i = 0; i < 12; i++) {
+            final shiftKey = '${med.prescriptionItemId}_${i}_$dateKey';
+            final shifted = prefs.getString('med_dose_shift_$shiftKey');
+            if (shifted != null) {
+              _dateShiftedDoseTimes[shiftKey] = shifted;
             }
           }
         }
@@ -211,6 +241,23 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
 
     final dateKey = DateFormat('yyyy-MM-dd').format(date);
 
+    // 0. Load date-specific shifted dose times
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _dateShiftedDoseTimes.clear();
+        for (var med in _medicines) {
+          for (int i = 0; i < 12; i++) {
+            final shiftKey = '${med.prescriptionItemId}_${i}_$dateKey';
+            final shifted = prefs.getString('med_dose_shift_$shiftKey');
+            if (shifted != null) {
+              _dateShiftedDoseTimes[shiftKey] = shifted;
+            }
+          }
+        }
+      });
+    }
+
     // 1. Instant local logs load
     final localLogs = await MedicineCacheService.loadCachedIntakeLogs(widget.citizenId, dateKey);
     if (mounted && localLogs != null) {
@@ -218,12 +265,22 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         _takenDoses.clear();
         _takenTimestamps.clear();
         for (var log in localLogs) {
-          final key = '${log['prescription_item_id']}_${log['dose_index']}';
+          final pid = log['prescription_item_id'];
+          final doseIdx = log['dose_index'];
+          final key = '${pid}_$doseIdx';
           _takenDoses.add(key);
+          if (log['scheduled_time'] != null) {
+            _takenDoses.add('${pid}_${log['scheduled_time']}');
+          }
           final timeRaw = log['actual_time'] ?? log['created_at'];
           if (timeRaw != null) {
             final dt = DateTime.tryParse(timeRaw.toString())?.toLocal();
-            if (dt != null) _takenTimestamps[key] = dt;
+            if (dt != null) {
+              _takenTimestamps[key] = dt;
+              if (log['scheduled_time'] != null) {
+                _takenTimestamps['${pid}_${log['scheduled_time']}'] = dt;
+              }
+            }
           }
         }
       });
@@ -243,10 +300,18 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
             final doseIdx = (log['dose_index'] as num?)?.toInt() ?? 0;
             final key = '${pid}_$doseIdx';
             _takenDoses.add(key);
+            if (log['scheduled_time'] != null) {
+              _takenDoses.add('${pid}_${log['scheduled_time']}');
+            }
             final timeRaw = log['actual_time'] ?? log['created_at'];
             if (timeRaw != null) {
               final dt = DateTime.tryParse(timeRaw.toString())?.toLocal();
-              if (dt != null) _takenTimestamps[key] = dt;
+              if (dt != null) {
+                _takenTimestamps[key] = dt;
+                if (log['scheduled_time'] != null) {
+                  _takenTimestamps['${pid}_${log['scheduled_time']}'] = dt;
+                }
+              }
             }
           }
         });
@@ -254,9 +319,17 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     } catch (_) {}
   }
 
+  bool _isItemTaken(ScheduledMedicine med, int doseIndex, [String? timeStr]) {
+    final key = '${med.prescriptionItemId}_$doseIndex';
+    if (_takenDoses.contains(key)) return true;
+    if (timeStr != null && _takenDoses.contains('${med.prescriptionItemId}_$timeStr')) return true;
+    return false;
+  }
+
   Future<void> _markAsTaken(ScheduledMedicine med, int doseIndex, String scheduledTime) async {
     final key = '${med.prescriptionItemId}_$doseIndex';
-    if (_takenDoses.contains(key)) return;
+    final timeKey = '${med.prescriptionItemId}_$scheduledTime';
+    if (_isItemTaken(med, doseIndex, scheduledTime)) return;
 
     final now = DateTime.now();
     final dateKey = DateFormat('yyyy-MM-dd').format(_selectedDate);
@@ -267,7 +340,9 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     // 1. Optimistic immediate local UI update
     setState(() {
       _takenDoses.add(key);
+      _takenDoses.add(timeKey);
       _takenTimestamps[key] = now;
+      _takenTimestamps[timeKey] = now;
       _startedPrescriptions.add(med.prescriptionItemId);
     });
 
@@ -293,7 +368,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           action: SnackBarAction(
             label: 'UNDO',
             textColor: Colors.white,
-            onPressed: () => _undoMarkAsTaken(key, med: med, doseIndex: doseIndex),
+            onPressed: () => _undoMarkAsTaken(key, med: med, doseIndex: doseIndex, scheduledTime: scheduledTime),
           ),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -313,6 +388,41 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       );
     } catch (e) {
       debugPrint('Intake stored locally, will sync when online: $e');
+    }
+
+    // Check for late intake safe-spacing adjustment on today's schedule
+    if (DateUtils.isSameDay(_selectedDate, DateTime.now()) && med.dailyDoseCount > 1) {
+      final rawTodayDoses = med.getDosesForDate(_selectedDate, customStartTime: _persistedStartTimes[med.prescriptionItemId]);
+      if (doseIndex < rawTodayDoses.length - 1) {
+        final scheduledMinutesList = <int>[];
+        for (final d in rawTodayDoses) {
+          final idx = d['doseIndex'] as int;
+          final shiftKey = '${med.prescriptionItemId}_${idx}_$dateKey';
+          if (_dateShiftedDoseTimes.containsKey(shiftKey)) {
+            scheduledMinutesList.add(_parseTime(_dateShiftedDoseTimes[shiftKey]!));
+          } else {
+            scheduledMinutesList.add(d['mins'] as int);
+          }
+        }
+
+        final nowMinutes = now.hour * 60 + now.minute;
+        final shifts = med.computeLateIntakeShifts(
+          takenDoseIndex: doseIndex,
+          actualTakenMinutes: nowMinutes,
+          currentScheduledMinutes: scheduledMinutesList,
+        );
+
+        if (shifts.isNotEmpty && mounted) {
+          _showLateIntakeAdjustmentDialog(
+            med: med,
+            takenDoseIndex: doseIndex,
+            actualTakenMinutes: nowMinutes,
+            scheduledMinutesList: scheduledMinutesList,
+            shifts: shifts,
+            dateKey: dateKey,
+          );
+        }
+      }
     }
   }
 
@@ -389,10 +499,50 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         debugPrint('Intake stored locally, will sync when online: $e');
       }
     }
+
+    if (DateUtils.isSameDay(_selectedDate, DateTime.now())) {
+      for (var item in untaken) {
+        final med = item['med'] as ScheduledMedicine;
+        final doseIndex = item['doseIndex'] as int;
+        final rawTodayDoses = med.getDosesForDate(_selectedDate, customStartTime: _persistedStartTimes[med.prescriptionItemId]);
+        if (med.dailyDoseCount > 1 && doseIndex < rawTodayDoses.length - 1) {
+          final scheduledMinutesList = <int>[];
+          for (final d in rawTodayDoses) {
+            final idx = d['doseIndex'] as int;
+            final shiftKey = '${med.prescriptionItemId}_${idx}_$dateKey';
+            if (_dateShiftedDoseTimes.containsKey(shiftKey)) {
+              scheduledMinutesList.add(_parseTime(_dateShiftedDoseTimes[shiftKey]!));
+            } else {
+              scheduledMinutesList.add(d['mins'] as int);
+            }
+          }
+
+          final nowMinutes = now.hour * 60 + now.minute;
+          final shifts = med.computeLateIntakeShifts(
+            takenDoseIndex: doseIndex,
+            actualTakenMinutes: nowMinutes,
+            currentScheduledMinutes: scheduledMinutesList,
+          );
+
+          if (shifts.isNotEmpty && mounted) {
+            _showLateIntakeAdjustmentDialog(
+              med: med,
+              takenDoseIndex: doseIndex,
+              actualTakenMinutes: nowMinutes,
+              scheduledMinutesList: scheduledMinutesList,
+              shifts: shifts,
+              dateKey: dateKey,
+            );
+            break;
+          }
+        }
+      }
+    }
   }
 
   void _undoMarkAllAsTaken(List<Map<String, dynamic>> items) async {
     final dateKey = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final prefs = await SharedPreferences.getInstance();
     setState(() {
       for (var item in items) {
         final med = item['med'] as ScheduledMedicine;
@@ -400,6 +550,13 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         final key = '${med.prescriptionItemId}_$doseIndex';
         _takenDoses.remove(key);
         _takenTimestamps.remove(key);
+        for (int i = 0; i < med.doseTimes.length; i++) {
+          final shiftKey = '${med.prescriptionItemId}_${i}_$dateKey';
+          if (_dateShiftedDoseTimes.containsKey(shiftKey)) {
+            _dateShiftedDoseTimes.remove(shiftKey);
+            prefs.remove('med_dose_shift_$shiftKey');
+          }
+        }
       }
     });
 
@@ -407,7 +564,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       final med = item['med'] as ScheduledMedicine;
       final doseIndex = item['doseIndex'] as int;
       final key = '${med.prescriptionItemId}_$doseIndex';
-      MedicineCacheService.removeLocalIntake(
+      await MedicineCacheService.removeLocalIntake(
         widget.citizenId,
         prescriptionItemKey: key,
         dateKey: dateKey,
@@ -432,17 +589,36 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     }
   }
 
-  void _undoMarkAsTaken(String key, {ScheduledMedicine? med, int? doseIndex}) async {
+  void _undoMarkAsTaken(String key, {ScheduledMedicine? med, int? doseIndex, String? scheduledTime}) async {
     setState(() {
       _takenDoses.remove(key);
       _takenTimestamps.remove(key);
+      if (med != null && scheduledTime != null) {
+        final timeKey = '${med.prescriptionItemId}_$scheduledTime';
+        _takenDoses.remove(timeKey);
+        _takenTimestamps.remove(timeKey);
+      }
     });
     final dateKey = DateFormat('yyyy-MM-dd').format(_selectedDate);
-    MedicineCacheService.removeLocalIntake(
+    await MedicineCacheService.removeLocalIntake(
       widget.citizenId,
       prescriptionItemKey: key,
       dateKey: dateKey,
     );
+
+    if (med != null) {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        for (int i = 0; i < 12; i++) {
+          final shiftKey = '${med.prescriptionItemId}_${i}_$dateKey';
+          if (_dateShiftedDoseTimes.containsKey(shiftKey)) {
+            _dateShiftedDoseTimes.remove(shiftKey);
+            prefs.remove('med_dose_shift_$shiftKey');
+          }
+        }
+      });
+    }
+
     _scheduleNotifications();
 
     if (med != null && doseIndex != null) {
@@ -493,9 +669,12 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         final t = _parseTime(timeStr);
         final bool allTakenToday = untakenToday.isEmpty;
         
+        // For late night/midnight bedtime doses (12:00 AM), effective timeline minute is 1440
+        final effectiveT = (t == 0 && (timeStr.startsWith('12') || timeStr.contains('12:00'))) ? 1440 : t;
+
         // If all taken today, or the intake time + grace period (120 mins) has already passed today,
         // we schedule daily recurring notifications starting tomorrow so taking today's dose never cancels tomorrow's alarms!
-        final DateTime? reminderStartDate = (allTakenToday || nowMins > t + 120)
+        final DateTime? reminderStartDate = (allTakenToday || nowMins > effectiveT + 120)
             ? DateTime(now.year, now.month, now.day).add(const Duration(days: 1))
             : null;
 
@@ -505,7 +684,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
 
         // 1. 30-Minute Heads-up Reminder (with midnight rollover support)
         if (id < NotificationService.medicineIdOffset + NotificationService.maxMedicineNotifications) {
-          final targetMins = (t - 30 + 1440) % 1440;
+          final targetMins = (effectiveT - 30 + 1440) % 1440;
           final h30 = (targetMins ~/ 60) % 24;
           final m30 = targetMins % 60;
           
@@ -531,13 +710,18 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           final hExact = (t ~/ 60) % 24;
           final mExact = t % 60;
           
+          DateTime? exactStartDate = reminderStartDate;
+          if (exactStartDate == null && effectiveT != 1440 && nowMins > t + 120) {
+            exactStartDate = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+          }
+
           await NotificationService.scheduleMedicineReminder(
             id: id++,
             title: 'Medication Time: $medsStr',
             body: 'It is time for your $timeStr intake right now:\n$bodyStr',
             hour: hExact,
             minute: mExact,
-            startDate: reminderStartDate,
+            startDate: exactStartDate,
             payload: '{"action":"medicine","username":"${widget.username}","citizenId":"${widget.citizenId}"}',
           );
         }
@@ -560,39 +744,49 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     for (final med in activeMeds) {
       if (med.dailyDoseCount == 0) {
         // PRN (as-needed) medicines go into a separate group
-        allDoses.add({'med': med, 'time': 'As Needed', 'doseIndex': 0, 'mins': 9999});
+        allDoses.add({'med': med, 'time': 'As Needed', 'doseIndex': 0, 'mins': 99999});
       } else {
         final startSaved = _persistedStartTimes[med.prescriptionItemId];
-        List<int>? cascadedMinutes;
-        if (startSaved != null) {
-          cascadedMinutes = med.calculateDoseMinutesFromStart(_parseTime(startSaved));
-        }
+        final targetDateKey = DateFormat('yyyy-MM-dd').format(targetDate);
+        final rawDoses = med.getDosesForDate(targetDate, customStartTime: startSaved);
 
-        for (int i = 0; i < med.doseTimes.length; i++) {
-          final key = '${med.prescriptionItemId}_$i';
-          String time;
-          int mins;
-          if (_customDoseTimes.containsKey(key)) {
-            time = _customDoseTimes[key]!;
+        for (final d in rawDoses) {
+          final doseIndex = d['doseIndex'] as int;
+          final shiftKey = '${med.prescriptionItemId}_${doseIndex}_$targetDateKey';
+          String time = d['time'] as String;
+          int mins = d['mins'] as int;
+          bool isShifted = false;
+
+          if (_dateShiftedDoseTimes.containsKey(shiftKey)) {
+            time = _dateShiftedDoseTimes[shiftKey]!;
             mins = _parseTime(time);
-          } else if (cascadedMinutes != null && i < cascadedMinutes.length) {
-            mins = cascadedMinutes[i];
-            time = _formatMinutes(mins);
-          } else {
-            time = med.doseTimes[i];
-            mins = _parseTime(time);
+            isShifted = true;
           }
-          allDoses.add({'med': med, 'time': time, 'doseIndex': i, 'mins': mins});
+
+          allDoses.add({
+            'med': med,
+            'time': time,
+            'doseIndex': doseIndex,
+            'globalDoseIndex': d['globalDoseIndex'],
+            'mins': mins,
+            'isShifted': isShifted,
+          });
         }
       }
     }
 
-    // Sort chronologically by minutes (00:00 to 23:59)
-    allDoses.sort((a, b) {
-      final aMin = a['mins'] as int;
-      final bMin = b['mins'] as int;
-      return aMin.compareTo(bMin);
-    });
+    int getSortMins(Map<String, dynamic> d) {
+      final mins = d['mins'] as int;
+      final timeStr = d['time'] as String;
+      final doseIndex = (d['doseIndex'] as int?) ?? 0;
+      if (mins == 0 && (timeStr.startsWith('12') || timeStr.contains('12:00')) && doseIndex > 0) {
+        return 1440;
+      }
+      return mins;
+    }
+
+    // Sort chronologically (00:00 to 24:00)
+    allDoses.sort((a, b) => getSortMins(a).compareTo(getSortMins(b)));
 
     // Grouping logic
     for (var dose in allDoses) {
@@ -607,13 +801,16 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         continue;
       }
 
-      final mins = dose['mins'] as int;
+      final mins = getSortMins(dose);
       String? targetGroup;
       
       // Look for an existing group within 10 minutes
       for (var existingTime in groups.keys) {
         if (existingTime == 'Setup Required' || existingTime == 'As Needed') continue;
-        final groupMins = _parseTime(existingTime);
+        int groupMins = _parseTime(existingTime);
+        if (groupMins == 0 && (existingTime.startsWith('12') || existingTime.contains('12:00'))) {
+          groupMins = 1440;
+        }
         if ((mins - groupMins).abs() <= 10) {
           targetGroup = existingTime;
           break;
@@ -631,7 +828,11 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       if (b == 'As Needed') return -1;
       if (a == 'Setup Required') return -1;
       if (b == 'Setup Required') return 1;
-      return _parseTime(a).compareTo(_parseTime(b));
+      int aM = _parseTime(a);
+      int bM = _parseTime(b);
+      if (aM == 0 && (a.startsWith('12') || a.contains('12:00'))) aM = 1440;
+      if (bM == 0 && (b.startsWith('12') || b.contains('12:00'))) bM = 1440;
+      return aM.compareTo(bM);
     });
 
     final sortedGroups = <String, List<Map<String, dynamic>>>{};
@@ -646,7 +847,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     final period = h >= 12 ? 'PM' : 'AM';
     final displayHour = (h % 12 == 0) ? 12 : (h % 12);
     final minuteStr = minute.toString().padLeft(2, '0');
-    return '$displayHour:$minuteStr $period';
+    return '${displayHour.toString().padLeft(2, '0')}:$minuteStr $period';
   }
 
   String _formatMinutes(int minutes) {
@@ -680,6 +881,42 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       return 0;
     } catch (_) {
       return 0;
+    }
+  }
+
+  /// Computes status for a scheduled dose time string on the selected date.
+  /// Returns one of: 'TAKEN', 'UPCOMING', 'DUE', 'LATE'.
+  /// Correctly handles circular midnight comparisons so late-night doses are never falsely overdue in the daytime.
+  String _getIntakeStatus({
+    required String timeStr,
+    required bool allTaken,
+    required bool isToday,
+    required bool isFuture,
+    required bool isPast,
+    required int nowMins,
+  }) {
+    if (allTaken) return 'TAKEN';
+    if (isFuture) return 'UPCOMING';
+    if (isPast) return 'LATE';
+
+    int tMins = _parseTime(timeStr);
+    if (tMins == 0 && (timeStr.startsWith('12') || timeStr.contains('12:00'))) {
+      tMins = 1440;
+    }
+
+    int diff;
+    if (tMins == 1440 && nowMins < 240) {
+      diff = 1440 - (1440 + nowMins);
+    } else {
+      diff = tMins - nowMins;
+    }
+
+    if (diff <= 30 && diff >= -120) {
+      return 'DUE';
+    } else if (diff > 30) {
+      return 'UPCOMING';
+    } else {
+      return 'LATE';
     }
   }
 
@@ -843,6 +1080,8 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
   }
 
   Map<String, dynamic>? _getNextDose(Map<String, List<Map<String, dynamic>>> grouped) {
+    if (!DateUtils.isSameDay(_selectedDate, DateTime.now())) return null;
+
     final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
     Map<String, dynamic>? dueNowCandidate;
     Map<String, dynamic>? overdueCandidate;
@@ -851,27 +1090,35 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     for (var entry in grouped.entries) {
       if (entry.key == 'Setup Required' || entry.key == 'As Needed') continue;
       final untaken = entry.value.where((d) => 
-        !_takenDoses.contains('${(d['med'] as ScheduledMedicine).prescriptionItemId}_${d['doseIndex']}')
+        !_isItemTaken(d['med'] as ScheduledMedicine, d['doseIndex'] as int, entry.key)
       ).toList();
       
       if (untaken.isEmpty) continue;
 
-      final tMins = _parseTime(entry.key);
-      if (nowMins >= tMins - 30 && nowMins <= tMins + 120) {
+      final status = _getIntakeStatus(
+        timeStr: entry.key,
+        allTaken: false,
+        isToday: true,
+        isFuture: false,
+        isPast: false,
+        nowMins: nowMins,
+      );
+
+      if (status == 'DUE') {
         dueNowCandidate ??= {
           'time': entry.key,
           'items': entry.value,
           'untaken': untaken,
           'status': 'DUE NOW',
         };
-      } else if (nowMins > tMins + 120) {
+      } else if (status == 'LATE') {
         overdueCandidate ??= {
           'time': entry.key,
           'items': entry.value,
           'untaken': untaken,
           'status': 'OVERDUE',
         };
-      } else {
+      } else if (status == 'UPCOMING') {
         upcomingCandidate ??= {
           'time': entry.key,
           'items': entry.value,
@@ -894,7 +1141,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
         // Skip setup required and PRN (as-needed) medicines from daily scheduled adherence goal
         if (d['doseIndex'] == -1 || med.dailyDoseCount == 0) continue;
         total++;
-        if (_takenDoses.contains('${med.prescriptionItemId}_${d['doseIndex']}')) {
+        if (_isItemTaken(med, d['doseIndex'] as int, entry.key)) {
           taken++;
         }
       }
@@ -1040,11 +1287,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                 ),
                 const SizedBox(height: 8),
                 InkWell(
-                  onTap: () {
-                    // Pick time for the first item, others will follow if they share the time
-                    final first = items.first;
-                    _pickTime(context, first['med'] as ScheduledMedicine, first['doseIndex'] as int, time);
-                  },
+                  onTap: () => _handleTimeBoxTap(context, items, time),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1170,61 +1413,98 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
             Row(children: [
               Container(
                 padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(color: Colors.teal, shape: BoxShape.circle),
+                decoration: const BoxDecoration(color: Colors.teal, shape: BoxShape.circle),
                 child: const Icon(Icons.medication_liquid_rounded, color: Colors.white, size: 16),
               ),
               const SizedBox(width: 10),
-              Text('Take as needed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.teal.shade800)),
+              Text('Take as needed (PRN)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.teal.shade800)),
             ]),
             const SizedBox(height: 12),
             ...items.map((item) {
               final med = item['med'] as ScheduledMedicine;
-              final key = '${med.prescriptionItemId}_${item['doseIndex']}';
-              final taken = _takenDoses.contains(key);
+              // Collect all recorded intakes for this PRN medicine on selected date
+              final prnKeys = _takenTimestamps.keys
+                  .where((k) => k.startsWith('${med.prescriptionItemId}_'))
+                  .toList()
+                ..sort((a, b) {
+                  final tA = _takenTimestamps[a] ?? DateTime(2000);
+                  final tB = _takenTimestamps[b] ?? DateTime(2000);
+                  return tA.compareTo(tB);
+                });
+              final takenCount = prnKeys.length;
+              final hasTakenAny = takenCount > 0;
+
               return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.medication_rounded, color: taken ? _primary : Colors.teal.shade300, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(med.medicineName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: taken ? _primary.withOpacity(0.6) : _textDark)),
-                          if (med.dosage.isNotEmpty) Text(med.dosage, style: const TextStyle(fontSize: 11, color: _textMuted)),
-                          if (med.instructions.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(med.instructions, style: TextStyle(fontSize: 10, color: _textMuted.withOpacity(0.8), fontStyle: FontStyle.italic)),
-                            ),
-                        ],
-                      ),
-                    ),
-                    if (!taken && isToday) TextButton.icon(
-                      onPressed: () => _markAsTaken(med, item['doseIndex'] as int, 'PRN'),
-                      icon: const Icon(Icons.check_rounded, size: 16),
-                      label: const Text('Take', style: TextStyle(fontSize: 12)),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.teal,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        backgroundColor: Colors.teal.withOpacity(0.1),
-                      ),
-                    ) else if (taken) Column(
-                      mainAxisSize: MainAxisSize.min,
+                    Row(
                       children: [
-                        const Icon(Icons.check_circle_rounded, color: _primary, size: 20),
-                        if (_takenTimestamps.containsKey(key))
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              DateFormat('h:mm a').format(_takenTimestamps[key]!),
-                              style: const TextStyle(fontSize: 8, color: _primary, fontWeight: FontWeight.w600),
+                        Icon(Icons.medication_rounded, color: hasTakenAny ? _primary : Colors.teal.shade400, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(med.medicineName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: hasTakenAny ? _primaryMid : _textDark)),
+                              if (med.dosage.isNotEmpty) Text(med.dosage, style: const TextStyle(fontSize: 11, color: _textMuted)),
+                              if (med.instructions.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(med.instructions, style: TextStyle(fontSize: 10, color: _textMuted.withOpacity(0.8), fontStyle: FontStyle.italic)),
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (isToday)
+                          ElevatedButton.icon(
+                            onPressed: () => _markAsTaken(med, takenCount, 'PRN'),
+                            icon: Icon(hasTakenAny ? Icons.add_rounded : Icons.check_rounded, size: 16),
+                            label: Text(hasTakenAny ? '+ Take another' : 'Take dose', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              elevation: 0,
                             ),
                           ),
                       ],
                     ),
+                    if (hasTakenAny) ...[
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 30),
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: prnKeys.map((k) {
+                            final dt = _takenTimestamps[k];
+                            final timeStr = dt != null ? DateFormat('h:mm a').format(dt) : 'Taken';
+                            final doseIdx = int.tryParse(k.split('_')[1]) ?? 0;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.teal.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.check_circle_rounded, size: 12, color: _primaryMid),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Dose ${doseIdx + 1}: $timeStr',
+                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _primaryMid),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -1234,41 +1514,31 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       );
     }
 
-    final allTaken = items.every((i) => _takenDoses.contains('${(i['med'] as ScheduledMedicine).prescriptionItemId}_${i['doseIndex']}'));
+    final allTaken = items.every((i) => _isItemTaken(i['med'] as ScheduledMedicine, i['doseIndex'] as int, time));
     final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
-    final tMins = _parseTime(time);
     final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
     final isFuture = _selectedDate.isAfter(DateTime.now()) && !isToday;
     final isPast = _selectedDate.isBefore(DateTime.now()) && !isToday;
     
     bool isLocked = isFuture; // Only lock future dates! Today and past dates can be marked.
-    String status = 'PENDING';
-    Color statusColor = _textMuted;
+    final status = _getIntakeStatus(
+      timeStr: time,
+      allTaken: allTaken,
+      isToday: isToday,
+      isFuture: isFuture,
+      isPast: isPast,
+      nowMins: nowMins,
+    );
 
-    if (allTaken) {
-      status = 'TAKEN';
+    Color statusColor;
+    if (status == 'TAKEN') {
       statusColor = _primary;
-    } else if (isFuture) {
-      status = 'UPCOMING';
+    } else if (status == 'DUE') {
+      statusColor = _primary;
+    } else if (status == 'UPCOMING') {
       statusColor = const Color(0xFF007BFF);
-      isLocked = true;
-    } else if (isPast) {
-      status = 'LATE';
-      statusColor = Colors.orange;
-      isLocked = false;
     } else {
-      // isToday: distinguish UPCOMING (< t - 30m), DUE (within [-30m, +120m]), and LATE (> t + 120m)
-      if (nowMins < tMins - 30) {
-        status = 'UPCOMING';
-        statusColor = const Color(0xFF007BFF);
-      } else if (nowMins <= tMins + 120) {
-        status = 'DUE';
-        statusColor = _primary;
-      } else {
-        status = 'LATE';
-        statusColor = Colors.orange;
-      }
-      isLocked = false;
+      statusColor = Colors.orange;
     }
 
     return Container(
@@ -1278,10 +1548,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             GestureDetector(
-              onTap: (allTaken || isLocked) ? null : () {
-                final first = items.first;
-                _pickTime(context, first['med'] as ScheduledMedicine, first['doseIndex'] as int, time);
-              },
+              onTap: (allTaken || isLocked) ? null : () => _handleTimeBoxTap(context, items, time),
               child: Container(
                 width: 70,
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1321,6 +1588,31 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
+                        if (items.any((it) => it['isShifted'] == true))
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            margin: const EdgeInsets.only(right: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFFFCC80), width: 0.8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.sync_rounded, size: 11, color: Color(0xFFE65100)),
+                                SizedBox(width: 3),
+                                Text(
+                                  'Shifted',
+                                  style: TextStyle(
+                                    color: Color(0xFFE65100),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 9,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
@@ -1343,7 +1635,8 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                     ...items.map((item) {
                       final med = item['med'] as ScheduledMedicine;
                       final key = '${med.prescriptionItemId}_${item['doseIndex']}';
-                      final taken = _takenDoses.contains(key);
+                      final timeKey = '${med.prescriptionItemId}_$time';
+                      final taken = _isItemTaken(med, item['doseIndex'] as int, time);
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
@@ -1370,6 +1663,12 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                                 ],
                               ),
                             ),
+                            if (!taken && items.length > 1)
+                              IconButton(
+                                onPressed: isLocked ? null : () => _pickTime(context, med, item['doseIndex'] as int, item['time'] as String? ?? time),
+                                icon: const Icon(Icons.edit_calendar_rounded, size: 18, color: _textMuted),
+                                tooltip: 'Adjust time for ${med.medicineName}',
+                              ),
                             if (!taken) IconButton(
                               onPressed: isLocked ? null : () => _markAsTaken(med, item['doseIndex'] as int, time),
                               icon: Icon(Icons.check_circle_outline_rounded, color: isLocked ? _textMuted.withOpacity(0.2) : _primary, size: 22),
@@ -1379,11 +1678,11 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 const Icon(Icons.check_circle_rounded, color: _primary, size: 20),
-                                if (_takenTimestamps.containsKey(key))
+                                if (_takenTimestamps.containsKey(key) || _takenTimestamps.containsKey(timeKey))
                                   Padding(
                                     padding: const EdgeInsets.only(top: 2),
                                     child: Text(
-                                      DateFormat('h:mm a').format(_takenTimestamps[key]!),
+                                      DateFormat('h:mm a').format(_takenTimestamps[key] ?? _takenTimestamps[timeKey]!),
                                       style: const TextStyle(fontSize: 8, color: _primary, fontWeight: FontWeight.w600),
                                     ),
                                   ),
@@ -1551,9 +1850,13 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           for (var m in _medicines) {
             final start = DateTime(m.startDate.year, m.startDate.month, m.startDate.day);
             final end   = DateTime(m.endDate.year, m.endDate.month, m.endDate.day);
-            if (DateUtils.isSameDay(date, start)) isStart = true;
-            else if (DateUtils.isSameDay(date, end)) isFinal = true;
-            else if (date.isAfter(start) && date.isBefore(end)) isOngoing = true;
+            if (DateUtils.isSameDay(date, start)) {
+              isStart = true;
+            } else if (DateUtils.isSameDay(date, end)) {
+              isFinal = true;
+            } else if (date.isAfter(start) && date.isBefore(end)) {
+              isOngoing = true;
+            }
           }
 
           bool hasFollowup = false;
@@ -1836,61 +2139,129 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
     _manuallySetDoseTimes.add(key);
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('med_dose_manual_${med.prescriptionItemId}_$doseIndex', true);
-    await prefs.setString('med_dose_${med.prescriptionItemId}_$doseIndex', timeStr);
+    final targetDateKey = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final isStartDay = DateUtils.isSameDay(_selectedDate, med.startDate);
 
-    final updatedCustomTimes = <String, String>{};
-    updatedCustomTimes[key] = timeStr;
-
-    // If doseIndex == 0, persist start time and cascade to uncustomized subsequent doses
-    if (doseIndex == 0) {
+    // If changing on start day or dose 0, update start anchor and re-project continuous rolling timeline
+    if (isStartDay || doseIndex == 0) {
       await prefs.setString('med_start_${med.prescriptionItemId}', timeStr);
+      // Clean up any stale old per-index keys for this medicine
+      for (int i = 0; i < 6; i++) {
+        await prefs.remove('med_dose_${med.prescriptionItemId}_$i');
+      }
       if (mounted) {
         setState(() {
           _persistedStartTimes[med.prescriptionItemId] = timeStr;
         });
       }
-
-      final startMinutes = picked.hour * 60 + picked.minute;
-      final cascadedMinutes = med.calculateDoseMinutesFromStart(startMinutes);
-
-      for (int i = 1; i < med.doseTimes.length; i++) {
-        final nextKey = '${med.prescriptionItemId}_$i';
-        // Only cascade to subsequent doses if the user hasn't explicitly set a custom time for them
-        if (!_manuallySetDoseTimes.contains(nextKey)) {
-          final cascadedTimeStr = _formatMinutes(cascadedMinutes[i]);
-          updatedCustomTimes[nextKey] = cascadedTimeStr;
-          await prefs.setString('med_dose_${med.prescriptionItemId}_$i', cascadedTimeStr);
-        }
+    } else {
+      // Shifting a specific dose on a specific date
+      final shiftKey = '${med.prescriptionItemId}_${doseIndex}_$targetDateKey';
+      await prefs.setString('med_dose_shift_$shiftKey', timeStr);
+      if (mounted) {
+        setState(() {
+          _dateShiftedDoseTimes[shiftKey] = timeStr;
+        });
       }
     }
 
-    for (final entry in updatedCustomTimes.entries) {
-      final idx = entry.key.split('_')[1];
-      await prefs.setString('med_dose_${med.prescriptionItemId}_$idx', entry.value);
-    }
-
     if (mounted) {
-      setState(() {
-        _customDoseTimes.addAll(updatedCustomTimes);
-      });
+      setState(() {});
       _scheduleNotifications();
     }
   }
 
-  Future<void> _pickTime(BuildContext context, ScheduledMedicine med, int doseIndex, String currentTime) async {
+  Future<TimeOfDay?> _showTimePickerFor(BuildContext context, String currentTime) async {
     final totalMins = _parseTime(currentTime);
     final initialH = (totalMins ~/ 60) % 24;
     final initialM = totalMins % 60;
 
-    final picked = await showTimePicker(
+    return await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: initialH, minute: initialM),
     );
+  }
 
+  Future<void> _pickTime(BuildContext context, ScheduledMedicine med, int doseIndex, String currentTime) async {
+    final picked = await _showTimePickerFor(context, currentTime);
     if (picked != null) {
       _applyTimeChange(med, doseIndex, picked);
     }
+  }
+
+  Future<void> _handleTimeBoxTap(BuildContext context, List<Map<String, dynamic>> items, String currentTime) async {
+    final untakenItems = items.where((i) => 
+      !_isItemTaken(i['med'] as ScheduledMedicine, i['doseIndex'] as int, currentTime)
+    ).toList();
+
+    if (untakenItems.isEmpty) return;
+
+    if (untakenItems.length == 1) {
+      final item = untakenItems.first;
+      await _pickTime(context, item['med'] as ScheduledMedicine, item['doseIndex'] as int, currentTime);
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: _fieldBdr, borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            Text('Reschedule Intake ($currentTime)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: _textDark)),
+            const SizedBox(height: 6),
+            const Text('Which medication would you like to adjust?', style: TextStyle(fontSize: 13, color: _textMuted)),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: _primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.schedule_rounded, color: _primary),
+              ),
+              title: const Text('All medicines in this slot', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: Text('${untakenItems.length} medications', style: const TextStyle(fontSize: 12, color: _textMuted)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final picked = await _showTimePickerFor(context, currentTime);
+                if (picked != null) {
+                  for (var item in untakenItems) {
+                    _applyTimeChange(item['med'] as ScheduledMedicine, item['doseIndex'] as int, picked);
+                  }
+                }
+              },
+            ),
+            const Divider(height: 20),
+            ...untakenItems.map((item) {
+              final med = item['med'] as ScheduledMedicine;
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: _primaryMid.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.medication_rounded, color: _primaryMid),
+                ),
+                title: Text(med.medicineName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text(med.dosage.isNotEmpty ? med.dosage : 'Dose ${item['doseIndex'] + 1}', style: const TextStyle(fontSize: 12, color: _textMuted)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _pickTime(context, med, item['doseIndex'] as int, currentTime);
+                },
+              );
+            }),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showRxModal(ScheduledMedicine med) {
@@ -2167,6 +2538,280 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
           ])),
           const Icon(Icons.chevron_right_rounded, color: _fieldBdr),
         ]),
+      ),
+    );
+  }
+
+  Future<void> _showLateIntakeAdjustmentDialog({
+    required ScheduledMedicine med,
+    required int takenDoseIndex,
+    required int actualTakenMinutes,
+    required List<int> scheduledMinutesList,
+    required Map<int, int> shifts,
+    required String dateKey,
+  }) async {
+    final scheduledMinutes = scheduledMinutesList[takenDoseIndex];
+    final delay = actualTakenMinutes - scheduledMinutes;
+    final delayStr = delay >= 60
+        ? '${delay ~/ 60}h ${delay % 60 > 0 ? '${delay % 60}m' : ''}'
+        : '${delay}m';
+
+    final nextIndex = takenDoseIndex + 1;
+    final nextOriginalTime = _formatMinutes(scheduledMinutesList[nextIndex]);
+    int currentGap = scheduledMinutesList[nextIndex] - actualTakenMinutes;
+    if (currentGap < 0) currentGap = 0;
+    final currentGapStr = currentGap >= 60
+        ? '${currentGap ~/ 60}h ${currentGap % 60 > 0 ? '${currentGap % 60}m' : ''}'
+        : '${currentGap}m';
+
+    final safeGapMinutes = med.minSafeGapMinutes;
+    final safeGapStr = safeGapMinutes >= 60
+        ? '${safeGapMinutes ~/ 60}h ${safeGapMinutes % 60 > 0 ? '${safeGapMinutes % 60}m' : ''}'
+        : '${safeGapMinutes}m';
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: _fieldBdr,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.schedule_rounded,
+                      color: Color(0xFFE65100),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Late Intake Detected',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 17,
+                            color: _textDark,
+                          ),
+                        ),
+                        Text(
+                          med.medicineName,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: _textMuted,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFFFE082)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFFB78103)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Dose logged $delayStr late',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: Color(0xFF795548),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Taking your next dose at $nextOriginalTime would be only $currentGapStr later. A safe spacing of at least $safeGapStr is recommended to avoid taking doses too close together.',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF5D4037),
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Suggested Today\'s Schedule:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: _textDark,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: _bg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _fieldBdr),
+                ),
+                child: Column(
+                  children: shifts.entries.map((entry) {
+                    final dIdx = entry.key;
+                    final oldTime = _formatMinutes(scheduledMinutesList[dIdx]);
+                    final newTime = _formatMinutes(entry.value);
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Dose ${dIdx + 1}:',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: _textDark,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            oldTime,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _textMuted.withOpacity(0.8),
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward_rounded, size: 14, color: _primary),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _primary.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              newTime,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: _primaryMid,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.lock_reset_rounded, size: 14, color: _textMuted.withOpacity(0.7)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Applies today only. Tomorrow resets to standard times.',
+                    style: TextStyle(fontSize: 11.5, color: _textMuted.withOpacity(0.8)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final prefs = await SharedPreferences.getInstance();
+                    setState(() {
+                      for (var entry in shifts.entries) {
+                        final shiftKey = '${med.prescriptionItemId}_${entry.key}_$dateKey';
+                        final timeStr = _formatMinutes(entry.value);
+                        _dateShiftedDoseTimes[shiftKey] = timeStr;
+                        prefs.setString('med_dose_shift_$shiftKey', timeStr);
+                      }
+                    });
+                    _scheduleNotifications();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Today\'s doses shifted for safe spacing'),
+                          duration: const Duration(seconds: 3),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          backgroundColor: _primaryMid,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Adjust Today\'s Schedule',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Keep Original Schedule',
+                    style: TextStyle(
+                      color: _textMuted,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

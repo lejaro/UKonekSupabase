@@ -43,7 +43,8 @@ class _PrescriptionGroup {
 }
 
 class PrescriptionPage extends StatefulWidget {
-  const PrescriptionPage({super.key});
+  final int? initialPrescriptionId;
+  const PrescriptionPage({super.key, this.initialPrescriptionId});
 
   @override
   State<PrescriptionPage> createState() => _PrescriptionPageState();
@@ -60,6 +61,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
   bool _refreshing = false;
   String? _error;
   List<_PrescriptionGroup> _groups = [];
+  bool _hasAutoOpened = false;
 
   // Purchase logs state
   List<PrescriptionDispenseLog> _dispenseLogs = [];
@@ -98,6 +100,18 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
         _dispenseLogs = logs;
         _loading = false;
       });
+
+      // Auto-open target prescription detail if requested
+      if (widget.initialPrescriptionId != null && !_hasAutoOpened && _groups.isNotEmpty) {
+        _hasAutoOpened = true;
+        final match = _groups.firstWhere(
+          (g) => g.prescriptionId == widget.initialPrescriptionId,
+          orElse: () => _groups.first,
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showGroupDetail(match);
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {

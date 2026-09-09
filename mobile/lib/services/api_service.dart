@@ -200,7 +200,7 @@ class PrescriptionRecord {
 
   factory PrescriptionRecord.fromMap(Map<String, dynamic> m) {
     return PrescriptionRecord(
-      prescriptionId:   (m['prescription_id']   as num?)?.toInt() ?? 0,
+      prescriptionId:   (m['prescription_id']   as num?)?.toInt() ?? (m['id'] as num?)?.toInt() ?? 0,
       prescriptionCode: (m['prescription_code']  as String?) ?? '',
       dispensingStatus: (m['dispensing_status']  as String?) ?? 'pending',
       issuedAt:         DateTime.parse((m['issued_at'] as String?) ?? DateTime.now().toIso8601String()).toLocal(),
@@ -280,6 +280,23 @@ class PrescriptionDispenseLog {
   }
 }
 
+/// Holds information about a newly issued prescription for alerting the patient.
+class NewPrescriptionAlert {
+  final int prescriptionId;
+  final String prescriptionCode;
+  final String doctorName;
+  final DateTime issuedAt;
+  final List<PrescriptionRecord> items;
+
+  const NewPrescriptionAlert({
+    required this.prescriptionId,
+    required this.prescriptionCode,
+    required this.doctorName,
+    required this.issuedAt,
+    required this.items,
+  });
+}
+
 class ScheduledMedicine {
   final int prescriptionItemId;
   final int prescriptionId;
@@ -340,7 +357,7 @@ class ScheduledMedicine {
     if (RegExp(r'\b(qid|q6h|every\s*6\s*h(ours?)?|4\s*times?\s*(a|per)?\s*(day|daily)?|four\s*times?\s*(a|per)?\s*(day|daily)?)\b').hasMatch(f)) return 4;
     if (RegExp(r'\b(tid|thrice|q8h|every\s*8\s*h(ours?)?|3\s*times?\s*(a|per)?\s*(day|daily)?|three\s*times?\s*(a|per)?\s*(day|daily)?)\b').hasMatch(f)) return 3;
     if (RegExp(r'\b(bid|twice|q12h|every\s*12\s*h(ours?)?|2\s*times?\s*(a|per)?\s*(day|daily)?|two\s*times?\s*(a|per)?\s*(day|daily)?)\b').hasMatch(f)) return 2;
-    if (RegExp(r'\b(od|om|on|hs|once|daily|once\s*(a|per)?\s*(day|daily)?|every\s*day|q24h)\b').hasMatch(f)) return 1;
+    if (RegExp(r'\b(od|om|o\.n\.|hs|once|daily|once\s*(a|per)?\s*(day|daily)?|every\s*day|every\s*morning|in\s*the\s*morning|every\s*night|at\s*night|nightly|every\s*evening|at\s*bedtime|q24h)\b').hasMatch(f)) return 1;
 
     final xday = RegExp(r'(\d+)\s*x').firstMatch(f);
     if (xday != null) return int.tryParse(xday.group(1)!) ?? 1;
@@ -376,8 +393,58 @@ class ScheduledMedicine {
     return 30; // Default to 30 active days for dispensed medicines
   }
 
+  static int parseTimeString(String t) {
+    try {
+      final clean = t.trim().replaceAll('\u202f', ' ').replaceAll('\u00a0', ' ');
+      final match = RegExp(r'(\d{1,2}):(\d{2})(?:\s*([AP]M?|[ap]m?))?', caseSensitive: false).firstMatch(clean);
+      if (match != null) {
+        int h = int.parse(match.group(1)!);
+        final m = int.parse(match.group(2)!);
+        final period = match.group(3)?.toUpperCase().replaceAll('.', '');
+        if (period == 'PM' || period == 'P') {
+          if (h != 12) h += 12;
+        } else if (period == 'AM' || period == 'A') {
+          if (h == 12) h = 0;
+        }
+        return (h % 24) * 60 + m;
+      }
+      final simpleMatch = RegExp(r'(\d{1,2})\s*([AP]M?|[ap]m?)', caseSensitive: false).firstMatch(clean);
+      if (simpleMatch != null) {
+        int h = int.parse(simpleMatch.group(1)!);
+        final period = simpleMatch.group(2)!.toUpperCase().replaceAll('.', '');
+        if ((period == 'PM' || period == 'P') && h != 12) h += 12;
+        if ((period == 'AM' || period == 'A') && h == 12) h = 0;
+        return (h % 24) * 60;
+      }
+      return 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  static String formatMinutesToTime(int totalMins) {
+    final h = (totalMins ~/ 60) % 24;
+    final m = totalMins % 60;
+    final period = h >= 12 ? 'PM' : 'AM';
+    final displayH = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+    return '${displayH.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $period';
+  }
+
   DateTime get startDate => dispensedAt ?? issuedAt;
-  DateTime get endDate => DateTime(startDate.year, startDate.month, startDate.day).add(Duration(days: durationDays > 0 ? durationDays - 1 : 0));
+
+  DateTime get endDate {
+    if (dailyDoseCount <= 0) {
+      return DateTime(startDate.year, startDate.month, startDate.day)
+          .add(Duration(days: durationDays > 0 ? durationDays - 1 : 0));
+    }
+    final doses = getScheduledDoseDateTimes();
+    if (doses.isNotEmpty) {
+      final last = doses.last;
+      return DateTime(last.year, last.month, last.day);
+    }
+    return DateTime(startDate.year, startDate.month, startDate.day)
+        .add(Duration(days: durationDays > 0 ? durationDays - 1 : 0));
+  }
 
   bool isActiveOn(DateTime date) {
     if (dailyDoseCount == 0) return true; // PRN / As-needed is always active
@@ -387,6 +454,26 @@ class ScheduledMedicine {
     return (d.isAtSameMomentAs(s) || d.isAfter(s)) && (d.isAtSameMomentAs(e) || d.isBefore(e));
   }
 
+  /// Determines whether a specific dose time (in minutes from midnight) is active on [date].
+  /// On the day the medicine is dispensed, doses earlier than the dispense time are excluded
+  /// so patients are not greeted with false overdue doses before receiving the medication.
+  bool isDoseActiveOn(DateTime date, int doseMinutes) {
+    if (!isActiveOn(date)) return false;
+    if (dailyDoseCount == 0) return true; // PRN always active
+    if (dispensedAt != null) {
+      final isDispenseDay = date.year == dispensedAt!.year &&
+          date.month == dispensedAt!.month &&
+          date.day == dispensedAt!.day;
+      if (isDispenseDay) {
+        final dispMinutes = dispensedAt!.hour * 60 + dispensedAt!.minute;
+        if (doseMinutes < dispMinutes - 15) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   int get doseIntervalMinutes {
     final count = dailyDoseCount;
     if (count <= 1) return 0;
@@ -394,10 +481,143 @@ class ScheduledMedicine {
     if (RegExp(r'\b(q8h|every\s*8\s*h(ours?)?)\b').hasMatch(f)) return 8 * 60;
     if (RegExp(r'\b(q6h|every\s*6\s*h(ours?)?)\b').hasMatch(f)) return 6 * 60;
     if (RegExp(r'\b(q4h|every\s*4\s*h(ours?)?)\b').hasMatch(f)) return 4 * 60;
+    final qMatch = RegExp(r'\b(?:q|every\s*)(\d+)\s*(?:h|hrs?|hours?)\b').firstMatch(f);
+    if (qMatch != null) {
+      final hours = int.tryParse(qMatch.group(1)!);
+      if (hours != null && hours > 0) return hours * 60;
+    }
     if (count == 2) return 12 * 60; // 12 hours (e.g. 8:00 AM, 8:00 PM)
     if (count == 3) return 5 * 60;  // 5-6 hours daytime interval (e.g. 8:00 AM, 1:00 PM, 7:00 PM)
     if (count == 4) return 5 * 60;  // 4-5 hours daytime interval (e.g. 7:00 AM, 12:00 PM, 5:00 PM, 9:00 PM)
     return (24 * 60) ~/ count;
+  }
+
+  int get totalPrescribedDoses {
+    if (dailyDoseCount <= 0) return 0; // PRN
+    if (quantity > 0) return quantity;
+    if (durationDays > 0) return durationDays * dailyDoseCount;
+    return dailyDoseCount * 30;
+  }
+
+  DateTime getAnchorStartDateTime({String? customStartTime}) {
+    final sDate = startDate;
+    int h = 8;
+    int m = 0;
+
+    if (customStartTime != null && customStartTime.trim().isNotEmpty) {
+      final mins = parseTimeString(customStartTime);
+      h = (mins ~/ 60) % 24;
+      m = mins % 60;
+    } else if (dispensedAt != null) {
+      h = dispensedAt!.hour;
+      m = dispensedAt!.minute;
+    } else {
+      final dTimes = doseTimes;
+      if (dTimes.isNotEmpty) {
+        final mins = parseTimeString(dTimes.first);
+        h = (mins ~/ 60) % 24;
+        m = mins % 60;
+      }
+    }
+    return DateTime(sDate.year, sDate.month, sDate.day, h, m);
+  }
+
+  /// Calculates the continuous sequence of scheduled dose DateTimes from the start anchor across all days.
+  List<DateTime> getScheduledDoseDateTimes({String? customStartTime, int? maxDoses}) {
+    if (dailyDoseCount <= 0) return []; // PRN
+    final anchor = getAnchorStartDateTime(customStartTime: customStartTime);
+    final count = maxDoses ?? totalPrescribedDoses;
+    if (count <= 0) return [];
+
+    final f = frequency.toLowerCase().trim();
+    final isMealRoutine = (count == 3 || count == 4) &&
+        (f.contains('meal') || instructions.toLowerCase().contains('meal'));
+
+    if (isMealRoutine) {
+      // Daytime meal routine without midnight rolling
+      final minsList = calculateDoseMinutesFromStart(anchor.hour * 60 + anchor.minute);
+      final days = (count / dailyDoseCount).ceil();
+      final List<DateTime> list = [];
+      for (int d = 0; d < days; d++) {
+        final dayDate = anchor.add(Duration(days: d));
+        for (final m in minsList) {
+          if (list.length >= count) break;
+          final dt = DateTime(dayDate.year, dayDate.month, dayDate.day, (m ~/ 60) % 24, m % 60);
+          if (d == 0 && dt.isBefore(anchor)) continue;
+          list.add(dt);
+        }
+      }
+      return list;
+    }
+
+    final isQ8h = RegExp(r'\b(q8h|every\s*8\s*h(ours?)?)\b').hasMatch(f);
+    final isQ6h = RegExp(r'\b(q6h|every\s*6\s*h(ours?)?)\b').hasMatch(f);
+    final isQ4h = RegExp(r'\b(q4h|every\s*4\s*h(ours?)?)\b').hasMatch(f);
+    final isQ12h = RegExp(r'\b(q12h|every\s*12\s*h(ours?)?|bid|twice)\b').hasMatch(f);
+
+    int interval;
+    if (isQ8h) {
+      interval = 8 * 60;
+    } else if (isQ6h) {
+      interval = 6 * 60;
+    } else if (isQ4h) {
+      interval = 4 * 60;
+    } else if (isQ12h) {
+      interval = 12 * 60;
+    } else if (dailyDoseCount > 0) {
+      interval = (24 * 60) ~/ dailyDoseCount;
+    } else {
+      interval = 24 * 60;
+    }
+
+    final List<DateTime> list = [];
+    for (int i = 0; i < count; i++) {
+      list.add(anchor.add(Duration(minutes: i * interval)));
+    }
+    return list;
+  }
+
+  /// Returns scheduled doses for [targetDate] projected from the continuous rolling timeline.
+  List<Map<String, dynamic>> getDosesForDate(DateTime targetDate, {String? customStartTime}) {
+    if (dailyDoseCount <= 0) {
+      // PRN
+      return [
+        {
+          'med': this,
+          'time': 'As Needed',
+          'mins': 99999,
+          'doseIndex': 0,
+          'globalDoseIndex': 0,
+          'isShifted': false,
+        }
+      ];
+    }
+
+    final doses = getScheduledDoseDateTimes(customStartTime: customStartTime);
+    final targetY = targetDate.year;
+    final targetM = targetDate.month;
+    final targetD = targetDate.day;
+
+    final List<Map<String, dynamic>> dateDoses = [];
+    int indexOnDate = 0;
+
+    for (int i = 0; i < doses.length; i++) {
+      final dt = doses[i];
+      if (dt.year == targetY && dt.month == targetM && dt.day == targetD) {
+        final mins = dt.hour * 60 + dt.minute;
+        dateDoses.add({
+          'med': this,
+          'time': formatMinutesToTime(mins),
+          'mins': mins,
+          'doseIndex': indexOnDate++,
+          'globalDoseIndex': i,
+          'scheduledDateTime': dt,
+          'isShifted': false,
+        });
+      }
+    }
+
+    return dateDoses;
   }
 
   /// Calculates cascading dose times in minutes from midnight given a custom starting dose time.
@@ -450,6 +670,74 @@ class ScheduledMedicine {
     return List.generate(count, (i) => (startMinutes + i * intervalMins) % 1440);
   }
 
+  /// Minimum safe spacing (in minutes) required before taking the subsequent dose.
+  int get minSafeGapMinutes {
+    final count = dailyDoseCount;
+    if (count <= 1) return 0;
+    if (count == 2) return 8 * 60; // 8 hours minimum for twice-daily
+    if (count == 3) return 4 * 60; // 4 hours minimum for three-times-daily
+    if (count == 4) return 3 * 60; // 3 hours minimum for four-times-daily
+    return (doseIntervalMinutes * 0.75).round();
+  }
+
+  /// Computes suggested shifted times (in minutes from midnight) for remaining doses on the current day
+  /// when [takenDoseIndex] is taken late at [actualTakenMinutes].
+  ///
+  /// Returns a map of `{ doseIndex: shiftedMinutes }` for doses after [takenDoseIndex] that need shifting.
+  /// If the intake was taken within the safe window or the remaining doses already have a safe gap,
+  /// returns an empty map.
+  Map<int, int> computeLateIntakeShifts({
+    required int takenDoseIndex,
+    required int actualTakenMinutes,
+    required List<int> currentScheduledMinutes,
+    int lateThresholdMinutes = 45,
+    int bedtimeCapMinutes = 1350, // 10:30 PM
+  }) {
+    final count = dailyDoseCount;
+    if (count <= 1 || takenDoseIndex >= count - 1 || takenDoseIndex >= currentScheduledMinutes.length) {
+      return {};
+    }
+
+    final scheduledMinutes = currentScheduledMinutes[takenDoseIndex];
+    final delay = actualTakenMinutes - scheduledMinutes;
+    if (delay < lateThresholdMinutes) {
+      return {};
+    }
+
+    final minSafeGap = minSafeGapMinutes;
+    if (minSafeGap <= 0) return {};
+
+    final nextDoseIndex = takenDoseIndex + 1;
+    final nextScheduledMinutes = currentScheduledMinutes[nextDoseIndex];
+
+    // Gap from actual intake to the next scheduled dose
+    int gapToNext = nextScheduledMinutes - actualTakenMinutes;
+    if (gapToNext < 0) {
+      gapToNext = 0;
+    }
+
+    // If safe spacing is already preserved, no shift is required
+    if (gapToNext >= minSafeGap) {
+      return {};
+    }
+
+    // Safe spacing violated: calculate cascading shifts for subsequent doses today
+    final Map<int, int> shifts = {};
+    int prevShiftedMinutes = actualTakenMinutes;
+    final interval = doseIntervalMinutes > 0 ? doseIntervalMinutes : minSafeGap;
+
+    for (int i = nextDoseIndex; i < currentScheduledMinutes.length; i++) {
+      int suggestedMinutes = prevShiftedMinutes + interval;
+      if (suggestedMinutes > bedtimeCapMinutes) {
+        suggestedMinutes = bedtimeCapMinutes;
+      }
+      shifts[i] = suggestedMinutes % 1440;
+      prevShiftedMinutes = suggestedMinutes;
+    }
+
+    return shifts;
+  }
+
   List<String> get doseTimes {
     final f = frequency.toLowerCase().trim();
 
@@ -461,9 +749,10 @@ class ScheduledMedicine {
       }
     }
 
-    if (RegExp(r'\b(om)\b').hasMatch(f)) return ['08:00 AM'];
-    if (RegExp(r'\b(on)\b').hasMatch(f)) return ['08:00 PM'];
-    if (RegExp(r'\b(hs|at\s*bedtime|bedtime)\b').hasMatch(f)) return ['09:00 PM'];
+    // Explicit morning / night natural language phrasing (avoiding matching English 'on')
+    if (RegExp(r'\b(hs|at\s*bedtime|bedtime|before\s*bed)\b').hasMatch(f)) return ['09:00 PM'];
+    if (RegExp(r'\b(o\.n\.|every\s*night|at\s*night|nightly|every\s*evening|in\s*the\s*evening)\b').hasMatch(f)) return ['08:00 PM'];
+    if (RegExp(r'\b(om|every\s*morning|in\s*the\s*morning)\b').hasMatch(f)) return ['08:00 AM'];
 
     final count = dailyDoseCount;
     if (count <= 0) return [];
@@ -472,13 +761,14 @@ class ScheduledMedicine {
     if (count == 2) return ['08:00 AM', '08:00 PM'];
     if (count == 3) {
       if (RegExp(r'\b(q8h|every\s*8\s*h(ours?)?)\b').hasMatch(f)) {
-        return ['08:00 AM', '04:00 PM', '12:00 AM'];
+        // Standard outpatient waking-hour intervals (6 AM, 2 PM, 10 PM)
+        return ['06:00 AM', '02:00 PM', '10:00 PM'];
       }
       return ['08:00 AM', '01:00 PM', '07:00 PM'];
     }
     if (count == 4) {
       if (RegExp(r'\b(q6h|every\s*6\s*h(ours?)?)\b').hasMatch(f)) {
-        return ['06:00 AM', '12:00 PM', '06:00 PM', '12:00 AM'];
+        return ['06:00 AM', '12:00 PM', '06:00 PM', '11:59 PM'];
       }
       return ['07:00 AM', '12:00 PM', '05:00 PM', '09:00 PM'];
     }
@@ -1408,6 +1698,52 @@ class ApiService {
     return response == true;
   }
 
+  /// Retrieves the current status and details of a specific queue ticket.
+  static Future<Map<String, dynamic>?> getTicketStatus(int ticketId) async {
+    try {
+      final response = await _client
+          .from('queue_tickets')
+          .select('id, status, service_label, queue_number, ticket_code, completed_at')
+          .eq('id', ticketId)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      debugPrint('Error getting ticket status: $e');
+      return null;
+    }
+  }
+
+  /// Retrieves the citizen's latest completed queue ticket for today.
+  static Future<Map<String, dynamic>?> getCompletedQueueTicket({int? ticketId}) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return null;
+
+    try {
+      final profile = await fetchMyCitizenProfile();
+      final citizenId = profile['id'];
+
+      var query = _client
+          .from('queue_tickets')
+          .select('id, status, service_label, queue_number, ticket_code, completed_at, queue_date')
+          .eq('citizen_id', citizenId)
+          .eq('status', 'completed');
+
+      if (ticketId != null) {
+        query = query.eq('id', ticketId);
+      }
+
+      final response = await query
+          .order('completed_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      return response;
+    } catch (e) {
+      debugPrint('Error getting completed queue ticket: $e');
+      return null;
+    }
+  }
+
   static Map<String, dynamic>? _cachedCitizenProfile;
 
   static void clearCitizenProfileCache() {
@@ -1605,6 +1941,74 @@ class ApiService {
     } catch (e) {
       debugPrint('Error fetching TV display: $e');
       return {};
+    }
+  }
+
+  /// Retrieves the latest prescription if it has not been acknowledged yet.
+  /// Used to trigger the New E-Prescription pop-up modal and local notification.
+  static Future<NewPrescriptionAlert?> fetchLatestUnacknowledgedPrescription() async {
+    try {
+      final records = await fetchPrescriptions(limit: 20);
+      if (records.isEmpty) return null;
+
+      // Group by prescriptionId
+      final Map<int, List<PrescriptionRecord>> groups = {};
+      for (final r in records) {
+        if (r.prescriptionId <= 0) continue;
+        groups.putIfAbsent(r.prescriptionId, () => []).add(r);
+      }
+      if (groups.isEmpty) return null;
+
+      // Find the newest prescription group by highest ID or most recent issuedAt
+      final sortedEntries = groups.entries.toList()
+        ..sort((a, b) {
+          final timeComp = b.value.first.issuedAt.compareTo(a.value.first.issuedAt);
+          if (timeComp != 0) return timeComp;
+          return b.key.compareTo(a.key);
+        });
+
+      final latestGroup = sortedEntries.first;
+      final latestId = latestGroup.key;
+      final latestItems = latestGroup.value;
+      final firstItem = latestItems.first;
+
+      final prefs = await SharedPreferences.getInstance();
+      final lastAckId = prefs.getInt('last_acknowledged_prescription_id') ?? 0;
+
+      // If already acknowledged, do not alert again
+      if (latestId <= lastAckId) return null;
+
+      // Only alert if issued recently (within last 24 hours)
+      final age = DateTime.now().difference(firstItem.issuedAt);
+      if (age.inHours > 24) {
+        // Automatically mark stale prescription as acknowledged so it doesn't pop up later
+        await prefs.setInt('last_acknowledged_prescription_id', latestId);
+        return null;
+      }
+
+      return NewPrescriptionAlert(
+        prescriptionId: latestId,
+        prescriptionCode: firstItem.prescriptionCode,
+        doctorName: firstItem.displayDoctorName,
+        issuedAt: firstItem.issuedAt,
+        items: latestItems,
+      );
+    } catch (e) {
+      debugPrint('Error checking unacknowledged prescription: $e');
+      return null;
+    }
+  }
+
+  /// Marks a prescription ID as acknowledged so its pop-up notification is not repeated.
+  static Future<void> acknowledgePrescription(int prescriptionId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final current = prefs.getInt('last_acknowledged_prescription_id') ?? 0;
+      if (prescriptionId > current) {
+        await prefs.setInt('last_acknowledged_prescription_id', prescriptionId);
+      }
+    } catch (e) {
+      debugPrint('Error acknowledging prescription: $e');
     }
   }
 }

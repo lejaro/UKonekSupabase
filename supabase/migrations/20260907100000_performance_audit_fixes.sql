@@ -465,17 +465,25 @@ begin
         is_dispensed = (v_item.remaining_quantity - v_row.quantity = 0)
       where id = v_item.id;
 
-      -- Record dispense event
+      -- Record dispense event with required prescription_id NOT NULL column
       insert into public.prescription_item_dispenses (
+        prescription_id,
         prescription_item_id,
+        medicine_id,
         dispensed_quantity,
+        unit,
+        note,
         dispensed_by_staff_id,
-        note
+        dispensed_at
       ) values (
+        v_header_id,
         v_item.id,
+        v_medicine_id,
         v_row.quantity,
+        coalesce(v_item.unit, ''),
+        nullif(trim(p_note), ''),
         v_staff_id,
-        nullif(trim(p_note), '')
+        now()
       );
     end loop;
 
@@ -493,7 +501,7 @@ begin
     elsif v_medicine_qty = v_total_rows then
       v_new_status := 'dispensed';
     elsif v_medicine_qty > 0 or v_medicine_id > 0 then
-      v_new_status := 'partially_dispensed';
+      v_new_status := 'partial';
     else
       v_new_status := 'pending';
     end if;
@@ -516,6 +524,25 @@ begin
   end;
 end;
 $$;
+
+-- Provide dispense_prescription_items definition and grants as well
+create or replace function public.dispense_prescription_items(
+  p_prescription_code text,
+  p_items jsonb,
+  p_note text default null
+)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return public.dispense_prescription(p_prescription_code, p_items, p_note);
+end;
+$$;
+
+grant execute on function public.dispense_prescription(text, jsonb, text) to authenticated;
+grant execute on function public.dispense_prescription_items(text, jsonb, text) to authenticated;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- 4. UPDATE get_my_queue_dashboard TO RETURN has_vitals

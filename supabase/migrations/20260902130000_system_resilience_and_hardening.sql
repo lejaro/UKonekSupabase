@@ -254,17 +254,25 @@ begin
         is_dispensed = (v_item.remaining_quantity - v_row.quantity = 0)
       where id = v_item.id;
 
-      -- Record dispense event
+      -- Record dispense event with required prescription_id NOT NULL column
       insert into public.prescription_item_dispenses (
+        prescription_id,
         prescription_item_id,
+        medicine_id,
         dispensed_quantity,
+        unit,
+        note,
         dispensed_by_staff_id,
-        note
+        dispensed_at
       ) values (
+        v_header_id,
         v_item.id,
+        v_medicine_id,
         v_row.quantity,
+        coalesce(v_item.unit, ''),
+        nullif(trim(p_note), ''),
         v_staff_id,
-        nullif(trim(p_note), '')
+        now()
       );
     end loop;
 
@@ -282,7 +290,7 @@ begin
     elsif v_medicine_qty = v_total_rows then
       v_new_status := 'dispensed';
     elsif v_medicine_qty > 0 or v_medicine_id > 0 then
-      v_new_status := 'partially_dispensed';
+      v_new_status := 'partial';
     else
       v_new_status := 'pending';
     end if;

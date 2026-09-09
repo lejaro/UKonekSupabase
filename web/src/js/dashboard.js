@@ -784,6 +784,17 @@ function isClinicalStaff(user) {
   return role === 'doctor' || role === 'nurse' || role === 'staff';
 }
 
+function isNurseUser(user) {
+  const role = String(user?.role || '').trim().toLowerCase();
+  return role === 'nurse' || role === 'staff';
+}
+
+function canModifyUserAccounts(user = cachedSessionUser) {
+  if (!user) return false;
+  if (isNurseUser(user)) return false;
+  return isAdminUser(user);
+}
+
 function isFullAccessUser(user) {
   return isAdminUser(user) || isClinicalStaff(user);
 }
@@ -874,12 +885,13 @@ function getDisplayFirstName(user) {
 }
 
 function isDoctorRole(value) {
-  return String(value || '').trim().toLowerCase() === 'doctor';
+  const key = String(value || '').trim().toLowerCase();
+  return key === 'doctor' || key === 'specialist';
 }
 
 function isScheduleRole(value) {
   const key = String(value || '').trim().toLowerCase();
-  return key === 'doctor' || key === 'nurse' || key === 'pharmacist';
+  return key === 'doctor' || key === 'specialist' || key === 'nurse' || key === 'staff';
 }
 
 function getDoctorDisplayName(doctor) {
@@ -912,9 +924,10 @@ const AVAILABILITY_LABELS = {
 
 function normalizeAvailabilityStatus(value) {
   const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'available' || raw === 'on_duty' || raw === 'onduty') return 'available';
   if (raw === 'on break' || raw === 'on_break') return 'on_break';
-  if (raw === 'unavailable') return 'unavailable';
-  return 'available';
+  if (raw === 'unavailable' || raw === 'off duty' || raw === 'off_duty' || raw === 'offduty') return 'unavailable';
+  return 'unavailable';
 }
 
 function getAvailabilityStatusText(user) {
@@ -2427,10 +2440,7 @@ function getStaffInitials(name) {
 
 function updateRosterSummaryCounters(staffList = cachedScheduleStaff) {
   if (!Array.isArray(staffList)) return;
-  const doctors = staffList.filter((s) => {
-    const r = String(s?.role || '').toLowerCase();
-    return r === 'doctor' || r === 'specialist';
-  });
+  const doctors = staffList.filter((s) => isDoctorRole(s?.role));
   const nurses = staffList.filter((s) => {
     const r = String(s?.role || '').toLowerCase();
     return r === 'nurse' || r === 'staff';
@@ -2438,9 +2448,10 @@ function updateRosterSummaryCounters(staffList = cachedScheduleStaff) {
 
   const getStatus = (s) => normalizeAvailabilityStatus(s?.availability_status || s?.availabilityStatus);
 
-  const availCount = staffList.filter((s) => getStatus(s) === 'available').length;
-  const breakCount = staffList.filter((s) => getStatus(s) === 'on_break').length;
-  const offCount = staffList.filter((s) => getStatus(s) === 'unavailable').length;
+  const rosterStaff = [...doctors, ...nurses];
+  const availCount = rosterStaff.filter((s) => getStatus(s) === 'available').length;
+  const breakCount = rosterStaff.filter((s) => getStatus(s) === 'on_break').length;
+  const offCount = rosterStaff.filter((s) => getStatus(s) === 'unavailable').length;
   const docAvail = doctors.filter((d) => getStatus(d) === 'available').length;
   const nurseAvail = nurses.filter((n) => getStatus(n) === 'available').length;
 
@@ -2452,7 +2463,6 @@ function updateRosterSummaryCounters(staffList = cachedScheduleStaff) {
   setEl('summary-avail-count', availCount);
   setEl('summary-break-count', breakCount);
   setEl('summary-off-count', offCount);
-  setEl('summary-total-count', staffList.length);
 
   const docBadge = document.getElementById('doctors-count-badge');
   if (docBadge) {
@@ -2491,10 +2501,7 @@ function renderScheduleDoctors(staffList, user) {
   const nurseGrid = document.getElementById('schedule-nurses-grid') || document.getElementById('schedule-nurses-tbody');
   if (!doctorGrid || !nurseGrid) return;
 
-  const doctors = (staffList || []).filter((s) => {
-    const r = String(s?.role || '').toLowerCase();
-    return r === 'doctor' || r === 'specialist';
-  });
+  const doctors = (staffList || []).filter((s) => isDoctorRole(s?.role));
   const nurses = (staffList || []).filter((s) => {
     const r = String(s?.role || '').toLowerCase();
     return r === 'nurse' || r === 'staff';
@@ -2813,7 +2820,7 @@ async function loadSchedules(user) {
       if (staffResp.ok) {
         const staff = await staffResp.json();
         staffRoster = Array.isArray(staff) ? staff : [];
-        doctors = staffRoster.filter((item) => isScheduleRole(item?.role));
+        doctors = staffRoster.filter((item) => isDoctorRole(item?.role));
       }
 
       if (!schedulesResp.ok || !staffResp.ok || doctors.length === 0 || schedules.length === 0) {
@@ -2823,7 +2830,7 @@ async function loadSchedules(user) {
         if (doctors.length === 0) {
           const fallbackStaff = await staffService.listStaff();
           staffRoster = Array.isArray(fallbackStaff) ? fallbackStaff : [];
-          doctors = staffRoster.filter((item) => isScheduleRole(item?.role));
+          doctors = staffRoster.filter((item) => isDoctorRole(item?.role));
         }
 
         if (schedules.length === 0) {
@@ -2869,7 +2876,7 @@ async function loadSchedules(user) {
         ? (Array.isArray(staffRpc.data) ? staffRpc.data : [])
         : await staffService.listStaff();
       staffRoster = Array.isArray(staff) ? staff : [];
-      doctors = staffRoster.filter((item) => isScheduleRole(item?.role));
+      doctors = staffRoster.filter((item) => isDoctorRole(item?.role));
 
       const scheduleRpc = await supabase.rpc('list_doctor_schedules');
       if (!scheduleRpc.error) {
@@ -3377,11 +3384,13 @@ async function initializeDashboard() {
     ]);
 
     renderDashboardInsights();
+    populateMedicineDatalist();
 
     // Defer non-critical background data until after dashboard is already responsive
     setTimeout(() => {
       refreshAnnouncementsData().catch(() => null);
       refreshFeedbackData().catch(() => null);
+      refreshMedicineData().catch(() => null);
       subscribeToStaffAvailability();
     }, 1500);
 
@@ -7090,6 +7099,18 @@ function setModalEditError(message = '') {
 }
 
 function setAccountEditMode(editMode) {
+  if (editMode && !canModifyUserAccounts(cachedSessionUser)) {
+    isAccountEditMode = false;
+    showToast('Forbidden: Nurses cannot modify user accounts.', 'error');
+    if (modalViewFields) modalViewFields.classList.remove('hidden');
+    if (modalEditForm) modalEditForm.classList.add('hidden');
+    const modalActions = document.getElementById('modal-actions');
+    if (modalActions) modalActions.classList.remove('hidden');
+    const modalEditActions = document.getElementById('modal-edit-actions');
+    if (modalEditActions) modalEditActions.classList.add('hidden');
+    setModalEditError('');
+    return;
+  }
   isAccountEditMode = Boolean(editMode);
   if (modalViewFields) modalViewFields.classList.toggle('hidden', isAccountEditMode);
   if (modalEditForm) modalEditForm.classList.toggle('hidden', !isAccountEditMode);
@@ -7129,6 +7150,10 @@ function closeAccountModal() {
 }
 
 async function updateStaffAccountById(staffId, payload) {
+  if (!canModifyUserAccounts(cachedSessionUser)) {
+    throw new Error('Forbidden: Nurses cannot modify user accounts.');
+  }
+
   if (isDemoMode) {
     const idx = DEMO_REGISTERED_USERS.findIndex((item) => String(item.id || '') === String(staffId));
     if (idx >= 0) {
@@ -7167,6 +7192,10 @@ async function updateStaffAccountById(staffId, payload) {
 }
 
 async function resetStaffPasswordById(staffId, newPassword) {
+  if (!canModifyUserAccounts(cachedSessionUser)) {
+    throw new Error('Forbidden: Nurses cannot reset user passwords.');
+  }
+
   const normalizedPassword = String(newPassword || '');
   if (normalizedPassword.length < 8) {
     throw new Error('Password must be at least 8 characters.');
@@ -7248,21 +7277,51 @@ function openAccountModal(user) {
   });
 
   const modalDeleteBtn = document.getElementById('modal-delete-btn');
+  const modalEditBtn = document.getElementById('modal-edit-btn');
+  const modalResetPasswordBtn = document.getElementById('modal-reset-password-btn');
   const modalSelfNotice = document.getElementById('modal-self-notice');
   const isSelf = isSelfUser(user);
+  const canModify = canModifyUserAccounts(cachedSessionUser);
 
   if (modalSelfNotice) {
     modalSelfNotice.style.display = isSelf ? 'flex' : 'none';
     modalSelfNotice.classList.toggle('hidden', !isSelf);
   }
 
+  // Enforce role-based restrictions: Nurses cannot edit, reset password, or delete user accounts
+  if (modalEditBtn) {
+    if (canModify) {
+      modalEditBtn.style.display = '';
+      modalEditBtn.disabled = false;
+      modalEditBtn.classList.remove('hidden');
+    } else {
+      modalEditBtn.style.display = 'none';
+      modalEditBtn.disabled = true;
+      modalEditBtn.classList.add('hidden');
+    }
+  }
+
+  if (modalResetPasswordBtn) {
+    if (canModify) {
+      modalResetPasswordBtn.style.display = '';
+      modalResetPasswordBtn.disabled = false;
+      modalResetPasswordBtn.classList.remove('hidden');
+    } else {
+      modalResetPasswordBtn.style.display = 'none';
+      modalResetPasswordBtn.disabled = true;
+      modalResetPasswordBtn.classList.add('hidden');
+    }
+  }
+
   if (modalDeleteBtn) {
-    if (isSelf) {
+    if (!canModify || isSelf) {
       modalDeleteBtn.style.display = 'none';
       modalDeleteBtn.disabled = true;
+      modalDeleteBtn.classList.add('hidden');
     } else {
       modalDeleteBtn.style.display = '';
       modalDeleteBtn.disabled = false;
+      modalDeleteBtn.classList.remove('hidden');
     }
   }
 
@@ -7323,9 +7382,10 @@ function attachAccountRowListener(row) {
     const roleLabel = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '—';
     const isSelf = isSelfUser(user);
 
+    const canManage = canModifyUserAccounts(cachedSessionUser);
     const actions = document.getElementById('account-modal') ? [
       {
-        label: isSelf ? 'Manage My Account' : 'Manage Account',
+        label: canManage ? (isSelf ? 'Manage My Account' : 'Manage Account') : 'View Account Details',
         className: 'btn',
         onClick: () => {
           closeDataDetail();
@@ -7384,6 +7444,10 @@ if (closeModalBtn) {
 const editBtn = document.getElementById('modal-edit-btn');
 if (editBtn) {
   editBtn.addEventListener('click', () => {
+    if (!canModifyUserAccounts(cachedSessionUser)) {
+      showToast('Forbidden: Nurses cannot modify user accounts.', 'error');
+      return;
+    }
     if (!currentAccountData) return;
     setAccountEditMode(true);
   });
@@ -7393,6 +7457,10 @@ if (editBtn) {
 const deleteBtn = document.getElementById('modal-delete-btn');
 if (deleteBtn) {
   deleteBtn.addEventListener('click', () => {
+    if (!canModifyUserAccounts(cachedSessionUser)) {
+      showToast('Forbidden: Nurses cannot delete user accounts.', 'error');
+      return;
+    }
     if (isSelfUser(currentAccountData)) {
       showToast('Guardrail Active: You cannot delete your own account.', 'warning');
       return;
@@ -7407,6 +7475,10 @@ if (deleteBtn) {
 const resetPasswordBtn = document.getElementById('modal-reset-password-btn');
 if (resetPasswordBtn) {
   resetPasswordBtn.addEventListener('click', async () => {
+    if (!canModifyUserAccounts(cachedSessionUser)) {
+      showToast('Forbidden: Nurses cannot reset user passwords.', 'error');
+      return;
+    }
     if (!currentAccountData || !currentAccountData.id) {
       showToast('Unable to reset password: missing account id.', 'error');
       return;
@@ -7459,6 +7531,14 @@ if (confirmBtn) {
   confirmBtn.addEventListener('click', async () => {
     if (currentAction === 'delete') {
       try {
+        if (!canModifyUserAccounts(cachedSessionUser)) {
+          showToast('Forbidden: Nurses cannot delete user accounts.', 'error');
+          document.getElementById('modal-confirm-section').style.display = 'none';
+          document.getElementById('modal-actions').style.display = 'flex';
+          currentAction = null;
+          return;
+        }
+
         if (!currentAccountData || !currentAccountData.id) {
           showToast('Unable to delete: missing account id.', 'error');
           return;
@@ -7516,6 +7596,12 @@ const modalSaveBtn = document.getElementById('modal-save-btn');
 if (modalSaveBtn) {
   modalSaveBtn.addEventListener('click', async (event) => {
     event.preventDefault();
+    if (!canModifyUserAccounts(cachedSessionUser)) {
+      setModalEditError('Forbidden: Nurses cannot modify user accounts.');
+      showToast('Forbidden: Nurses cannot modify user accounts.', 'error');
+      return;
+    }
+
     if (!currentAccountData || !currentAccountData.id) {
       setModalEditError('Missing account id.');
       return;
@@ -9151,15 +9237,182 @@ function initMedicineSection() {
   }
 }
 
+// Philippine Primary Healthcare Formulary & Standard Clinical Catalog
+const CLINICAL_FORMULARY = [
+  // Antibiotics & Anti-infectives
+  { name: 'Amoxicillin 500 mg Capsule', category: 'Antibiotic (Penicillin)', unit: 'capsule', defaultDosage: '500 mg', defaultFrequency: 'TID', defaultDuration: '7 days' },
+  { name: 'Amoxicillin 250 mg / 5 mL Suspension', category: 'Antibiotic (Pediatric)', unit: 'bottle', defaultDosage: '5 mL', defaultFrequency: 'TID', defaultDuration: '7 days' },
+  { name: 'Co-amoxiclav 625 mg Tablet', category: 'Broad-Spectrum Antibiotic', unit: 'tablet', defaultDosage: '625 mg', defaultFrequency: 'BID', defaultDuration: '7 days' },
+  { name: 'Co-amoxiclav 312.5 mg / 5 mL Suspension', category: 'Antibiotic (Pediatric)', unit: 'bottle', defaultDosage: '5 mL', defaultFrequency: 'BID', defaultDuration: '7 days' },
+  { name: 'Cefalexin 500 mg Capsule', category: 'Cephalosporin Antibiotic', unit: 'capsule', defaultDosage: '500 mg', defaultFrequency: 'QID', defaultDuration: '7 days' },
+  { name: 'Cefalexin 250 mg / 5 mL Suspension', category: 'Antibiotic (Pediatric)', unit: 'bottle', defaultDosage: '5 mL', defaultFrequency: 'QID', defaultDuration: '7 days' },
+  { name: 'Cefixime 200 mg Capsule', category: 'Cephalosporin Antibiotic', unit: 'capsule', defaultDosage: '200 mg', defaultFrequency: 'BID', defaultDuration: '7 days' },
+  { name: 'Azithromycin 500 mg Tablet', category: 'Macrolide Antibiotic', unit: 'tablet', defaultDosage: '500 mg', defaultFrequency: 'OD', defaultDuration: '3 days' },
+  { name: 'Ciprofloxacin 500 mg Tablet', category: 'Quinolone Antibiotic', unit: 'tablet', defaultDosage: '500 mg', defaultFrequency: 'BID', defaultDuration: '7 days' },
+  { name: 'Doxycycline 100 mg Capsule', category: 'Tetracycline Antibiotic', unit: 'capsule', defaultDosage: '100 mg', defaultFrequency: 'BID', defaultDuration: '7 days' },
+  { name: 'Metronidazole 500 mg Tablet', category: 'Antiprotozoal / Antibacterial', unit: 'tablet', defaultDosage: '500 mg', defaultFrequency: 'TID', defaultDuration: '7 days' },
+  { name: 'Co-trimoxazole 800/160 mg Tablet', category: 'Antibacterial', unit: 'tablet', defaultDosage: '1 tablet', defaultFrequency: 'BID', defaultDuration: '7 days' },
+  { name: 'Clindamycin 300 mg Capsule', category: 'Lincosamide Antibiotic', unit: 'capsule', defaultDosage: '300 mg', defaultFrequency: 'TID', defaultDuration: '7 days' },
+  { name: 'Erythromycin 500 mg Tablet', category: 'Macrolide Antibiotic', unit: 'tablet', defaultDosage: '500 mg', defaultFrequency: 'QID', defaultDuration: '7 days' },
+
+  // Analgesics, Antipyretics & Anti-inflammatories
+  { name: 'Paracetamol 500 mg Tablet', category: 'Analgesic / Antipyretic', unit: 'tablet', defaultDosage: '500 mg', defaultFrequency: 'Q4H PRN', defaultDuration: '3 days' },
+  { name: 'Paracetamol 250 mg / 5 mL Syrup', category: 'Pediatric Antipyretic', unit: 'bottle', defaultDosage: '5 mL', defaultFrequency: 'Q4H PRN', defaultDuration: '3 days' },
+  { name: 'Paracetamol 120 mg / 5 mL Drops', category: 'Infant Antipyretic', unit: 'bottle', defaultDosage: '1 mL', defaultFrequency: 'Q4H PRN', defaultDuration: '3 days' },
+  { name: 'Ibuprofen 400 mg Tablet', category: 'NSAID / Anti-inflammatory', unit: 'tablet', defaultDosage: '400 mg', defaultFrequency: 'TID PC', defaultDuration: '5 days' },
+  { name: 'Ibuprofen 200 mg / 5 mL Suspension', category: 'Pediatric NSAID', unit: 'bottle', defaultDosage: '5 mL', defaultFrequency: 'TID PC', defaultDuration: '5 days' },
+  { name: 'Mefenamic Acid 500 mg Capsule', category: 'Analgesic / NSAID', unit: 'capsule', defaultDosage: '500 mg', defaultFrequency: 'TID PC', defaultDuration: '5 days' },
+  { name: 'Celecoxib 200 mg Capsule', category: 'COX-2 Inhibitor NSAID', unit: 'capsule', defaultDosage: '200 mg', defaultFrequency: 'OD PC', defaultDuration: '7 days' },
+  { name: 'Tramadol 50 mg Capsule', category: 'Opioid Analgesic', unit: 'capsule', defaultDosage: '50 mg', defaultFrequency: 'BID PRN', defaultDuration: '3 days' },
+  { name: 'Aspirin 80 mg Tablet', category: 'Antiplatelet', unit: 'tablet', defaultDosage: '80 mg', defaultFrequency: 'OD PC', defaultDuration: '30 days' },
+
+  // Cardiovascular & Antihypertensives
+  { name: 'Amlodipine 5 mg Tablet', category: 'Antihypertensive (CCB)', unit: 'tablet', defaultDosage: '5 mg', defaultFrequency: 'OD', defaultDuration: '30 days' },
+  { name: 'Amlodipine 10 mg Tablet', category: 'Antihypertensive (CCB)', unit: 'tablet', defaultDosage: '10 mg', defaultFrequency: 'OD', defaultDuration: '30 days' },
+  { name: 'Losartan 50 mg Tablet', category: 'Antihypertensive (ARB)', unit: 'tablet', defaultDosage: '50 mg', defaultFrequency: 'OD', defaultDuration: '30 days' },
+  { name: 'Losartan 100 mg Tablet', category: 'Antihypertensive (ARB)', unit: 'tablet', defaultDosage: '100 mg', defaultFrequency: 'OD', defaultDuration: '30 days' },
+  { name: 'Metoprolol Tartrate 50 mg Tablet', category: 'Beta-Blocker', unit: 'tablet', defaultDosage: '50 mg', defaultFrequency: 'BID', defaultDuration: '30 days' },
+  { name: 'Carvedilol 25 mg Tablet', category: 'Beta-Blocker', unit: 'tablet', defaultDosage: '25 mg', defaultFrequency: 'BID', defaultDuration: '30 days' },
+  { name: 'Enalapril 10 mg Tablet', category: 'ACE Inhibitor', unit: 'tablet', defaultDosage: '10 mg', defaultFrequency: 'OD', defaultDuration: '30 days' },
+  { name: 'Captopril 25 mg Tablet', category: 'ACE Inhibitor', unit: 'tablet', defaultDosage: '25 mg', defaultFrequency: 'BID', defaultDuration: '30 days' },
+  { name: 'Atorvastatin 20 mg Tablet', category: 'Lipid-lowering (Statin)', unit: 'tablet', defaultDosage: '20 mg', defaultFrequency: 'OD HS', defaultDuration: '30 days' },
+  { name: 'Atorvastatin 40 mg Tablet', category: 'Lipid-lowering (Statin)', unit: 'tablet', defaultDosage: '40 mg', defaultFrequency: 'OD HS', defaultDuration: '30 days' },
+  { name: 'Simvastatin 20 mg Tablet', category: 'Lipid-lowering (Statin)', unit: 'tablet', defaultDosage: '20 mg', defaultFrequency: 'OD HS', defaultDuration: '30 days' },
+  { name: 'Furosemide 40 mg Tablet', category: 'Loop Diuretic', unit: 'tablet', defaultDosage: '40 mg', defaultFrequency: 'OD AM', defaultDuration: '14 days' },
+  { name: 'Hydrochlorothiazide 25 mg Tablet', category: 'Thiazide Diuretic', unit: 'tablet', defaultDosage: '25 mg', defaultFrequency: 'OD AM', defaultDuration: '30 days' },
+  { name: 'Clonidine 75 mcg Tablet', category: 'Central Alpha Agonist', unit: 'tablet', defaultDosage: '75 mcg', defaultFrequency: 'PRN for BP spike', defaultDuration: '5 days' },
+
+  // Antidiabetic Agents
+  { name: 'Metformin 500 mg Tablet', category: 'Oral Antidiabetic', unit: 'tablet', defaultDosage: '500 mg', defaultFrequency: 'BID PC', defaultDuration: '30 days' },
+  { name: 'Metformin 850 mg Tablet', category: 'Oral Antidiabetic', unit: 'tablet', defaultDosage: '850 mg', defaultFrequency: 'BID PC', defaultDuration: '30 days' },
+  { name: 'Gliclazide 30 mg MR Tablet', category: 'Oral Antidiabetic', unit: 'tablet', defaultDosage: '30 mg', defaultFrequency: 'OD AC', defaultDuration: '30 days' },
+  { name: 'Gliclazide 80 mg Tablet', category: 'Oral Antidiabetic', unit: 'tablet', defaultDosage: '80 mg', defaultFrequency: 'OD AC', defaultDuration: '30 days' },
+  { name: 'Glimepiride 2 mg Tablet', category: 'Oral Antidiabetic', unit: 'tablet', defaultDosage: '2 mg', defaultFrequency: 'OD AC', defaultDuration: '30 days' },
+
+  // Respiratory & Antihistamines
+  { name: 'Salbutamol 2 mg Tablet', category: 'Bronchodilator', unit: 'tablet', defaultDosage: '2 mg', defaultFrequency: 'TID', defaultDuration: '7 days' },
+  { name: 'Salbutamol 2 mg / 5 mL Syrup', category: 'Bronchodilator (Pediatric)', unit: 'bottle', defaultDosage: '5 mL', defaultFrequency: 'TID', defaultDuration: '7 days' },
+  { name: 'Salbutamol 1 mg / mL Nebule', category: 'Bronchodilator', unit: 'nebule', defaultDosage: '1 nebule', defaultFrequency: 'Q4H PRN', defaultDuration: '3 days' },
+  { name: 'Salbutamol + Ipratropium Nebule', category: 'Combination Bronchodilator', unit: 'nebule', defaultDosage: '1 nebule', defaultFrequency: 'Q6H PRN', defaultDuration: '3 days' },
+  { name: 'Cetirizine 10 mg Tablet', category: 'Antihistamine', unit: 'tablet', defaultDosage: '10 mg', defaultFrequency: 'OD HS', defaultDuration: '7 days' },
+  { name: 'Cetirizine 5 mg / 5 mL Syrup', category: 'Antihistamine (Pediatric)', unit: 'bottle', defaultDosage: '5 mL', defaultFrequency: 'OD HS', defaultDuration: '7 days' },
+  { name: 'Loratadine 10 mg Tablet', category: 'Antihistamine', unit: 'tablet', defaultDosage: '10 mg', defaultFrequency: 'OD', defaultDuration: '7 days' },
+  { name: 'Diphenhydramine 50 mg Capsule', category: 'Antihistamine', unit: 'capsule', defaultDosage: '50 mg', defaultFrequency: 'OD HS', defaultDuration: '5 days' },
+  { name: 'Lagundi 600 mg Tablet', category: 'Herbal Antitussive', unit: 'tablet', defaultDosage: '600 mg', defaultFrequency: 'TID', defaultDuration: '7 days' },
+  { name: 'Lagundi 300 mg / 5 mL Syrup', category: 'Herbal Antitussive (Pediatric)', unit: 'bottle', defaultDosage: '5 mL', defaultFrequency: 'TID', defaultDuration: '7 days' },
+  { name: 'Carbocisteine 500 mg Capsule', category: 'Mucolytic', unit: 'capsule', defaultDosage: '500 mg', defaultFrequency: 'TID', defaultDuration: '7 days' },
+  { name: 'Carbocisteine 250 mg / 5 mL Syrup', category: 'Mucolytic (Pediatric)', unit: 'bottle', defaultDosage: '5 mL', defaultFrequency: 'TID', defaultDuration: '7 days' },
+  { name: 'Dextromethorphan 15 mg / 5 mL Syrup', category: 'Antitussive', unit: 'bottle', defaultDosage: '5 mL', defaultFrequency: 'TID', defaultDuration: '5 days' },
+
+  // Gastrointestinal
+  { name: 'Omeprazole 20 mg Capsule', category: 'Proton Pump Inhibitor', unit: 'capsule', defaultDosage: '20 mg', defaultFrequency: 'OD AC', defaultDuration: '14 days' },
+  { name: 'Omeprazole 40 mg Capsule', category: 'Proton Pump Inhibitor', unit: 'capsule', defaultDosage: '40 mg', defaultFrequency: 'OD AC', defaultDuration: '14 days' },
+  { name: 'Ranitidine / Famotidine 20 mg Tablet', category: 'H2 Receptor Blocker', unit: 'tablet', defaultDosage: '20 mg', defaultFrequency: 'BID AC', defaultDuration: '14 days' },
+  { name: 'Aluminum Hydroxide + Magnesium Hydroxide Tablet', category: 'Antacid', unit: 'tablet', defaultDosage: '1 tablet', defaultFrequency: 'TID PC', defaultDuration: '5 days' },
+  { name: 'Aluminum Hydroxide + Magnesium Hydroxide Suspension', category: 'Antacid Suspension', unit: 'bottle', defaultDosage: '10 mL', defaultFrequency: 'TID PC', defaultDuration: '5 days' },
+  { name: 'Hyoscine N-butylbromide 10 mg Tablet', category: 'Antispasmodic', unit: 'tablet', defaultDosage: '10 mg', defaultFrequency: 'TID PRN', defaultDuration: '3 days' },
+  { name: 'Oral Rehydration Salts (ORS) Sachet', category: 'Electrolyte Replenisher', unit: 'sachet', defaultDosage: '1 sachet in 1L water', defaultFrequency: 'PRN after stool', defaultDuration: '3 days' },
+  { name: 'Loperamide 2 mg Capsule', category: 'Antidiarrheal', unit: 'capsule', defaultDosage: '2 mg', defaultFrequency: 'PRN after loose stool', defaultDuration: '2 days' },
+  { name: 'Metoclopramide 10 mg Tablet', category: 'Antiemetic / Prokinetic', unit: 'tablet', defaultDosage: '10 mg', defaultFrequency: 'TID AC', defaultDuration: '3 days' },
+
+  // Vitamins, Minerals & Topicals
+  { name: 'Ascorbic Acid (Vit C) 500 mg Tablet', category: 'Vitamin Supplement', unit: 'tablet', defaultDosage: '500 mg', defaultFrequency: 'OD', defaultDuration: '30 days' },
+  { name: 'Ascorbic Acid 100 mg / 5 mL Syrup', category: 'Pediatric Vitamin', unit: 'bottle', defaultDosage: '5 mL', defaultFrequency: 'OD', defaultDuration: '30 days' },
+  { name: 'Ferrous Sulfate + Folic Acid Tablet', category: 'Iron / Prenatal Supplement', unit: 'tablet', defaultDosage: '1 tablet', defaultFrequency: 'OD', defaultDuration: '30 days' },
+  { name: 'Multivitamins Capsule', category: 'Multivitamin Supplement', unit: 'capsule', defaultDosage: '1 capsule', defaultFrequency: 'OD', defaultDuration: '30 days' },
+  { name: 'Calcium Carbonate 500 mg Tablet', category: 'Mineral Supplement', unit: 'tablet', defaultDosage: '500 mg', defaultFrequency: 'OD PC', defaultDuration: '30 days' },
+  { name: 'Zinc Sulfate 55 mg / 5 mL Syrup', category: 'Pediatric Supplement', unit: 'bottle', defaultDosage: '5 mL', defaultFrequency: 'OD', defaultDuration: '14 days' },
+  { name: 'Mupirocin 2% Ointment', category: 'Topical Antibacterial', unit: 'tube', defaultDosage: 'apply to affected area', defaultFrequency: 'TID', defaultDuration: '7 days' },
+  { name: 'Hydrocortisone 1% Cream', category: 'Topical Corticosteroid', unit: 'tube', defaultDosage: 'apply thinly', defaultFrequency: 'BID', defaultDuration: '7 days' },
+  { name: 'Betamethasone 0.1% Cream', category: 'Topical Corticosteroid', unit: 'tube', defaultDosage: 'apply thinly', defaultFrequency: 'BID', defaultDuration: '7 days' },
+  { name: 'Silver Sulfadiazine 1% Cream', category: 'Topical Burn Antibacterial', unit: 'tube', defaultDosage: 'apply to burn wound', defaultFrequency: 'OD', defaultDuration: '7 days' }
+];
+
+function getAllMedicineCatalog() {
+  const catalogMap = new Map();
+
+  // 1. Add baseline clinical formulary entries
+  for (const item of CLINICAL_FORMULARY) {
+    const key = item.name.toLowerCase().trim();
+    catalogMap.set(key, {
+      name: item.name,
+      category: item.category || 'Clinical Formulary',
+      unit: item.unit || '',
+      defaultDosage: item.defaultDosage || '',
+      defaultFrequency: item.defaultFrequency || 'OD',
+      defaultDuration: item.defaultDuration || '7 days',
+      inDispensary: false,
+      qty: 0,
+      dbId: null
+    });
+  }
+
+  // 2. Merge dispensary inventory from `medicines`
+  if (Array.isArray(medicines) && medicines.length > 0) {
+    for (const med of medicines) {
+      if (!med || !med.name) continue;
+      const key = med.name.toLowerCase().trim();
+
+      // Look for exact or partial match
+      let targetKey = null;
+      if (catalogMap.has(key)) {
+        targetKey = key;
+      } else {
+        for (const fKey of catalogMap.keys()) {
+          if (fKey.includes(key) || key.includes(fKey)) {
+            targetKey = fKey;
+            break;
+          }
+        }
+      }
+
+      if (targetKey) {
+        const entry = catalogMap.get(targetKey);
+        entry.inDispensary = true;
+        entry.qty = Number(med.qty) || 0;
+        entry.dbId = med.id;
+        if (med.unit && !entry.unit) entry.unit = med.unit;
+      } else {
+        catalogMap.set(key, {
+          name: med.name,
+          category: 'Dispensary Stock',
+          unit: med.unit || '',
+          defaultDosage: '',
+          defaultFrequency: 'OD',
+          defaultDuration: '7 days',
+          inDispensary: true,
+          qty: Number(med.qty) || 0,
+          dbId: med.id
+        });
+      }
+    }
+  }
+
+  return Array.from(catalogMap.values());
+}
+
+function populateMedicineDatalist() {
+  const medicineList = document.getElementById('medicine-list');
+  if (!medicineList) return;
+
+  const catalog = getAllMedicineCatalog();
+  catalog.sort((a, b) => a.name.localeCompare(b.name));
+
+  medicineList.innerHTML = catalog.map(item => {
+    let extra = item.category || '';
+    if (item.inDispensary) {
+      extra += ` • Stock: ${item.qty} ${item.unit || ''}`.trim();
+    }
+    return `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}${extra ? ' — ' + escapeHtml(extra) : ''}</option>`;
+  }).join('');
+}
+
 function renderMedicines() {
+  // Always update datalists and catalogs across the app regardless of current tab/table
+  populateMedicineDatalist();
+
   if (!medicineTbody) return;
   initMedicineSection();
-
-  // Update datalist for prescriptions
-  const medicineList = document.getElementById('medicine-list');
-  if (medicineList) {
-    medicineList.innerHTML = medicines.map(m => `<option value="${m.name}">${m.name} (${m.unit || ''})</option>`).join('');
-  }
 
   // Calculate Telemetry across ALL active medicines
   const now = new Date();
@@ -10143,6 +10396,12 @@ async function openPrescriptionModalForPatient(patientId = '', consultationDbId 
     }
   }
 
+  // Ensure medicine catalog datalist is populated and latest stock is fetched
+  populateMedicineDatalist();
+  if (!medicines || medicines.length === 0) {
+    refreshMedicineData().catch(() => null);
+  }
+
   if (prescriptionLines) {
     prescriptionLines.innerHTML = '';
     addPrescriptionLine();
@@ -10186,9 +10445,10 @@ function addPrescriptionLine() {
   line.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
   line.innerHTML = `
     <div style="display: grid; grid-template-columns: 2fr 0.6fr 1fr 1fr 1fr auto; gap: 10px; align-items: end;">
-      <div class="field" style="margin: 0;">
+      <div class="field medicine-autocomplete-container" style="margin: 0; position: relative;">
         <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Medicine Name</label>
-        <input type="text" class="pres-med" list="medicine-list" placeholder="Search medicine..." style="width: 100%; height: 38px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 8px;" required />
+        <input type="text" class="pres-med" autocomplete="off" placeholder="Search medicine (e.g. Amoxicillin)..." style="width: 100%; height: 38px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 8px;" required />
+        <div class="medicine-autocomplete-dropdown" style="display: none;"></div>
       </div>
       <div class="field" style="margin: 0;">
         <label class="inputLabel" style="font-size: 11px; margin-bottom: 4px;">Qty</label>
@@ -10216,9 +10476,12 @@ function addPrescriptionLine() {
   prescriptionLines.appendChild(line);
 
   const qtyInput = line.querySelector('.pres-qty');
+  const dosageInput = line.querySelector('.pres-dosage');
   const freqInput = line.querySelector('.pres-freq');
   const durInput = line.querySelector('.pres-duration');
   const medInput = line.querySelector('.pres-med');
+  const container = line.querySelector('.medicine-autocomplete-container');
+  const dropdown = line.querySelector('.medicine-autocomplete-dropdown');
 
   // Inline real-time allergy error message container
   const errorContainer = document.createElement('div');
@@ -10227,7 +10490,7 @@ function addPrescriptionLine() {
   errorContainer.style.color = '#ef4444';
   errorContainer.style.marginTop = '4px';
   errorContainer.style.display = 'none';
-  medInput.parentNode.appendChild(errorContainer);
+  container.appendChild(errorContainer);
 
   const checkAllergy = () => {
     const medName = medInput.value.toLowerCase().trim();
@@ -10259,9 +10522,6 @@ function addPrescriptionLine() {
     }
   };
 
-  medInput.addEventListener('input', checkAllergy);
-  medInput.addEventListener('change', checkAllergy);
-
   const updateQty = () => {
     const freq = freqInput.value;
     const dur = durInput.value;
@@ -10271,12 +10531,182 @@ function addPrescriptionLine() {
     }
   };
 
+  // --- Medicine Autocomplete Dropdown Logic ---
+  let currentMatches = [];
+  let highlightedIndex = -1;
+
+  const closeDropdown = () => {
+    if (dropdown) {
+      dropdown.classList.remove('is-open');
+      dropdown.style.display = 'none';
+    }
+    highlightedIndex = -1;
+    currentMatches = [];
+  };
+
+  const renderSuggestions = () => {
+    const rawVal = medInput.value.trim().toLowerCase();
+    const catalog = getAllMedicineCatalog();
+
+    if (!rawVal) {
+      currentMatches = catalog.slice(0, 15);
+    } else {
+      const exactStarts = [];
+      const wordStarts = [];
+      const substringMatches = [];
+      const categoryMatches = [];
+
+      for (const item of catalog) {
+        const nameLower = item.name.toLowerCase();
+        const catLower = (item.category || '').toLowerCase();
+
+        if (nameLower.startsWith(rawVal)) {
+          exactStarts.push(item);
+        } else if (nameLower.split(/\s+/).some(w => w.startsWith(rawVal))) {
+          wordStarts.push(item);
+        } else if (nameLower.includes(rawVal)) {
+          substringMatches.push(item);
+        } else if (catLower.includes(rawVal)) {
+          categoryMatches.push(item);
+        }
+      }
+
+      currentMatches = [...exactStarts, ...wordStarts, ...substringMatches, ...categoryMatches].slice(0, 20);
+    }
+
+    if (currentMatches.length === 0) {
+      dropdown.innerHTML = `<div style="padding: 10px 12px; font-size: 12px; color: #64748b; text-align: center;">No standard medicines matched "${escapeHtml(medInput.value)}".<br><span style="font-size: 11px; color: #94a3b8;">You may proceed typing to prescribe a custom item.</span></div>`;
+    } else {
+      dropdown.innerHTML = currentMatches.map((item, idx) => {
+        let badgeHtml = '';
+        if (item.inDispensary) {
+          if (item.qty <= 0) {
+            badgeHtml = `<span class="medicine-suggestion-badge" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;">Out of Stock</span>`;
+          } else if (item.qty <= 5) {
+            badgeHtml = `<span class="medicine-suggestion-badge badge-low-stock">Low Stock: ${item.qty} ${escapeHtml(item.unit || '')}</span>`;
+          } else {
+            badgeHtml = `<span class="medicine-suggestion-badge badge-in-stock">In Stock: ${item.qty} ${escapeHtml(item.unit || '')}</span>`;
+          }
+        } else {
+          badgeHtml = `<span class="medicine-suggestion-badge badge-formulary">Clinical Formulary</span>`;
+        }
+
+        const dosageSnippet = item.defaultDosage ? ` • ${escapeHtml(item.defaultDosage)}` : '';
+        const freqSnippet = item.defaultFrequency ? ` (${escapeHtml(item.defaultFrequency)})` : '';
+
+        return `
+          <div class="medicine-suggestion-item" data-index="${idx}">
+            <div class="medicine-suggestion-info">
+              <span class="medicine-suggestion-name">${escapeHtml(item.name)}</span>
+              <span class="medicine-suggestion-meta">${escapeHtml(item.category || '')}${dosageSnippet}${freqSnippet}</span>
+            </div>
+            ${badgeHtml}
+          </div>
+        `;
+      }).join('');
+    }
+
+    dropdown.classList.add('is-open');
+    dropdown.style.display = 'block';
+    highlightedIndex = -1;
+  };
+
+  const selectSuggestion = (item) => {
+    if (!item) return;
+    medInput.value = item.name;
+    if (dosageInput && item.defaultDosage && !dosageInput.value) {
+      dosageInput.value = item.defaultDosage;
+    }
+    if (freqInput && item.defaultFrequency && !freqInput.value) {
+      freqInput.value = item.defaultFrequency;
+    }
+    if (durInput && item.defaultDuration && !durInput.value) {
+      durInput.value = item.defaultDuration;
+    }
+    closeDropdown();
+    updateQty();
+    checkAllergy();
+  };
+
+  const updateHighlight = (items) => {
+    items.forEach((it, idx) => {
+      if (idx === highlightedIndex) {
+        it.classList.add('is-active');
+        it.scrollIntoView({ block: 'nearest' });
+      } else {
+        it.classList.remove('is-active');
+      }
+    });
+  };
+
+  medInput.addEventListener('focus', renderSuggestions);
+
+  medInput.addEventListener('input', () => {
+    renderSuggestions();
+    checkAllergy();
+  });
+
+  medInput.addEventListener('change', checkAllergy);
+
+  dropdown.addEventListener('mousedown', (e) => {
+    // Prevent medInput blur so click on suggestion executes cleanly
+    e.preventDefault();
+  });
+
+  dropdown.addEventListener('click', (e) => {
+    const itemEl = e.target.closest('.medicine-suggestion-item');
+    if (itemEl && itemEl.dataset.index !== undefined) {
+      const idx = parseInt(itemEl.dataset.index, 10);
+      if (currentMatches[idx]) {
+        selectSuggestion(currentMatches[idx]);
+      }
+    }
+  });
+
+  medInput.addEventListener('keydown', (e) => {
+    if (!dropdown.classList.contains('is-open') || currentMatches.length === 0) {
+      if (e.key === 'ArrowDown') {
+        renderSuggestions();
+      }
+      return;
+    }
+
+    const items = dropdown.querySelectorAll('.medicine-suggestion-item');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      highlightedIndex = (highlightedIndex + 1) % items.length;
+      updateHighlight(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      highlightedIndex = (highlightedIndex - 1 + items.length) % items.length;
+      updateHighlight(items);
+    } else if (e.key === 'Enter') {
+      if (highlightedIndex >= 0 && currentMatches[highlightedIndex]) {
+        e.preventDefault();
+        selectSuggestion(currentMatches[highlightedIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      closeDropdown();
+    }
+  });
+
+  // Global click to close dropdown when clicking outside line
+  const onDocClick = (e) => {
+    if (!container.contains(e.target)) {
+      closeDropdown();
+    }
+  };
+  document.addEventListener('click', onDocClick);
+
   freqInput.addEventListener('input', updateQty);
   durInput.addEventListener('input', updateQty);
   freqInput.addEventListener('change', updateQty);
   durInput.addEventListener('change', updateQty);
 
-  line.querySelector('[data-action="remove-line"]').addEventListener('click', () => line.remove());
+  line.querySelector('[data-action="remove-line"]').addEventListener('click', () => {
+    document.removeEventListener('click', onDocClick);
+    line.remove();
+  });
 }
 
 if (addPrescriptionLineBtn) {
@@ -10339,11 +10769,12 @@ if (prescriptionForm) {
         patientId: patient,
         consultationDbId: Number(prescriptionForm.dataset.consultationDbId || '0') || null,
         items: items.map((it) => {
-          const med = medicines.find((m) => String(m.name || '') === String(it.name || ''));
+          const med = medicines.find((m) => String(m.name || '').toLowerCase() === String(it.name || '').toLowerCase());
+          const catItem = !med ? getAllMedicineCatalog().find((c) => String(c.name || '').toLowerCase() === String(it.name || '').toLowerCase()) : null;
           return { 
             name: it.name, 
             qty: it.qty, 
-            unit: med?.unit || '', 
+            unit: med?.unit || catItem?.unit || '', 
             dosage: it.dosage, 
             frequency: it.frequency,
             duration: it.duration,

@@ -1812,7 +1812,6 @@
                   id="summary-break-count">0</strong> On Break</span>
               <span class="roster-summary-pill pill-off"><span class="roster-pill-dot"></span> <strong
                   id="summary-off-count">0</strong> Off Duty</span>
-              <span class="roster-summary-pill"><strong id="summary-total-count">0</strong> Clinical Staff</span>
             </div>
           </div>
 
@@ -3670,7 +3669,7 @@
             </div>
           </div>
 
-          <form id="modal-edit-form" class="hidden">
+          <form id="modal-edit-form" class="hidden admin-only">
             <div class="modal-group">
               <label class="modal-label" for="modal-edit-first-name">First Name</label>
               <input id="modal-edit-first-name" class="search-input" type="text" required />
@@ -3712,12 +3711,12 @@
 
           <p id="modal-edit-error" class="note hidden" style="color:#b91c1c; margin-top:8px;"></p>
           <div class="actions" id="modal-actions">
-            <button id="modal-edit-btn" class="btn">Edit</button>
-            <button id="modal-reset-password-btn" class="btn">Reset Password</button>
-            <button id="modal-delete-btn" class="btn btn-delete">Delete</button>
+            <button id="modal-edit-btn" class="btn admin-only">Edit</button>
+            <button id="modal-reset-password-btn" class="btn admin-only">Reset Password</button>
+            <button id="modal-delete-btn" class="btn btn-delete admin-only">Delete</button>
             <button id="modal-close-btn" class="btn btn-close">Close</button>
           </div>
-          <div class="actions hidden" id="modal-edit-actions">
+          <div class="actions hidden admin-only" id="modal-edit-actions">
             <button id="modal-save-btn" class="btn">Save</button>
             <button id="modal-cancel-edit-btn" class="btn btn-close">Cancel</button>
           </div>
@@ -4120,7 +4119,77 @@
             </form>
 
             <!-- Predefined clinical suggestions -->
-            <datalist id="medicine-list"></datalist>
+            <datalist id="medicine-list">
+              <option value="Amoxicillin 500 mg Capsule">Amoxicillin 500mg • Antibiotic</option>
+              <option value="Amoxicillin 250 mg / 5 mL Suspension">Amoxicillin 250mg/5mL • Pediatric Antibiotic</option>
+              <option value="Co-amoxiclav 625 mg Tablet">Co-amoxiclav 625mg • Broad-Spectrum Antibiotic</option>
+              <option value="Cefalexin 500 mg Capsule">Cefalexin 500mg • Antibiotic (Cephalosporin)</option>
+              <option value="Azithromycin 500 mg Tablet">Azithromycin 500mg • Macrolide Antibiotic</option>
+              <option value="Ciprofloxacin 500 mg Tablet">Ciprofloxacin 500mg • Quinolone Antibiotic</option>
+              <option value="Doxycycline 100 mg Capsule">Doxycycline 100mg • Tetracycline Antibiotic</option>
+              <option value="Metronidazole 500 mg Tablet">Metronidazole 500mg • Antiprotozoal / Antibacterial</option>
+              <option value="Co-trimoxazole 800/160 mg Tablet">Co-trimoxazole 800/160mg • Antibacterial</option>
+              <option value="Clindamycin 300 mg Capsule">Clindamycin 300mg • Lincosamide Antibiotic</option>
+              <option value="Erythromycin 500 mg Tablet">Erythromycin 500mg • Macrolide Antibiotic</option>
+              <option value="Paracetamol 500 mg Tablet">Paracetamol 500mg • Analgesic / Antipyretic</option>
+              <option value="Paracetamol 250 mg / 5 mL Syrup">Paracetamol 250mg/5mL • Pediatric Syrup</option>
+              <option value="Paracetamol 120 mg / 5 mL Drops">Paracetamol 120mg/5mL • Infant Drops</option>
+              <option value="Ibuprofen 400 mg Tablet">Ibuprofen 400mg • NSAID / Anti-inflammatory</option>
+              <option value="Ibuprofen 200 mg / 5 mL Suspension">Ibuprofen 200mg/5mL • Pediatric Suspension</option>
+              <option value="Mefenamic Acid 500 mg Capsule">Mefenamic Acid 500mg • Analgesic / NSAID</option>
+              <option value="Celecoxib 200 mg Capsule">Celecoxib 200mg • COX-2 Inhibitor NSAID</option>
+              <option value="Tramadol 50 mg Capsule">Tramadol 50mg • Opioid Analgesic</option>
+              <option value="Aspirin 80 mg Tablet">Aspirin 80mg • Antiplatelet</option>
+              <option value="Amlodipine 5 mg Tablet">Amlodipine 5mg • Antihypertensive (CCB)</option>
+              <option value="Amlodipine 10 mg Tablet">Amlodipine 10mg • Antihypertensive (CCB)</option>
+              <option value="Losartan 50 mg Tablet">Losartan 50mg • Antihypertensive (ARB)</option>
+              <option value="Losartan 100 mg Tablet">Losartan 100mg • Antihypertensive (ARB)</option>
+              <option value="Metoprolol Tartrate 50 mg Tablet">Metoprolol 50mg • Beta-Blocker</option>
+              <option value="Carvedilol 25 mg Tablet">Carvedilol 25mg • Beta-Blocker / Vasodilator</option>
+              <option value="Enalapril 10 mg Tablet">Enalapril 10mg • ACE Inhibitor</option>
+              <option value="Captopril 25 mg Tablet">Captopril 25mg • ACE Inhibitor</option>
+              <option value="Atorvastatin 20 mg Tablet">Atorvastatin 20mg • Statin / Lipid-lowering</option>
+              <option value="Simvastatin 20 mg Tablet">Simvastatin 20mg • Statin / Lipid-lowering</option>
+              <option value="Furosemide 40 mg Tablet">Furosemide 40mg • Loop Diuretic</option>
+              <option value="Hydrochlorothiazide 25 mg Tablet">Hydrochlorothiazide 25mg • Thiazide Diuretic</option>
+              <option value="Clonidine 75 mcg Tablet">Clonidine 75mcg • Central Alpha Agonist</option>
+              <option value="Metformin 500 mg Tablet">Metformin 500mg • Antidiabetic (Biguanide)</option>
+              <option value="Metformin 850 mg Tablet">Metformin 850mg • Antidiabetic (Biguanide)</option>
+              <option value="Gliclazide 30 mg MR Tablet">Gliclazide 30mg MR • Sulfonylurea Antidiabetic</option>
+              <option value="Gliclazide 80 mg Tablet">Gliclazide 80mg • Sulfonylurea Antidiabetic</option>
+              <option value="Salbutamol 2 mg Tablet">Salbutamol 2mg • Bronchodilator</option>
+              <option value="Salbutamol 2 mg / 5 mL Syrup">Salbutamol 2mg/5mL • Pediatric Bronchodilator</option>
+              <option value="Salbutamol Nebule 2.5 mg / 2.5 mL">Salbutamol Nebule • Inhalation Solution</option>
+              <option value="Cetirizine 10 mg Tablet">Cetirizine 10mg • Antihistamine</option>
+              <option value="Cetirizine 5 mg / 5 mL Syrup">Cetirizine 5mg/5mL • Pediatric Antihistamine</option>
+              <option value="Loratadine 10 mg Tablet">Loratadine 10mg • Non-sedating Antihistamine</option>
+              <option value="Diphenhydramine 25 mg Capsule">Diphenhydramine 25mg • Antihistamine</option>
+              <option value="Prednisone 20 mg Tablet">Prednisone 20mg • Corticosteroid</option>
+              <option value="Prednisone 5 mg Tablet">Prednisone 5mg • Corticosteroid</option>
+              <option value="Montelukast 10 mg Tablet">Montelukast 10mg • Leukotriene Receptor Antagonist</option>
+              <option value="Carbocisteine 500 mg Capsule">Carbocisteine 500mg • Mucolytic</option>
+              <option value="Lagundi 600 mg Tablet">Lagundi 600mg • Herbal Cough Relief</option>
+              <option value="Omeprazole 20 mg Capsule">Omeprazole 20mg • Proton Pump Inhibitor</option>
+              <option value="Omeprazole 40 mg Capsule">Omeprazole 40mg • Proton Pump Inhibitor</option>
+              <option value="Aluminum Hydroxide + Magnesium Hydroxide Tablet">Antacid (AlOH + MgOH) • Chewable</option>
+              <option value="Domperidone 10 mg Tablet">Domperidone 10mg • Antiemetic / Prokinetic</option>
+              <option value="Metoclopramide 10 mg Tablet">Metoclopramide 10mg • Antiemetic</option>
+              <option value="Hyoscine N-butylbromide 10 mg Tablet">Hyoscine N-butylbromide 10mg • Antispasmodic</option>
+              <option value="Oral Rehydration Salts (ORS) Sachet">ORS Sachet • Electrolyte Replacement</option>
+              <option value="Loperamide 2 mg Capsule">Loperamide 2mg • Antimotility</option>
+              <option value="Ascorbic Acid (Vitamin C) 500 mg Tablet">Vitamin C 500mg • Nutritional Supplement</option>
+              <option value="Multivitamins + Iron Capsule">Multivitamins with Iron • Nutritional</option>
+              <option value="Ferrous Sulfate 325 mg Tablet">Ferrous Sulfate 325mg • Iron Supplement</option>
+              <option value="Folic Acid 5 mg Tablet">Folic Acid 5mg • Prenatal / Hematologic</option>
+              <option value="Calcium Carbonate 500 mg Tablet">Calcium Carbonate 500mg • Mineral Supplement</option>
+              <option value="Vitamin B-Complex Tablet">Vitamin B-Complex • Neurotropic Vitamins</option>
+              <option value="Zinc Sulfate 20 mg Tablet">Zinc Sulfate 20mg • Mineral Supplement</option>
+              <option value="Mupirocin 2% Ointment">Mupirocin 2% • Topical Antibiotic</option>
+              <option value="Silver Sulfadiazine 1% Cream">Silver Sulfadiazine 1% • Burn Wound Care</option>
+              <option value="Hydrocortisone 1% Cream">Hydrocortisone 1% • Topical Anti-inflammatory</option>
+              <option value="Betamethasone 0.1% Cream">Betamethasone 0.1% • Topical Corticosteroid</option>
+              <option value="Neomycin + Polymyxin Eye Drops">Neomycin + Polymyxin • Ophthalmic Solution</option>
+            </datalist>
 
             <datalist id="dosage-list">
               <option value="500 mg">

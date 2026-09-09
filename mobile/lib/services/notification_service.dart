@@ -18,11 +18,24 @@ class NotificationService {
 
     tz.initializeTimeZones();
     try {
-      final tzName = DateTime.now().timeZoneName;
-      try {
-        tz.setLocalLocation(tz.getLocation(tzName));
-      } catch (_) {
+      final now = DateTime.now();
+      final offsetHours = now.timeZoneOffset.inHours;
+      // If the device is in UTC+8 (Manila standard time), use Asia/Manila directly
+      if (offsetHours == 8) {
         tz.setLocalLocation(tz.getLocation('Asia/Manila'));
+      } else {
+        final tzName = now.timeZoneName;
+        try {
+          final loc = tz.getLocation(tzName);
+          final tzOffset = tz.TZDateTime.now(loc).timeZoneOffset.inHours;
+          if (tzOffset == offsetHours) {
+            tz.setLocalLocation(loc);
+          } else {
+            tz.setLocalLocation(tz.getLocation('Asia/Manila'));
+          }
+        } catch (_) {
+          tz.setLocalLocation(tz.getLocation('Asia/Manila'));
+        }
       }
     } catch (_) {
       try {
@@ -195,9 +208,11 @@ class NotificationService {
   /// without affecting clinic alerts or other notification channels.
   static Future<void> cancelMedicineReminders() async {
     if (kIsWeb) return;
+    final futures = <Future<void>>[];
     for (int i = 0; i < maxMedicineNotifications; i++) {
-      await _notificationsPlugin.cancel(id: medicineIdOffset + i);
+      futures.add(_notificationsPlugin.cancel(id: medicineIdOffset + i));
     }
+    await Future.wait(futures);
   }
 
   static Future<void> cancelAll() async {

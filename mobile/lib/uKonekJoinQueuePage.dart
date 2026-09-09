@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:ukonekmobile/uKonekDashboardPage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/api_service.dart';
+import 'services/notification_service.dart';
+import 'uKonekDashboardPage.dart';
 import 'uKonekMedicineScheduler.dart';
 import 'uKonekProfilePage.dart';
 import 'utils/app_transitions.dart';
@@ -18,7 +22,6 @@ class _C {
   static const textDark    = Color(0xFF1B2E1E);
   static const textMuted   = Color(0xFF637367);
   static const fieldBorder = Color(0xFFDCEDDF);
-  static const fieldBg     = Color(0xFFF8FCF9);
   static const success     = Color(0xFF28A745);
   static const warning     = Color(0xFFF59E0B);
   static const danger      = Color(0xFFDC3545);
@@ -60,6 +63,15 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
   final _symptomsController = TextEditingController();
   bool _isSubmitting = false;
 
+  // Tracking & completion state
+  int? _activeQueueId;
+  String? _activeServiceLabel;
+  int? _activeQueueNumber;
+  String? _activeTicketCode;
+  bool _isShowingDoneModal = false;
+  bool _userManuallyCancelled = false;
+  RealtimeChannel? _queueRealtimeChannel;
+
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
 
@@ -70,7 +82,6 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _loadInitialData();
     _animController.forward();
-    // Timer will be started only when citizen has active queue ticket
   }
 
   void _loadInitialData() {
@@ -82,9 +93,17 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
     _dashboardFuture.then((snapshot) {
       if (!mounted) return;
       if (snapshot.hasActiveQueue) {
+        _activeQueueId = snapshot.queueId;
+        _activeServiceLabel = snapshot.serviceLabel;
+        _activeQueueNumber = snapshot.myQueueNumber;
+        _activeTicketCode = snapshot.ticketCode;
+        _userManuallyCancelled = false;
+        _subscribeQueueRealtime(snapshot.queueId);
         _startRefreshTimer();
       } else {
         _stopRefreshTimer();
+        _unsubscribeQueueRealtime();
+        _checkRecentCompletedTicket();
       }
     });
     
@@ -101,9 +120,56 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
     }
   }
 
+  void _subscribeQueueRealtime(int? ticketId) {
+    if (ticketId == null) return;
+    _unsubscribeQueueRealtime();
+
+    try {
+      final client = Supabase.instance.client;
+      _queueRealtimeChannel = client
+          .channel('queue_ticket_$ticketId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'queue_tickets',
+            callback: (payload) {
+              final rec = payload.newRecord;
+              if (rec.isEmpty) return;
+              final id = (rec['id'] as num?)?.toInt();
+              if (id != ticketId) return;
+
+              final status = (rec['status'] ?? '').toString().toLowerCase().trim();
+              if (status == 'completed') {
+                _handleConsultationDone(
+                  ticketId: id!,
+                  serviceLabel: rec['service_label']?.toString() ?? _activeServiceLabel ?? 'Consultation',
+                  queueNumber: (rec['queue_number'] as num?)?.toInt() ?? _activeQueueNumber ?? 0,
+                  ticketCode: rec['ticket_code']?.toString() ?? _activeTicketCode ?? '',
+                );
+              } else {
+                _refreshDashboard();
+              }
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('Error subscribing to queue realtime: $e');
+    }
+  }
+
+  void _unsubscribeQueueRealtime() {
+    if (_queueRealtimeChannel != null) {
+      try {
+        Supabase.instance.client.removeChannel(_queueRealtimeChannel!);
+      } catch (_) {}
+      _queueRealtimeChannel = null;
+    }
+  }
+
   void _startRefreshTimer() {
     _refreshTimer?.cancel();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) => _refreshDashboard());
+    // Fast 6-second polling while queue ticket is active for prompt status updates
+    _refreshTimer = Timer.periodic(const Duration(seconds: 6), (_) => _refreshDashboard());
   }
 
   void _stopRefreshTimer() {
@@ -118,19 +184,336 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
       _limiterStatusFuture = ApiService.getQueueLimiterStatus();
     });
     
-    // Re-check if we should continue refreshing
-    _dashboardFuture.then((snapshot) {
+    // Re-check if we should continue refreshing or if ticket completed
+    _dashboardFuture.then((snapshot) async {
       if (!mounted) return;
       if (snapshot.hasActiveQueue) {
+        _activeQueueId = snapshot.queueId;
+        _activeServiceLabel = snapshot.serviceLabel;
+        _activeQueueNumber = snapshot.myQueueNumber;
+        _activeTicketCode = snapshot.ticketCode;
+        _userManuallyCancelled = false;
         if (_refreshTimer == null) _startRefreshTimer();
+        if (_queueRealtimeChannel == null) _subscribeQueueRealtime(snapshot.queueId);
       } else {
         _stopRefreshTimer();
+        _unsubscribeQueueRealtime();
+
+        // If we previously had an active ticket and the citizen did NOT manually leave:
+        if (_activeQueueId != null && !_userManuallyCancelled && !_isShowingDoneModal) {
+          final prevId = _activeQueueId!;
+          final prevService = _activeServiceLabel ?? 'Consultation';
+          final prevNum = _activeQueueNumber ?? 0;
+          final prevCode = _activeTicketCode ?? '';
+
+          final ticketInfo = await ApiService.getTicketStatus(prevId);
+          final status = ticketInfo?['status']?.toString().toLowerCase().trim();
+          if (status == 'completed') {
+            _handleConsultationDone(
+              ticketId: prevId,
+              serviceLabel: ticketInfo?['service_label']?.toString() ?? prevService,
+              queueNumber: (ticketInfo?['queue_number'] as num?)?.toInt() ?? prevNum,
+              ticketCode: ticketInfo?['ticket_code']?.toString() ?? prevCode,
+            );
+          } else {
+            _activeQueueId = null;
+          }
+        }
       }
     });
   }
 
+  Future<void> _checkRecentCompletedTicket() async {
+    if (_isShowingDoneModal || !mounted) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastAck = prefs.getInt('last_acknowledged_completed_ticket_id');
+      final completedTicket = await ApiService.getCompletedQueueTicket();
+      if (completedTicket != null && mounted) {
+        final ticketId = (completedTicket['id'] as num?)?.toInt();
+        if (ticketId != null && ticketId != lastAck) {
+          final completedAtStr = completedTicket['completed_at']?.toString();
+          if (completedAtStr != null) {
+            final completedAt = DateTime.tryParse(completedAtStr);
+            if (completedAt != null && DateTime.now().difference(completedAt.toLocal()).inHours < 2) {
+              _handleConsultationDone(
+                ticketId: ticketId,
+                serviceLabel: completedTicket['service_label']?.toString() ?? 'Consultation',
+                queueNumber: (completedTicket['queue_number'] as num?)?.toInt() ?? 0,
+                ticketCode: completedTicket['ticket_code']?.toString() ?? '',
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking recent completed ticket: $e');
+    }
+  }
+
+  Future<void> _handleConsultationDone({
+    required int ticketId,
+    required String serviceLabel,
+    required int queueNumber,
+    required String ticketCode,
+  }) async {
+    if (_isShowingDoneModal || !mounted) return;
+    _isShowingDoneModal = true;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('last_acknowledged_completed_ticket_id', ticketId);
+
+      // Erase all inputs in the queue tracker
+      _clearFormInputs();
+      _activeQueueId = null;
+      _activeServiceLabel = null;
+      _activeQueueNumber = null;
+      _activeTicketCode = null;
+
+      // Notify citizen immediately
+      NotificationService.showImmediateNotification(
+        id: 890,
+        title: 'Consultation Completed!',
+        body: 'Your consultation for $serviceLabel has been completed. Prescriptions & instructions are ready.',
+        payload: '{"action":"consultation_done"}',
+      );
+
+      // Pop up the completion modal
+      await _showConsultationDoneModal(
+        serviceLabel: serviceLabel,
+        queueNumber: queueNumber,
+        ticketCode: ticketCode,
+      );
+    } finally {
+      _isShowingDoneModal = false;
+    }
+  }
+
+  void _clearFormInputs() {
+    if (!mounted) return;
+    setState(() {
+      _selectedService = null;
+      _citizenType = 'regular';
+      _reasonController.clear();
+      _symptomsController.clear();
+    });
+  }
+
+  void _navigateToMainMenu() {
+    if (widget.isEmbeddedInShell) {
+      uKonekMainShellPage.switchTab(context, 0);
+      uKonekMainShellPage.checkPrescriptions(context);
+    } else if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _showConsultationDoneModal({
+    required String serviceLabel,
+    required int queueNumber,
+    required String ticketCode,
+  }) async {
+    if (!mounted) return;
+
+    HapticFeedback.heavyImpact();
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return PopScope(
+          canPop: false,
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Container(
+              padding: const EdgeInsets.all(26),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: _C.primaryMid.withOpacity(0.18),
+                    blurRadius: 32,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Animated celebratory green icon
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFA5D6A7), width: 2),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.check_circle_rounded,
+                        color: Color(0xFF2E7D32),
+                        size: 46,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Title
+                  const Text(
+                    'Consultation Done!',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: _C.textDark,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Subtitle
+                  const Text(
+                    'Your consultation has been successfully completed by the clinic doctor.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _C.textMuted,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Details card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FCF9),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE2E9E3)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Service',
+                              style: TextStyle(fontSize: 12, color: _C.textMuted, fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              serviceLabel,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _C.textDark),
+                            ),
+                          ],
+                        ),
+                        if (queueNumber > 0) ...[
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Queue Number',
+                                style: TextStyle(fontSize: 12, color: _C.textMuted, fontWeight: FontWeight.w600),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _C.primaryLight,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '#${queueNumber.toString().padLeft(3, '0')}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: _C.primaryMid),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Status',
+                              style: TextStyle(fontSize: 12, color: _C.textMuted, fontWeight: FontWeight.w600),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'COMPLETED',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF15803D)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Health records note
+                  const Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 16, color: _C.primaryMid),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Prescriptions and instructions have been updated in your records.',
+                          style: TextStyle(fontSize: 11.5, color: _C.textMuted, height: 1.3),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Primary Button -> Return to Main Menu
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(dialogCtx).pop();
+                        _navigateToMainMenu();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _C.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.home_rounded, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Back to Main Menu',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
+    _unsubscribeQueueRealtime();
     _refreshTimer?.cancel();
     _animController.dispose();
     _reasonController.dispose();
@@ -198,6 +581,7 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
     if (_reasonController.text.trim().isEmpty) return _showSnack('Reason for visit is required.', isError: true);
     setState(() => _isSubmitting = true);
     try {
+      _userManuallyCancelled = false;
       await ApiService.joinQueue(QueueJoinRequest(
         serviceKey:   _selectedService!.serviceKey,
         serviceLabel: _selectedService!.serviceLabel,
@@ -259,15 +643,21 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
     );
     if (confirm != true) return;
     try {
+      _userManuallyCancelled = true;
       final success = await ApiService.cancelMyQueue();
       if (success) {
+        _unsubscribeQueueRealtime();
         _stopRefreshTimer(); // Stop auto-refresh after leaving queue
+        _activeQueueId = null;
+        _clearFormInputs();
         _refreshDashboard();
         _showSnack('You have left the queue.');
       } else {
+        _userManuallyCancelled = false;
         _showSnack('Unable to cancel ticket. Please refresh.', isError: true);
       }
     } catch (e) {
+      _userManuallyCancelled = false;
       _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
