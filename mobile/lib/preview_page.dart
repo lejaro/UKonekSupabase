@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'uKonekOtpPage.dart';
+import 'otp_page.dart';
 import 'utils/app_transitions.dart';
 
 class uKonekPreviewPage extends StatelessWidget {

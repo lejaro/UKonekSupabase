@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'uKonekMenuPage.dart';
+import 'menu_page.dart';
 
 // ── Shared design tokens ───────────────────────────────────────
 class _C {

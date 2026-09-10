@@ -1,20 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'services/api_service.dart';
+import 'core/theme/app_colors.dart';
 
-class _C {
-  static const primary      = Color(0xFF059669);
-  static const primaryMid   = Color(0xFF064E3B);
-  static const primaryLight = Color(0xFFECFDF5);
-  static const bg           = Color(0xFFF8FAFC);
-  static const surface      = Colors.white;
-  static const textDark     = Color(0xFF0F172A);
-  static const textMuted    = Color(0xFF64748B);
-  static const divider      = Color(0xFFE2E8F0);
-  static const success      = Color(0xFF10B981);
-  static const warning      = Color(0xFFF59E0B);
-  static const shadow       = Color(0x080F172A);
-}
+typedef _C = AppColors;
+
 
 // ── Groups all items under a single prescription header ──────────
 class _PrescriptionGroup {

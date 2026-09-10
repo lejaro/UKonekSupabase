@@ -2,11 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'services/api_service.dart';
-import 'uKonekDashboardPage.dart';
-import 'uKonekMainShellPage.dart';
-import 'package:ukonekmobile/uKonekRegistration/uKonekRegisterWrapper.dart';
-import 'uKonekMenuPage.dart';
-import 'uKonekForgotPasswordPage.dart';
+import 'dashboard_page.dart';
+import 'main_shell_page.dart';
+import 'registration/register_wrapper.dart';
+import 'menu_page.dart';
+import 'forgot_password_page.dart';
 import 'utils/app_transitions.dart';
 
 class uKonekLoginPage extends StatefulWidget {

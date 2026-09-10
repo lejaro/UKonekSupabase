@@ -6,11 +6,11 @@ import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'services/medicine_cache_service.dart';
 import 'utils/app_transitions.dart';
-import 'uKonekPrescriptionPage.dart';
-import 'uKonekDashboardPage.dart';
-import 'uKonekMedicineScheduler.dart';
-import 'uKonekJoinQueuePage.dart';
-import 'uKonekProfilePage.dart';
+import 'prescription_page.dart';
+import 'dashboard_page.dart';
+import 'medicine_scheduler_page.dart';
+import 'join_queue_page.dart';
+import 'profile_page.dart';
 
 /// Unified persistent App Shell for uKonek.
 /// Hosts Dashboard, Medicine Scheduler, Queue, and Profile tabs without route pushing.

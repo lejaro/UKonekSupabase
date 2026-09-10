@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'services/api_service.dart';
-import 'uKonekCredentialsPage.dart';
+import 'credentials_page.dart';
 import 'utils/app_transitions.dart';
 
 class uKonekOtpPage extends StatefulWidget {

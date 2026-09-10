@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
-import 'uKonekLoginPage.dart';
+import 'login_page.dart';
 import 'utils/app_transitions.dart';
 
 class uKonekChangePasswordPage extends StatefulWidget {

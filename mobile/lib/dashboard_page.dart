@@ -3,33 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'services/api_service.dart';
-import 'uKonekJoinQueuePage.dart';
-import 'uKonekHealthRecordsPage.dart';
-import 'uKonekProfilePage.dart';
-import 'uKonekFeedbackPage.dart';
-import 'uKonekMedicineScheduler.dart';
-import 'uKonekNotificationPage.dart';
+import 'join_queue_page.dart';
+import 'health_records_page.dart';
+import 'profile_page.dart';
+import 'feedback_page.dart';
+import 'medicine_scheduler_page.dart';
+import 'notification_page.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'uKonekPrescriptionPage.dart';
+import 'prescription_page.dart';
 import 'services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'utils/app_transitions.dart';
-import 'uKonekDoctorSchedulesPage.dart';
-import 'uKonekMainShellPage.dart';
+import 'doctor_schedules_page.dart';
+import 'main_shell_page.dart';
+import 'core/theme/app_colors.dart';
 
-class _C {
-  static const primary      = Color(0xFF059669); // Emerald 600
-  static const primaryMid   = Color(0xFF064E3B); // Forest Emerald 900
-  static const primaryLight = Color(0xFFECFDF5); // Mint 50
-  static const bg           = Color(0xFFF8FAFC); // Slate 50
-  static const surface      = Colors.white;
-  static const textDark     = Color(0xFF0F172A); // Slate 900
-  static const textMuted    = Color(0xFF64748B); // Slate 500
-  static const divider      = Color(0xFFE2E8F0); // Slate 200
-  static const success      = Color(0xFF10B981);
-  static const warning      = Color(0xFFF59E0B);
-  static const shadow       = Color(0x080F172A);
-}
+typedef _C = AppColors;
+
 
 class _SkeletonPulse extends StatefulWidget {
   final Widget child;

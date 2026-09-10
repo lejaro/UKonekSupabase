@@ -6,27 +6,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
-import 'uKonekDashboardPage.dart';
-import 'uKonekMedicineScheduler.dart';
-import 'uKonekProfilePage.dart';
+import 'dashboard_page.dart';
+import 'medicine_scheduler_page.dart';
+import 'profile_page.dart';
 import 'utils/app_transitions.dart';
-import 'uKonekMainShellPage.dart';
+import 'main_shell_page.dart';
 
-// ── Design Tokens ─────────────────────────────────────────────
-class _C {
-  static const primary     = Color(0xFF059669);
-  static const primaryMid  = Color(0xFF064E3B);
-  static const primaryLight= Color(0xFFECFDF5);
-  static const bg          = Color(0xFFF8FAFC);
-  static const surface     = Colors.white;
-  static const textDark    = Color(0xFF0F172A);
-  static const textMuted   = Color(0xFF64748B);
-  static const fieldBorder = Color(0xFFE2E8F0);
-  static const success     = Color(0xFF10B981);
-  static const warning     = Color(0xFFF59E0B);
-  static const danger      = Color(0xFFDC3545);
-  static const shadow      = Color(0x080F172A);
-}
+import 'core/theme/app_colors.dart';
+
+typedef _C = AppColors;
+
 
 class uKonekJoinQueuePage extends StatefulWidget {
   final String username;

@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'uKonekDashboardPage.dart';
-import 'uKonekJoinQueuePage.dart';
-import 'uKonekProfilePage.dart';
+import 'dashboard_page.dart';
+import 'join_queue_page.dart';
+import 'profile_page.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'services/medicine_cache_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'utils/app_transitions.dart';
+
+import 'core/theme/app_colors.dart';
 
 class uKonekMedicineSchedulerPage extends StatefulWidget {
   final String username;
@@ -29,12 +31,12 @@ class uKonekMedicineSchedulerPage extends StatefulWidget {
 }
 
 class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPage> with WidgetsBindingObserver {
-  static const Color _primary    = Color(0xFF059669);
-  static const Color _primaryMid = Color(0xFF064E3B);
-  static const Color _bg         = Color(0xFFF8FAFC);
-  static const Color _textDark   = Color(0xFF0F172A);
-  static const Color _textMuted  = Color(0xFF64748B);
-  static const Color _fieldBdr   = Color(0xFFE2E8F0);
+  static const Color _primary    = AppColors.primary;
+  static const Color _primaryMid = AppColors.primaryMid;
+  static const Color _bg         = AppColors.bg;
+  static const Color _textDark   = AppColors.textDark;
+  static const Color _textMuted  = AppColors.textMuted;
+  static const Color _fieldBdr   = AppColors.fieldBdr;
 
   int _selectedTab = 1;
 

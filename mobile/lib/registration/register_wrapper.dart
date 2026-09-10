@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ukonekmobile/uKonekPreviewPage.dart';
+import '../preview_page.dart';
 import '../utils/app_transitions.dart';
 import 'steps/personal_info_step.dart';
 import 'steps/contact_address_step.dart';

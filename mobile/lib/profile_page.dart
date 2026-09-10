@@ -1,31 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'uKonekMenuPage.dart';
+import 'menu_page.dart';
 import 'services/api_service.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'uKonekMedicineScheduler.dart';  // ✅ added
-import 'uKonekJoinQueuePage.dart';
-import 'uKonekDashboardPage.dart';
+import 'medicine_scheduler_page.dart';
+import 'join_queue_page.dart';
+import 'dashboard_page.dart';
 import 'utils/app_transitions.dart';
-import 'uKonekMainShellPage.dart';
+import 'main_shell_page.dart';
 
-// ── Design tokens ──────────────────────────────────────────────
-class _C {
-  static const primary     = Color(0xFF059669);
-  static const primaryMid  = Color(0xFF064E3B);
-  static const accent      = Color(0xFF10B981);
-  static const bg          = Color(0xFFF8FAFC);
-  static const surface     = Colors.white;
-  static const textDark    = Color(0xFF0F172A);
-  static const textMuted   = Color(0xFF64748B);
-  static const divider     = Color(0xFFE2E8F0);
-  static const success     = Color(0xFF10B981);
-  static const warning     = Color(0xFFF59E0B);
-  static const shadow      = Color(0x080F172A);
-  static const fieldBg     = Color(0xFFF8FAFC);
-  static const fieldBdr    = Color(0xFFE2E8F0);
-}
+import 'core/theme/app_colors.dart';
+
+typedef _C = AppColors;
+
 
 class uKonekProfilePage extends StatefulWidget {
   final String username;

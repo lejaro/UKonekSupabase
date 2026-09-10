@@ -5,7 +5,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../uKonekMedicineScheduler.dart';
+import '../medicine_scheduler_page.dart';
 import '../utils/app_transitions.dart';
 
 class NotificationService {

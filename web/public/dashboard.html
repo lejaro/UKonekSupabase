@@ -7,825 +7,8 @@
   <title>U-Konek+ — Dashboard</title>
   <link rel="stylesheet" href="../src/css/style.css?v=20260902d" />
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    .stats-chart-panel {
-      margin-top: 20px;
-      padding: 24px 26px 26px !important;
-      border-radius: 20px;
-    }
-
-    .stats-chart-panel .panel-head {
-      margin-bottom: 16px;
-      padding-bottom: 2px;
-    }
-
-    .stats-chart-content {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: stretch;
-      gap: 22px;
-      padding: 4px 0 0;
-    }
-
-    .stats-chart-visual-area {
-      flex: 0 0 310px;
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 14px;
-    }
-
-    .stats-chart-visual {
-      width: 100%;
-      box-sizing: border-box;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      padding: 20px 20px 18px;
-      border-radius: 18px;
-      border: 1px solid rgba(148, 163, 184, 0.3);
-      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-      box-shadow: 0 4px 18px -2px rgba(15, 23, 42, 0.05);
-    }
-
-    .stats-chart-canvas {
-      width: 185px;
-      height: 185px;
-      max-width: 100%;
-      filter: drop-shadow(0 6px 16px rgba(15, 23, 42, 0.08));
-    }
-
-    .stats-chart-panel .note {
-      margin: 4px 0 0;
-      font-size: 12px;
-      color: #64748b;
-      text-align: center;
-      line-height: 1.4;
-    }
-
-    .stats-chart-legend {
-      width: 100%;
-      box-sizing: border-box;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      padding: 0;
-      margin: 0;
-      list-style: none;
-    }
-
-    .stats-chart-legend li {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: #0f172a;
-      padding: 8px 12px;
-      border: 1px solid rgba(15, 23, 42, 0.08);
-      border-radius: 10px;
-      background: #ffffff;
-      justify-content: space-between;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-    }
-
-    .stats-chart-label {
-      flex: 1;
-      color: #475569;
-      font-weight: 600;
-      font-size: 11.5px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .stats-chart-value {
-      font-weight: 800;
-      color: #0f172a;
-      font-size: 12.5px;
-    }
-
-    .stats-chart-dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 999px;
-      display: inline-flex;
-      flex-shrink: 0;
-    }
-
-    /* Clinical Quick Action Launchpad */
-    .clinical-launchpad-area {
-      flex: 1 1 480px;
-      min-width: 320px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 20px;
-      padding: 20px 22px;
-    }
-
-    .launchpad-header {
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .launchpad-title-group h4 {
-      margin: 0;
-      font-size: 15.5px;
-      font-weight: 800;
-      color: #0f172a;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      letter-spacing: -0.01em;
-    }
-
-    .launchpad-title-group p {
-      margin: 3px 0 0;
-      font-size: 12px;
-      color: #64748b;
-    }
-
-    .launchpad-badge {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3.5px 10px;
-      border-radius: 9999px;
-      background: #dcfce7;
-      color: #166534;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .launchpad-pulse-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #16a34a;
-      animation: launchpadPulse 2s infinite;
-    }
-
-    @keyframes launchpadPulse {
-      0% {
-        opacity: 1;
-        transform: scale(1);
-      }
-
-      50% {
-        opacity: 0.35;
-        transform: scale(0.85);
-      }
-
-      100% {
-        opacity: 1;
-        transform: scale(1);
-      }
-    }
-
-    .clinical-launchpad-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 11px;
-      flex: 1;
-    }
-
-    .launchpad-action-card {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 14px;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 13px;
-      cursor: pointer;
-      text-decoration: none;
-      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
-    }
-
-    .launchpad-action-card:hover {
-      transform: translateY(-2px);
-      border-color: #cbd5e1;
-      box-shadow: 0 8px 18px -4px rgba(15, 23, 42, 0.08);
-      background: #ffffff;
-    }
-
-    .launchpad-card-icon {
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .launchpad-card-info {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .launchpad-card-title {
-      margin: 0;
-      font-size: 13px;
-      font-weight: 700;
-      color: #1e293b;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .launchpad-card-desc {
-      margin: 2px 0 0;
-      font-size: 11px;
-      color: #64748b;
-      line-height: 1.35;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .launchpad-card-arrow {
-      font-size: 13px;
-      color: #94a3b8;
-      transition: transform 0.18s ease, color 0.18s ease;
-    }
-
-    .launchpad-action-card:hover .launchpad-card-arrow {
-      color: #16a34a;
-      transform: translateX(3px);
-    }
-
-    @media (max-width: 900px) {
-      .stats-chart-content {
-        flex-direction: column;
-      }
-
-      .stats-chart-visual-area {
-        flex: 1 1 auto;
-        width: 100%;
-      }
-    }
-
-    @media (max-width: 600px) {
-      .clinical-launchpad-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .topbar-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: #475569;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-
-    .notif-panel {
-      position: fixed;
-      top: 64px;
-      right: 32px;
-      width: 320px;
-      max-height: 420px;
-      padding: 16px;
-      border-radius: 14px;
-      box-shadow: 0 18px 35px rgba(15, 23, 42, 0.18);
-      background: #fff;
-      border: 1px solid rgba(148, 163, 184, 0.4);
-      z-index: 1200;
-    }
-
-    .notif-panel.hidden {
-      display: none;
-    }
-
-    .notif-panel h4 {
-      margin: 0 0 8px 0;
-      font-size: 15px;
-    }
-
-    .notif-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      max-height: 280px;
-      overflow-y: auto;
-    }
-
-    .notif-list li {
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(226, 232, 240, 0.9);
-      font-size: 13px;
-    }
-
-    .notif-list li:last-child {
-      border-bottom: none;
-    }
-
-    .notif-type {
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #15803d;
-      display: inline-block;
-      margin-bottom: 2px;
-    }
-
-    .notif-meta {
-      display: block;
-      font-size: 12px;
-      color: #64748b;
-    }
-
-    #notif-close-btn {
-      margin-top: 12px;
-      width: 100%;
-    }
-
-    .queue-board {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 18px;
-      margin-top: 18px;
-      align-items: stretch;
-    }
-
-    .queue-lane {
-      border: 1.5px solid #e2e8f0;
-      border-radius: 16px;
-      background: #ffffff;
-      min-height: 420px;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      position: relative;
-    }
-
-    .queue-lane:hover {
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
-    }
-
-    .queue-lane::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-    }
-
-    .queue-lane--waiting::before {
-      background: #f59e0b;
-    }
-
-    .queue-lane--oncall::before {
-      background: #8b5cf6;
-    }
-
-    .queue-lane--serving::before {
-      background: #16a34a;
-    }
-
-    .queue-lane-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 14px 16px;
-      border-bottom: 1.5px solid #f1f5f9;
-      background: #fbfcfe;
-    }
-
-    .queue-lane-header h4 {
-      margin: 0;
-      font-size: 13.5px;
-      font-weight: 700;
-      color: #0f172a;
-      letter-spacing: 0.01em;
-    }
-
-    .queue-lane-count {
-      font-size: 11.5px;
-      font-weight: 700;
-      border-radius: 999px;
-      padding: 2px 10px;
-      min-width: 26px;
-      text-align: center;
-      border: 1px solid transparent;
-    }
-
-    .queue-lane-count--waiting {
-      background: #fef3c7;
-      color: #92400e;
-      border-color: #fde68a;
-    }
-
-    .queue-lane-count--oncall {
-      background: #ede9fe;
-      color: #5b21b6;
-      border-color: #ddd6fe;
-    }
-
-    .queue-lane-count--serving {
-      background: #dcfce7;
-      color: #166534;
-      border-color: #bbf7d0;
-    }
-
-    .queue-card-list {
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      min-height: 320px;
-      flex: 1;
-      background: #fafbfe;
-    }
-
-    .queue-card-list.is-drop-target {
-      background: rgba(22, 163, 74, 0.06);
-      border-radius: 12px;
-      outline: 2px dashed #16a34a;
-      outline-offset: -4px;
-    }
-
-    /* Modern Lane Empty States */
-    .queue-lane-empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 42px 18px;
-      margin: auto 0;
-      border: 2px dashed #e2e8f0;
-      border-radius: 14px;
-      background: #ffffff;
-      transition: all 0.2s ease;
-    }
-
-    .empty-state-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 12px;
-      transition: transform 0.2s ease;
-    }
-
-    .queue-lane-empty-state:hover .empty-state-icon {
-      transform: scale(1.08);
-    }
-
-    .empty-state-icon.waiting-icon {
-      background: #fef3c7;
-      border: 1px solid #fde68a;
-    }
-
-    .empty-state-icon.oncall-icon {
-      background: #ede9fe;
-      border: 1px solid #ddd6fe;
-    }
-
-    .empty-state-icon.serving-icon {
-      background: #dcfce7;
-      border: 1px solid #bbf7d0;
-    }
-
-    .empty-state-title {
-      font-size: 13.5px;
-      font-weight: 700;
-      color: #1e293b;
-      margin-bottom: 4px;
-    }
-
-    .empty-state-subtitle {
-      font-size: 11.5px;
-      color: #64748b;
-      line-height: 1.45;
-      max-width: 210px;
-    }
-
-    /* Queue Header Station Pill */
-    .queue-station-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      padding: 5px 13px;
-      border-radius: 9999px;
-      font-size: 12px;
-      font-weight: 700;
-      transition: all 0.2s ease;
-    }
-
-    .queue-station-pill.ready {
-      background: #f0fdf4;
-      color: #15803d;
-      border: 1px solid #bbf7d0;
-    }
-
-    .queue-station-pill.active {
-      background: #f0fdf4;
-      color: #15803d;
-      border: 1px solid #bbf7d0;
-      box-shadow: 0 0 10px rgba(22, 163, 74, 0.15);
-    }
-
-    .queue-station-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #22c55e;
-      display: inline-block;
-    }
-
-    .queue-station-pill.active .queue-station-dot {
-      background: #16a34a;
-      box-shadow: 0 0 6px rgba(22, 163, 74, 0.8);
-    }
-
-    .queue-summary-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 12px;
-      border-radius: 9999px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      color: #475569;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .queue-ticket-card {
-      border: 1px solid rgba(148, 163, 184, 0.3);
-      border-radius: 12px;
-      background: #ffffff;
-      padding: 12px;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
-      transition: box-shadow 0.15s ease, transform 0.15s ease;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-
-    .queue-ticket-card:hover {
-      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
-      transform: translateY(-1px);
-    }
-
-    .queue-ticket-card:active {
-      cursor: grabbing;
-    }
-
-    .queue-ticket-top {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-start;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 10px;
-    }
-
-    .queue-ticket-code {
-      font-size: 10px;
-      font-weight: 700;
-      color: #64748b;
-      background: #f1f5f9;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 2px 6px;
-      font-family: 'JetBrains Mono', monospace;
-      margin-left: auto;
-    }
-
-    .queue-ticket-queue {
-      font-size: 15px;
-      font-weight: 800;
-      color: #15803d;
-    }
-
-    .queue-ticket-name {
-      font-size: 14px;
-      font-weight: 700;
-      color: #0f172a;
-      margin-bottom: 3px;
-    }
-
-    .queue-ticket-meta {
-      font-size: 12px;
-      color: #64748b;
-      margin-bottom: 10px;
-    }
-
-    .queue-ticket-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      border-top: 1px solid #f1f5f9;
-      padding-top: 10px;
-      margin-top: 2px;
-    }
-
-    .queue-ticket-btn {
-      border: 1px solid #cbd5e1;
-      background: #f8fafc;
-      border-radius: 8px;
-      padding: 5px 10px;
-      font-size: 12px;
-      font-weight: 600;
-      color: #334155;
-      cursor: pointer;
-      transition: background 0.12s, border-color 0.12s;
-      white-space: nowrap;
-    }
-
-    .queue-ticket-btn:hover {
-      background: #e2e8f0;
-      border-color: #94a3b8;
-    }
-
-    .queue-ticket-empty {
-      text-align: center;
-      padding: 32px 10px;
-      color: #94a3b8;
-      font-size: 13px;
-    }
-
-    @media (max-width: 980px) {
-      .queue-board {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-
-    @media (max-width: 640px) {
-      .queue-board {
-        grid-template-columns: 1fr;
-      }
-
-      .panel-head {
-        flex-direction: column;
-        align-items: stretch !important;
-      }
-
-      #queue-refresh-btn,
-      #open-tv-view-btn {
-        width: 100%;
-        margin-left: 0 !important;
-      }
-    }
-
-    .queue-ticket-card.dragging {
-      opacity: 0.4;
-      transform: scale(0.95);
-      border: 2px dashed #16a34a;
-    }
-
-    .queue-card-list.drag-over {
-      background: rgba(22, 163, 74, 0.08) !important;
-      outline: 2px dashed #16a34a;
-      outline-offset: -4px;
-      border-radius: 12px;
-    }
-
-    .queue-ticket-btn.btn-vital {
-      background: #ecfdf5;
-      border-color: #6ee7b7;
-      color: #065f46;
-      font-weight: 700;
-    }
-
-    .queue-ticket-btn.btn-vital:hover {
-      background: #d1fae5;
-      border-color: #34d399;
-    }
-
-    .queue-ticket-btn.btn-consult {
-      background: #f0fdf4;
-      border-color: #bbf7d0;
-      color: #15803d;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .queue-ticket-btn.btn-consult:hover {
-      background: #dcfce7;
-      border-color: #86efac;
-      color: #166534;
-      transform: translateY(-1px);
-    }
-
-    .queue-vital-done-badge,
-    .vitals-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 10px;
-      font-weight: 800;
-      color: #065f46;
-      background: #d1fae5;
-      border: 1px solid #6ee7b7;
-      border-radius: 6px;
-      padding: 2px 6px;
-      text-transform: uppercase;
-      line-height: 1.2;
-    }
-
-    /* High-contrast Clinical Consultation Header */
-    .consult-modal-topbar {
-      padding: 16px 24px;
-      background: linear-gradient(135deg, #065f46 0%, #047857 50%, #0f766e 100%) !important;
-      color: #ffffff !important;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.18) !important;
-      box-shadow: 0 4px 12px rgba(6, 78, 59, 0.2) !important;
-    }
-
-    .consult-badge-pill {
-      font-size: 10.5px !important;
-      font-weight: 700 !important;
-      letter-spacing: 0.06em !important;
-      text-transform: uppercase !important;
-      color: #ffffff !important;
-      background: rgba(255, 255, 255, 0.22) !important;
-      border: 1px solid rgba(255, 255, 255, 0.35) !important;
-      padding: 2px 10px !important;
-      border-radius: 9999px !important;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
-    }
-
-    .consult-modal-topbar .modal-heading,
-    .consult-modal-topbar h3 {
-      color: #ffffff !important;
-      font-size: 19px !important;
-      font-weight: 700 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      border-bottom: none !important;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
-    }
-
-    .consult-patient-meta-pill {
-      background: rgba(0, 0, 0, 0.25) !important;
-      border: 1px solid rgba(255, 255, 255, 0.28) !important;
-      padding: 6px 16px !important;
-      border-radius: 9999px !important;
-      color: #ffffff !important;
-    }
-
-    .consult-patient-meta-pill .panel-hint,
-    .consult-patient-meta-pill span {
-      color: #f1f5f9 !important;
-      font-size: 13px !important;
-      font-weight: 500 !important;
-    }
-
-    .consult-patient-meta-pill #consult-display-id {
-      color: #fef08a !important;
-      font-weight: 700 !important;
-    }
-
-    .consult-modal-topbar .modal-close {
-      color: #ffffff !important;
-      font-size: 20px !important;
-      background: rgba(255, 255, 255, 0.18) !important;
-      border: 1px solid rgba(255, 255, 255, 0.3) !important;
-      border-radius: 50% !important;
-      width: 32px !important;
-      height: 32px !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      cursor: pointer !important;
-      opacity: 1 !important;
-      transition: all 0.18s ease !important;
-    }
-
-    .consult-modal-topbar .modal-close:hover {
-      background: rgba(255, 255, 255, 0.35) !important;
-      transform: scale(1.08) !important;
-    }
-
-    /* Prevent textareas from being expandable / resizable */
-    textarea,
-    .consult-dual-pane-modal textarea,
-    .consult-main-editor textarea,
-    .modal-box textarea {
-      resize: none !important;
-    }
-  </style>
+  <link rel="stylesheet" href="../src/css/dashboard-layout.css" />
+  <link rel="stylesheet" href="../src/css/print.css" media="print" />
 </head>
 
 <body>
@@ -1010,7 +193,7 @@
                 <div class="user-name"><span class="skeleton-shimmer user-name-skeleton"></span></div>
                 <div class="user-pos"><span class="skeleton-shimmer user-pos-skeleton"></span></div>
               </div>
-              <span class="profile-arrow" aria-hidden="true">▾</span>
+              <span class="profile-arrow" aria-hidden="true">â–¾</span>
             </button>
 
             <div id="user-profile-popover" class="user-profile-popover hidden" role="menu">
@@ -1077,7 +260,7 @@
           </div>
           <div class="hero-actions">
             <span class="panel-hint" id="dashboard-last-sync"
-              style="margin: 0 4px 0 0; font-size: 12.5px; color: #64748b;">Last synced: —</span>
+              style="margin: 0 4px 0 0; font-size: 12.5px; color: #64748b;">Last synced: â€”</span>
             <button id="dash-refresh-btn" class="chip-btn" title="Refresh dashboard data">Refresh Data</button>
           </div>
         </div>
@@ -1221,7 +404,7 @@
                     </svg>
                   </div>
                   <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Live Queue Call <span class="launchpad-card-arrow">→</span></div>
+                    <div class="launchpad-card-title">Live Queue Call <span class="launchpad-card-arrow">â†’</span></div>
                     <div class="launchpad-card-desc">Call next patient & triage intake</div>
                   </div>
                 </div>
@@ -1236,7 +419,7 @@
                     </svg>
                   </div>
                   <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Doctor Consultation <span class="launchpad-card-arrow">→</span>
+                    <div class="launchpad-card-title">Doctor Consultation <span class="launchpad-card-arrow">â†’</span>
                     </div>
                     <div class="launchpad-card-desc">Diagnose, clinical notes & Rx orders</div>
                   </div>
@@ -1250,7 +433,7 @@
                     </svg>
                   </div>
                   <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Triage & Vitals <span class="launchpad-card-arrow">→</span></div>
+                    <div class="launchpad-card-title">Triage & Vitals <span class="launchpad-card-arrow">â†’</span></div>
                     <div class="launchpad-card-desc">Scan citizen QR & record vitals</div>
                   </div>
                 </div>
@@ -1263,7 +446,7 @@
                     </svg>
                   </div>
                   <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Pharmacy & OTC <span class="launchpad-card-arrow">→</span></div>
+                    <div class="launchpad-card-title">Pharmacy & OTC <span class="launchpad-card-arrow">â†’</span></div>
                     <div class="launchpad-card-desc">Dispense doctor Rx or OTC meds</div>
                   </div>
                 </div>
@@ -1278,7 +461,7 @@
                     </svg>
                   </div>
                   <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Citizen Directory <span class="launchpad-card-arrow">→</span>
+                    <div class="launchpad-card-title">Citizen Directory <span class="launchpad-card-arrow">â†’</span>
                     </div>
                     <div class="launchpad-card-desc">Patient search & health histories</div>
                   </div>
@@ -1294,7 +477,7 @@
                     </svg>
                   </div>
                   <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Staff On-Duty <span class="launchpad-card-arrow">→</span></div>
+                    <div class="launchpad-card-title">Staff On-Duty <span class="launchpad-card-arrow">â†’</span></div>
                     <div class="launchpad-card-desc">Doctor & nurse active availability</div>
                   </div>
                 </div>
@@ -1316,15 +499,15 @@
               restricted to doctor accounts.</p>
             <div class="modal-group">
               <label class="modal-label">Username</label>
-              <p class="modal-text" id="non-admin-username">—</p>
+              <p class="modal-text" id="non-admin-username">â€”</p>
             </div>
             <div class="modal-group">
               <label class="modal-label">Role</label>
-              <p class="modal-text" id="non-admin-role">—</p>
+              <p class="modal-text" id="non-admin-role">â€”</p>
             </div>
             <div class="modal-group">
               <label class="modal-label">Email</label>
-              <p class="modal-text" id="non-admin-email">—</p>
+              <p class="modal-text" id="non-admin-email">â€”</p>
             </div>
           </div>
         </div>
@@ -1485,7 +668,7 @@
                       <th>Blood Pressure</th>
                       <th>Heart Rate</th>
                       <th>Temp</th>
-                      <th>SpO₂</th>
+                      <th>SpOâ‚‚</th>
                       <th>Triage Status</th>
                     </tr>
                   </thead>
@@ -2216,7 +1399,7 @@
                     <button type="button" class="ph-filter-chip is-active" data-rating="all">All Feedback</button>
                     <button type="button" class="ph-filter-chip" data-rating="5">5/5 Excellent</button>
                     <button type="button" class="ph-filter-chip" data-rating="4">4/5 Good</button>
-                    <button type="button" class="ph-filter-chip" data-rating="3">≤ 3/5 Needs Attention</button>
+                    <button type="button" class="ph-filter-chip" data-rating="3">â‰¤ 3/5 Needs Attention</button>
                   </div>
                 </div>
               </div>
@@ -2290,7 +1473,7 @@
                       <div>
                         <span
                           style="font-size: 11.5px; color: #9f1239; font-weight: 700; text-transform: uppercase; letter-spacing:0.04em;">Hypertensive
-                          Patients (BP ≥ 140/90)</span>
+                          Patients (BP â‰¥ 140/90)</span>
                         <div id="hypertension-count"
                           style="font-size: 26px; font-weight: 800; color: #be123c; margin-top: 4px;"><span
                             class="skeleton-shimmer stat-skeleton"></span></div>
@@ -2595,7 +1778,7 @@
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
               <span id="consult-desk-status-pill" class="consult-desk-pill ready">
                 <span class="consult-desk-dot"></span>
-                <span id="consult-desk-status-text">Station Ready • Waiting for Patient</span>
+                <span id="consult-desk-status-text">Station Ready â€¢ Waiting for Patient</span>
               </span>
               <button id="open-consult-modal-btn" class="chip-btn"
                 style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px;">
@@ -2686,7 +1869,7 @@
                 <select id="consult-sort-select" class="chip-btn chip-btn-outline">
                   <option value="date-desc">Newest First</option>
                   <option value="date-asc">Oldest First</option>
-                  <option value="name-asc">Name (A–Z)</option>
+                  <option value="name-asc">Name (Aâ€“Z)</option>
                 </select>
               </div>
               <button id="consult-date-clear" class="chip-btn chip-btn-outline" title="Clear date filter">Clear</button>
@@ -2726,7 +1909,7 @@
             </div>
             <div>
               <div class="ph-telemetry-lbl">Total Catalog</div>
-              <div class="ph-telemetry-val blue" id="ph-stat-total">—</div>
+              <div class="ph-telemetry-val blue" id="ph-stat-total">â€”</div>
               <div class="ph-telemetry-sub">Registered formulations</div>
             </div>
           </div>
@@ -2741,7 +1924,7 @@
             </div>
             <div>
               <div class="ph-telemetry-lbl">Adequate Stock</div>
-              <div class="ph-telemetry-val green" id="ph-stat-instock">—</div>
+              <div class="ph-telemetry-val green" id="ph-stat-instock">â€”</div>
               <div class="ph-telemetry-sub">Above safety threshold</div>
             </div>
           </div>
@@ -2757,8 +1940,8 @@
             </div>
             <div>
               <div class="ph-telemetry-lbl">Low Stock Alert</div>
-              <div class="ph-telemetry-val amber" id="ph-stat-low">—</div>
-              <div class="ph-telemetry-sub">≤ 5 units remaining</div>
+              <div class="ph-telemetry-val amber" id="ph-stat-low">â€”</div>
+              <div class="ph-telemetry-sub">â‰¤ 5 units remaining</div>
             </div>
           </div>
 
@@ -2774,7 +1957,7 @@
             </div>
             <div>
               <div class="ph-telemetry-lbl">Critical / Out of Stock</div>
-              <div class="ph-telemetry-val red" id="ph-stat-out">—</div>
+              <div class="ph-telemetry-val red" id="ph-stat-out">â€”</div>
               <div class="ph-telemetry-sub">Depleted or expired</div>
             </div>
           </div>
@@ -2894,7 +2077,7 @@
                 In Stock <span class="chip-count" id="chip-count-instock">0</span>
               </button>
               <button type="button" class="ph-filter-chip" data-filter="low_stock">
-                Low Stock (≤5) <span class="chip-count" id="chip-count-low">0</span>
+                Low Stock (â‰¤5) <span class="chip-count" id="chip-count-low">0</span>
               </button>
               <button type="button" class="ph-filter-chip" data-filter="expiring">
                 Expiring Soon <span class="chip-count" id="chip-count-expiring">0</span>
@@ -2979,7 +2162,7 @@
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <span id="queue-current-serving-badge" class="queue-station-pill ready">
                 <span class="queue-station-dot"></span>
-                <span>Station Ready • Queue Clear</span>
+                <span>Station Ready â€¢ Queue Clear</span>
               </span>
               <span id="queue-summary-badge" class="queue-summary-pill">
                 Waiting: 0 | On Call: 0 | Serving: 0
@@ -3119,8 +2302,8 @@
                 </svg>
               </div>
               <div class="patient-details">
-                <div class="patient-name" id="vital-modal-patient-name">—</div>
-                <div class="patient-meta" id="vital-modal-patient-meta">—</div>
+                <div class="patient-name" id="vital-modal-patient-name">â€”</div>
+                <div class="patient-meta" id="vital-modal-patient-meta">â€”</div>
               </div>
             </div>
             <div id="vital-modal-existing-badge" class="vital-update-badge" style="display:none;">
@@ -3129,7 +2312,7 @@
                 <line x1="12" y1="9" x2="12" y2="13" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
-              <span>Previous assessment found — submitting will update it</span>
+              <span>Previous assessment found â€” submitting will update it</span>
             </div>
           </div>
 
@@ -3149,7 +2332,7 @@
                 Patient Symptoms & Reason for Visit
               </label>
               <div id="va-patient-symptoms-display"
-                style="font-size:13px; color:#1b2e1e; font-weight:500; line-height:1.5; white-space:pre-wrap;">—</div>
+                style="font-size:13px; color:#1b2e1e; font-weight:500; line-height:1.5; white-space:pre-wrap;">â€”</div>
             </div>
 
             <!-- Chief Complaint -->
@@ -3243,7 +2426,7 @@
                   </label>
                   <input id="va-temp" class="vital-input" type="number" step="0.1" min="30" max="45"
                     placeholder="36.5" />
-                  <span class="vital-unit">°C</span>
+                  <span class="vital-unit">Â°C</span>
                   <div id="va-temp-badge" class="vital-risk-badge hidden"></div>
                 </div>
 
@@ -3292,8 +2475,8 @@
                 <div class="vital-field bmi-display-field">
                   <label class="vital-label">Calculated BMI</label>
                   <div class="bmi-result-box">
-                    <span id="va-bmi-value" class="bmi-value">—</span>
-                    <span id="va-bmi-badge" class="bmi-category-badge hidden">—</span>
+                    <span id="va-bmi-value" class="bmi-value">â€”</span>
+                    <span id="va-bmi-badge" class="bmi-category-badge hidden">â€”</span>
                   </div>
                 </div>
               </div>
@@ -3426,7 +2609,7 @@
             </div>
             <div class="consult-patient-meta-pill">
               <span class="panel-hint" style="color:#f1f5f9 !important;">Patient ID: <span id="consult-display-id"
-                  style="color:#fef08a !important; font-weight:700;">—</span></span>
+                  style="color:#fef08a !important; font-weight:700;">â€”</span></span>
             </div>
             <button type="button" id="consult-modal-close-icon" class="modal-close"
               aria-label="Close modal">&times;</button>
@@ -3446,7 +2629,7 @@
                   </svg>
                   <strong>CRITICAL DRUG ALLERGIES</strong>
                 </div>
-                <div id="consult-allergy-text" class="allergy-body">—</div>
+                <div id="consult-allergy-text" class="allergy-body">â€”</div>
               </div>
 
               <!-- Vitals Summary from Nurse Assessment -->
@@ -3791,124 +2974,6 @@
               onmouseout="this.style.background='transparent'">&#x2715;</button>
           </div>
 
-          <style>
-            @media print {
-
-              /* Hide everything else */
-              body * {
-                visibility: hidden;
-              }
-
-              #citizen-health-modal,
-              #citizen-health-modal * {
-                visibility: visible;
-              }
-
-              /* Reset modal positioning for full page */
-              #citizen-health-modal {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                margin: 0;
-                padding: 0;
-                background: white;
-                visibility: visible !important;
-              }
-
-              #citizen-health-modal .modal-box {
-                box-shadow: none;
-                border: none;
-                max-width: 100% !important;
-                width: 100% !important;
-                max-height: none !important;
-                overflow: visible !important;
-                background: white;
-                margin: 0;
-                padding: 0;
-              }
-
-              /* Hide UI controls */
-              #chr-close-btn,
-              #chr-export-btn,
-              .chr-tab,
-              input,
-              select,
-              .btn,
-              .chip-btn,
-              .search-box,
-              .tab-controls,
-              [id*="search"],
-              [id*="filter"],
-              [id*="count"],
-              .record-count {
-                display: none !important;
-              }
-
-              /* Expand sections */
-              .chr-tab-content {
-                display: block !important;
-                margin-top: 30px;
-                page-break-inside: auto;
-                overflow: visible !important;
-              }
-
-              .chr-tab-content h4 {
-                display: block !important;
-                border-bottom: 2px solid #16a34a;
-                padding-bottom: 8px;
-                margin-bottom: 16px;
-                color: #16a34a;
-                font-size: 18px;
-              }
-
-              /* Table formatting for PDF */
-              table {
-                width: 100% !important;
-                border-collapse: collapse !important;
-                table-layout: auto !important;
-                overflow: visible !important;
-                margin-bottom: 20px;
-              }
-
-              th,
-              td {
-                border: 1px solid #e2e8f0 !important;
-                padding: 6px 8px !important;
-                text-align: left !important;
-                font-size: 10px !important;
-                white-space: normal !important;
-                /* Force wrap */
-                word-break: break-word !important;
-                line-height: 1.4 !important;
-              }
-
-              .table-header-row {
-                background-color: #f1f5f9 !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-              }
-
-              /* Remove scrollbars specifically */
-              .table-wrap,
-              .modal-box,
-              .chr-tab-content,
-              #citizen-health-modal {
-                overflow: visible !important;
-                max-height: none !important;
-              }
-
-              ::-webkit-scrollbar {
-                display: none !important;
-              }
-
-              * {
-                -ms-overflow-style: none !important;
-                scrollbar-width: none !important;
-                overflow: visible !important;
-              }
-            }
-          </style>
 
           <!-- Profile strip -->
           <div id="chr-profile"
@@ -4072,7 +3137,7 @@
             <div class="field"
               style="margin-bottom:16px; padding:12px 16px; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
               <span style="font-size:12px; color:#64748b; display:block; margin-bottom:2px;">Prescribing for</span>
-              <strong id="prescription-patient-display" style="font-size:15px; color:#166534;">—</strong>
+              <strong id="prescription-patient-display" style="font-size:15px; color:#166534;">â€”</strong>
             </div>
             <!-- Prescription Allergy Banner -->
             <div id="prescription-allergy-banner" class="field"
@@ -4086,7 +3151,7 @@
                 </svg>
                 CRITICAL ALLERGY ALERT
               </span>
-              <strong id="prescription-allergy-text" style="font-size:13px; color:#9f1239;">—</strong>
+              <strong id="prescription-allergy-text" style="font-size:13px; color:#9f1239;">â€”</strong>
             </div>
             <form id="prescription-form">
               <input type="hidden" id="prescription-patient" />
@@ -4120,75 +3185,75 @@
 
             <!-- Predefined clinical suggestions -->
             <datalist id="medicine-list">
-              <option value="Amoxicillin 500 mg Capsule">Amoxicillin 500mg • Antibiotic</option>
-              <option value="Amoxicillin 250 mg / 5 mL Suspension">Amoxicillin 250mg/5mL • Pediatric Antibiotic</option>
-              <option value="Co-amoxiclav 625 mg Tablet">Co-amoxiclav 625mg • Broad-Spectrum Antibiotic</option>
-              <option value="Cefalexin 500 mg Capsule">Cefalexin 500mg • Antibiotic (Cephalosporin)</option>
-              <option value="Azithromycin 500 mg Tablet">Azithromycin 500mg • Macrolide Antibiotic</option>
-              <option value="Ciprofloxacin 500 mg Tablet">Ciprofloxacin 500mg • Quinolone Antibiotic</option>
-              <option value="Doxycycline 100 mg Capsule">Doxycycline 100mg • Tetracycline Antibiotic</option>
-              <option value="Metronidazole 500 mg Tablet">Metronidazole 500mg • Antiprotozoal / Antibacterial</option>
-              <option value="Co-trimoxazole 800/160 mg Tablet">Co-trimoxazole 800/160mg • Antibacterial</option>
-              <option value="Clindamycin 300 mg Capsule">Clindamycin 300mg • Lincosamide Antibiotic</option>
-              <option value="Erythromycin 500 mg Tablet">Erythromycin 500mg • Macrolide Antibiotic</option>
-              <option value="Paracetamol 500 mg Tablet">Paracetamol 500mg • Analgesic / Antipyretic</option>
-              <option value="Paracetamol 250 mg / 5 mL Syrup">Paracetamol 250mg/5mL • Pediatric Syrup</option>
-              <option value="Paracetamol 120 mg / 5 mL Drops">Paracetamol 120mg/5mL • Infant Drops</option>
-              <option value="Ibuprofen 400 mg Tablet">Ibuprofen 400mg • NSAID / Anti-inflammatory</option>
-              <option value="Ibuprofen 200 mg / 5 mL Suspension">Ibuprofen 200mg/5mL • Pediatric Suspension</option>
-              <option value="Mefenamic Acid 500 mg Capsule">Mefenamic Acid 500mg • Analgesic / NSAID</option>
-              <option value="Celecoxib 200 mg Capsule">Celecoxib 200mg • COX-2 Inhibitor NSAID</option>
-              <option value="Tramadol 50 mg Capsule">Tramadol 50mg • Opioid Analgesic</option>
-              <option value="Aspirin 80 mg Tablet">Aspirin 80mg • Antiplatelet</option>
-              <option value="Amlodipine 5 mg Tablet">Amlodipine 5mg • Antihypertensive (CCB)</option>
-              <option value="Amlodipine 10 mg Tablet">Amlodipine 10mg • Antihypertensive (CCB)</option>
-              <option value="Losartan 50 mg Tablet">Losartan 50mg • Antihypertensive (ARB)</option>
-              <option value="Losartan 100 mg Tablet">Losartan 100mg • Antihypertensive (ARB)</option>
-              <option value="Metoprolol Tartrate 50 mg Tablet">Metoprolol 50mg • Beta-Blocker</option>
-              <option value="Carvedilol 25 mg Tablet">Carvedilol 25mg • Beta-Blocker / Vasodilator</option>
-              <option value="Enalapril 10 mg Tablet">Enalapril 10mg • ACE Inhibitor</option>
-              <option value="Captopril 25 mg Tablet">Captopril 25mg • ACE Inhibitor</option>
-              <option value="Atorvastatin 20 mg Tablet">Atorvastatin 20mg • Statin / Lipid-lowering</option>
-              <option value="Simvastatin 20 mg Tablet">Simvastatin 20mg • Statin / Lipid-lowering</option>
-              <option value="Furosemide 40 mg Tablet">Furosemide 40mg • Loop Diuretic</option>
-              <option value="Hydrochlorothiazide 25 mg Tablet">Hydrochlorothiazide 25mg • Thiazide Diuretic</option>
-              <option value="Clonidine 75 mcg Tablet">Clonidine 75mcg • Central Alpha Agonist</option>
-              <option value="Metformin 500 mg Tablet">Metformin 500mg • Antidiabetic (Biguanide)</option>
-              <option value="Metformin 850 mg Tablet">Metformin 850mg • Antidiabetic (Biguanide)</option>
-              <option value="Gliclazide 30 mg MR Tablet">Gliclazide 30mg MR • Sulfonylurea Antidiabetic</option>
-              <option value="Gliclazide 80 mg Tablet">Gliclazide 80mg • Sulfonylurea Antidiabetic</option>
-              <option value="Salbutamol 2 mg Tablet">Salbutamol 2mg • Bronchodilator</option>
-              <option value="Salbutamol 2 mg / 5 mL Syrup">Salbutamol 2mg/5mL • Pediatric Bronchodilator</option>
-              <option value="Salbutamol Nebule 2.5 mg / 2.5 mL">Salbutamol Nebule • Inhalation Solution</option>
-              <option value="Cetirizine 10 mg Tablet">Cetirizine 10mg • Antihistamine</option>
-              <option value="Cetirizine 5 mg / 5 mL Syrup">Cetirizine 5mg/5mL • Pediatric Antihistamine</option>
-              <option value="Loratadine 10 mg Tablet">Loratadine 10mg • Non-sedating Antihistamine</option>
-              <option value="Diphenhydramine 25 mg Capsule">Diphenhydramine 25mg • Antihistamine</option>
-              <option value="Prednisone 20 mg Tablet">Prednisone 20mg • Corticosteroid</option>
-              <option value="Prednisone 5 mg Tablet">Prednisone 5mg • Corticosteroid</option>
-              <option value="Montelukast 10 mg Tablet">Montelukast 10mg • Leukotriene Receptor Antagonist</option>
-              <option value="Carbocisteine 500 mg Capsule">Carbocisteine 500mg • Mucolytic</option>
-              <option value="Lagundi 600 mg Tablet">Lagundi 600mg • Herbal Cough Relief</option>
-              <option value="Omeprazole 20 mg Capsule">Omeprazole 20mg • Proton Pump Inhibitor</option>
-              <option value="Omeprazole 40 mg Capsule">Omeprazole 40mg • Proton Pump Inhibitor</option>
-              <option value="Aluminum Hydroxide + Magnesium Hydroxide Tablet">Antacid (AlOH + MgOH) • Chewable</option>
-              <option value="Domperidone 10 mg Tablet">Domperidone 10mg • Antiemetic / Prokinetic</option>
-              <option value="Metoclopramide 10 mg Tablet">Metoclopramide 10mg • Antiemetic</option>
-              <option value="Hyoscine N-butylbromide 10 mg Tablet">Hyoscine N-butylbromide 10mg • Antispasmodic</option>
-              <option value="Oral Rehydration Salts (ORS) Sachet">ORS Sachet • Electrolyte Replacement</option>
-              <option value="Loperamide 2 mg Capsule">Loperamide 2mg • Antimotility</option>
-              <option value="Ascorbic Acid (Vitamin C) 500 mg Tablet">Vitamin C 500mg • Nutritional Supplement</option>
-              <option value="Multivitamins + Iron Capsule">Multivitamins with Iron • Nutritional</option>
-              <option value="Ferrous Sulfate 325 mg Tablet">Ferrous Sulfate 325mg • Iron Supplement</option>
-              <option value="Folic Acid 5 mg Tablet">Folic Acid 5mg • Prenatal / Hematologic</option>
-              <option value="Calcium Carbonate 500 mg Tablet">Calcium Carbonate 500mg • Mineral Supplement</option>
-              <option value="Vitamin B-Complex Tablet">Vitamin B-Complex • Neurotropic Vitamins</option>
-              <option value="Zinc Sulfate 20 mg Tablet">Zinc Sulfate 20mg • Mineral Supplement</option>
-              <option value="Mupirocin 2% Ointment">Mupirocin 2% • Topical Antibiotic</option>
-              <option value="Silver Sulfadiazine 1% Cream">Silver Sulfadiazine 1% • Burn Wound Care</option>
-              <option value="Hydrocortisone 1% Cream">Hydrocortisone 1% • Topical Anti-inflammatory</option>
-              <option value="Betamethasone 0.1% Cream">Betamethasone 0.1% • Topical Corticosteroid</option>
-              <option value="Neomycin + Polymyxin Eye Drops">Neomycin + Polymyxin • Ophthalmic Solution</option>
+              <option value="Amoxicillin 500 mg Capsule">Amoxicillin 500mg â€¢ Antibiotic</option>
+              <option value="Amoxicillin 250 mg / 5 mL Suspension">Amoxicillin 250mg/5mL â€¢ Pediatric Antibiotic</option>
+              <option value="Co-amoxiclav 625 mg Tablet">Co-amoxiclav 625mg â€¢ Broad-Spectrum Antibiotic</option>
+              <option value="Cefalexin 500 mg Capsule">Cefalexin 500mg â€¢ Antibiotic (Cephalosporin)</option>
+              <option value="Azithromycin 500 mg Tablet">Azithromycin 500mg â€¢ Macrolide Antibiotic</option>
+              <option value="Ciprofloxacin 500 mg Tablet">Ciprofloxacin 500mg â€¢ Quinolone Antibiotic</option>
+              <option value="Doxycycline 100 mg Capsule">Doxycycline 100mg â€¢ Tetracycline Antibiotic</option>
+              <option value="Metronidazole 500 mg Tablet">Metronidazole 500mg â€¢ Antiprotozoal / Antibacterial</option>
+              <option value="Co-trimoxazole 800/160 mg Tablet">Co-trimoxazole 800/160mg â€¢ Antibacterial</option>
+              <option value="Clindamycin 300 mg Capsule">Clindamycin 300mg â€¢ Lincosamide Antibiotic</option>
+              <option value="Erythromycin 500 mg Tablet">Erythromycin 500mg â€¢ Macrolide Antibiotic</option>
+              <option value="Paracetamol 500 mg Tablet">Paracetamol 500mg â€¢ Analgesic / Antipyretic</option>
+              <option value="Paracetamol 250 mg / 5 mL Syrup">Paracetamol 250mg/5mL â€¢ Pediatric Syrup</option>
+              <option value="Paracetamol 120 mg / 5 mL Drops">Paracetamol 120mg/5mL â€¢ Infant Drops</option>
+              <option value="Ibuprofen 400 mg Tablet">Ibuprofen 400mg â€¢ NSAID / Anti-inflammatory</option>
+              <option value="Ibuprofen 200 mg / 5 mL Suspension">Ibuprofen 200mg/5mL â€¢ Pediatric Suspension</option>
+              <option value="Mefenamic Acid 500 mg Capsule">Mefenamic Acid 500mg â€¢ Analgesic / NSAID</option>
+              <option value="Celecoxib 200 mg Capsule">Celecoxib 200mg â€¢ COX-2 Inhibitor NSAID</option>
+              <option value="Tramadol 50 mg Capsule">Tramadol 50mg â€¢ Opioid Analgesic</option>
+              <option value="Aspirin 80 mg Tablet">Aspirin 80mg â€¢ Antiplatelet</option>
+              <option value="Amlodipine 5 mg Tablet">Amlodipine 5mg â€¢ Antihypertensive (CCB)</option>
+              <option value="Amlodipine 10 mg Tablet">Amlodipine 10mg â€¢ Antihypertensive (CCB)</option>
+              <option value="Losartan 50 mg Tablet">Losartan 50mg â€¢ Antihypertensive (ARB)</option>
+              <option value="Losartan 100 mg Tablet">Losartan 100mg â€¢ Antihypertensive (ARB)</option>
+              <option value="Metoprolol Tartrate 50 mg Tablet">Metoprolol 50mg â€¢ Beta-Blocker</option>
+              <option value="Carvedilol 25 mg Tablet">Carvedilol 25mg â€¢ Beta-Blocker / Vasodilator</option>
+              <option value="Enalapril 10 mg Tablet">Enalapril 10mg â€¢ ACE Inhibitor</option>
+              <option value="Captopril 25 mg Tablet">Captopril 25mg â€¢ ACE Inhibitor</option>
+              <option value="Atorvastatin 20 mg Tablet">Atorvastatin 20mg â€¢ Statin / Lipid-lowering</option>
+              <option value="Simvastatin 20 mg Tablet">Simvastatin 20mg â€¢ Statin / Lipid-lowering</option>
+              <option value="Furosemide 40 mg Tablet">Furosemide 40mg â€¢ Loop Diuretic</option>
+              <option value="Hydrochlorothiazide 25 mg Tablet">Hydrochlorothiazide 25mg â€¢ Thiazide Diuretic</option>
+              <option value="Clonidine 75 mcg Tablet">Clonidine 75mcg â€¢ Central Alpha Agonist</option>
+              <option value="Metformin 500 mg Tablet">Metformin 500mg â€¢ Antidiabetic (Biguanide)</option>
+              <option value="Metformin 850 mg Tablet">Metformin 850mg â€¢ Antidiabetic (Biguanide)</option>
+              <option value="Gliclazide 30 mg MR Tablet">Gliclazide 30mg MR â€¢ Sulfonylurea Antidiabetic</option>
+              <option value="Gliclazide 80 mg Tablet">Gliclazide 80mg â€¢ Sulfonylurea Antidiabetic</option>
+              <option value="Salbutamol 2 mg Tablet">Salbutamol 2mg â€¢ Bronchodilator</option>
+              <option value="Salbutamol 2 mg / 5 mL Syrup">Salbutamol 2mg/5mL â€¢ Pediatric Bronchodilator</option>
+              <option value="Salbutamol Nebule 2.5 mg / 2.5 mL">Salbutamol Nebule â€¢ Inhalation Solution</option>
+              <option value="Cetirizine 10 mg Tablet">Cetirizine 10mg â€¢ Antihistamine</option>
+              <option value="Cetirizine 5 mg / 5 mL Syrup">Cetirizine 5mg/5mL â€¢ Pediatric Antihistamine</option>
+              <option value="Loratadine 10 mg Tablet">Loratadine 10mg â€¢ Non-sedating Antihistamine</option>
+              <option value="Diphenhydramine 25 mg Capsule">Diphenhydramine 25mg â€¢ Antihistamine</option>
+              <option value="Prednisone 20 mg Tablet">Prednisone 20mg â€¢ Corticosteroid</option>
+              <option value="Prednisone 5 mg Tablet">Prednisone 5mg â€¢ Corticosteroid</option>
+              <option value="Montelukast 10 mg Tablet">Montelukast 10mg â€¢ Leukotriene Receptor Antagonist</option>
+              <option value="Carbocisteine 500 mg Capsule">Carbocisteine 500mg â€¢ Mucolytic</option>
+              <option value="Lagundi 600 mg Tablet">Lagundi 600mg â€¢ Herbal Cough Relief</option>
+              <option value="Omeprazole 20 mg Capsule">Omeprazole 20mg â€¢ Proton Pump Inhibitor</option>
+              <option value="Omeprazole 40 mg Capsule">Omeprazole 40mg â€¢ Proton Pump Inhibitor</option>
+              <option value="Aluminum Hydroxide + Magnesium Hydroxide Tablet">Antacid (AlOH + MgOH) â€¢ Chewable</option>
+              <option value="Domperidone 10 mg Tablet">Domperidone 10mg â€¢ Antiemetic / Prokinetic</option>
+              <option value="Metoclopramide 10 mg Tablet">Metoclopramide 10mg â€¢ Antiemetic</option>
+              <option value="Hyoscine N-butylbromide 10 mg Tablet">Hyoscine N-butylbromide 10mg â€¢ Antispasmodic</option>
+              <option value="Oral Rehydration Salts (ORS) Sachet">ORS Sachet â€¢ Electrolyte Replacement</option>
+              <option value="Loperamide 2 mg Capsule">Loperamide 2mg â€¢ Antimotility</option>
+              <option value="Ascorbic Acid (Vitamin C) 500 mg Tablet">Vitamin C 500mg â€¢ Nutritional Supplement</option>
+              <option value="Multivitamins + Iron Capsule">Multivitamins with Iron â€¢ Nutritional</option>
+              <option value="Ferrous Sulfate 325 mg Tablet">Ferrous Sulfate 325mg â€¢ Iron Supplement</option>
+              <option value="Folic Acid 5 mg Tablet">Folic Acid 5mg â€¢ Prenatal / Hematologic</option>
+              <option value="Calcium Carbonate 500 mg Tablet">Calcium Carbonate 500mg â€¢ Mineral Supplement</option>
+              <option value="Vitamin B-Complex Tablet">Vitamin B-Complex â€¢ Neurotropic Vitamins</option>
+              <option value="Zinc Sulfate 20 mg Tablet">Zinc Sulfate 20mg â€¢ Mineral Supplement</option>
+              <option value="Mupirocin 2% Ointment">Mupirocin 2% â€¢ Topical Antibiotic</option>
+              <option value="Silver Sulfadiazine 1% Cream">Silver Sulfadiazine 1% â€¢ Burn Wound Care</option>
+              <option value="Hydrocortisone 1% Cream">Hydrocortisone 1% â€¢ Topical Anti-inflammatory</option>
+              <option value="Betamethasone 0.1% Cream">Betamethasone 0.1% â€¢ Topical Corticosteroid</option>
+              <option value="Neomycin + Polymyxin Eye Drops">Neomycin + Polymyxin â€¢ Ophthalmic Solution</option>
             </datalist>
 
             <datalist id="dosage-list">
@@ -4383,11 +3448,11 @@
                   <input id="vitals-rr" class="manual-entry-input" type="number" placeholder="16" />
                 </div>
                 <div class="field">
-                  <label class="inputLabel" for="vitals-temp">Temp (°C)</label>
+                  <label class="inputLabel" for="vitals-temp">Temp (Â°C)</label>
                   <input id="vitals-temp" class="manual-entry-input" type="number" step="0.1" placeholder="36.5" />
                 </div>
                 <div class="field">
-                  <label class="inputLabel" for="vitals-spo2">SpO₂ (%)</label>
+                  <label class="inputLabel" for="vitals-spo2">SpOâ‚‚ (%)</label>
                   <input id="vitals-spo2" class="manual-entry-input" type="number" placeholder="98" />
                 </div>
               </div>
@@ -4593,17 +3658,17 @@
         }
 
         tbody.innerHTML = logs.map(log => {
-          const formattedDate = log.logged_at ? new Date(log.logged_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : '—';
+          const formattedDate = log.logged_at ? new Date(log.logged_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'â€”';
           const actionStyle = log.action === 'login'
             ? 'background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:700;display:inline-block;'
             : 'background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:700;display:inline-block;';
 
           return `
             <tr style="border-bottom:1px solid #f1f5f9;">
-              <td style="padding:12px;font-size:13px;color:#0f172a;text-align:left;">${log.staff_id || '—'}</td>
-              <td style="padding:12px;font-size:13px;color:#334155;font-weight:600;text-align:left;">${log.username || '—'}</td>
-              <td style="padding:12px;font-size:13px;color:#475569;text-align:left;">${log.email || '—'}</td>
-              <td style="padding:12px;font-size:13px;color:#475569;text-align:left;text-transform:capitalize;">${log.role || '—'}</td>
+              <td style="padding:12px;font-size:13px;color:#0f172a;text-align:left;">${log.staff_id || 'â€”'}</td>
+              <td style="padding:12px;font-size:13px;color:#334155;font-weight:600;text-align:left;">${log.username || 'â€”'}</td>
+              <td style="padding:12px;font-size:13px;color:#475569;text-align:left;">${log.email || 'â€”'}</td>
+              <td style="padding:12px;font-size:13px;color:#475569;text-align:left;text-transform:capitalize;">${log.role || 'â€”'}</td>
               <td style="padding:12px;font-size:13px;text-align:center;"><span style="${actionStyle}">${log.action}</span></td>
               <td style="padding:12px;font-size:13px;color:#64748b;text-align:right;">${formattedDate}</td>
             </tr>

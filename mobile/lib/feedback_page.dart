@@ -1,20 +1,9 @@
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
+import 'core/theme/app_colors.dart';
 
-// ── Medical/Dental Green Design tokens ────────────────────────────────
-class _C {
-  static const primary    = Color(0xFF059669);   // Emerald 600
-  static const primaryMid = Color(0xFF064E3B);   // Forest Emerald 900
-  static const accent     = Color(0xFF10B981);   // Mint Accent
-  static const bg         = Color(0xFFF8FAFC);   // Slate Background
-  static const surface    = Colors.white;
-  static const textDark   = Color(0xFF0F172A);   // Slate 900
-  static const textMuted  = Color(0xFF64748B);   // Slate 500
-  static const divider    = Color(0xFFE2E8F0);   // Slate 200
-  static const success    = Color(0xFF10B981);
-  static const warning    = Color(0xFFF59E0B);
-  static const shadow     = Color(0x080F172A);
-}
+typedef _C = AppColors;
+
 
 class uKonekFeedbackPage extends StatefulWidget {
   const uKonekFeedbackPage({super.key});
