@@ -16,3 +16,11 @@ String formatDoctorName(String? raw) {
   if (n.isEmpty) return 'Doctor';
   return 'Dr. $n';
 }
+
+/// Formats a DateTime as standard ISO YYYY-MM-DD for database query parameters.
+String formatDateIso(DateTime value) {
+  final d = DateTime(value.year, value.month, value.day);
+  final mm = d.month.toString().padLeft(2, '0');
+  final dd = d.day.toString().padLeft(2, '0');
+  return '${d.year}-$mm-$dd';
+}
