@@ -203,7 +203,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     if (isInitial) setState(() => _isInitialLoading = true);
     try {
       final results = await Future.wait<dynamic>([
-        ApiService.listDoctorStatus(),
+        ApiService.listDoctorStatus(forceRefresh: !isInitial),
         ApiService.getMyQueueDashboard(),
         ApiService.fetchPrescriptions(limit: 10),
         ApiService.fetchAnnouncements(),

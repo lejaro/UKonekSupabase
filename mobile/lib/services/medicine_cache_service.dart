@@ -38,8 +38,16 @@ class MedicineCacheService {
     }
   }
 
-  /// Check if schedule cache is still fresh
-  static Future<bool> isScheduleCacheFresh(String citizenId, {Duration maxAge = const Duration(hours: 6)}) async {
+  /// Invalidate schedule cache so next load fetches fresh data from remote
+  static Future<void> invalidateScheduleCache(String citizenId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('$_scheduleSyncedPrefix$citizenId');
+    } catch (_) {}
+  }
+
+  /// Check if schedule cache is still fresh (default: 5 minutes for rapid dispensary sync)
+  static Future<bool> isScheduleCacheFresh(String citizenId, {Duration maxAge = const Duration(minutes: 5)}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastSynced = prefs.getInt('$_scheduleSyncedPrefix$citizenId');

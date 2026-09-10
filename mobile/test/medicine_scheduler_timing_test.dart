@@ -446,7 +446,6 @@ void main() {
     });
 
     test('Multiple Simultaneous Prescriptions coordinate harmoniously on the same day', () {
-      final anchorDate = DateTime(2026, 9, 9);
       final bioflu = _createMed(
         id: 51,
         name: 'Bioflu',

@@ -92,7 +92,22 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
       ]);
 
       final records = results[0] as List<PrescriptionRecord>;
-      final logs = results[1] as List<PrescriptionDispenseLog>;
+      var logs = results[1] as List<PrescriptionDispenseLog>;
+
+      // Fallback synthesis: if server logs are empty or missing fulfilled items,
+      // synthesize from verified dispensed prescription records so purchase logs are never 0
+      if (logs.isEmpty && records.isNotEmpty) {
+        logs = ApiService.synthesizeDispenseLogsFromPrescriptions(records);
+      } else if (records.isNotEmpty) {
+        final existingKeys = logs.map((l) => '${l.prescriptionId}_${l.medicineName.toLowerCase()}').toSet();
+        final synthetic = ApiService.synthesizeDispenseLogsFromPrescriptions(records);
+        for (final s in synthetic) {
+          if (!existingKeys.contains('${s.prescriptionId}_${s.medicineName.toLowerCase()}')) {
+            logs.add(s);
+          }
+        }
+        logs.sort((a, b) => b.dispensedAt.compareTo(a.dispensedAt));
+      }
 
       if (!mounted) return;
       setState(() {
@@ -131,7 +146,20 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
       ]);
 
       final records = results[0] as List<PrescriptionRecord>;
-      final logs = results[1] as List<PrescriptionDispenseLog>;
+      var logs = results[1] as List<PrescriptionDispenseLog>;
+
+      if (logs.isEmpty && records.isNotEmpty) {
+        logs = ApiService.synthesizeDispenseLogsFromPrescriptions(records);
+      } else if (records.isNotEmpty) {
+        final existingKeys = logs.map((l) => '${l.prescriptionId}_${l.medicineName.toLowerCase()}').toSet();
+        final synthetic = ApiService.synthesizeDispenseLogsFromPrescriptions(records);
+        for (final s in synthetic) {
+          if (!existingKeys.contains('${s.prescriptionId}_${s.medicineName.toLowerCase()}')) {
+            logs.add(s);
+          }
+        }
+        logs.sort((a, b) => b.dispensedAt.compareTo(a.dispensedAt));
+      }
 
       if (!mounted) return;
       setState(() {

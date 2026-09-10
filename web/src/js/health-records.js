@@ -121,17 +121,28 @@ function buildStaffLookup(staffRows) {
   return lookup;
 }
 
-function resolveStaffName({ staff, staffId, lookup, fallback = 'Unknown' }) {
-  if (staff?.first_name || staff?.last_name) {
-    return `Dr. ${staff.first_name || ''} ${staff.last_name || ''}`.trim();
+function formatDoctorName(raw) {
+  if (!raw) return 'Doctor';
+  let n = String(raw).trim();
+  if (!n) return 'Doctor';
+  while (/^(dr\.?|doctor)\s+/i.test(n)) {
+    n = n.replace(/^(dr\.?|doctor)\s+/i, '').trim();
   }
-  if (lookup && staffId !== null && staffId !== undefined) {
+  return n ? `Dr. ${n}` : 'Doctor';
+}
+
+function resolveStaffName({ staff, staffId, lookup, fallback = 'Unknown' }) {
+  let name = '';
+  if (staff?.first_name || staff?.last_name) {
+    name = `${staff.first_name || ''} ${staff.last_name || ''}`.trim();
+  } else if (lookup && staffId !== null && staffId !== undefined) {
     const match = lookup.get(String(staffId));
     if (match?.first_name || match?.last_name) {
-      return `Dr. ${match.first_name || ''} ${match.last_name || ''}`.trim();
+      name = `${match.first_name || ''} ${match.last_name || ''}`.trim();
     }
   }
-  return fallback;
+  if (!name) return fallback;
+  return formatDoctorName(name);
 }
 
 async function openCitizenHealthModal(citizen) {

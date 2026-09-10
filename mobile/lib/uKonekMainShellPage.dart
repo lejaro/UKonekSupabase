@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
+import 'services/medicine_cache_service.dart';
 import 'utils/app_transitions.dart';
 import 'uKonekPrescriptionPage.dart';
 import 'uKonekDashboardPage.dart';
@@ -59,6 +60,8 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
   late final List<Widget> _pages;
   Timer? _prescriptionCheckTimer;
   bool _isShowingPrescriptionModal = false;
+  bool _isCheckingPrescriptionAlert = false;
+  int? _lastAlertedPrescriptionId;
 
   @override
   void initState() {
@@ -102,8 +105,8 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
       if (mounted) _checkNewPrescriptionAlert();
     });
 
-    // Check periodically every 10 seconds while the app is active
-    _prescriptionCheckTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    // Check periodically every 30 seconds while the app is active
+    _prescriptionCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) _checkNewPrescriptionAlert();
     });
   }
@@ -123,22 +126,38 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
   }
 
   Future<void> _checkNewPrescriptionAlert() async {
-    if (!mounted || _isShowingPrescriptionModal) return;
-    final alert = await ApiService.fetchLatestUnacknowledgedPrescription();
-    if (alert != null && mounted && !_isShowingPrescriptionModal) {
-      _showNewPrescriptionModal(alert);
+    if (!mounted || _isShowingPrescriptionModal || _isCheckingPrescriptionAlert) return;
+    _isCheckingPrescriptionAlert = true;
+    try {
+      final alert = await ApiService.fetchLatestUnacknowledgedPrescription();
+      if (alert != null &&
+          mounted &&
+          !_isShowingPrescriptionModal &&
+          alert.prescriptionId != _lastAlertedPrescriptionId) {
+        _lastAlertedPrescriptionId = alert.prescriptionId;
+        _showNewPrescriptionModal(alert);
+      }
+    } catch (e) {
+      debugPrint('Error checking new prescription alert: $e');
+    } finally {
+      _isCheckingPrescriptionAlert = false;
     }
   }
 
   void _showNewPrescriptionModal(NewPrescriptionAlert alert) {
     if (!mounted || _isShowingPrescriptionModal) return;
     _isShowingPrescriptionModal = true;
+    _lastAlertedPrescriptionId = alert.prescriptionId;
+
+    // Immediately mark as acknowledged so background checks or tab switches cannot trigger it again
+    ApiService.acknowledgePrescription(alert.prescriptionId);
+    MedicineCacheService.invalidateScheduleCache(widget.citizenId);
 
     // Trigger immediate push notification in system bar
     NotificationService.showImmediateNotification(
       id: 777,
       title: 'New E-Prescription Issued!',
-      body: 'Dr. ${alert.doctorName} has issued a new prescription (${alert.prescriptionCode}).',
+      body: '${alert.displayDoctorName} has issued a new prescription (${alert.prescriptionCode}).',
       payload: '{"action":"prescription","id":${alert.prescriptionId}}',
     );
 
@@ -198,7 +217,7 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Dr. ${alert.doctorName} has issued your official electronic prescription.',
+                  '${alert.displayDoctorName} has issued your official electronic prescription.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 13,
@@ -428,8 +447,6 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
     setState(() {
       _selectedTab = index;
     });
-    // Trigger prescription check when switching tabs
-    _checkNewPrescriptionAlert();
   }
 
   DateTime? _lastBackPressTime;

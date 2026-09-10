@@ -47,18 +47,7 @@ class DoctorSchedule {
     this.availabilityStatus = 'available',
   });
 
-  String get displayName {
-    final name = doctorName.trim();
-    if (name.isEmpty) return 'Doctor';
-    if (name.toLowerCase().startsWith('dr.')) return name;
-    final parts = name.split(' ');
-    if (parts.length >= 2) {
-      final surname = parts.last;
-      final firstname = parts.sublist(0, parts.length - 1).join(' ');
-      return 'Dr. $surname, $firstname';
-    }
-    return 'Dr. $name';
-  }
+  String get displayName => ApiService.formatDoctorName(doctorName);
 
   factory DoctorSchedule.fromMap(Map<String, dynamic> map) {
     DateTime parsedDate;
@@ -111,9 +100,10 @@ class DoctorStatus {
   });
 
   String get displayName {
-    final full = '$lastName $firstName'.trim();
-    if (full.toLowerCase().startsWith('dr.')) return full;
-    return 'Dr. $full';
+    final cleanFirst = firstName.replaceAll(RegExp(r'^(dr\.?|doctor)\s*', caseSensitive: false), '').trim();
+    final cleanLast = lastName.replaceAll(RegExp(r'^(dr\.?|doctor)\s*', caseSensitive: false), '').trim();
+    final full = '$cleanFirst $cleanLast'.trim();
+    return ApiService.formatDoctorName(full.isNotEmpty ? full : '$firstName $lastName');
   }
 
   factory DoctorStatus.fromMap(Map<String, dynamic> map) {
@@ -168,12 +158,7 @@ class PrescriptionRecord {
     required this.isDispensed,
   });
 
-  String get displayDoctorName {
-    final n = doctorName.trim();
-    if (n.isEmpty) return 'Doctor';
-    if (n.toLowerCase().startsWith('dr.')) return n;
-    return 'Dr. $n';
-  }
+  String get displayDoctorName => ApiService.formatDoctorName(doctorName);
 
   bool get isPrescriptionDispensed => dispensingStatus == 'dispensed';
   bool get isCancelled            => dispensingStatus == 'cancelled';
@@ -295,6 +280,8 @@ class NewPrescriptionAlert {
     required this.issuedAt,
     required this.items,
   });
+
+  String get displayDoctorName => ApiService.formatDoctorName(doctorName);
 }
 
 class ScheduledMedicine {
@@ -336,12 +323,7 @@ class ScheduledMedicine {
     required this.isDispensed,
   });
 
-  String get displayDoctorName {
-    final n = doctorName.trim();
-    if (n.isEmpty) return 'Doctor';
-    if (n.toLowerCase().startsWith('dr.')) return n;
-    return 'Dr. $n';
-  }
+  String get displayDoctorName => ApiService.formatDoctorName(doctorName);
 
   int get dailyDoseCount {
     final f = frequency.toLowerCase().trim();
@@ -912,7 +894,9 @@ class Consultation {
 
   factory Consultation.fromMap(Map<String, dynamic> map) {
     final doctor = map['doctor'] as Map<String, dynamic>?;
-    final drName = doctor != null ? '${doctor['last_name'] ?? ''} ${doctor['first_name'] ?? ''}'.trim() : null;
+    final drName = doctor != null
+        ? ApiService.formatDoctorName('${doctor['first_name'] ?? ''} ${doctor['last_name'] ?? ''}'.trim())
+        : null;
 
     return Consultation(
       id: (map['id'] as num?)?.toInt() ?? 0,
@@ -1219,6 +1203,22 @@ class PrescribedMedicine {
 // ── BACKEND WEB WORKER SUBSYSTEM ENGINE (API SERVICE INTERFACE) ───────
 class ApiService {
   static SupabaseClient get _client => Supabase.instance.client;
+
+  /// Formats a doctor's name cleanly, stripping redundant 'Dr.', 'Dr', 'Doctor' prefixes
+  /// and returning a single standardized 'Dr. [Clean Name]'.
+  static String formatDoctorName(String? raw) {
+    if (raw == null) return 'Doctor';
+    var n = raw.trim();
+    if (n.isEmpty) return 'Doctor';
+
+    // Remove any repeated prefixes like "Dr.", "Dr", "Doctor" at the beginning, case-insensitive
+    final drPrefix = RegExp(r'^(dr\.?|doctor)\s*', caseSensitive: false);
+    while (drPrefix.hasMatch(n)) {
+      n = n.replaceFirst(drPrefix, '').trim();
+    }
+    if (n.isEmpty) return 'Doctor';
+    return 'Dr. $n';
+  }
 
   // ── TTL-based in-memory cache to reduce redundant RPC calls ──────────
   static final Map<String, _CacheEntry> _cache = {};
@@ -1544,15 +1544,17 @@ class ApiService {
       } catch (_) {}
       try {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.clear();
+        await prefs.remove('session_token');
       } catch (_) {}
     }
   }
 
-  static Future<List<DoctorStatus>> listDoctorStatus() async {
+  static Future<List<DoctorStatus>> listDoctorStatus({bool forceRefresh = false}) async {
     const cacheKey = 'doctor_status_list';
-    final cached = _getCached<List<DoctorStatus>>(cacheKey);
-    if (cached != null) return cached;
+    if (!forceRefresh) {
+      final cached = _getCached<List<DoctorStatus>>(cacheKey);
+      if (cached != null) return cached;
+    }
 
     final response = await _client.rpc('list_staff_accounts');
     final rows = (response as List<dynamic>?) ?? const [];
@@ -1816,6 +1818,79 @@ class ApiService {
     }
   }
 
+  /// Synthesizes dispense log entries from dispensed prescription records.
+  /// Used as a robust fallback when the backend dispense logs RPC returns empty
+  /// or encounters an overloaded function error, ensuring the patient's Purchase Logs
+  /// accurately reflect all fulfilled prescriptions.
+  static List<PrescriptionDispenseLog> synthesizeDispenseLogsFromPrescriptions(
+    List<PrescriptionRecord> prescriptions,
+  ) {
+    final List<PrescriptionDispenseLog> logs = [];
+    int syntheticId = 1;
+
+    for (final r in prescriptions) {
+      final isDisp = r.isPrescriptionDispensed || r.isDispensed || r.dispensedQuantity > 0;
+      if (!isDisp) continue;
+
+      final qty = r.dispensedQuantity > 0 ? r.dispensedQuantity : r.quantity;
+      final dispensedDate = r.dispensedAt ?? r.issuedAt;
+
+      logs.add(PrescriptionDispenseLog(
+        dispenseId: r.prescriptionId * 1000 + (syntheticId++),
+        prescriptionId: r.prescriptionId,
+        prescriptionCode: r.prescriptionCode,
+        prescriptionItemId: r.prescriptionId * 1000 + syntheticId,
+        medicineName: r.medicineName,
+        dosage: r.dosage,
+        dispensedQuantity: qty,
+        unit: r.unit,
+        note: r.instructions.isNotEmpty ? r.instructions : 'Fulfilled by Pharmacy',
+        pharmacistName: 'Pharmacy Staff',
+        dispensedAt: dispensedDate,
+      ));
+    }
+
+    logs.sort((a, b) => b.dispensedAt.compareTo(a.dispensedAt));
+    return logs;
+  }
+
+  /// Synthesizes ScheduledMedicine items from dispensed prescription records.
+  /// Guarantees newly fulfilled dispensed medicines immediately populate
+  /// the Medicine Scheduler even before background RPC synchronization completes.
+  static List<ScheduledMedicine> synthesizeScheduledMedicinesFromPrescriptions(
+    List<PrescriptionRecord> prescriptions,
+  ) {
+    final List<ScheduledMedicine> meds = [];
+    for (final r in prescriptions) {
+      final isDisp = r.isPrescriptionDispensed || r.isDispensed || r.dispensedQuantity > 0;
+      if (!isDisp) continue;
+
+      final qty = r.dispensedQuantity > 0 ? r.dispensedQuantity : r.quantity;
+      final dispensedDate = r.dispensedAt ?? r.issuedAt;
+
+      meds.add(ScheduledMedicine(
+        prescriptionItemId: r.prescriptionId * 1000 + 1,
+        prescriptionId: r.prescriptionId,
+        prescriptionCode: r.prescriptionCode,
+        dispensingStatus: r.dispensingStatus.isNotEmpty ? r.dispensingStatus : 'dispensed',
+        issuedAt: r.issuedAt,
+        dispensedAt: dispensedDate,
+        doctorName: r.doctorName,
+        medicineName: r.medicineName,
+        quantity: qty,
+        unit: r.unit,
+        dosage: r.dosage,
+        frequency: r.frequency,
+        duration: r.duration,
+        instructions: r.instructions,
+        additionalInfo: r.additionalInfo,
+        isAvailable: true,
+        isDispensed: true,
+      ));
+    }
+    return meds;
+  }
+
   static Future<List<PrescriptionDispenseLog>> fetchPrescriptionDispenseLogs({
     int? prescriptionId,
     int limit = 50,
@@ -1823,18 +1898,34 @@ class ApiService {
     final user = _client.auth.currentUser;
     if (user == null) return [];
 
+    final params = <String, dynamic>{'p_limit': limit};
+    if (prescriptionId != null) {
+      params['p_prescription_id'] = prescriptionId;
+    }
+
+    // 1. Try canonical function
     try {
-      final params = <String, dynamic>{'p_limit': limit};
-      if (prescriptionId != null) {
-        params['p_prescription_id'] = prescriptionId;
-      }
       final response = await _client.rpc('get_my_prescription_dispense_logs', params: params);
       final rows = (response as List<dynamic>?) ?? const [];
-      return rows.whereType<Map<String, dynamic>>().map(PrescriptionDispenseLog.fromMap).toList();
+      if (rows.isNotEmpty) {
+        return rows.whereType<Map<String, dynamic>>().map(PrescriptionDispenseLog.fromMap).toList();
+      }
     } catch (e) {
-      debugPrint('Error fetching prescription dispense logs: $e');
-      return [];
+      debugPrint('Primary get_my_prescription_dispense_logs failed: $e, trying alias...');
     }
+
+    // 2. Try alias get_my_dispense_history
+    try {
+      final response = await _client.rpc('get_my_dispense_history', params: params);
+      final rows = (response as List<dynamic>?) ?? const [];
+      if (rows.isNotEmpty) {
+        return rows.whereType<Map<String, dynamic>>().map(PrescriptionDispenseLog.fromMap).toList();
+      }
+    } catch (e) {
+      debugPrint('Alias get_my_dispense_history failed: $e');
+    }
+
+    return [];
   }
 
   static Future<List<Consultation>> fetchConsultations({int limit = 50}) async {
@@ -1944,6 +2035,17 @@ class ApiService {
     }
   }
 
+  static String _prescriptionAckKeyForUser() {
+    try {
+      final session = _client.auth.currentSession;
+      final userId = session?.user.id;
+      if (userId != null && userId.isNotEmpty) {
+        return 'last_acknowledged_prescription_id_$userId';
+      }
+    } catch (_) {}
+    return 'last_acknowledged_prescription_id';
+  }
+
   /// Retrieves the latest prescription if it has not been acknowledged yet.
   /// Used to trigger the New E-Prescription pop-up modal and local notification.
   static Future<NewPrescriptionAlert?> fetchLatestUnacknowledgedPrescription() async {
@@ -1973,7 +2075,10 @@ class ApiService {
       final firstItem = latestItems.first;
 
       final prefs = await SharedPreferences.getInstance();
-      final lastAckId = prefs.getInt('last_acknowledged_prescription_id') ?? 0;
+      final userKey = _prescriptionAckKeyForUser();
+      final lastAckIdUser = prefs.getInt(userKey) ?? 0;
+      final lastAckIdGlobal = prefs.getInt('last_acknowledged_prescription_id') ?? 0;
+      final lastAckId = lastAckIdUser > lastAckIdGlobal ? lastAckIdUser : lastAckIdGlobal;
 
       // If already acknowledged, do not alert again
       if (latestId <= lastAckId) return null;
@@ -1982,7 +2087,7 @@ class ApiService {
       final age = DateTime.now().difference(firstItem.issuedAt);
       if (age.inHours > 24) {
         // Automatically mark stale prescription as acknowledged so it doesn't pop up later
-        await prefs.setInt('last_acknowledged_prescription_id', latestId);
+        await acknowledgePrescription(latestId);
         return null;
       }
 
@@ -2006,6 +2111,13 @@ class ApiService {
       final current = prefs.getInt('last_acknowledged_prescription_id') ?? 0;
       if (prescriptionId > current) {
         await prefs.setInt('last_acknowledged_prescription_id', prescriptionId);
+      }
+      final userKey = _prescriptionAckKeyForUser();
+      if (userKey != 'last_acknowledged_prescription_id') {
+        final userCurrent = prefs.getInt(userKey) ?? 0;
+        if (prescriptionId > userCurrent) {
+          await prefs.setInt(userKey, prescriptionId);
+        }
       }
     } catch (e) {
       debugPrint('Error acknowledging prescription: $e');

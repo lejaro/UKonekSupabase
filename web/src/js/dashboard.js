@@ -925,7 +925,7 @@ const AVAILABILITY_LABELS = {
 function normalizeAvailabilityStatus(value) {
   const raw = String(value || '').trim().toLowerCase();
   if (raw === 'available' || raw === 'on_duty' || raw === 'onduty') return 'available';
-  if (raw === 'on break' || raw === 'on_break') return 'on_break';
+  if (raw === 'on break' || raw === 'on_break' || raw === 'break') return 'on_break';
   if (raw === 'unavailable' || raw === 'off duty' || raw === 'off_duty' || raw === 'offduty') return 'unavailable';
   return 'unavailable';
 }
@@ -1949,7 +1949,7 @@ function updateProfileDutyUI(status) {
   if (heroDutyText) heroDutyText.textContent = label;
 
   if (heroDutyBadge) {
-    const badgeClass = normStatus === 'available' ? 'on-duty' : normStatus === 'break' ? 'break' : 'off-duty';
+    const badgeClass = normStatus === 'available' ? 'on-duty' : normStatus === 'on_break' ? 'break' : 'off-duty';
     heroDutyBadge.className = `duty-status-badge ${badgeClass}`;
     heroDutyBadge.innerHTML = `<span class="duty-dot ${badgeClass}"></span> <span id="profile-hero-duty-text">${escapeHtml(label)}</span>`;
   }
@@ -1959,7 +1959,7 @@ function updateProfileDutyUI(status) {
   const btnOffDuty = document.getElementById('duty-toggle-offduty');
 
   if (btnOnDuty) btnOnDuty.classList.toggle('is-active', normStatus === 'available');
-  if (btnBreak) btnBreak.classList.toggle('is-active', normStatus === 'break');
+  if (btnBreak) btnBreak.classList.toggle('is-active', normStatus === 'on_break');
   if (btnOffDuty) btnOffDuty.classList.toggle('is-active', normStatus === 'unavailable');
 }
 
@@ -1968,7 +1968,7 @@ function updateProfileDutyUI(status) {
   const btn = document.getElementById(btnId);
   if (!btn) return;
   btn.addEventListener('click', async () => {
-    const targetStatus = btnId === 'duty-toggle-onduty' ? 'available' : btnId === 'duty-toggle-break' ? 'break' : 'unavailable';
+    const targetStatus = btnId === 'duty-toggle-onduty' ? 'available' : btnId === 'duty-toggle-break' ? 'on_break' : 'unavailable';
     try {
       btn.disabled = true;
       const user = cachedSessionUser || (await ensureAuthenticatedSession());
@@ -1976,7 +1976,7 @@ function updateProfileDutyUI(status) {
         await updateStaffAvailabilityById(user.id, targetStatus);
         if (cachedSessionUser) cachedSessionUser.availability_status = targetStatus;
         updateProfileDutyUI(targetStatus);
-        showToast(`Consultation presence updated to ${AVAILABILITY_LABELS[targetStatus]}.`, 'success');
+        showToast(`Consultation presence updated to ${AVAILABILITY_LABELS[targetStatus] || 'Updated'}.`, 'success');
       }
     } catch (err) {
       console.error('Failed to change duty presence:', err);
@@ -2528,7 +2528,7 @@ function renderScheduleDoctors(staffList, user) {
         String(staff.id) === String(user.id) ||
         (staff.email && user.email && String(staff.email).toLowerCase() === String(user.email).toLowerCase())
       );
-      const canEditAvailability = isSelf || isAdminUser(user);
+      const canEditAvailability = isSelf || isAdminUser(user) || isClinicalStaff(user);
 
       const card = document.createElement('div');
       card.className = `staff-station-card card-${availabilityStatus} ${isSelf ? 'card-is-self' : ''}`;
@@ -2542,7 +2542,7 @@ function renderScheduleDoctors(staffList, user) {
       if (canEditAvailability) {
         actionsHtml = `
           <div class="staff-card-actions">
-            <span class="staff-card-actions-label">${isSelf ? 'Your Shift Control' : 'Shift Control (Admin)'}</span>
+            <span class="staff-card-actions-label">${isSelf ? 'Your Shift Control' : (isAdminUser(user) ? 'Shift Control (Admin)' : 'Shift Control')}</span>
             <div class="availability-segmented-control" data-staff-id="${staff.id}">
               <button type="button" class="availability-segmented-btn btn-available ${availabilityStatus === 'available' ? 'is-active' : ''}" data-status="available">
                 <span class="pill-dot" style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;"></span> Available
@@ -2684,6 +2684,7 @@ async function updateStaffAvailabilityById(staffId, status) {
         body: JSON.stringify({ status: normalized })
       });
       if (resp.ok) {
+        updateAvailabilityInCaches(staffId, normalized);
         return true;
       }
     } catch (_) {
@@ -2701,6 +2702,7 @@ async function updateStaffAvailabilityById(staffId, status) {
     throw new Error(error.message || 'Unable to update availability status.');
   }
 
+  updateAvailabilityInCaches(staffId, normalized);
   return true;
 }
 
@@ -2713,7 +2715,7 @@ async function handleAvailabilityToggle(staff, nextStatus, toggleGroup) {
     String(staffId) === String(cachedSessionUser.id) || 
     (staff.email && cachedSessionUser.email && String(staff.email).toLowerCase() === String(cachedSessionUser.email).toLowerCase())
   );
-  if (!isSelf && !isAdminUser(cachedSessionUser)) {
+  if (!isSelf && !isAdminUser(cachedSessionUser) && !isClinicalStaff(cachedSessionUser)) {
     showToast('You can only update your own availability.', 'error');
     return;
   }
@@ -2754,8 +2756,7 @@ async function subscribeToStaffAvailability() {
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'staff',
-        filter: 'role=in.(doctor,nurse)'
+        table: 'staff'
       }, (payload) => {
         const updated = payload?.new;
         if (!updated || !updated.id) return;
@@ -3509,17 +3510,28 @@ function buildStaffLookup(staffRows) {
   return lookup;
 }
 
-function resolveStaffName({ staff, staffId, lookup, fallback = '—' }) {
-  if (staff?.first_name || staff?.last_name) {
-    return `Dr. ${staff.first_name || ''} ${staff.last_name || ''}`.trim();
+function formatDoctorName(raw) {
+  if (!raw) return 'Doctor';
+  let n = String(raw).trim();
+  if (!n) return 'Doctor';
+  while (/^(dr\.?|doctor)\s+/i.test(n)) {
+    n = n.replace(/^(dr\.?|doctor)\s+/i, '').trim();
   }
-  if (lookup && staffId !== null && staffId !== undefined) {
+  return n ? `Dr. ${n}` : 'Doctor';
+}
+
+function resolveStaffName({ staff, staffId, lookup, fallback = '—' }) {
+  let name = '';
+  if (staff?.first_name || staff?.last_name) {
+    name = `${staff.first_name || ''} ${staff.last_name || ''}`.trim();
+  } else if (lookup && staffId !== null && staffId !== undefined) {
     const match = lookup.get(String(staffId));
     if (match?.first_name || match?.last_name) {
-      return `Dr. ${match.first_name || ''} ${match.last_name || ''}`.trim();
+      name = `${match.first_name || ''} ${match.last_name || ''}`.trim();
     }
   }
-  return fallback;
+  if (!name) return fallback;
+  return formatDoctorName(name);
 }
 
 async function openCitizenHealthModal(citizen) {

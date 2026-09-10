@@ -80,8 +80,12 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
 
   final Set<int> _startedPrescriptions = {};
 
-  Future<void> _load() async {
+  Future<void> _load({bool forceRefresh = false}) async {
     final prefs = await SharedPreferences.getInstance();
+
+    if (forceRefresh) {
+      await MedicineCacheService.invalidateScheduleCache(widget.citizenId);
+    }
 
     // 1. Instant local load if cache is available
     final cachedMeds = await MedicineCacheService.loadCachedSchedule(widget.citizenId);
@@ -94,13 +98,11 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       _manuallySetDoseTimes.clear();
       _takenDoses.clear();
       _takenTimestamps.clear();
-
       _dateShiftedDoseTimes.clear();
 
       for (var med in cachedMeds) {
         String? start = prefs.getString('med_start_${med.prescriptionItemId}');
         if (start == null) {
-          // Migration fallback: if user previously had a custom dose time saved
           for (int i = 0; i < 4; i++) {
             final oldCustom = prefs.getString('med_dose_${med.prescriptionItemId}_$i');
             if (oldCustom != null) {
@@ -151,35 +153,36 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
       _scheduleNotifications();
     }
 
-    // 2. If schedule cache is fresh, quietly load consultations and sync queue in background
-    final isFresh = await MedicineCacheService.isScheduleCacheFresh(widget.citizenId);
-    if (isFresh && cachedMeds != null && cachedMeds.isNotEmpty) {
-      try {
-        MedicineCacheService.syncPendingIntakeLogs();
-        final consultations = await ApiService.fetchConsultations();
-        if (mounted) {
-          setState(() {
-            _consultations = consultations;
-          });
-        }
-        _loadDateLogs(_selectedDate, silent: true);
-      } catch (_) {}
-      return;
-    }
-
-    // 3. Otherwise, fetch fresh schedule from remote Supabase
+    // 2. Fetch fresh schedule from remote Supabase (stale-while-revalidate)
     try {
       MedicineCacheService.syncPendingIntakeLogs();
 
       final results = await Future.wait([
         ApiService.getMedicineSchedule(),
         ApiService.fetchConsultations(),
+        ApiService.fetchPrescriptions(),
       ]);
 
-      final meds = results[0] as List<ScheduledMedicine>;
+      final remoteMeds = results[0] as List<ScheduledMedicine>;
       final cons = results[1] as List<Consultation>;
+      final prescriptions = results[2] as List<PrescriptionRecord>;
 
-      // Cache schedule & logs locally
+      // Combine remote schedule with synthesized prescriptions for 100% completeness
+      final Map<int, ScheduledMedicine> mergedMap = {};
+      for (final m in remoteMeds) {
+        if (m.isDispensed) mergedMap[m.prescriptionItemId] = m;
+      }
+
+      final synthesized = ApiService.synthesizeScheduledMedicinesFromPrescriptions(prescriptions);
+      for (final sm in synthesized) {
+        if (!mergedMap.containsKey(sm.prescriptionItemId)) {
+          mergedMap[sm.prescriptionItemId] = sm;
+        }
+      }
+
+      final meds = mergedMap.values.toList();
+
+      // Cache updated schedule locally
       await MedicineCacheService.saveSchedule(widget.citizenId, meds);
 
       if (mounted) {
@@ -958,7 +961,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
             : _error != null ? _buildError()
             : RefreshIndicator(
                 color: _primary,
-                onRefresh: _load,
+                onRefresh: () => _load(forceRefresh: true),
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -983,7 +986,7 @@ class _uKonekMedicineSchedulerPageState extends State<uKonekMedicineSchedulerPag
                           onPressed: () {
                             setState(() {
                               _selectedDate = DateTime.now();
-                              _load();
+                              _load(forceRefresh: true);
                             });
                           }, 
                           child: Text(DateUtils.isSameDay(_selectedDate, DateTime.now()) ? 'Refresh' : 'Today', 
