@@ -8,7 +8,6 @@ import 'medicine_scheduler_page.dart';
 import 'join_queue_page.dart';
 import 'dashboard_page.dart';
 import 'utils/app_transitions.dart';
-import 'main_shell_page.dart';
 
 import 'core/theme/app_colors.dart';
 

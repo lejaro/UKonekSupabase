@@ -5,3 +5,5 @@ export * from './queueService.js';
 export * from './consultationService.js';
 export * from './pharmacyService.js';
 export * from './scheduleService.js';
+export * from './sessionStore.js';
+

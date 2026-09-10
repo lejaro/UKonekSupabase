@@ -10,7 +10,7 @@ import 'dashboard_page.dart';
 import 'medicine_scheduler_page.dart';
 import 'profile_page.dart';
 import 'utils/app_transitions.dart';
-import 'main_shell_page.dart';
+import 'core/navigation/shell_navigation.dart';
 
 import 'core/theme/app_colors.dart';
 
@@ -291,8 +291,8 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
 
   void _navigateToMainMenu() {
     if (widget.isEmbeddedInShell) {
-      uKonekMainShellPage.switchTab(context, 0);
-      uKonekMainShellPage.checkPrescriptions(context);
+      ShellNavigation.switchTab(ShellNavigation.tabDashboard);
+      ShellNavigation.checkPrescriptions();
     } else if (Navigator.canPop(context)) {
       Navigator.pop(context);
     }

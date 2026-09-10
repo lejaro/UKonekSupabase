@@ -11,6 +11,7 @@ import 'config/supabase_config.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'utils/app_transitions.dart';
+import 'core/session/patient_session.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -221,6 +222,7 @@ class _RootHandlerState extends State<RootHandler> {
     debugPrint('RootHandler: Checking session... ${session != null ? "Supabase OK" : "No Supabase"} | Token: ${sessionToken != null ? "Present" : "Missing"}');
 
     if (session == null || sessionToken == null) {
+      PatientSessionState.clearSession();
       if (session != null) {
         // Mismatch: Supabase has session but our custom token is gone (happens after signOut)
         debugPrint('RootHandler: Session mismatch, clearing Supabase session.');
@@ -235,6 +237,9 @@ class _RootHandlerState extends State<RootHandler> {
       final profile = await ApiService.fetchMyCitizenProfile();
       debugPrint('RootHandler: Profile fetched successfully.');
 
+      final patientSession = PatientSession.fromProfile(profile);
+      PatientSessionState.setSession(patientSession);
+
       final displayName = profile['username'] ?? session.user.email ?? 'User';
 
       _navigate(uKonekMainShellPage(
@@ -247,6 +252,7 @@ class _RootHandlerState extends State<RootHandler> {
       ));
     } catch (e) {
       debugPrint('RootHandler: Error fetching profile: $e');
+      PatientSessionState.clearSession();
       // If error (e.g. profile missing), clear session and go to onboarding
       try {
         await ApiService.signOut();

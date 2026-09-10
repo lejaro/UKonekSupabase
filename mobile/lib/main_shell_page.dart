@@ -12,6 +12,9 @@ import 'medicine_scheduler_page.dart';
 import 'join_queue_page.dart';
 import 'profile_page.dart';
 
+import 'core/navigation/shell_navigation.dart';
+import 'core/session/patient_session.dart';
+
 /// Unified persistent App Shell for uKonek.
 /// Hosts Dashboard, Medicine Scheduler, Queue, and Profile tabs without route pushing.
 class uKonekMainShellPage extends StatefulWidget {
@@ -36,14 +39,12 @@ class uKonekMainShellPage extends StatefulWidget {
 
   /// Helper to allow child widgets to switch tabs in the shell
   static void switchTab(BuildContext context, int index) {
-    final state = context.findAncestorStateOfType<_uKonekMainShellPageState>();
-    state?.selectTab(index);
+    ShellNavigation.switchTab(index);
   }
 
   /// Helper to trigger an immediate check for newly issued prescriptions
   static void checkPrescriptions(BuildContext context) {
-    final state = context.findAncestorStateOfType<_uKonekMainShellPageState>();
-    state?._checkNewPrescriptionAlert();
+    ShellNavigation.checkPrescriptions();
   }
 
   @override
@@ -68,6 +69,9 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _selectedTab = widget.initialTab;
+    ShellNavigation.currentTab.value = _selectedTab;
+    ShellNavigation.currentTab.addListener(_onNavigationTabChanged);
+    ShellNavigation.prescriptionAlertTrigger.addListener(_onPrescriptionTrigger);
 
     _pages = [
       uKonekDashboardPage(
@@ -114,6 +118,8 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    ShellNavigation.currentTab.removeListener(_onNavigationTabChanged);
+    ShellNavigation.prescriptionAlertTrigger.removeListener(_onPrescriptionTrigger);
     _prescriptionCheckTimer?.cancel();
     super.dispose();
   }
@@ -440,10 +446,22 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
     });
   }
 
+  void _onNavigationTabChanged() {
+    final target = ShellNavigation.currentTab.value;
+    if (target != _selectedTab && mounted) {
+      selectTab(target);
+    }
+  }
+
+  void _onPrescriptionTrigger() {
+    if (mounted) _checkNewPrescriptionAlert();
+  }
+
   void selectTab(int index) {
     if (index == _selectedTab) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     HapticFeedback.selectionClick();
+    ShellNavigation.currentTab.value = index;
     setState(() {
       _selectedTab = index;
     });

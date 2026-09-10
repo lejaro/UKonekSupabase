@@ -5,13 +5,15 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../medicine_scheduler_page.dart';
-import '../utils/app_transitions.dart';
+import '../core/navigation/shell_navigation.dart';
 
 class NotificationService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
   FlutterLocalNotificationsPlugin();
+
+  /// Callback allowing UI/Router layers to handle notification clicks customly.
+  static void Function(Map<String, dynamic> payload)? onNotificationAction;
 
   static Future<void> init() async {
     if (kIsWeb) return;
@@ -97,15 +99,16 @@ class NotificationService {
   static void _handleNotificationPayload(String payload) {
     try {
       final data = jsonDecode(payload);
-      if (data['action'] == 'medicine') {
-        final username = data['username'] ?? '';
-        final citizenId = data['citizenId'] ?? '';
-        navigatorKey.currentState?.push(AppPageRoute.slideRight(
-          uKonekMedicineSchedulerPage(
-            username: username,
-            citizenId: citizenId,
-          ),
-        ));
+      if (data is Map<String, dynamic>) {
+        if (onNotificationAction != null) {
+          onNotificationAction!(data);
+          return;
+        }
+
+        // Default navigation fallback: switch to the medicine scheduler tab
+        if (data['action'] == 'medicine') {
+          ShellNavigation.switchTab(ShellNavigation.tabMedicineScheduler);
+        }
       }
     } catch (e) {
       debugPrint('Error parsing notification payload: $e');

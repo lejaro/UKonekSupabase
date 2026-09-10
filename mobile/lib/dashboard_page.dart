@@ -15,7 +15,7 @@ import 'services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'utils/app_transitions.dart';
 import 'doctor_schedules_page.dart';
-import 'main_shell_page.dart';
+import 'core/navigation/shell_navigation.dart';
 import 'core/theme/app_colors.dart';
 
 typedef _C = AppColors;
@@ -130,7 +130,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   // ── Navigate to profile with ALL registration fields ──────────
   void _navigateToProfile() {
     if (widget.isEmbeddedInShell) {
-      uKonekMainShellPage.switchTab(context, 3);
+      ShellNavigation.switchTab(ShellNavigation.tabProfile);
       return;
     }
     Navigator.push(
@@ -1195,7 +1195,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               onTap: () {
                 HapticFeedback.lightImpact();
                 if (widget.isEmbeddedInShell) {
-                  uKonekMainShellPage.switchTab(context, 2);
+                  ShellNavigation.switchTab(ShellNavigation.tabQueue);
                 } else {
                   Navigator.push(context, AppPageRoute.slideRight(uKonekJoinQueuePage(username: widget.username, citizenId: widget.citizenId)));
                 }
@@ -1239,7 +1239,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                       onPressed: () {
                         HapticFeedback.lightImpact();
                         if (widget.isEmbeddedInShell) {
-                          uKonekMainShellPage.switchTab(context, 2);
+                          ShellNavigation.switchTab(ShellNavigation.tabQueue);
                         } else {
                           Navigator.push(
                             context,
@@ -1394,7 +1394,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
           onTap: () async {
             HapticFeedback.lightImpact();
             if (widget.isEmbeddedInShell) {
-              uKonekMainShellPage.switchTab(context, 2);
+              ShellNavigation.switchTab(ShellNavigation.tabQueue);
               return;
             }
             final joined = await Navigator.push<bool>(

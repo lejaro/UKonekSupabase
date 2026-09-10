@@ -8,6 +8,7 @@ import 'registration/register_wrapper.dart';
 import 'menu_page.dart';
 import 'forgot_password_page.dart';
 import 'utils/app_transitions.dart';
+import 'core/session/patient_session.dart';
 
 class uKonekLoginPage extends StatefulWidget {
   const uKonekLoginPage({super.key});
@@ -161,6 +162,16 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
           .join(' ')
           .trim()
           .let((n) => n.isNotEmpty ? n : displayName); // fallback to username if all empty
+
+      PatientSessionState.setSession(PatientSession(
+        id: (user['id'] ?? '').toString(),
+        username: displayName,
+        fullname: fullName,
+        email: _str(user, 'email'),
+        phone: _str(user, 'contact_number'),
+        address: _str(user, 'complete_address'),
+        rawProfile: user,
+      ));
 
       Navigator.pushAndRemoveUntil(
         context,
