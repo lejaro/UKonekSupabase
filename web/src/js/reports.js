@@ -694,12 +694,12 @@ export async function exportStaffLoginLogsReport(startDate = null, endDate = nul
   }
 }
 
-/**
- * Helper function to load Supabase module
- */
+let _supabaseModulePromise = null;
 async function loadSupabaseModule() {
-  const module = await import('./lib/supabaseClient.js');
-  return { supabase: module.supabase };
+  if (!_supabaseModulePromise) {
+    _supabaseModulePromise = import('./lib/supabaseClient.js').then(m => ({ supabase: m.supabase }));
+  }
+  return _supabaseModulePromise;
 }
 
 // Export all functions
