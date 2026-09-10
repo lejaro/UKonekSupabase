@@ -17,6 +17,7 @@ import 'utils/app_transitions.dart';
 import 'doctor_schedules_page.dart';
 import 'core/navigation/shell_navigation.dart';
 import 'core/theme/app_colors.dart';
+import 'widgets/dashboard/dashboard_quick_action.dart';
 
 typedef _C = AppColors;
 
@@ -1453,69 +1454,31 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
       mainAxisSpacing: 14,
       childAspectRatio: 2.3,
       children: [
-        _actionBtn('My Patient ID', Icons.qr_code_scanner_rounded, const Color(0xFF059669), () {
-          _showPatientQrModal();
-        }),
-        _actionBtn('Health Records', Icons.assignment_outlined, const Color(0xFF0284C7), () =>
-            Navigator.push(context, AppPageRoute.slideRight(const uKonekHealthRecordsPage()))),
-        _actionBtn('Doctor Schedules', Icons.calendar_month_rounded, const Color(0xFF7C3AED), () =>
-            Navigator.push(context, AppPageRoute.slideRight(const uKonekDoctorSchedulesPage()))),
-        _actionBtn('Clinic Feedback', Icons.chat_bubble_outline_rounded, const Color(0xFFD97706), () =>
-            Navigator.push(context, AppPageRoute.slideRight(const uKonekFeedbackPage()))),
+        DashboardQuickAction(
+          label: 'My Patient ID',
+          icon: Icons.qr_code_scanner_rounded,
+          color: const Color(0xFF059669),
+          onTap: _showPatientQrModal,
+        ),
+        DashboardQuickAction(
+          label: 'Health Records',
+          icon: Icons.assignment_outlined,
+          color: const Color(0xFF0284C7),
+          onTap: () => Navigator.push(context, AppPageRoute.slideRight(const uKonekHealthRecordsPage())),
+        ),
+        DashboardQuickAction(
+          label: 'Doctor Schedules',
+          icon: Icons.calendar_month_rounded,
+          color: const Color(0xFF7C3AED),
+          onTap: () => Navigator.push(context, AppPageRoute.slideRight(const uKonekDoctorSchedulesPage())),
+        ),
+        DashboardQuickAction(
+          label: 'Clinic Feedback',
+          icon: Icons.chat_bubble_outline_rounded,
+          color: const Color(0xFFD97706),
+          onTap: () => Navigator.push(context, AppPageRoute.slideRight(const uKonekFeedbackPage())),
+        ),
       ],
-    );
-  }
-
-  Widget _actionBtn(String label, IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        decoration: BoxDecoration(
-          color: _C.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _C.divider, width: 1),
-          boxShadow: const [
-            BoxShadow(
-              color: _C.shadow, 
-              blurRadius: 12, 
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 19),
-            ),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                  color: _C.textDark,
-                  letterSpacing: -0.2,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

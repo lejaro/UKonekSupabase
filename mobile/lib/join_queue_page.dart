@@ -13,6 +13,7 @@ import 'utils/app_transitions.dart';
 import 'core/navigation/shell_navigation.dart';
 
 import 'core/theme/app_colors.dart';
+import 'widgets/queue/queue_service_picker.dart';
 
 typedef _C = AppColors;
 
@@ -510,60 +511,6 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
     super.dispose();
   }
 
-  void _showServiceSearchModal(List<QueueServiceOption> services) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return _ServiceSearchModal(
-          services: services,
-          onSelected: (service) {
-            setState(() => _selectedService = service);
-            Navigator.pop(context);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildSearchableServicePicker(List<QueueServiceOption> services) {
-    return InkWell(
-      onTap: () => _showServiceSearchModal(services),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          color: _C.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _C.fieldBorder),
-          boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 8, offset: Offset(0, 3))],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(color: _C.primaryLight, borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.medical_services_outlined, size: 16, color: _C.primaryMid),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                _selectedService?.serviceLabel ?? 'Choose a healthcare service',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: _selectedService != null ? FontWeight.w600 : FontWeight.normal,
-                  color: _selectedService != null ? _C.textDark : _C.textMuted.withOpacity(0.6),
-                ),
-              ),
-            ),
-            const Icon(Icons.search_rounded, color: _C.primary, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
 
   Future<void> _handleJoin() async {
     if (_selectedService == null) return _showSnack('Please select a service.', isError: true);
@@ -922,7 +869,11 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
 
               _sectionLabel('HEALTHCARE SERVICE', Icons.medical_services_outlined),
               const SizedBox(height: 12),
-              _buildSearchableServicePicker(services),
+              QueueServicePicker(
+                services: services,
+                selectedService: _selectedService,
+                onSelected: (service) => setState(() => _selectedService = service),
+              ),
               const SizedBox(height: 24),
 
               // ── Priority category ───────────────────────────────
@@ -1544,132 +1495,4 @@ class _uKonekJoinQueuePageState extends State<uKonekJoinQueuePage>
       ),
     );
   }
-}
-
-class _ServiceSearchModal extends StatefulWidget {
-  final List<QueueServiceOption> services;
-  final Function(QueueServiceOption) onSelected;
-
-  const _ServiceSearchModal({required this.services, required this.onSelected});
-
-  @override
-  State<_ServiceSearchModal> createState() => _ServiceSearchModalState();
-}
-
-class _ServiceSearchModalState extends State<_ServiceSearchModal> {
-  final TextEditingController _searchController = TextEditingController();
-  List<QueueServiceOption> _filteredServices = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _filteredServices = widget.services;
-  }
-
-  void _filterServices(String query) {
-    setState(() {
-      _filteredServices = widget.services
-          .where((s) => s.serviceLabel.toLowerCase().contains(query.toLowerCase()))
-          .toList();
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    return Container(
-      height: mq.size.height * 0.75,
-      decoration: const BoxDecoration(
-        color: _C.bg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(children: [
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 12),
-          width: 40, height: 4,
-          decoration: BoxDecoration(color: _C.textMuted.withOpacity(0.2), borderRadius: BorderRadius.circular(2)),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          child: Column(children: [
-            const Text('Select Healthcare Service', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _C.textDark)),
-            const SizedBox(height: 16),
-            Container(
-              decoration: BoxDecoration(
-                color: _C.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _C.fieldBorder),
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: _filterServices,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Search healthcare service...',
-                  hintStyle: TextStyle(color: _C.textMuted.withOpacity(0.5), fontSize: 14),
-                  prefixIcon: const Icon(Icons.search_rounded, color: _C.primary),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 15),
-                ),
-              ),
-            ),
-          ]),
-        ),
-        Expanded(
-          child: _filteredServices.isEmpty
-              ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.search_off_rounded, size: 48, color: _C.textMuted.withOpacity(0.3)),
-                    const SizedBox(height: 12),
-                    Text('No services found', style: TextStyle(color: _C.textMuted.withOpacity(0.6), fontSize: 14)),
-                  ],
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-                  itemCount: _filteredServices.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final s = _filteredServices[index];
-                    return InkWell(
-                      onTap: () => widget.onSelected(s),
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: _C.surface,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: _C.fieldBorder),
-                        ),
-                        child: Row(children: [
-                          Container(
-                            width: 36, height: 36,
-                            decoration: BoxDecoration(color: _C.primaryLight, borderRadius: BorderRadius.circular(10)),
-                            child: const Icon(Icons.medical_services_outlined, size: 18, color: _C.primaryMid),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(s.serviceLabel, style: const TextStyle(fontWeight: FontWeight.w600, color: _C.textDark, fontSize: 14)),
-                              ],
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right_rounded, color: _C.textMuted, size: 20),
-                        ]),
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ]),
-    );
-  }
-}
+}

@@ -14,6 +14,7 @@ import 'profile_page.dart';
 
 import 'core/navigation/shell_navigation.dart';
 import 'core/session/patient_session.dart';
+import 'widgets/prescription_details_sheet.dart';
 
 /// Unified persistent App Shell for uKonek.
 /// Hosts Dashboard, Medicine Scheduler, Queue, and Profile tabs without route pushing.
@@ -167,280 +168,27 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
       payload: '{"action":"prescription","id":${alert.prescriptionId}}',
     );
 
-    final dateStr = DateFormat('MMM d, yyyy • h:mm a').format(alert.issuedAt);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => PopScope(
-        canPop: false,
-        child: Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          elevation: 12,
-          backgroundColor: Colors.white,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Top Icon Badge
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF6F42C1), Color(0xFF8B5CF6)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF6F42C1).withOpacity(0.32),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.receipt_long_rounded,
-                    color: Colors.white,
-                    size: 34,
-                  ),
-                ),
-                const SizedBox(height: 18),
-
-                // Title & Subtitle
-                const Text(
-                  'New E-Prescription Issued!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: _textDark,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${alert.displayDoctorName} has issued your official electronic prescription.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF64748B),
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 18),
-
-                // Details Card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3E8FF),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFE9D5FF)),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Rx Code:',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF7E22CE),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            alert.prescriptionCode,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF581C87),
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Issued:',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF7E22CE),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            dateStr,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF581C87),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Medicines List Preview
-                if (alert.items.isNotEmpty) ...[
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'PRESCRIBED MEDICATIONS (${alert.items.length})',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF6F42C1),
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    constraints: const BoxConstraints(maxHeight: 140),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: alert.items.map((it) => Container(
-                          margin: const EdgeInsets.only(bottom: 6),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 26,
-                                height: 26,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF6F42C1).withOpacity(0.12),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.medication_rounded,
-                                  size: 15,
-                                  color: Color(0xFF6F42C1),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      it.medicineName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: _textDark,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${it.dosage.isNotEmpty ? '${it.dosage} • ' : ''}${it.quantityLabel}${it.frequency.isNotEmpty ? ' (${it.frequency})' : ''}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Color(0xFF64748B),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        )).toList(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                ],
-
-                // Action Buttons
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      await ApiService.acknowledgePrescription(alert.prescriptionId);
-                      if (ctx.mounted) Navigator.of(ctx).pop();
-                      _isShowingPrescriptionModal = false;
-                      if (mounted) {
-                        Navigator.push(
-                          context,
-                          AppPageRoute.slideRight(PrescriptionPage(
-                            initialPrescriptionId: alert.prescriptionId,
-                          )),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6F42C1),
-                      foregroundColor: Colors.white,
-                      elevation: 3,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.receipt_long_rounded, size: 18),
-                        SizedBox(width: 8),
-                        Text(
-                          'View E-Prescription',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.1,
-                          ),
-                        ),
-                        SizedBox(width: 4),
-                        Icon(Icons.arrow_forward_rounded, size: 16),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton(
-                    onPressed: () async {
-                      await ApiService.acknowledgePrescription(alert.prescriptionId);
-                      if (ctx.mounted) Navigator.of(ctx).pop();
-                      _isShowingPrescriptionModal = false;
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF64748B),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                    child: const Text(
-                      'Dismiss for now',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    PrescriptionAlertDialog.show(
+      context,
+      alert: alert,
+      onViewPrescription: () async {
+        await ApiService.acknowledgePrescription(alert.prescriptionId);
+        if (mounted) Navigator.of(context).pop();
+        _isShowingPrescriptionModal = false;
+        if (mounted) {
+          Navigator.push(
+            context,
+            AppPageRoute.slideRight(PrescriptionPage(
+              initialPrescriptionId: alert.prescriptionId,
+            )),
+          );
+        }
+      },
+      onDismiss: () async {
+        await ApiService.acknowledgePrescription(alert.prescriptionId);
+        if (mounted) Navigator.of(context).pop();
+        _isShowingPrescriptionModal = false;
+      },
     ).then((_) {
       _isShowingPrescriptionModal = false;
     });
