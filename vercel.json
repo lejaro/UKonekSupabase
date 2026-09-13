@@ -1,0 +1,19 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": false,
+  "rewrites": [
+    { "source": "/", "destination": "/web/public/index.html" },
+    { "source": "/index.html", "destination": "/web/public/index.html" },
+    { "source": "/login", "destination": "/web/public/index.html" },
+    { "source": "/dashboard", "destination": "/web/public/dashboard.html" },
+    { "source": "/dashboard.html", "destination": "/web/public/dashboard.html" },
+    { "source": "/dashboard-pharmacist", "destination": "/web/public/dashboard-pharmacist.html" },
+    { "source": "/dashboard-pharmacist.html", "destination": "/web/public/dashboard-pharmacist.html" },
+    { "source": "/tv-view", "destination": "/web/public/tv-view.html" },
+    { "source": "/tv-view.html", "destination": "/web/public/tv-view.html" },
+    { "source": "/U-KonekLogo-transparent.png", "destination": "/web/public/U-KonekLogo-transparent.png" },
+    { "source": "/favicon.ico", "destination": "/web/public/U-KonekLogo-transparent.png" },
+    { "source": "/src/(.*)", "destination": "/web/src/$1" },
+    { "source": "/public/(.*)", "destination": "/web/public/$1" }
+  ]
+}
