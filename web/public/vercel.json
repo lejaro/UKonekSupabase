@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": false,
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/login", "destination": "/index.html" },
+    { "source": "/dashboard", "destination": "/dashboard.html" },
+    { "source": "/dashboard-pharmacist", "destination": "/dashboard-pharmacist.html" },
+    { "source": "/tv-view", "destination": "/tv-view.html" },
+    { "source": "/favicon.ico", "destination": "/U-KonekLogo-transparent.png" }
+  ]
+}

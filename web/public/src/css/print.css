@@ -1,0 +1,116 @@
+﻿            @media print {
+
+              /* Hide everything else */
+              body * {
+                visibility: hidden;
+              }
+
+              #citizen-health-modal,
+              #citizen-health-modal * {
+                visibility: visible;
+              }
+
+              /* Reset modal positioning for full page */
+              #citizen-health-modal {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                background: white;
+                visibility: visible !important;
+              }
+
+              #citizen-health-modal .modal-box {
+                box-shadow: none;
+                border: none;
+                max-width: 100% !important;
+                width: 100% !important;
+                max-height: none !important;
+                overflow: visible !important;
+                background: white;
+                margin: 0;
+                padding: 0;
+              }
+
+              /* Hide UI controls */
+              #chr-close-btn,
+              #chr-export-btn,
+              .chr-tab,
+              input,
+              select,
+              .btn,
+              .chip-btn,
+              .search-box,
+              .tab-controls,
+              [id*="search"],
+              [id*="filter"],
+              [id*="count"],
+              .record-count {
+                display: none !important;
+              }
+
+              /* Expand sections */
+              .chr-tab-content {
+                display: block !important;
+                margin-top: 30px;
+                page-break-inside: auto;
+                overflow: visible !important;
+              }
+
+              .chr-tab-content h4 {
+                display: block !important;
+                border-bottom: 2px solid #16a34a;
+                padding-bottom: 8px;
+                margin-bottom: 16px;
+                color: #16a34a;
+                font-size: 18px;
+              }
+
+              /* Table formatting for PDF */
+              table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                table-layout: auto !important;
+                overflow: visible !important;
+                margin-bottom: 20px;
+              }
+
+              th,
+              td {
+                border: 1px solid #e2e8f0 !important;
+                padding: 6px 8px !important;
+                text-align: left !important;
+                font-size: 10px !important;
+                white-space: normal !important;
+                /* Force wrap */
+                word-break: break-word !important;
+                line-height: 1.4 !important;
+              }
+
+              .table-header-row {
+                background-color: #f1f5f9 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+
+              /* Remove scrollbars specifically */
+              .table-wrap,
+              .modal-box,
+              .chr-tab-content,
+              #citizen-health-modal {
+                overflow: visible !important;
+                max-height: none !important;
+              }
+
+              ::-webkit-scrollbar {
+                display: none !important;
+              }
+
+              * {
+                -ms-overflow-style: none !important;
+                scrollbar-width: none !important;
+                overflow: visible !important;
+              }
+            }

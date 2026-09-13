@@ -1,0 +1,1327 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   U-KONEK+ WEB APP - EHR/MEDICAL RECORD VISUAL THEME
+   Electronic Health Record Standard Layout & Typography
+   
+   SCOPE: Web app only (doctor/staff-facing)
+   PRESERVES: All existing colors, functionality, and logic
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPOGRAPHY - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+html,
+body {
+    font-family: "Inter", "Segoe UI", "Roboto", Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* Body text */
+.mainview,
+.modal-box,
+.panel,
+.management-shell {
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* Field/section labels - EHR standard */
+label,
+.modal-label,
+.filter-label,
+.sidebar-section-label,
+.section-kicker {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    color: #6b7a8d;
+}
+
+/* Data values */
+.modal-text,
+.table-cell,
+.stat-value,
+.patient-name {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Page/section headings */
+.section-title,
+.modal-heading,
+.panel-head h3,
+h3 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+h2,
+.dashboard-hero .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAYOUT & SPACING - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Sidebar - EHR standard width */
+.sidebar {
+    flex-basis: 240px;
+    width: 240px;
+}
+
+.sidebar.collapsed {
+    flex-basis: 90px;
+    width: 90px;
+}
+
+/* Main content - centered with max-width */
+.mainview {
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 20px 24px 100px;
+}
+
+.sidebar ~ .mainview {
+    margin-left: 260px;
+    margin-right: 10px;
+    width: calc(100% - 270px);
+    max-width: calc(1100px + 260px);
+}
+
+.sidebar.collapsed ~ .mainview {
+    margin-left: 110px;
+    width: calc(100% - 120px);
+}
+
+/* Section cards - EHR standard */
+.panel,
+.management-shell,
+.registration-box,
+.stat-card {
+    background: #ffffff;
+    border: 1px solid #d0d7e2;
+    border-radius: 6px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+/* Card headers - EHR standard */
+.panel-head,
+.management-head,
+.table-header-row {
+    background: #f0f2f5;
+    border-bottom: 1px solid #d0d7e2;
+    padding: 10px 20px;
+    margin: -16px -20px 16px -20px;
+    border-radius: 6px 6px 0 0;
+}
+
+.panel-head h3,
+.management-head h3 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+    color: #1e293b;
+}
+
+/* Field row spacing - 2-3 column grid */
+.modal-group,
+.field {
+    margin-bottom: 12px;
+}
+
+.profile-grid,
+.vital-signs-grid,
+.assessment-field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENTS - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Buttons - preserve existing colors, update shape only */
+.btn,
+.chip-btn,
+button[type="submit"],
+button[type="button"] {
+    border-radius: 4px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+.btn.small {
+    padding: 5px 12px;
+    font-size: 12px;
+}
+
+/* Inputs - EHR standard */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea,
+.search-input,
+.filter-select,
+.vital-input {
+    border: 1px solid #d0d7e2;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 13px;
+    background: #ffffff;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.search-input:focus,
+.filter-select:focus,
+.vital-input:focus {
+    outline: none;
+    border-color: var(--primary, #2D5A27);
+    box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.15);
+}
+
+/* Status badges - clinical semantic colors (NEW ADDITIONS ONLY) */
+.badge-normal,
+.badge-success {
+    background: #dcfce7;
+    color: #166534;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge-warning,
+.badge-borderline {
+    background: #fef9c3;
+    color: #854d0e;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge-danger,
+.badge-critical {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Existing badges - preserve colors, update typography */
+.badge-active,
+.badge-pending,
+.badge-available,
+.badge-break,
+.badge-unavailable,
+.badge-waiting,
+.badge-on_call,
+.notif-type {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 3px;
+    padding: 2px 8px;
+}
+
+/* Tables - EHR standard */
+.accounts-table {
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.table-header-row {
+    background: #f0f2f5;
+    border-bottom: 2px solid #d0d7e2;
+}
+
+.table-header-cell {
+    padding: 10px 12px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: #475569;
+}
+
+.table-cell {
+    padding: 10px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.accounts-table tbody tr:hover,
+.account-row:hover,
+.pending-row:hover {
+    background: #f8fafc;
+}
+
+/* Tabs - underline style with existing primary color */
+.tabs,
+.modal-tabs {
+    border-bottom: 2px solid #e2e8f0;
+    gap: 20px;
+    background: transparent;
+    padding: 0;
+    margin-bottom: 16px;
+}
+
+.tab,
+.modal-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: 10px 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    margin: 0;
+    box-shadow: none;
+}
+
+.tab.active,
+.modal-tab.active {
+    color: var(--primary, #2D5A27);
+    border-bottom-color: var(--primary, #2D5A27);
+    background: transparent;
+    box-shadow: none;
+}
+
+.tab:hover,
+.modal-tab:hover {
+    color: var(--primary-light, #3E7D32);
+    background: transparent;
+    transform: none;
+}
+
+/* ID / reference fields - monospace */
+.ticket-code,
+.prescription-code,
+.patient-id,
+[data-field="id"],
+[data-field="code"] {
+    font-family: "SF Mono", "Monaco", "Consolas", "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+    background: #f0f2f5;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SIDEBAR - EHR STANDARD (preserve existing colors)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.sidebar .nav a,
+.sidebar .nav .nav-btn {
+    border-radius: 4px;
+    padding: 9px 10px;
+}
+
+.sidebar .nav .dropdown-item {
+    border-radius: 4px;
+    padding: 7px 10px;
+    font-size: 12px;
+}
+
+.sidebar-section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    margin: 8px 10px 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOPBAR / HEADER - EHR STANDARD (preserve existing colors)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.topbar {
+    min-height: 56px;
+    padding: 12px 20px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+}
+
+.topbar .icon-btn {
+    border-radius: 4px;
+    padding: 8px;
+}
+
+/* Patient context bar (if needed in future) */
+.patient-context-bar {
+    background: rgba(45, 90, 39, 0.05);
+    border: 1px solid rgba(45, 90, 39, 0.15);
+    border-radius: 4px;
+    padding: 5px 20px;
+    font-size: 12px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ICONOGRAPHY - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.nav-icon,
+.nav-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.topbar .icon-btn svg,
+.modal-close-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODALS - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.modal-box {
+    border-radius: 6px;
+    padding: 24px 28px;
+    background: #ffffff;
+}
+
+.modal-heading {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-group {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 12px;
+    align-items: start;
+    margin-bottom: 12px;
+}
+
+.modal-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    color: #6b7a8d;
+    padding-top: 2px;
+}
+
+.modal-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1e293b;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DASHBOARD HERO - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dashboard-hero {
+    background: #ffffff;
+    border: 1px solid #d0d7e2;
+    border-radius: 6px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+}
+
+.dashboard-hero::before {
+    height: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATS CARDS - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.stat-card {
+    background: #ffffff;
+    border: 1px solid #d0d7e2;
+    border-radius: 6px;
+    padding: 16px 18px;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    color: #6b7a8d;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 6px 0 4px;
+}
+
+.stat-foot {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   QUEUE MANAGEMENT - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.queue-ticket-card {
+    border: 1px solid #d0d7e2;
+    border-radius: 6px;
+    padding: 12px 14px;
+    background: #ffffff;
+}
+
+.queue-ticket-card:hover {
+    border-color: #94a3b8;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VITAL SIGNS MODAL - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.vital-assessment-modal {
+    border-radius: 6px;
+}
+
+.vital-modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #d0d7e2;
+    background: #f0f2f5;
+}
+
+.vital-modal-title h3 {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.vital-patient-banner {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 20px 24px;
+}
+
+.vital-form {
+    padding: 20px 24px 28px;
+}
+
+.section-header {
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.section-title {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.vital-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    color: #6b7a8d;
+    margin-bottom: 6px;
+}
+
+.vital-input {
+    border: 1px solid #d0d7e2;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+.vital-input:focus {
+    border-color: var(--primary, #2D5A27);
+    box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.15);
+}
+
+.vital-actions {
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.vital-btn {
+    border-radius: 4px;
+    padding: 9px 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FORMS - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.field {
+    margin-bottom: 12px;
+}
+
+.field label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    color: #6b7a8d;
+    margin-bottom: 6px;
+}
+
+.field input,
+.field select,
+.field textarea {
+    width: 100%;
+    border: 1px solid #d0d7e2;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOTIFICATIONS - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.notification-item {
+    border: 1px solid #d0d7e2;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+
+.notification-item:hover {
+    border-color: #94a3b8;
+}
+
+.notification-title {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.notif-meta {
+    font-size: 12px;
+    color: #6b7a8d;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SEARCH & FILTERS - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.search-wrap {
+    border-radius: 4px;
+    border: 1px solid #d0d7e2;
+}
+
+.search-input {
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+.filter-select {
+    border: 1px solid #d0d7e2;
+    border-radius: 4px;
+    padding: 7px 12px;
+    font-size: 13px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE ADJUSTMENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+    .sidebar ~ .mainview {
+        margin-left: 0;
+        width: 100%;
+        max-width: none;
+    }
+    
+    .mainview {
+        padding: 14px;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 900px) {
+    .sidebar.slid ~ .mainview {
+        margin-left: 240px;
+        width: calc(100% - 240px);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY - WCAG AA COMPLIANCE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Ensure focus indicators are visible */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--primary, #2D5A27);
+    outline-offset: 2px;
+}
+
+/* Ensure sufficient contrast for muted text */
+.muted,
+.small,
+.stat-foot,
+.panel-hint {
+    color: #6b7a8d;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRINT STYLES - EHR STANDARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media print {
+    .sidebar,
+    .topbar,
+    .btn,
+    .chip-btn,
+    button {
+        display: none !important;
+    }
+    
+    .mainview {
+        margin: 0;
+        width: 100%;
+        max-width: none;
+        padding: 0;
+    }
+    
+    .panel,
+    .management-shell,
+    .stat-card {
+        border: 1px solid #000;
+        page-break-inside: avoid;
+    }
+    
+    .table-header-row {
+        background: #f0f2f5 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EHR UTILITY CLASSES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Clinical data display */
+.ehr-data-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f2f5;
+}
+
+.ehr-data-row:last-child {
+    border-bottom: none;
+}
+
+.ehr-data-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    color: #6b7a8d;
+}
+
+.ehr-data-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1e293b;
+}
+
+/* Section dividers */
+.ehr-section-divider {
+    height: 1px;
+    background: #d0d7e2;
+    margin: 16px 0;
+}
+
+/* Compact spacing for dense information */
+.ehr-compact {
+    line-height: 1.4;
+}
+
+.ehr-compact .field,
+.ehr-compact .modal-group {
+    margin-bottom: 8px;
+}
+
+/* Clinical notes styling */
+.clinical-note {
+    background: #fafbfc;
+    border: 1px solid #e5e7eb;
+    border-left: 3px solid var(--primary, #2D5A27);
+    border-radius: 4px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 12px 0;
+}
+
+.clinical-note-header {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: #6b7a8d;
+    margin-bottom: 6px;
+}
+
+/* Prescription styling */
+.prescription-item {
+    background: #ffffff;
+    border: 1px solid #d0d7e2;
+    border-radius: 4px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+}
+
+.prescription-item:hover {
+    border-color: #94a3b8;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+.prescription-drug-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.prescription-instructions {
+    font-size: 12px;
+    color: #6b7a8d;
+    line-height: 1.5;
+}
+
+/* Alert boxes - clinical */
+.ehr-alert {
+    border-radius: 4px;
+    padding: 12px 14px;
+    margin: 12px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.ehr-alert-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+}
+
+.ehr-alert-info {
+    background: #dbeafe;
+    border: 1px solid #93c5fd;
+    color: #1e40af;
+}
+
+.ehr-alert-warning {
+    background: #fef9c3;
+    border: 1px solid #fde047;
+    color: #854d0e;
+}
+
+.ehr-alert-danger {
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+}
+
+.ehr-alert-success {
+    background: #dcfce7;
+    border: 1px solid #86efac;
+    color: #166534;
+}
+
+/* Timeline styling for medical history */
+.ehr-timeline {
+    position: relative;
+    padding-left: 24px;
+}
+
+.ehr-timeline::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: #d0d7e2;
+}
+
+.ehr-timeline-item {
+    position: relative;
+    padding-bottom: 16px;
+}
+
+.ehr-timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primary, #2D5A27);
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 0 2px #d0d7e2;
+}
+
+.ehr-timeline-date {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: #6b7a8d;
+    margin-bottom: 4px;
+}
+
+.ehr-timeline-content {
+    font-size: 13px;
+    color: #1e293b;
+    line-height: 1.6;
+}
+
+/* Vital signs display */
+.vital-signs-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.vital-sign-box {
+    background: #fafbfc;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 10px 12px;
+    text-align: center;
+}
+
+.vital-sign-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: #6b7a8d;
+    margin-bottom: 4px;
+}
+
+.vital-sign-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.vital-sign-unit {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-left: 2px;
+}
+
+/* Patient header card */
+.patient-header-card {
+    background: #ffffff;
+    border: 1px solid #d0d7e2;
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.patient-header-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 6px;
+    background: linear-gradient(145deg, #475569, #334155);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.patient-header-info {
+    flex: 1;
+}
+
+.patient-header-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.patient-header-meta {
+    font-size: 12px;
+    color: #6b7a8d;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.patient-header-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Medication list styling */
+.medication-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.medication-list-item {
+    background: #ffffff;
+    border: 1px solid #d0d7e2;
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.medication-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.medication-dosage {
+    font-size: 12px;
+    color: #6b7a8d;
+}
+
+/* Lab results table */
+.lab-results-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid #d0d7e2;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.lab-results-table thead {
+    background: #f0f2f5;
+}
+
+.lab-results-table th {
+    padding: 10px 12px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: #475569;
+    text-align: left;
+    border-bottom: 2px solid #d0d7e2;
+}
+
+.lab-results-table td {
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #1e293b;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.lab-results-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.lab-results-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+/* Reference range indicator */
+.ref-range {
+    font-size: 11px;
+    color: #94a3b8;
+    font-style: italic;
+}
+
+/* Abnormal flag */
+.abnormal-flag {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+
+.abnormal-flag-high {
+    background: #ef4444;
+}
+
+.abnormal-flag-low {
+    background: #3b82f6;
+}
+
+/* Signature block */
+.signature-block {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 2px solid #d0d7e2;
+}
+
+.signature-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+}
+
+.signature-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    color: #6b7a8d;
+}
+
+.signature-value {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1e293b;
+}
+
+/* Document metadata footer */
+.document-footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+    font-size: 11px;
+    color: #94a3b8;
+    text-align: center;
+}
+
+/* Grid layouts for forms */
+.ehr-form-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.ehr-form-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+@media (max-width: 768px) {
+    .ehr-form-grid-2,
+    .ehr-form-grid-3 {
+        grid-template-columns: 1fr;
+    }
+    
+    .patient-header-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .patient-header-meta {
+        justify-content: center;
+    }
+}
+
+/* Status indicators for appointments */
+.appointment-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.appointment-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.appointment-status-scheduled .appointment-status-dot {
+    background: #3b82f6;
+}
+
+.appointment-status-confirmed .appointment-status-dot {
+    background: #10b981;
+}
+
+.appointment-status-cancelled .appointment-status-dot {
+    background: #ef4444;
+}
+
+.appointment-status-completed .appointment-status-dot {
+    background: #6b7280;
+}
+
+/* Collapsible sections */
+.ehr-collapsible-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border: 1px solid #d0d7e2;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    transition: background 0.2s ease;
+}
+
+.ehr-collapsible-header:hover {
+    background: #f1f5f9;
+}
+
+.ehr-collapsible-icon {
+    transition: transform 0.2s ease;
+}
+
+.ehr-collapsible-header.is-open .ehr-collapsible-icon {
+    transform: rotate(180deg);
+}
+
+.ehr-collapsible-content {
+    padding: 16px;
+    border: 1px solid #d0d7e2;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+}
+
+/* Quick action buttons */
+.ehr-quick-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ehr-quick-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid #d0d7e2;
+    border-radius: 4px;
+    background: #ffffff;
+    font-size: 12px;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ehr-quick-action-btn:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+}
+
+.ehr-quick-action-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Empty state */
+.ehr-empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: #94a3b8;
+}
+
+.ehr-empty-state-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.ehr-empty-state-text {
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* Loading skeleton */
+.ehr-skeleton {
+    background: linear-gradient(90deg, #f0f2f5 25%, #e5e7eb 50%, #f0f2f5 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+    border-radius: 4px;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+.ehr-skeleton-text {
+    height: 14px;
+    margin-bottom: 8px;
+}
+
+.ehr-skeleton-title {
+    height: 20px;
+    width: 60%;
+    margin-bottom: 12px;
+}
+
+.ehr-skeleton-button {
+    height: 36px;
+    width: 120px;
+}

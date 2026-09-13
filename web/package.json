@@ -1,0 +1,8 @@
+{
+  "name": "u-konek-web-sub",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "node -e \"const fs=require('fs'); if(fs.existsSync('src')){fs.cpSync('src','public/src',{recursive:true});console.log('Synced src to public/src');}\""
+  }
+}
