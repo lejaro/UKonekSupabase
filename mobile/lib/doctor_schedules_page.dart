@@ -37,44 +37,73 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
     _availabilityChannel = client
         .channel('staff-availability')
         .onPostgresChanges(
-      event: PostgresChangeEvent.all, // Replaces event: '*'
+      event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'staff',
       callback: (payload) {
         final record = payload.newRecord;
-        if (record.isEmpty) return; // In 2.x, newRecord is often a Map
+        if (record.isEmpty || !mounted) return;
 
-        final role = (record['role'] ?? '').toString().toLowerCase();
-        if (role != 'doctor' && role != 'nurse') return;
+        final staffId = (record['id'] as num?)?.toInt();
+        final role = (record['role'] ?? '').toString().toLowerCase().trim();
+        final isDoctorOrNurse = role == 'doctor' || role == 'nurse';
+        final isKnownInSchedules = staffId != null && _allSchedules.any((s) => s.doctorStaffId == staffId);
 
-        _loadSchedules();
+        if (role.isNotEmpty && !isDoctorOrNurse && !isKnownInSchedules) return;
+
+        debugPrint('[DoctorSchedules] Availability updated in realtime (staffId: $staffId). Updating...');
+
+        // Instant local update on existing schedule cards
+        final newStatus = (record['availability_status'] ?? '').toString().toLowerCase().trim();
+        if (staffId != null && newStatus.isNotEmpty && mounted) {
+          setState(() {
+            _allSchedules = _allSchedules.map((s) {
+              if (s.doctorStaffId == staffId) {
+                return s.copyWith(availabilityStatus: newStatus);
+              }
+              return s;
+            }).toList();
+          });
+        }
+
+        ApiService.invalidateDoctorCache();
+        _loadSchedules(isSilent: true, forceRefresh: true);
       },
     )
-        .subscribe();
+        .subscribe((status, [error]) {
+      debugPrint('[DoctorSchedules Realtime] Subscription status: $status${error != null ? ', error: $error' : ''}');
+    });
   }
 
-  Future<void> _loadSchedules() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadSchedules({bool isSilent = false, bool forceRefresh = false}) async {
+    if (!isSilent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
-      final data = await ApiService.listAvailableDoctorSchedules();
+      final data = await ApiService.listAvailableDoctorSchedules(
+        forceRefresh: forceRefresh || !isSilent,
+      );
       if (!mounted) return;
       setState(() {
         _allSchedules = data;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
-      });
+      if (!isSilent) {
+        setState(() {
+          _error = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-      });
+      if (mounted && !isSilent) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -129,6 +158,10 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
       case 'on_break':
         color = Colors.orange;
         label = 'On Break';
+        break;
+      case 'busy':
+        color = Colors.red;
+        label = 'Busy';
         break;
       case 'unavailable':
         color = Colors.grey;

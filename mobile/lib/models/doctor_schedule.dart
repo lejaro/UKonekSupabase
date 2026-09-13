@@ -58,6 +58,30 @@ class DoctorSchedule {
       availabilityStatus: (map['availability_status'] ?? '').toString().toLowerCase(),
     );
   }
+
+  DoctorSchedule copyWith({
+    int? id,
+    int? doctorStaffId,
+    String? doctorName,
+    String? specialization,
+    DateTime? scheduleDate,
+    String? startTime,
+    String? endTime,
+    String? notes,
+    String? availabilityStatus,
+  }) {
+    return DoctorSchedule(
+      id: id ?? this.id,
+      doctorStaffId: doctorStaffId ?? this.doctorStaffId,
+      doctorName: doctorName ?? this.doctorName,
+      specialization: specialization ?? this.specialization,
+      scheduleDate: scheduleDate ?? this.scheduleDate,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      notes: notes ?? this.notes,
+      availabilityStatus: availabilityStatus ?? this.availabilityStatus,
+    );
+  }
 }
 
 class DoctorStatus {
@@ -80,6 +104,22 @@ class DoctorStatus {
     final cleanLast = lastName.replaceAll(RegExp(r'^(dr\.?|doctor)\s*', caseSensitive: false), '').trim();
     final full = '$cleanFirst $cleanLast'.trim();
     return formatDoctorName(full.isNotEmpty ? full : '$firstName $lastName');
+  }
+
+  DoctorStatus copyWith({
+    int? id,
+    String? firstName,
+    String? lastName,
+    String? specialization,
+    String? availabilityStatus,
+  }) {
+    return DoctorStatus(
+      id: id ?? this.id,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      specialization: specialization ?? this.specialization,
+      availabilityStatus: availabilityStatus ?? this.availabilityStatus,
+    );
   }
 
   factory DoctorStatus.fromMap(Map<String, dynamic> map) {

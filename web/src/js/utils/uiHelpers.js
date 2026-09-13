@@ -55,7 +55,7 @@ export function renderTableSkeleton(tbody, columnCount, rowCount = 5) {
 export function toggleStatsSkeleton(isLoading) {
   const statIds = [
     'stat-queue-waiting', 'stat-consults-today', 'stat-vitals-today',
-    'stat-dispenses-today', 'stat-citizens'
+    'stat-dispenses-today'
   ];
   statIds.forEach(id => {
     const el = document.getElementById(id);
@@ -63,6 +63,11 @@ export function toggleStatsSkeleton(isLoading) {
     if (isLoading) {
       el.classList.remove('data-loaded');
       el.innerHTML = '<span class="skeleton-shimmer stat-skeleton" aria-hidden="true"></span>';
+    } else {
+      if (el.querySelector('.skeleton-shimmer')) {
+        el.textContent = '0';
+        el.classList.add('data-loaded');
+      }
     }
   });
 }

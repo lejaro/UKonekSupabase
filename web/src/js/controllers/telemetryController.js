@@ -11,6 +11,15 @@ export const ADMIN_DASHBOARD_REFRESH_MS = 15000;
 let adminDashboardRefreshTimer = null;
 let adminDashboardRefreshInFlight = false;
 
+export function getManilaTodayStr() {
+  return new Intl.DateTimeFormat('fr-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+}
+
 export let clinicalMetricsCache = {
   waiting: 0,
   serving: 0,
@@ -21,37 +30,50 @@ export let clinicalMetricsCache = {
 
 export async function loadClinicalOperationsMetrics() {
   try {
-    const { data, error } = await supabase.rpc('get_clinical_operations_metrics');
+    const manilaTodayStr = getManilaTodayStr();
+    const manilaStartIso = `${manilaTodayStr}T00:00:00+08:00`;
+    const manilaEndIso = `${manilaTodayStr}T23:59:59.999+08:00`;
+
+    // Query active queue tickets specifically for today's queue date
+    const [metricsRpc, queueWaitingRes, queueServingRes] = await Promise.all([
+      supabase.rpc('get_clinical_operations_metrics'),
+      supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).in('status', ['waiting', 'on_call']).eq('queue_date', manilaTodayStr),
+      supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'serving').eq('queue_date', manilaTodayStr)
+    ]);
+
+    const { data, error } = metricsRpc;
+
+    const waitingToday = (queueWaitingRes && typeof queueWaitingRes.count === 'number')
+      ? queueWaitingRes.count
+      : (data?.waiting || 0);
+
+    const servingToday = (queueServingRes && typeof queueServingRes.count === 'number')
+      ? queueServingRes.count
+      : (data?.serving || 0);
 
     if (error) {
       console.warn('RPC get_clinical_operations_metrics failed, falling back to individual queries:', error);
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayIso = todayStart.toISOString();
-
-      const [waitingRes, servingRes, consultsRes, vitalsRes, rxRes, otcRes] = await Promise.all([
-        supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).in('status', ['waiting', 'on_call']),
-        supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'serving'),
-        supabase.from('consultations').select('id', { count: 'exact', head: true }).gte('created_at', todayIso),
-        supabase.from('vital_signs').select('id', { count: 'exact', head: true }).gte('created_at', todayIso),
-        supabase.from('prescription_item_dispenses').select('id', { count: 'exact', head: true }).gte('dispensed_at', todayIso),
-        supabase.from('otc_dispenses').select('id', { count: 'exact', head: true }).gte('dispensed_at', todayIso)
+      const [consultsRes, vitalsRes, rxRes, otcRes] = await Promise.all([
+        supabase.from('consultations').select('id', { count: 'exact', head: true }).gte('created_at', manilaStartIso).lte('created_at', manilaEndIso),
+        supabase.from('vital_signs').select('id', { count: 'exact', head: true }).gte('created_at', manilaStartIso).lte('created_at', manilaEndIso),
+        supabase.from('prescription_item_dispenses').select('id', { count: 'exact', head: true }).gte('dispensed_at', manilaStartIso).lte('dispensed_at', manilaEndIso),
+        supabase.from('otc_dispenses').select('id', { count: 'exact', head: true }).gte('dispensed_at', manilaStartIso).lte('dispensed_at', manilaEndIso)
       ]);
 
       const rxCount = (rxRes && typeof rxRes.count === 'number') ? rxRes.count : 0;
       const otcCount = (otcRes && typeof otcRes.count === 'number') ? otcRes.count : 0;
 
       clinicalMetricsCache = {
-        waiting: (waitingRes && typeof waitingRes.count === 'number') ? waitingRes.count : 0,
-        serving: (servingRes && typeof servingRes.count === 'number') ? servingRes.count : 0,
+        waiting: waitingToday,
+        serving: servingToday,
         consultsToday: (consultsRes && typeof consultsRes.count === 'number') ? consultsRes.count : 0,
         vitalsToday: (vitalsRes && typeof vitalsRes.count === 'number') ? vitalsRes.count : 0,
         dispensesToday: rxCount + otcCount
       };
     } else {
       clinicalMetricsCache = {
-        waiting: data?.waiting || 0,
-        serving: data?.serving || 0,
+        waiting: waitingToday,
+        serving: servingToday,
         consultsToday: data?.consults_today || 0,
         vitalsToday: data?.vitals_today || 0,
         dispensesToday: data?.dispenses_today || 0
@@ -61,6 +83,19 @@ export async function loadClinicalOperationsMetrics() {
     renderClinicalMetrics();
   } catch (err) {
     console.warn('Failed to load clinical operations metrics:', err);
+  } finally {
+    renderClinicalMetrics();
+  }
+}
+
+export function updateRegisteredCitizensMetric(count) {
+  clinicalMetricsCache.citizensCount = count;
+  const statCitizens = document.getElementById('stat-citizens');
+  if (statCitizens) {
+    statCitizens.textContent = String(count);
+    statCitizens.classList.remove('data-loaded');
+    void statCitizens.offsetWidth;
+    statCitizens.classList.add('data-loaded');
   }
 }
 
@@ -69,6 +104,7 @@ export function renderClinicalMetrics() {
   const statConsultsToday = document.getElementById('stat-consults-today');
   const statVitalsToday = document.getElementById('stat-vitals-today');
   const statDispensesToday = document.getElementById('stat-dispenses-today');
+  const statCitizens = document.getElementById('stat-citizens');
   const statQueueFoot = document.getElementById('stat-queue-foot');
 
   const updateMetric = (el, val) => {
@@ -83,6 +119,7 @@ export function renderClinicalMetrics() {
   updateMetric(statConsultsToday, clinicalMetricsCache.consultsToday);
   updateMetric(statVitalsToday, clinicalMetricsCache.vitalsToday);
   updateMetric(statDispensesToday, clinicalMetricsCache.dispensesToday);
+  updateMetric(statCitizens, clinicalMetricsCache.citizensCount);
 
   if (statQueueFoot) {
     if (clinicalMetricsCache.serving > 0) {
@@ -102,6 +139,7 @@ export function renderClinicalMetrics() {
     syncElem.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}`;
   }
 }
+
 
 let activeChartInstance = null;
 
@@ -205,3 +243,13 @@ export function initTelemetry() {
 
   startAdminDashboardAutoRefresh();
 }
+
+export const initTelemetryController = initTelemetry;
+
+export async function refreshAdminDashboard() {
+  // Instantly render cache/default metrics so skeletons are dismissed without waiting
+  renderClinicalMetrics();
+  await loadClinicalOperationsMetrics();
+  renderDashboardInsights();
+}
+

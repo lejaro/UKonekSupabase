@@ -87,8 +87,19 @@ class ApiService {
   static Future<List<DoctorStatus>> listDoctorStatus({bool forceRefresh = false}) =>
       DoctorScheduleService.listDoctorStatus(forceRefresh: forceRefresh);
 
-  static Future<List<DoctorSchedule>> listAvailableDoctorSchedules({DateTime? from, DateTime? to}) =>
-      DoctorScheduleService.listAvailableDoctorSchedules(from: from, to: to);
+  static Future<List<DoctorSchedule>> listAvailableDoctorSchedules({
+    DateTime? from,
+    DateTime? to,
+    bool forceRefresh = false,
+  }) =>
+      DoctorScheduleService.listAvailableDoctorSchedules(
+        from: from,
+        to: to,
+        forceRefresh: forceRefresh,
+      );
+
+  static void invalidateDoctorCache() =>
+      DoctorScheduleService.invalidateDoctorCache();
 
   // ── Queue Management ─────────────────────────────────────────────
   static Future<List<QueueServiceOption>> listAvailableQueueServices({DateTime? date}) =>
@@ -135,11 +146,11 @@ class ApiService {
   static Future<List<PrescribedMedicine>> getMyPrescribedMedicines() =>
       PrescriptionService.getMyPrescribedMedicines();
 
-  static Future<List<ScheduledMedicine>> getMedicineSchedule() =>
-      PrescriptionService.getMedicineSchedule();
+  static Future<List<ScheduledMedicine>> getMedicineSchedule({int? citizenId}) =>
+      PrescriptionService.getMedicineSchedule(citizenId: citizenId);
 
-  static Future<List<PrescriptionRecord>> fetchPrescriptions({int limit = 50}) =>
-      PrescriptionService.fetchPrescriptions(limit: limit);
+  static Future<List<PrescriptionRecord>> fetchPrescriptions({int limit = 50, int? citizenId}) =>
+      PrescriptionService.fetchPrescriptions(limit: limit, citizenId: citizenId);
 
   static List<PrescriptionDispenseLog> synthesizeDispenseLogsFromPrescriptions(
     List<PrescriptionRecord> prescriptions,
@@ -151,13 +162,21 @@ class ApiService {
   ) =>
       PrescriptionService.synthesizeScheduledMedicinesFromPrescriptions(prescriptions);
 
+  static List<ScheduledMedicine> deduplicateMedicines(
+    List<ScheduledMedicine> primary, [
+    List<ScheduledMedicine> secondary = const [],
+  ]) =>
+      PrescriptionService.deduplicateMedicines(primary, secondary);
+
   static Future<List<PrescriptionDispenseLog>> fetchPrescriptionDispenseLogs({
     int? prescriptionId,
     int limit = 50,
+    int? citizenId,
   }) =>
       PrescriptionService.fetchPrescriptionDispenseLogs(
         prescriptionId: prescriptionId,
         limit: limit,
+        citizenId: citizenId,
       );
 
   static Future<void> logMedicineIntake({

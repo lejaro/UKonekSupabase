@@ -95,7 +95,16 @@ class _JoinQueuePageState extends State<JoinQueuePage>
       } else {
         _stopRefreshTimer();
         _unsubscribeQueueRealtime();
-        _checkRecentCompletedTicket();
+        if (snapshot.isCompleted && snapshot.queueId != null) {
+          _handleConsultationDone(
+            ticketId: snapshot.queueId!,
+            serviceLabel: snapshot.serviceLabel.isNotEmpty ? snapshot.serviceLabel : (_activeServiceLabel ?? 'Consultation'),
+            queueNumber: snapshot.myQueueNumber ?? _activeQueueNumber ?? 0,
+            ticketCode: snapshot.ticketCode.isNotEmpty ? snapshot.ticketCode : (_activeTicketCode ?? ''),
+          );
+        } else {
+          _checkRecentCompletedTicket();
+        }
       }
     });
     
@@ -128,17 +137,39 @@ class _JoinQueuePageState extends State<JoinQueuePage>
               final rec = payload.newRecord;
               if (rec.isEmpty) return;
               final id = (rec['id'] as num?)?.toInt();
-              if (id != ticketId) return;
-
               final status = (rec['status'] ?? '').toString().toLowerCase().trim();
-              if (status == 'completed') {
-                _handleConsultationDone(
-                  ticketId: id!,
-                  serviceLabel: rec['service_label']?.toString() ?? _activeServiceLabel ?? 'Consultation',
-                  queueNumber: (rec['queue_number'] as num?)?.toInt() ?? _activeQueueNumber ?? 0,
-                  ticketCode: rec['ticket_code']?.toString() ?? _activeTicketCode ?? '',
-                );
-              } else {
+
+              if (id == ticketId) {
+                if (const {'completed', 'finished', 'done'}.contains(status)) {
+                  _handleConsultationDone(
+                    ticketId: id!,
+                    serviceLabel: rec['service_label']?.toString() ?? _activeServiceLabel ?? 'Consultation',
+                    queueNumber: (rec['queue_number'] as num?)?.toInt() ?? _activeQueueNumber ?? 0,
+                    ticketCode: rec['ticket_code']?.toString() ?? _activeTicketCode ?? '',
+                  );
+                } else if (status == 'serving') {
+                  HapticFeedback.heavyImpact();
+                  NotificationService.showImmediateNotification(
+                    id: 889,
+                    title: 'Now Serving! Please proceed.',
+                    body: 'Your ticket is now being served. Please proceed to the consultation room.',
+                    payload: '{"action":"queue"}',
+                  );
+                  _refreshDashboard();
+                } else if (status == 'on_call') {
+                  HapticFeedback.mediumImpact();
+                  NotificationService.showImmediateNotification(
+                    id: 888,
+                    title: 'Your number is being called!',
+                    body: 'Please proceed to the nurse for your vital assessment.',
+                    payload: '{"action":"queue"}',
+                  );
+                  _refreshDashboard();
+                } else {
+                  _refreshDashboard();
+                }
+              } else if (status == 'serving' || status == 'completed') {
+                // Another patient ahead moved forward, refresh countdown immediately
                 _refreshDashboard();
               }
             },
@@ -153,6 +184,7 @@ class _JoinQueuePageState extends State<JoinQueuePage>
     if (_queueRealtimeChannel != null) {
       try {
         Supabase.instance.client.removeChannel(_queueRealtimeChannel!);
+        debugPrint('[Queue Realtime] Unsubscribed channel successfully.');
       } catch (_) {}
       _queueRealtimeChannel = null;
     }
@@ -160,8 +192,8 @@ class _JoinQueuePageState extends State<JoinQueuePage>
 
   void _startRefreshTimer() {
     _refreshTimer?.cancel();
-    // Fast 6-second polling while queue ticket is active for prompt status updates
-    _refreshTimer = Timer.periodic(const Duration(seconds: 6), (_) => _refreshDashboard());
+    // 30-second fallback polling while realtime pushes live events
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshDashboard());
   }
 
   void _stopRefreshTimer() {
@@ -191,8 +223,14 @@ class _JoinQueuePageState extends State<JoinQueuePage>
         _stopRefreshTimer();
         _unsubscribeQueueRealtime();
 
-        // If we previously had an active ticket and the citizen did NOT manually leave:
-        if (_activeQueueId != null && !_userManuallyCancelled && !_isShowingDoneModal) {
+        if (snapshot.isCompleted && snapshot.queueId != null) {
+          _handleConsultationDone(
+            ticketId: snapshot.queueId!,
+            serviceLabel: snapshot.serviceLabel.isNotEmpty ? snapshot.serviceLabel : (_activeServiceLabel ?? 'Consultation'),
+            queueNumber: snapshot.myQueueNumber ?? _activeQueueNumber ?? 0,
+            ticketCode: snapshot.ticketCode.isNotEmpty ? snapshot.ticketCode : (_activeTicketCode ?? ''),
+          );
+        } else if (_activeQueueId != null && !_userManuallyCancelled && !_isShowingDoneModal) {
           final prevId = _activeQueueId!;
           final prevService = _activeServiceLabel ?? 'Consultation';
           final prevNum = _activeQueueNumber ?? 0;
@@ -200,7 +238,7 @@ class _JoinQueuePageState extends State<JoinQueuePage>
 
           final ticketInfo = await ApiService.getTicketStatus(prevId);
           final status = ticketInfo?['status']?.toString().toLowerCase().trim();
-          if (status == 'completed') {
+          if (const {'completed', 'finished', 'done'}.contains(status)) {
             _handleConsultationDone(
               ticketId: prevId,
               serviceLabel: ticketInfo?['service_label']?.toString() ?? prevService,

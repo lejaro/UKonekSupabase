@@ -8,13 +8,17 @@ import { supabase } from '../lib/supabaseClient.js';
 import { sessionStore } from '../services/sessionStore.js';
 import * as staffService from '../services/staffService.js';
 import { showToast, renderTableSkeleton, swapContainer } from '../utils/uiHelpers.js';
-import { attachDetailRow, sanitizeText, formatDetailValue } from '../utils/dataDetailModal.js';
-import { openDialogModal, toTitleCase } from './navigationController.js';
+import { attachDetailRow, openDataDetail, sanitizeText, formatDetailValue } from '../utils/dataDetailModal.js';
+import { openDialogModal, toTitleCase, navigateToSection } from './navigationController.js';
+import { updateRegisteredCitizensMetric } from './telemetryController.js';
+import { cleanNone, formatPhysicalExam } from '../utils/clinicalFormatters.js';
 
 export const storedAccounts = new Map();
 export let latestStaffList = [];
 export let latestPatientsList = [];
+let citizenActiveFilter = 'all';
 const citizenDetailCache = new Map();
+
 
 export function getStaffPresenceStatus(user) {
   const isOnline = user?.is_online || false;
@@ -157,9 +161,9 @@ export async function loadPatientData() {
   try {
     const { data, error } = await supabase
       .from('citizens')
-      .select('id, firstname, surname, username, email, contact_number, complete_address, age, date_of_birth, created_at')
+      .select('id, firstname, surname, username, email, contact_number, complete_address, age, date_of_birth, sex, emergency_contact_complete_name, emergency_contact_contact_number, relation, created_at')
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(200);
 
     if (!error && Array.isArray(data)) {
       patients = data;
@@ -169,6 +173,7 @@ export async function loadPatientData() {
   }
 
   latestPatientsList = Array.isArray(patients) ? [...patients] : [];
+  updateRegisteredCitizensMetric(latestPatientsList.length);
 
   if (citizensTbody) {
     swapContainer(citizensTbody, (fragment) => {
@@ -183,19 +188,21 @@ export async function loadPatientData() {
         const fullName = `${citizen.firstname || ''} ${citizen.surname || ''}`.trim() || citizen.username || 'Citizen';
         const contact = citizen.contact_number || '—';
         const email = citizen.email || '—';
-        const age = citizen.age ? `${citizen.age} yrs` : '—';
+        const regDate = citizen.created_at ? new Date(citizen.created_at).toLocaleDateString() : '—';
         const address = citizen.complete_address || '—';
+        const age = citizen.age ? `${citizen.age} yrs` : '—';
 
         const tr = document.createElement('tr');
         tr.className = 'citizen-row';
+        tr.dataset.createdAt = citizen.created_at || '';
         tr.innerHTML = `
           <td class="table-cell">
             <strong style="font-size:13px; color:#0f172a;">${sanitizeText(fullName)}</strong>
             <div style="font-size:11px; color:#64748b;">ID: #${citizen.id}</div>
           </td>
-          <td class="table-cell">${sanitizeText(age)}</td>
-          <td class="table-cell">${sanitizeText(contact)}</td>
-          <td class="table-cell" title="${sanitizeText(address)}">${sanitizeText(address)}</td>
+          <td class="table-cell" style="color:#475569;">${sanitizeText(email)}</td>
+          <td class="table-cell" style="color:#475569;">${sanitizeText(contact)}</td>
+          <td class="table-cell" style="color:#64748b;">${sanitizeText(regDate)}</td>
           <td class="table-cell" style="text-align:right;">
             <button type="button" class="btn small outline" data-action="view-ehr" style="padding:3px 10px; font-size:11px; border-radius:9999px;">View EHR</button>
           </td>
@@ -248,11 +255,29 @@ export function applyCitizensFinder() {
   const citizensFinderInput = document.getElementById('citizens-finder-input');
   const query = String(citizensFinderInput?.value || '').trim().toLowerCase();
   const rows = document.querySelectorAll('#citizens-tbody tr.citizen-row');
+
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
   rows.forEach((row) => {
     const text = row.textContent ? row.textContent.toLowerCase() : '';
-    row.style.display = !query || text.includes(query) ? '' : 'none';
+    const matchesQuery = !query || text.includes(query);
+
+    let matchesFilter = true;
+    if (citizenActiveFilter === 'recent') {
+      const createdRaw = row.dataset.createdAt;
+      if (createdRaw) {
+        const created = new Date(createdRaw);
+        matchesFilter = created >= thirtyDaysAgo;
+      } else {
+        matchesFilter = false;
+      }
+    }
+
+    row.style.display = matchesQuery && matchesFilter ? '' : 'none';
   });
 }
+
 
 export function updateUsersSectionTelemetry() {
   const staffCount = latestStaffList.length;
@@ -335,38 +360,307 @@ function fillAccountEditForm(user) {
   if (bd) bd.value = user.birthday || '';
 }
 
-export function openCitizenHealthModal(citizen) {
+export function switchUsersPane(paneId = 'registered-pane') {
+  const tabStaff = document.getElementById('tab-btn-staff');
+  const tabCitizens = document.getElementById('tab-btn-citizens');
+  const registeredPane = document.getElementById('registered-pane');
+  const citizensPane = document.getElementById('citizens-pane');
+  const accountsPane = document.getElementById('accounts-pane');
+  const registrationPane = document.getElementById('registration-pane');
+  const mgmtTitle = document.getElementById('user-mgmt-title');
+
+  if (accountsPane) accountsPane.classList.remove('hidden');
+  if (registrationPane) registrationPane.classList.add('hidden');
+
+  const isCitizens = paneId === 'citizens-pane';
+
+  if (tabStaff) tabStaff.classList.toggle('is-active', !isCitizens);
+  if (tabCitizens) tabCitizens.classList.toggle('is-active', isCitizens);
+
+  if (registeredPane) registeredPane.classList.toggle('hidden', isCitizens);
+  if (citizensPane) citizensPane.classList.toggle('hidden', !isCitizens);
+
+  if (mgmtTitle) {
+    mgmtTitle.textContent = isCitizens ? 'Citizen Resident Directory' : 'Personnel & Citizens Registry';
+  }
+
+  if (isCitizens && latestPatientsList.length === 0) {
+    loadPatientData();
+  }
+}
+
+export async function openCitizenHealthModal(citizen) {
   const modal = document.getElementById('citizen-health-modal');
   if (!modal || !citizen) return;
 
-  const nameEl = document.getElementById('chr-patient-name');
-  const idEl = document.getElementById('chr-patient-id');
-  const ageEl = document.getElementById('chr-patient-age');
-  const phoneEl = document.getElementById('chr-patient-phone');
-  const addrEl = document.getElementById('chr-patient-address');
+  // Reset tabs to Consultations
+  modal.querySelectorAll('.chr-tab').forEach((t, i) => {
+    const active = i === 0;
+    t.style.color = active ? '#16a34a' : '#64748b';
+    t.style.borderBottomColor = active ? '#16a34a' : 'transparent';
+    t.classList.toggle('active', active);
+  });
+  modal.querySelectorAll('.chr-tab-content').forEach((c, i) => {
+    c.style.display = i === 0 ? '' : 'none';
+  });
 
-  const fullName = `${citizen.firstname || ''} ${citizen.surname || ''}`.trim() || citizen.username;
+  const fullName = [citizen.firstname, citizen.surname].filter(Boolean).join(' ') || citizen.username || 'Citizen Resident';
+  const nameEl = document.getElementById('chr-name');
+  const metaEl = document.getElementById('chr-meta');
   if (nameEl) nameEl.textContent = fullName;
-  if (idEl) idEl.textContent = `CITIZEN #${citizen.id}`;
-  if (ageEl) ageEl.textContent = citizen.age ? `${citizen.age} yrs old` : 'Age: —';
-  if (phoneEl) phoneEl.textContent = citizen.contact_number || 'No contact number';
-  if (addrEl) addrEl.textContent = citizen.complete_address || 'No registered address';
+  if (metaEl) metaEl.textContent = citizen.email || `Citizen ID #${citizen.id}`;
+
+  const profileEl = document.getElementById('chr-profile');
+  if (profileEl) {
+    const profileFields = [
+      { label: 'Sex', value: citizen.sex || '—' },
+      { label: 'Age', value: citizen.age ? `${citizen.age} yrs` : '—' },
+      { label: 'Date of Birth', value: citizen.date_of_birth ? new Date(citizen.date_of_birth).toLocaleDateString() : '—' },
+      { label: 'Contact', value: citizen.contact_number || '—' },
+      { label: 'Address', value: citizen.complete_address || '—' },
+      { label: 'Emergency Contact', value: citizen.emergency_contact_complete_name || '—' },
+      { label: 'Emergency Phone', value: citizen.emergency_contact_contact_number || '—' },
+      { label: 'Relation', value: citizen.relation || '—' }
+    ];
+    profileEl.innerHTML = profileFields.map(f => `
+      <div>
+        <div style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">${sanitizeText(f.label)}</div>
+        <div style="font-size:13px;color:#1e293b;margin-top:2px;">${sanitizeText(String(f.value))}</div>
+      </div>
+    `).join('');
+  }
+
+  const setTabLoading = (id) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px;">Loading clinical records...</div>';
+  };
+  ['chr-consultations-body', 'chr-vitals-body', 'chr-prescriptions-body', 'chr-laborders-body'].forEach(setTabLoading);
 
   modal.classList.remove('hidden');
+
+  try {
+    const citizenId = Number(citizen.id);
+    const [consultRes, vitalsRes, rxRes, labRes] = await Promise.all([
+      supabase.from('consultations')
+        .select('*, doctor:staff!doctor_staff_id(first_name,last_name)')
+        .or(`patient_citizen_id.eq.${citizenId},patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId}`)
+        .order('consulted_at', { ascending: false })
+        .limit(50),
+      supabase.from('vital_signs')
+        .select('*, nurse:staff!nurse_id(first_name,last_name)')
+        .eq('citizen_id', citizenId)
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase.from('prescription_headers')
+        .select('id,issued_at,patient_identifier,doctor_staff_id,doctor:staff!doctor_staff_id(first_name,last_name),items:prescription_items(*)')
+        .or(`patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId}`)
+        .order('issued_at', { ascending: false })
+        .limit(50),
+      supabase.from('lab_orders')
+        .select('*, doctor:staff!doctor_staff_id(first_name,last_name)')
+        .or(`patient_citizen_id.eq.${citizenId},patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId}`)
+        .order('created_at', { ascending: false })
+        .limit(50)
+    ]);
+
+    // Render Consultations
+    const consultEl = document.getElementById('chr-consultations-body');
+    if (consultEl) {
+      const rows = consultRes.data || [];
+      if (!rows.length) {
+        consultEl.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px;">No consultation records found.</div>';
+      } else {
+        consultEl.innerHTML = `
+          <table class="accounts-table" style="width:100%;">
+            <thead><tr class="table-header-row">
+              <th class="table-header-cell">Date</th>
+              <th class="table-header-cell">Diagnosis</th>
+              <th class="table-header-cell">Doctor</th>
+            </tr></thead>
+            <tbody id="chr-consults-list"></tbody>
+          </table>`;
+        const tbody = document.getElementById('chr-consults-list');
+        rows.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.style.cursor = 'pointer';
+          const docName = r.doctor ? [r.doctor.first_name, r.doctor.last_name].filter(Boolean).join(' ') : 'Doctor';
+          tr.innerHTML = `
+            <td class="table-cell" style="white-space:nowrap;">${r.consulted_at ? new Date(r.consulted_at).toLocaleDateString() : '—'}</td>
+            <td class="table-cell"><strong>${sanitizeText(r.diagnosis || '—')}</strong></td>
+            <td class="table-cell" style="white-space:nowrap;">${sanitizeText(docName)}</td>
+          `;
+          tr.addEventListener('click', () => {
+            openDataDetail({
+              title: 'Consultation Record',
+              subtitle: r.consulted_at ? new Date(r.consulted_at).toLocaleString() : 'Record',
+              tag: 'Clinical EHR',
+              items: [
+                { label: 'Attending Doctor', value: docName },
+                { label: 'Diagnosis', value: cleanNone(r.diagnosis) },
+                { label: 'Chief Complaint', value: cleanNone(r.chief_complaint || r.symptoms) },
+                { label: 'Clinical Notes', value: cleanNone(r.notes) },
+                { label: 'Physical Exam', value: formatPhysicalExam(r.physical_exam) }
+              ]
+            });
+          });
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    // Render Vitals
+    const vitalsEl = document.getElementById('chr-vitals-body');
+    if (vitalsEl) {
+      const rows = vitalsRes.data || [];
+      if (!rows.length) {
+        vitalsEl.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px;">No vital assessment records found.</div>';
+      } else {
+        vitalsEl.innerHTML = `
+          <table class="accounts-table" style="width:100%;">
+            <thead><tr class="table-header-row">
+              <th class="table-header-cell">Date</th>
+              <th class="table-header-cell">Assessment</th>
+              <th class="table-header-cell">Nurse</th>
+            </tr></thead>
+            <tbody id="chr-vitals-list"></tbody>
+          </table>`;
+        const tbody = document.getElementById('chr-vitals-list');
+        rows.forEach(r => {
+          const tr = document.createElement('tr');
+          const nurseName = r.nurse ? [r.nurse.first_name, r.nurse.last_name].filter(Boolean).join(' ') : 'Nurse';
+          tr.innerHTML = `
+            <td class="table-cell" style="white-space:nowrap;">${r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}</td>
+            <td class="table-cell">BP: ${sanitizeText(r.blood_pressure || '—')} | Temp: ${sanitizeText(r.temperature || '—')}°C | HR: ${sanitizeText(r.heart_rate || '—')} bpm</td>
+            <td class="table-cell" style="white-space:nowrap;">${sanitizeText(nurseName)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    // Render Prescriptions
+    const rxEl = document.getElementById('chr-prescriptions-body');
+    if (rxEl) {
+      const rows = rxRes.data || [];
+      if (!rows.length) {
+        rxEl.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px;">No prescription records found.</div>';
+      } else {
+        rxEl.innerHTML = rows.map(rx => {
+          const items = (rx.items || []).map(it =>
+            `<li style="font-size:12px;color:#374151;">${sanitizeText(it.medicine_name)} — ${it.quantity} ${sanitizeText(it.unit || '')} ${it.dosage ? `(${sanitizeText(it.dosage)})` : ''} ${it.frequency || ''}</li>`
+          ).join('');
+          const doc = rx.doctor ? [rx.doctor.first_name, rx.doctor.last_name].filter(Boolean).join(' ') : 'Attending Doctor';
+          const date = rx.issued_at ? new Date(rx.issued_at).toLocaleDateString() : '—';
+          return `
+            <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-size:13px;font-weight:600;color:#1e293b;">${date}</span>
+                <span style="font-size:12px;color:#64748b;">${sanitizeText(doc)}</span>
+              </div>
+              <ul style="margin:0;padding-left:18px;">${items || '<li style="font-size:12px;color:#94a3b8;">No items</li>'}</ul>
+            </div>`;
+        }).join('');
+      }
+    }
+
+    // Render Lab Orders
+    const labEl = document.getElementById('chr-laborders-body');
+    if (labEl) {
+      const rows = labRes.data || [];
+      if (!rows.length) {
+        labEl.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px;">No lab orders found.</div>';
+      } else {
+        labEl.innerHTML = `
+          <table class="accounts-table" style="width:100%;">
+            <thead><tr class="table-header-row">
+              <th class="table-header-cell">Date</th>
+              <th class="table-header-cell">Test</th>
+              <th class="table-header-cell">Status</th>
+              <th class="table-header-cell">Doctor</th>
+            </tr></thead>
+            <tbody>${rows.map(r => {
+              const statusClass = r.status === 'Completed' ? 'badge badge-success' : 'badge badge-warning';
+              const doc = r.doctor ? [r.doctor.first_name, r.doctor.last_name].filter(Boolean).join(' ') : 'Doctor';
+              return `<tr>
+                <td class="table-cell" style="white-space:nowrap;">${r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}</td>
+                <td class="table-cell"><strong>${sanitizeText(r.test_name || '—')}</strong></td>
+                <td class="table-cell"><span class="${statusClass}">${sanitizeText(r.status || '—')}</span></td>
+                <td class="table-cell" style="white-space:nowrap;">${sanitizeText(doc)}</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>`;
+      }
+    }
+  } catch (err) {
+    console.warn('Error loading citizen EHR:', err);
+  }
 }
 
 export function initUsersSection() {
+  const tabStaff = document.getElementById('tab-btn-staff');
+  const tabCitizens = document.getElementById('tab-btn-citizens');
   const staffFinderInput = document.getElementById('staff-finder-input');
   const roleFilterInput = document.getElementById('role-filter');
   const citizensFinderInput = document.getElementById('citizens-finder-input');
   const refreshAccountsBtn = document.getElementById('refresh-accounts-btn');
   const staffRegisterBtn = document.getElementById('staff-register-btn');
+  const regBackBtn = document.getElementById('registration-back-btn');
+  const backToDashBtn = document.getElementById('back-to-dashboard-btn');
   const accountModalCloseBtn = document.getElementById('modal-close-btn');
-  const chrCloseBtn = document.getElementById('chr-modal-close');
+  const chrModal = document.getElementById('citizen-health-modal');
+  const chrCloseBtn = document.getElementById('chr-close-btn');
+
+  // Segmented In-Page Tab Switching
+  if (tabStaff) tabStaff.addEventListener('click', () => switchUsersPane('registered-pane'));
+  if (tabCitizens) tabCitizens.addEventListener('click', () => switchUsersPane('citizens-pane'));
+
+  // Registration Pane navigation
+  if (staffRegisterBtn) {
+    staffRegisterBtn.addEventListener('click', () => {
+      const accountsPane = document.getElementById('accounts-pane');
+      const regPane = document.getElementById('registration-pane');
+      if (accountsPane) accountsPane.classList.add('hidden');
+      if (regPane) regPane.classList.remove('hidden');
+    });
+  }
+
+  if (regBackBtn) {
+    regBackBtn.addEventListener('click', () => {
+      const accountsPane = document.getElementById('accounts-pane');
+      const regPane = document.getElementById('registration-pane');
+      if (accountsPane) accountsPane.classList.remove('hidden');
+      if (regPane) regPane.classList.add('hidden');
+    });
+  }
+
+  if (backToDashBtn) {
+    backToDashBtn.addEventListener('click', () => navigateToSection('dashboard-section'));
+  }
 
   if (staffFinderInput) staffFinderInput.addEventListener('input', applyStaffFinder);
   if (roleFilterInput) roleFilterInput.addEventListener('change', applyStaffFinder);
   if (citizensFinderInput) citizensFinderInput.addEventListener('input', applyCitizensFinder);
+
+  // Filter Chips for Citizens
+  document.querySelectorAll('#citizen-filter-chips .ph-filter-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#citizen-filter-chips .ph-filter-chip').forEach(c => c.classList.remove('is-active'));
+      chip.classList.add('is-active');
+      citizenActiveFilter = chip.getAttribute('data-filter') || 'all';
+      applyCitizensFinder();
+    });
+  });
+
+  // Role Chips for Staff
+  document.querySelectorAll('#staff-role-chips .ph-filter-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#staff-role-chips .ph-filter-chip').forEach(c => c.classList.remove('is-active'));
+      chip.classList.add('is-active');
+      const roleFilter = document.getElementById('role-filter');
+      if (roleFilter) roleFilter.value = chip.getAttribute('data-role') || '';
+      applyStaffFinder();
+    });
+  });
 
   if (refreshAccountsBtn) {
     refreshAccountsBtn.addEventListener('click', async () => {
@@ -381,10 +675,29 @@ export function initUsersSection() {
   }
 
   if (accountModalCloseBtn) accountModalCloseBtn.addEventListener('click', closeAccountModal);
-  if (chrCloseBtn) {
-    chrCloseBtn.addEventListener('click', () => {
-      const modal = document.getElementById('citizen-health-modal');
-      if (modal) modal.classList.add('hidden');
+
+  // Citizen Health Record Modal Listeners
+  if (chrCloseBtn && chrModal) {
+    chrCloseBtn.addEventListener('click', () => chrModal.classList.add('hidden'));
+  }
+  if (chrModal) {
+    chrModal.addEventListener('click', (e) => {
+      if (e.target === chrModal) chrModal.classList.add('hidden');
+    });
+
+    chrModal.querySelectorAll('.chr-tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const targetId = tab.dataset.chrTab;
+        chrModal.querySelectorAll('.chr-tab').forEach((t) => {
+          const isTarget = t === tab;
+          t.classList.toggle('active', isTarget);
+          t.style.color = isTarget ? '#16a34a' : '#64748b';
+          t.style.borderBottomColor = isTarget ? '#16a34a' : 'transparent';
+        });
+        chrModal.querySelectorAll('.chr-tab-content').forEach((pane) => {
+          pane.style.display = pane.id === targetId ? '' : 'none';
+        });
+      });
     });
   }
 
@@ -447,3 +760,9 @@ export function initUsersSection() {
     });
   }
 }
+
+export const initUsersController = initUsersSection;
+export const loadStaffDirectory = loadStaffData;
+export const loadCitizenDirectory = loadPatientData;
+
+

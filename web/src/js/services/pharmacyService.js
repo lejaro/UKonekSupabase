@@ -16,7 +16,7 @@ export async function listMedicines({ includeArchived = false, limit = 100 } = {
   let query = supabase
     .from('medicines')
     .select('*')
-    .order('brand_name', { ascending: true })
+    .order('name', { ascending: true })
     .limit(limit);
 
   if (!includeArchived) {

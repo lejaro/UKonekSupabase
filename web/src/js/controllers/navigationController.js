@@ -9,6 +9,9 @@ import * as authService from '../services/authService.js';
 import * as sessionAuth from '../services/sessionAuth.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { showToast, dismissPagePreloader, toggleUserSkeleton } from '../utils/uiHelpers.js';
+import { openDialogModal, closeDialogModal } from '../utils/dialogModal.js';
+
+export { openDialogModal, closeDialogModal } from '../utils/dialogModal.js';
 
 export const DEFAULT_SECTION_ID = 'dashboard-section';
 
@@ -45,7 +48,6 @@ export const SECTION_BREADCRUMBS = {
 };
 
 let activeSectionHooks = {};
-let activeDialogResolver = null;
 
 export function registerSectionHooks(hooks = {}) {
   activeSectionHooks = { ...activeSectionHooks, ...hooks };
@@ -335,15 +337,54 @@ export function showLogoutConfirmModal() {
     profilePopover.classList.add('hidden');
     if (profileTrigger) profileTrigger.setAttribute('aria-expanded', 'false');
   }
-  const notifPanel = document.getElementById('notif-panel');
+  const notifPanel = document.getElementById('notification-panel') || document.getElementById('notif-panel');
   if (notifPanel) notifPanel.classList.add('hidden');
   const modal = document.getElementById('logout-confirm-modal');
-  if (modal) modal.classList.remove('hidden');
+  if (modal) {
+    modal.classList.remove('hidden');
+    const cancelBtn = document.getElementById('logout-confirm-no');
+    if (cancelBtn) setTimeout(() => cancelBtn.focus(), 50);
+  }
 }
 
 export function hideLogoutConfirmModal() {
   const modal = document.getElementById('logout-confirm-modal');
   if (modal) modal.classList.add('hidden');
+}
+
+export function switchProfileSubpane(targetPaneId) {
+  const profileTabsWrap = document.getElementById('profile-tabs');
+  if (profileTabsWrap) {
+    profileTabsWrap.querySelectorAll('.personnel-tab-btn').forEach((b) => {
+      b.classList.toggle('is-active', b.getAttribute('data-pane') === targetPaneId);
+    });
+  }
+  document.querySelectorAll('#profile-section .profile-subpane').forEach((pane) => {
+    if (pane.id === targetPaneId) {
+      pane.classList.remove('hidden');
+    } else {
+      pane.classList.add('hidden');
+    }
+  });
+
+  const topbarTitleNode = document.getElementById('main-topbar-title');
+  if (topbarTitleNode) {
+    if (targetPaneId === 'profile-pane-security') {
+      topbarTitleNode.textContent = SECTION_BREADCRUMBS['security-section'] || 'Change Password';
+      setSectionHash('security-section');
+    } else {
+      topbarTitleNode.textContent = SECTION_BREADCRUMBS['profile-section'] || 'Personal Profile';
+      setSectionHash('profile-section');
+    }
+  }
+
+  if (targetPaneId === 'profile-pane-security') {
+    setupPasswordVisibilityToggles(document.getElementById('profile-pane-security') || document);
+    const newPwd = document.getElementById('profile-new-password');
+    if (newPwd) {
+      setTimeout(() => newPwd.focus(), 60);
+    }
+  }
 }
 
 export async function performLogout() {
@@ -359,85 +400,22 @@ export async function performLogout() {
   }
 }
 
-export function closeDialogModal(result = { confirmed: false, values: [] }) {
-  const dialogModal = document.getElementById('dialog-modal');
-  if (dialogModal) dialogModal.classList.add('hidden');
-  if (activeDialogResolver) {
-    activeDialogResolver(result);
-    activeDialogResolver = null;
-  }
+export function isDoctorRole(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return key === 'doctor' || key === 'specialist';
 }
 
-export function openDialogModal({
-  title = 'Confirm',
-  message = '',
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
-  inputs = []
-} = {}) {
-  const dialogModal = document.getElementById('dialog-modal');
-  const dialogTitle = document.getElementById('dialog-title');
-  const dialogMessage = document.getElementById('dialog-message');
-  const dialogConfirmBtn = document.getElementById('dialog-confirm-btn');
-  const dialogCancelBtn = document.getElementById('dialog-cancel-btn');
-  const dialogInput1Wrap = document.getElementById('dialog-input-1-wrap');
-  const dialogInput1Label = document.getElementById('dialog-input-1-label');
-  const dialogInput1 = document.getElementById('dialog-input-1');
-  const dialogInput2Wrap = document.getElementById('dialog-input-2-wrap');
-  const dialogInput2Label = document.getElementById('dialog-input-2-label');
-  const dialogInput2 = document.getElementById('dialog-input-2');
-  const dialogError = document.getElementById('dialog-error');
+export function isScheduleRole(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return key === 'doctor' || key === 'specialist' || key === 'nurse' || key === 'staff';
+}
 
-  if (!dialogModal) return Promise.resolve({ confirmed: false, values: [] });
-
-  if (dialogTitle) dialogTitle.textContent = title;
-  if (dialogMessage) dialogMessage.textContent = message;
-  if (dialogConfirmBtn) dialogConfirmBtn.textContent = confirmText;
-  if (dialogCancelBtn) dialogCancelBtn.textContent = cancelText;
-  if (dialogError) {
-    dialogError.textContent = '';
-    dialogError.classList.add('hidden');
-  }
-
-  const inputConfigs = Array.isArray(inputs) ? inputs.slice(0, 2) : [];
-  const first = inputConfigs[0] || null;
-  const second = inputConfigs[1] || null;
-
-  if (dialogInput1Wrap && dialogInput1 && dialogInput1Label) {
-    if (first) {
-      dialogInput1Wrap.classList.remove('hidden');
-      dialogInput1Label.textContent = first.label || 'Input';
-      dialogInput1.type = first.type || 'text';
-      dialogInput1.placeholder = first.placeholder || '';
-      dialogInput1.value = first.initialValue || '';
-    } else {
-      dialogInput1Wrap.classList.add('hidden');
-      dialogInput1.value = '';
-    }
-  }
-
-  if (dialogInput2Wrap && dialogInput2 && dialogInput2Label) {
-    if (second) {
-      dialogInput2Wrap.classList.remove('hidden');
-      dialogInput2Label.textContent = second.label || 'Input';
-      dialogInput2.type = second.type || 'text';
-      dialogInput2.placeholder = second.placeholder || '';
-      dialogInput2.value = second.initialValue || '';
-    } else {
-      dialogInput2Wrap.classList.add('hidden');
-      dialogInput2.value = '';
-    }
-  }
-
-  dialogModal.classList.remove('hidden');
-  setTimeout(() => {
-    if (first && dialogInput1) dialogInput1.focus();
-    else if (dialogConfirmBtn) dialogConfirmBtn.focus();
-  }, 0);
-
-  return new Promise((resolve) => {
-    activeDialogResolver = resolve;
-  });
+export function getDoctorDisplayName(doctor) {
+  if (!doctor) return 'Doctor';
+  const first = String(doctor.first_name || doctor.firstname || '').trim();
+  const last = String(doctor.last_name || doctor.surname || '').trim();
+  const full = `${first} ${last}`.trim();
+  return full || doctor.username || 'Doctor';
 }
 
 export function showSection(sectionId, options = {}) {
@@ -465,6 +443,11 @@ export function showSection(sectionId, options = {}) {
 }
 
 export function navigateToSection(sectionId, options = {}) {
+  // Alias security-section to profile-section with the security subpane
+  if (sectionId === 'security-section') {
+    return navigateToSection('profile-section', { ...options, pane: 'profile-pane-security' });
+  }
+
   const targetId = document.getElementById(sectionId) ? sectionId : DEFAULT_SECTION_ID;
   const user = sessionStore.getUser();
   const currentRole = user?.role || 'nurse';
@@ -497,11 +480,19 @@ export function navigateToSection(sectionId, options = {}) {
     }
   }
 
-  setSectionHash(allowedTarget);
+  if (allowedTarget === 'profile-section' && options?.pane === 'profile-pane-security') {
+    setSectionHash('security-section');
+  } else {
+    setSectionHash(allowedTarget);
+  }
 
   const topbarTitleNode = document.getElementById('main-topbar-title');
-  if (topbarTitleNode && SECTION_BREADCRUMBS[allowedTarget]) {
-    topbarTitleNode.textContent = SECTION_BREADCRUMBS[allowedTarget];
+  if (topbarTitleNode) {
+    if (allowedTarget === 'profile-section' && options?.pane === 'profile-pane-security') {
+      topbarTitleNode.textContent = SECTION_BREADCRUMBS['security-section'] || 'Change Password';
+    } else if (SECTION_BREADCRUMBS[allowedTarget]) {
+      topbarTitleNode.textContent = SECTION_BREADCRUMBS[allowedTarget];
+    }
   }
 }
 
@@ -574,10 +565,43 @@ export function initNavigation() {
     });
   }
 
+  // Notification Panel
+  const notifBtn = document.getElementById('notif-btn');
+  const notifPanel = document.getElementById('notification-panel') || document.getElementById('notif-panel');
+  const notifCloseBtn = document.getElementById('notif-close-btn');
+
+  if (notifBtn && notifPanel) {
+    notifBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (profilePopover) {
+        profilePopover.classList.add('hidden');
+        if (profileTrigger) profileTrigger.setAttribute('aria-expanded', 'false');
+      }
+      notifPanel.classList.toggle('hidden');
+    });
+
+    if (notifCloseBtn) {
+      notifCloseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        notifPanel.classList.add('hidden');
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!notifPanel.classList.contains('hidden')) {
+        if (!notifPanel.contains(e.target) && !notifBtn.contains(e.target)) {
+          notifPanel.classList.add('hidden');
+        }
+      }
+    });
+  }
+
   // Profile Popover
   if (profileTrigger && profilePopover) {
     profileTrigger.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (notifPanel) notifPanel.classList.add('hidden');
+
       const isHidden = profilePopover.classList.contains('hidden');
       profilePopover.classList.toggle('hidden', !isHidden);
       profileTrigger.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
@@ -591,11 +615,34 @@ export function initNavigation() {
         }
       }
     });
+
+    // Popover navigation menu links (My Profile, Change Password, Availability Schedule)
+    profilePopover.querySelectorAll('[data-section]').forEach((item) => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        profilePopover.classList.add('hidden');
+        if (profileTrigger) profileTrigger.setAttribute('aria-expanded', 'false');
+
+        const sectionId = item.getAttribute('data-section');
+        if (sectionId === 'security-section') {
+          navigateToSection('profile-section', { pane: 'profile-pane-security' });
+        } else if (sectionId) {
+          const pane = item.dataset.pane || (sectionId === 'profile-section' ? 'profile-pane-details' : undefined);
+          navigateToSection(sectionId, { pane });
+        }
+      });
+    });
   }
 
   // Logout modal
   if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => {
+    logoutBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (profilePopover) profilePopover.classList.add('hidden');
+      if (profileTrigger) profileTrigger.setAttribute('aria-expanded', 'false');
+
       if (logoutConfirmModal) {
         showLogoutConfirmModal();
       } else {
@@ -604,13 +651,28 @@ export function initNavigation() {
     });
   }
 
-  if (logoutConfirmYesBtn) logoutConfirmYesBtn.addEventListener('click', performLogout);
-  if (logoutConfirmNoBtn) logoutConfirmNoBtn.addEventListener('click', hideLogoutConfirmModal);
+  if (logoutConfirmYesBtn) {
+    logoutConfirmYesBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      performLogout();
+    });
+  }
+  if (logoutConfirmNoBtn) {
+    logoutConfirmNoBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      hideLogoutConfirmModal();
+    });
+  }
   if (logoutConfirmModal) {
     logoutConfirmModal.addEventListener('click', (e) => {
       if (e.target === logoutConfirmModal) hideLogoutConfirmModal();
     });
   }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && logoutConfirmModal && !logoutConfirmModal.classList.contains('hidden')) {
+      hideLogoutConfirmModal();
+    }
+  });
 
   // Confirmation dialog modal
   if (dialogCancelBtn) {
@@ -676,5 +738,181 @@ export function initNavigation() {
   }
 
   setupPasswordVisibilityToggles();
+  initProfileHandlers();
   state();
+}
+
+export function initProfileHandlers() {
+  const profileTabsWrap = document.getElementById('profile-tabs');
+  if (profileTabsWrap) {
+    profileTabsWrap.querySelectorAll('.personnel-tab-btn').forEach((tabBtn) => {
+      tabBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const paneId = tabBtn.getAttribute('data-pane');
+        if (paneId) switchProfileSubpane(paneId);
+      });
+    });
+  }
+
+  // Password strength & validation
+  const newPasswordInput = document.getElementById('profile-new-password');
+  const confirmPasswordInput = document.getElementById('profile-confirm-password');
+
+  function evaluatePasswordStrength(pwd) {
+    let score = 0;
+    if (!pwd) return { score: 0, label: 'None', color: '#cbd5e1', pct: 0 };
+    if (pwd.length >= 8) score += 1;
+    if (pwd.length >= 12) score += 1;
+    if (/[0-9]/.test(pwd)) score += 1;
+    if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pwd)) score += 1;
+
+    if (score <= 1) return { score, label: 'Weak', color: '#ef4444', pct: 20 };
+    if (score <= 3) return { score, label: 'Medium', color: '#f59e0b', pct: 60 };
+    return { score, label: 'Strong', color: '#10b981', pct: 100 };
+  }
+
+  function updatePasswordValidationUI() {
+    const pwd = newPasswordInput ? newPasswordInput.value : '';
+    const confirmPwd = confirmPasswordInput ? confirmPasswordInput.value : '';
+
+    const { label, color, pct } = evaluatePasswordStrength(pwd);
+    const strengthLabel = document.getElementById('password-strength-label');
+    const strengthMeter = document.getElementById('password-strength-meter');
+
+    if (strengthLabel) {
+      strengthLabel.textContent = label;
+      strengthLabel.style.color = color;
+    }
+    if (strengthMeter) {
+      strengthMeter.style.width = `${pct}%`;
+      strengthMeter.style.background = color;
+    }
+
+    const ruleLength = document.getElementById('rule-length');
+    const ruleComplexity = document.getElementById('rule-complexity');
+    const ruleMatch = document.getElementById('rule-match');
+
+    if (ruleLength) {
+      ruleLength.style.color = pwd.length >= 8 ? '#16a34a' : '#64748b';
+      ruleLength.style.fontWeight = pwd.length >= 8 ? '700' : '400';
+    }
+    if (ruleComplexity) {
+      const hasComplexity = /[A-Za-z]/.test(pwd) && /[0-9]/.test(pwd);
+      ruleComplexity.style.color = hasComplexity ? '#16a34a' : '#64748b';
+      ruleComplexity.style.fontWeight = hasComplexity ? '700' : '400';
+    }
+    if (ruleMatch) {
+      const isMatch = pwd.length > 0 && pwd === confirmPwd;
+      ruleMatch.style.color = isMatch ? '#16a34a' : '#64748b';
+      ruleMatch.style.fontWeight = isMatch ? '700' : '400';
+    }
+  }
+
+  if (newPasswordInput) newPasswordInput.addEventListener('input', updatePasswordValidationUI);
+  if (confirmPasswordInput) confirmPasswordInput.addEventListener('input', updatePasswordValidationUI);
+
+  // Update password button handler
+  const updatePasswordBtn = document.getElementById('profile-update-password-btn');
+  if (updatePasswordBtn) {
+    updatePasswordBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const newPwd = (newPasswordInput?.value || '').trim();
+      const confirmPwd = (confirmPasswordInput?.value || '').trim();
+
+      if (!newPwd || newPwd.length < 8) {
+        showToast('Password must be at least 8 characters in length.', 'error');
+        return;
+      }
+      if (newPwd !== confirmPwd) {
+        showToast('Passwords do not match. Please verify.', 'error');
+        return;
+      }
+
+      try {
+        updatePasswordBtn.disabled = true;
+        const { error } = await supabase.auth.updateUser({ password: newPwd });
+
+        if (error) {
+          throw new Error(error.message || 'Failed to update authentication password.');
+        }
+
+        showToast('Password updated securely. New credentials are now active.', 'success');
+        if (newPasswordInput) newPasswordInput.value = '';
+        if (confirmPasswordInput) confirmPasswordInput.value = '';
+        updatePasswordValidationUI();
+      } catch (err) {
+        console.error('Password update error:', err);
+        showToast(err?.message || 'Unable to update password.', 'error');
+      } finally {
+        updatePasswordBtn.disabled = false;
+      }
+    });
+  }
+
+  // Profile save button handler
+  const profileForm = document.getElementById('profile-form');
+  const profileSaveBtn = document.getElementById('profile-save-btn');
+  const profileCancelBtn = document.getElementById('profile-cancel-btn');
+
+  async function handleProfileSave(e) {
+    if (e) e.preventDefault();
+    const nameInput = document.getElementById('profile-name');
+    const displayName = String(nameInput?.value || '').trim();
+
+    if (!displayName) {
+      showToast('Display name cannot be empty.', 'error');
+      return;
+    }
+
+    try {
+      if (profileSaveBtn) profileSaveBtn.disabled = true;
+
+      const { data, error } = await supabase.rpc('update_my_staff_profile', {
+        p_display_name: displayName
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to update profile.');
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      // Update current user in session store
+      const currentUser = sessionStore.getUser() || {};
+      const updatedUser = {
+        ...currentUser,
+        first_name: displayName,
+        ...(data?.profile || {})
+      };
+      sessionStore.setUser(updatedUser);
+      applyRoleAccess(updatedUser);
+
+      showToast('Profile updated successfully.', 'success');
+    } catch (err) {
+      console.error('Profile save error:', err);
+      showToast(err?.message || 'Failed to save profile.', 'error');
+    } finally {
+      if (profileSaveBtn) profileSaveBtn.disabled = false;
+    }
+  }
+
+  if (profileForm) {
+    profileForm.addEventListener('submit', handleProfileSave);
+  }
+  if (profileSaveBtn && profileSaveBtn.type !== 'submit') {
+    profileSaveBtn.addEventListener('click', handleProfileSave);
+  }
+
+  // Reset button
+  if (profileCancelBtn) {
+    profileCancelBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const currentUser = sessionStore.getUser();
+      if (currentUser) populateProfile(currentUser);
+      showToast('Profile form reset.', 'info');
+    });
+  }
 }

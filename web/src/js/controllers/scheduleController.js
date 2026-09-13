@@ -648,6 +648,16 @@ export function closeScheduleModal() {
   if (modal) modal.classList.add('hidden');
 }
 
+export function teardownStaffAvailability() {
+  if (staffAvailabilityChannel) {
+    try {
+      supabase.removeChannel(staffAvailabilityChannel);
+      console.log('[Schedule] Staff availability realtime unsubscribed.');
+    } catch (_) {}
+    staffAvailabilityChannel = null;
+  }
+}
+
 export function subscribeToStaffAvailability() {
   if (staffAvailabilityChannel) return;
 
@@ -671,6 +681,10 @@ export function subscribeToStaffAvailability() {
   } catch (error) {
     console.warn('Realtime availability subscription failed:', error);
   }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', teardownStaffAvailability);
 }
 
 export function initSchedule() {
@@ -766,3 +780,10 @@ export function initSchedule() {
 
   subscribeToStaffAvailability();
 }
+
+export const initScheduleController = initSchedule;
+
+export async function loadDoctorSchedules(user = sessionStore.getUser()) {
+  return loadSchedules(user);
+}
+

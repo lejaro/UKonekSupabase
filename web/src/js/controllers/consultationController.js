@@ -7,10 +7,11 @@
 import { supabase } from '../lib/supabaseClient.js';
 import { sessionStore } from '../services/sessionStore.js';
 import * as consultationService from '../services/consultationService.js';
-import { showToast, swapContainer, renderTableSkeleton } from '../utils/uiHelpers.js';
+import { showToast, swapContainer, renderTableSkeleton, setLoading } from '../utils/uiHelpers.js';
 import { formatPhysicalExam, cleanNone } from '../utils/clinicalFormatters.js';
 import { attachDetailRow, sanitizeText } from '../utils/dataDetailModal.js';
 import { showSection } from './navigationController.js';
+import { openPrescriptionModalForPatient, resolveCitizenId } from './prescriptionController.js';
 
 export let consultations = [];
 export let consultationQueueTickets = [];
@@ -108,48 +109,105 @@ export function renderConsultations() {
 }
 
 export function initConsultationQuickDiagnosis() {
-  const container = document.getElementById('consult-quick-diag-container');
   const diagInput = document.getElementById('consult-diagnosis');
-  if (!container || !diagInput) return;
+  document.querySelectorAll('.diag-chip, .quick-diag-chip').forEach((btn) => {
+    if (btn.dataset.bound === 'true') return;
+    btn.dataset.bound = 'true';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const diagVal = btn.getAttribute('data-diag') || btn.getAttribute('data-val');
+      if (diagInput && diagVal) {
+        diagInput.value = diagVal;
+        showToast(`Diagnosis applied: ${diagVal}`, 'info');
 
-  const presets = [
-    'Upper Respiratory Tract Infection',
-    'Acute Bronchitis',
-    'Essential Hypertension',
-    'Type 2 Diabetes Mellitus',
-    'Acute Gastroenteritis',
-    'Allergic Rhinitis',
-    'Tension Headache',
-    'Musculoskeletal Strain'
-  ];
-
-  container.innerHTML = presets.map((d) =>
-    `<button type="button" class="chip-btn chip-btn-sm quick-diag-chip" data-val="${d}">${d}</button>`
-  ).join('');
-
-  container.querySelectorAll('.quick-diag-chip').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      diagInput.value = btn.getAttribute('data-val') || '';
+        // Switch to Diagnosis tab so the physician sees the populated field
+        const diagTabBtn = document.querySelector('#consultation-modal .modal-tab[data-tab="tab-diagnosis"]');
+        if (diagTabBtn) {
+          diagTabBtn.click();
+        }
+        diagInput.focus();
+      }
     });
   });
 }
 
 export function initConsultationTabs() {
-  const tabBtns = document.querySelectorAll('.consult-modal-tabs .modal-tab');
-  const panes = document.querySelectorAll('.consult-tab-content');
+  const modal = document.getElementById('consultation-modal');
+  const tabs = document.querySelectorAll('#consultation-modal .modal-tab');
+  const nextBtn = document.getElementById('consult-next-btn');
+  const prevBtn = document.getElementById('consult-prev-btn');
+  const submitBtn = document.getElementById('consult-submit-btn');
 
-  tabBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      tabBtns.forEach((b) => b.classList.remove('active'));
-      panes.forEach((p) => p.classList.remove('active'));
+  const updateButtons = (activeTabId) => {
+    if (!nextBtn || !prevBtn || !submitBtn) return;
 
-      btn.classList.add('active');
-      const targetPaneId = btn.getAttribute('data-tab');
-      if (targetPaneId) {
-        document.getElementById(targetPaneId)?.classList.add('active');
+    if (activeTabId === 'tab-history') {
+      prevBtn.classList.add('hidden');
+      nextBtn.classList.remove('hidden');
+      submitBtn.classList.add('hidden');
+    } else if (activeTabId === 'tab-exam') {
+      prevBtn.classList.remove('hidden');
+      nextBtn.classList.remove('hidden');
+      submitBtn.classList.add('hidden');
+    } else if (activeTabId === 'tab-diagnosis') {
+      prevBtn.classList.remove('hidden');
+      nextBtn.classList.add('hidden');
+      submitBtn.classList.remove('hidden');
+    }
+  };
+
+  tabs.forEach((tab) => {
+    if (tab.dataset.bound === 'true') return;
+    tab.dataset.bound = 'true';
+    tab.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetId = tab.dataset.tab;
+
+      tabs.forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      document.querySelectorAll('#consultation-modal .tab-content').forEach((content) => {
+        content.classList.remove('active');
+      });
+      const targetContent = document.getElementById(targetId);
+      if (targetContent) {
+        targetContent.classList.add('active');
       }
+
+      updateButtons(targetId);
     });
   });
+
+  if (nextBtn && !nextBtn.dataset.bound) {
+    nextBtn.dataset.bound = 'true';
+    nextBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const activeTab = document.querySelector('#consultation-modal .modal-tab.active');
+      const curTab = activeTab?.dataset.tab;
+      if (curTab === 'tab-history') {
+        document.querySelector('#consultation-modal .modal-tab[data-tab="tab-exam"]')?.click();
+      } else if (curTab === 'tab-exam') {
+        document.querySelector('#consultation-modal .modal-tab[data-tab="tab-diagnosis"]')?.click();
+      }
+    });
+  }
+
+  if (prevBtn && !prevBtn.dataset.bound) {
+    prevBtn.dataset.bound = 'true';
+    prevBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const activeTab = document.querySelector('#consultation-modal .modal-tab.active');
+      const curTab = activeTab?.dataset.tab;
+      if (curTab === 'tab-exam') {
+        document.querySelector('#consultation-modal .modal-tab[data-tab="tab-history"]')?.click();
+      } else if (curTab === 'tab-diagnosis') {
+        document.querySelector('#consultation-modal .modal-tab[data-tab="tab-exam"]')?.click();
+      }
+    });
+  }
+
+  const activeTabId = document.querySelector('#consultation-modal .modal-tab.active')?.dataset.tab || 'tab-history';
+  updateButtons(activeTabId);
 }
 
 export function initConsultationToolbar() {
@@ -323,6 +381,9 @@ export async function loadVitalsForConsultation(queueTicketId) {
       { label: 'Temp', value: data.temperature ? `${data.temperature} °C` : null },
       { label: 'RR', value: data.respiratory_rate ? `${data.respiratory_rate} bpm` : null },
       { label: 'SpO₂', value: data.oxygen_saturation ? `${data.oxygen_saturation}%` : null },
+      { label: 'Height', value: data.height_cm ? `${data.height_cm} cm` : null },
+      { label: 'Weight', value: data.weight_kg ? `${data.weight_kg} kg` : null },
+      { label: 'BMI', value: data.bmi ? `${data.bmi}` : null },
     ].filter(v => v.value);
 
     if (vitals.length === 0 && !data.chief_complaint) return;
@@ -369,8 +430,16 @@ export function openConsultationModal(prefill = {}) {
   // Reset tab to History
   consultationModal.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
   consultationModal.querySelector('.modal-tab[data-tab="tab-history"]')?.classList.add('active');
-  consultationModal.querySelectorAll('.consult-tab-content').forEach(t => t.classList.remove('active'));
+  consultationModal.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   consultationModal.querySelector('#tab-history')?.classList.add('active');
+
+  // Reset navigation buttons
+  const nextBtn = document.getElementById('consult-next-btn');
+  const prevBtn = document.getElementById('consult-prev-btn');
+  const submitBtn = document.getElementById('consult-submit-btn');
+  if (prevBtn) prevBtn.classList.add('hidden');
+  if (nextBtn) nextBtn.classList.remove('hidden');
+  if (submitBtn) submitBtn.classList.add('hidden');
 
   const patientInput = document.getElementById('consult-patient-id');
   const displayId = document.getElementById('consult-display-id');
@@ -539,10 +608,7 @@ export function initConsultationSection() {
           throw new Error('Unable to resolve doctor staff session.');
         }
 
-        let citizenId = null;
-        if (patientId && !isNaN(Number(patientId))) {
-          citizenId = Number(patientId);
-        }
+        const citizenId = resolveCitizenId(patientId);
 
         const payload = {
           patient_identifier: String(patientId || '').trim(),
@@ -598,11 +664,31 @@ export function initConsultationSection() {
         closeConsultationModal();
         await loadConsultationData();
 
-        // Complete queue ticket if present
-        const qId = consultationForm.dataset.queueTicketId;
+        // Complete queue ticket if present, or search for any active queue ticket for this citizen today
+        let qId = consultationForm.dataset.queueTicketId;
+        if (!qId && citizenId) {
+          try {
+            const { data: activeTickets } = await supabase
+              .from('queue_tickets')
+              .select('id')
+              .eq('citizen_id', citizenId)
+              .in('status', ['serving', 'on_call', 'waiting'])
+              .order('created_at', { ascending: false })
+              .limit(1);
+            if (activeTickets && activeTickets.length > 0) {
+              qId = String(activeTickets[0].id);
+            }
+          } catch (qErr) {
+            console.warn('Could not auto-resolve queue ticket for citizen:', qErr);
+          }
+        }
+
         if (qId) {
           await completeQueueTicket(qId);
         }
+
+        // Seamlessly transition doctor to prescription modal
+        await openPrescriptionModalForPatient(patientId, data.id, patientName, qId);
       } catch (err) {
         console.error('Failed to save consultation:', err);
         showToast(err.message || 'Unable to save consultation.', 'error');

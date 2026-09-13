@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/api_service.dart';
 import 'join_queue_page.dart';
 import 'health_records_page.dart';
@@ -126,6 +127,9 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   bool _isInitialLoading = true;
   bool _hasUnseenNotifications = false;
   Timer? _refreshTimer;
+  RealtimeChannel? _dashboardQueueRealtimeChannel;
+  RealtimeChannel? _doctorAvailabilityChannel;
+  int? _subscribedTicketId;
   final Map<String, dynamic> _tvQueueDisplay = {};
 
   // ── Navigate to profile with ALL registration fields ──────────
@@ -164,6 +168,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadAllData(isInitial: true);
+    _subscribeDoctorAvailabilityRealtime();
     _refreshTimer = Timer.periodic(const Duration(seconds: 180), (_) {
       _loadAllData(isInitial: false);
     });
@@ -179,12 +184,159 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
+    _unsubscribeDashboardQueueRealtime();
+    _unsubscribeDoctorAvailabilityRealtime();
     super.dispose();
+  }
+
+  void _subscribeDashboardQueueRealtime(int? ticketId) {
+    if (ticketId == null || !mounted) return;
+    if (_dashboardQueueRealtimeChannel != null && _subscribedTicketId == ticketId) return;
+    _unsubscribeDashboardQueueRealtime();
+
+    try {
+      final client = Supabase.instance.client;
+      _subscribedTicketId = ticketId;
+      _dashboardQueueRealtimeChannel = client
+          .channel('dashboard_queue_ticket_$ticketId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'queue_tickets',
+            callback: (payload) {
+              final rec = payload.newRecord;
+              if (rec.isEmpty || !mounted) return;
+              final id = (rec['id'] as num?)?.toInt();
+              final status = (rec['status'] ?? '').toString().toLowerCase().trim();
+
+              if (id == ticketId) {
+                if (status == 'serving') {
+                  HapticFeedback.heavyImpact();
+                  NotificationService.showImmediateNotification(
+                    id: 889,
+                    title: 'Now Serving! Please proceed.',
+                    body: 'Your ticket is now being served. Please proceed to the consultation room.',
+                    payload: '{"action":"queue"}',
+                  );
+                } else if (status == 'on_call') {
+                  HapticFeedback.mediumImpact();
+                  NotificationService.showImmediateNotification(
+                    id: 888,
+                    title: 'Your number is being called!',
+                    body: 'Please proceed to the nurse for your vital assessment.',
+                    payload: '{"action":"queue"}',
+                  );
+                } else if (const {'completed', 'finished', 'done'}.contains(status)) {
+                  NotificationService.showImmediateNotification(
+                    id: 890,
+                    title: 'Consultation Completed!',
+                    body: 'Your consultation has been completed. Prescriptions and instructions are ready.',
+                    payload: '{"action":"consultation_done"}',
+                  );
+                }
+                _loadAllData(isInitial: false);
+              } else if (status == 'serving' || status == 'completed') {
+                _loadAllData(isInitial: false);
+              }
+            },
+          )
+          .subscribe();
+      debugPrint('[Dashboard Queue Realtime] Subscribed to ticket $ticketId');
+    } catch (e) {
+      debugPrint('Error subscribing dashboard queue realtime: $e');
+    }
+  }
+
+  void _unsubscribeDashboardQueueRealtime() {
+    if (_dashboardQueueRealtimeChannel != null) {
+      try {
+        Supabase.instance.client.removeChannel(_dashboardQueueRealtimeChannel!);
+        debugPrint('[Dashboard Queue Realtime] Unsubscribed channel successfully.');
+      } catch (_) {}
+      _dashboardQueueRealtimeChannel = null;
+      _subscribedTicketId = null;
+    }
+  }
+
+  void _subscribeDoctorAvailabilityRealtime() {
+    if (_doctorAvailabilityChannel != null) return;
+
+    try {
+      final client = Supabase.instance.client;
+      _doctorAvailabilityChannel = client
+          .channel('dashboard-staff-availability')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'staff',
+            callback: (payload) {
+              final record = payload.newRecord;
+              if (record.isEmpty || !mounted) return;
+
+              final staffId = (record['id'] as num?)?.toInt();
+              final role = (record['role'] ?? '').toString().toLowerCase().trim();
+              final isKnownDoctor = staffId != null && _doctors.any((d) => d.id == staffId);
+              final isDoctorOrNurse = role == 'doctor' || role == 'nurse';
+
+              if (role.isNotEmpty && !isDoctorOrNurse && !isKnownDoctor) return;
+
+              debugPrint('[Dashboard] Doctor status changed in realtime (id: $staffId, role: $role). Updating UI...');
+
+              // Instant local UI update if availability_status is present
+              final newStatus = (record['availability_status'] ?? '').toString().toLowerCase().trim();
+              if (staffId != null && newStatus.isNotEmpty && mounted) {
+                setState(() {
+                  _doctors = _doctors.map((d) {
+                    if (d.id == staffId) {
+                      return d.copyWith(availabilityStatus: newStatus);
+                    }
+                    return d;
+                  }).toList();
+                });
+              }
+
+              ApiService.invalidateDoctorCache();
+              _refreshDoctorListSilently();
+            },
+          )
+          .subscribe((status, [error]) {
+            debugPrint('[Dashboard Staff Realtime] Subscription status: $status${error != null ? ', error: $error' : ''}');
+          });
+      debugPrint('[Dashboard Staff Realtime] Subscribed to staff availability.');
+    } catch (e) {
+      debugPrint('Error subscribing to doctor availability realtime: $e');
+    }
+  }
+
+  Future<void> _refreshDoctorListSilently() async {
+    try {
+      final doctors = await ApiService.listDoctorStatus(forceRefresh: true);
+      if (mounted) {
+        setState(() {
+          _doctors = doctors;
+        });
+      }
+    } catch (e) {
+      debugPrint('Silent doctor list refresh error: $e');
+    }
+  }
+
+  void _unsubscribeDoctorAvailabilityRealtime() {
+    if (_doctorAvailabilityChannel != null) {
+      try {
+        Supabase.instance.client.removeChannel(_doctorAvailabilityChannel!);
+        debugPrint('[Dashboard Staff Realtime] Unsubscribed channel successfully.');
+      } catch (_) {}
+      _doctorAvailabilityChannel = null;
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      if (_doctorAvailabilityChannel == null) {
+        _subscribeDoctorAvailabilityRealtime();
+      }
       _loadAllData(isInitial: false);
     }
   }
@@ -246,6 +398,13 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
             body: 'Please proceed to the nurse for your vital assessment.',
             payload: '{"action":"queue"}',
           );
+        }
+
+        // Realtime subscription management for active ticket
+        if (newQueueSnapshot.hasActiveQueue && newQueueSnapshot.queueId != null) {
+          _subscribeDashboardQueueRealtime(newQueueSnapshot.queueId);
+        } else {
+          _unsubscribeDashboardQueueRealtime();
         }
 
         setState(() {
@@ -1051,8 +1210,33 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
-  Color  _getStatusColor(String s) => s.toLowerCase() == 'on_break' ? _C.warning : (s.toLowerCase() == 'unavailable' ? const Color(0xFF94A3B8) : _C.success);
-  String _getStatusLabel(String s) => s.toLowerCase() == 'on_break' ? 'On Break' : (s.toLowerCase() == 'unavailable' ? 'Unavailable' : 'Available');
+  Color _getStatusColor(String s) {
+    switch (s.toLowerCase().trim()) {
+      case 'on_break':
+        return _C.warning;
+      case 'busy':
+        return const Color(0xFFEF4444);
+      case 'unavailable':
+        return const Color(0xFF94A3B8);
+      case 'available':
+      default:
+        return _C.success;
+    }
+  }
+
+  String _getStatusLabel(String s) {
+    switch (s.toLowerCase().trim()) {
+      case 'on_break':
+        return 'On Break';
+      case 'busy':
+        return 'Busy';
+      case 'unavailable':
+        return 'Unavailable';
+      case 'available':
+      default:
+        return 'Available';
+    }
+  }
 
   Widget _staffTile(String name, String sub, Color color, String label, IconData icon) {
     return Padding(
@@ -1141,7 +1325,9 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     const SizedBox(width: 5),
                     Text(
                       hasQueue
-                        ? (queue.status.toLowerCase() == 'on_call' ? 'ON CALL' : 'ACTIVE TICKET')
+                        ? (queue.isCompleted
+                            ? 'COMPLETED'
+                            : (queue.status.toLowerCase() == 'on_call' ? 'ON CALL' : 'ACTIVE TICKET'))
                         : 'CLINIC QUEUE',
                       style: TextStyle(color: statusColor, fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 0.4),
                     ),
@@ -1179,11 +1365,13 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      queue.status.toLowerCase() == 'serving'
-                        ? 'You are currently being served'
-                        : (queue.status.toLowerCase() == 'on_call'
-                            ? 'Please proceed to vital assessment station'
-                            : 'Est. Wait: ${_formatWaitTime(queue.estimatedWaitMinutes)}  •  Ahead: ${queue.waitingCount > 0 ? queue.waitingCount : "0"}'),
+                      queue.isCompleted
+                        ? 'Consultation completed • Instructions ready'
+                        : (queue.status.toLowerCase() == 'serving'
+                            ? 'You are currently being served'
+                            : (queue.status.toLowerCase() == 'on_call'
+                                ? 'Please proceed to vital assessment station'
+                                : 'Est. Wait: ${_formatWaitTime(queue.estimatedWaitMinutes)}  •  Ahead: ${queue.waitingCount > 0 ? queue.waitingCount : "0"}')),
                       style: const TextStyle(color: _C.primaryMid, fontWeight: FontWeight.bold, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),

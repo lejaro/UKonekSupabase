@@ -991,6 +991,7 @@ function renderRxItems(items) {
                   type="number"
                   class="rx-dispense-qty-input"
                   data-item-id="${it.id}"
+                  data-medicine-id="${it.medicine_id || ''}"
                   data-remaining="${remaining}"
                   min="0"
                   max="${remaining}"
@@ -1077,6 +1078,7 @@ async function confirmDispense() {
 
   inputs.forEach(input => {
     const itemId = parseInt(input.dataset.itemId, 10);
+    const medId = parseInt(input.dataset.medicineId, 10);
     const remaining = parseInt(input.dataset.remaining, 10);
     const qty = parseInt(input.value, 10);
 
@@ -1091,7 +1093,9 @@ async function confirmDispense() {
       return;
     }
     totalDispenseQty += qty;
-    pendingItems.push({ prescription_item_id: itemId, quantity: qty });
+    const itemRow = { prescription_item_id: itemId, quantity: qty };
+    if (!isNaN(medId) && medId > 0) itemRow.medicine_id = medId;
+    pendingItems.push(itemRow);
   });
 
   if (hasError || pendingItems.length === 0) return;
@@ -1593,9 +1597,18 @@ async function handleOtcDispenseSubmit() {
   setLoading(otcSubmitBtn, true);
   try {
     const sb = await getSupabase();
+    let citizenId = null;
+    const cleanName = patientName.trim();
+    const citMatch = /^CIT-(\d+)$/i.exec(cleanName);
+    if (citMatch) {
+      citizenId = Number(citMatch[1]);
+    } else if (!isNaN(Number(cleanName)) && Number(cleanName) > 0) {
+      citizenId = Number(cleanName);
+    }
+
     const { data, error } = await sb.rpc('dispense_otc_medicines', {
       p_items: payloadItems,
-      p_citizen_id: null,
+      p_citizen_id: citizenId,
       p_walkin_name: patientName,
       p_patient_name: patientName,
       p_notes: notes

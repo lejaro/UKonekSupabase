@@ -119,6 +119,8 @@ export function renderMedicines() {
   });
 }
 
+export { openPrescriptionModalForPatient } from './prescriptionController.js';
+
 export function openPrescriptionModal() {
   const modal = document.getElementById('prescription-modal');
   if (modal) modal.classList.remove('hidden');
@@ -150,26 +152,9 @@ export async function checkPatientDrugAllergies(patientId, medicineName) {
 }
 
 export function initPharmacySection() {
-  const openAddBtn = document.getElementById('open-add-medicine-btn');
-  const addPanel = document.getElementById('medicine-add-panel');
-  const cancelAddBtn = document.getElementById('medicine-add-cancel-btn');
-  const form = document.getElementById('medicine-form');
   const rxCloseBtn = document.getElementById('prescription-modal-close');
 
   refreshMedicineData();
-
-  if (openAddBtn) {
-    openAddBtn.addEventListener('click', () => {
-      addPanel?.classList.toggle('hidden');
-    });
-  }
-
-  if (cancelAddBtn) {
-    cancelAddBtn.addEventListener('click', () => {
-      addPanel?.classList.add('hidden');
-      form?.reset();
-    });
-  }
 
   if (rxCloseBtn) rxCloseBtn.addEventListener('click', closePrescriptionModal);
 
@@ -184,3 +169,7 @@ export function initPharmacySection() {
 
   document.getElementById('medicine-search-input')?.addEventListener('input', renderMedicines);
 }
+
+export const initPharmacyModule = initPharmacySection;
+export const loadMedicinesCatalog = refreshMedicineData;
+

@@ -273,5 +273,17 @@ const tvView = (() => {
     return { init, loadQueueData, playHospitalChime };
 })();
 
+// Unsubscribe on window unload to prevent connection leakage
+window.addEventListener('beforeunload', () => {
+    if (realtimeChannel && supabaseClient) {
+        try {
+            supabaseClient.removeChannel(realtimeChannel);
+            console.log('[TV View] Realtime channel unsubscribed.');
+        } catch (_) {}
+        realtimeChannel = null;
+    }
+});
+
 document.addEventListener('DOMContentLoaded', tvView.init);
 window.tvView = tvView; // Expose for debugging if needed
+

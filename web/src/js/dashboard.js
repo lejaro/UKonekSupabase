@@ -24,12 +24,14 @@ import {
 import {
   initNavigation,
   showSection,
+  navigateToSection,
   registerSectionHooks,
   getSectionFromHash,
   setSectionHash,
   DEFAULT_SECTION_ID,
   applyRoleAccess,
-  populateProfile
+  populateProfile,
+  switchProfileSubpane
 } from './controllers/navigationController.js';
 import {
   initTelemetryController,
@@ -42,7 +44,8 @@ import {
 import {
   initUsersController,
   loadStaffDirectory,
-  loadCitizenDirectory
+  loadCitizenDirectory,
+  switchUsersPane
 } from './controllers/usersController.js';
 import {
   initTriageSection,
@@ -61,11 +64,25 @@ import {
   loadMedicinesCatalog
 } from './controllers/pharmacyController.js';
 import {
+  initPrescriptionController,
+  openPrescriptionModalForPatient,
+  closePrescriptionModal
+} from './controllers/prescriptionController.js';
+import {
   initQueueController,
   loadQueueTickets,
   openVitalAssessmentModal,
   closeVitalAssessmentModal
 } from './controllers/queueController.js';
+
+function withTimeout(promise, timeoutMs, timeoutMessage) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    })
+  ]);
+}
 
 export async function ensureAuthenticatedSession(force = false) {
   const cached = sessionStore.getUser();
@@ -73,11 +90,33 @@ export async function ensureAuthenticatedSession(force = false) {
     return cached;
   }
 
+  console.log('[Dashboard] Validating staff session...');
+
   try {
-    const profile = await authService.getAuthenticatedStaffProfile();
+    const profile = await withTimeout(
+      authService.getAuthenticatedStaffProfile(),
+      5000,
+      'Session validation timed out'
+    );
+
     if (!profile) {
-      window.location.replace('./index.html');
-      return null;
+      console.warn('[Dashboard] No authenticated profile from Supabase, checking fallback session...');
+      const meta = sessionAuth.getAuthSessionMeta();
+      const role = (sessionStorage.getItem('ukonek_role') || meta?.role || '').trim().toLowerCase();
+      if (!role) {
+        console.warn('[Dashboard] No fallback role found. Redirecting to index.html');
+        window.location.replace('./index.html');
+        return null;
+      }
+
+      const fallbackProfile = {
+        id: meta?.userId || null,
+        email: meta?.email || 'clinician@ukonek.local',
+        role: role,
+        username: meta?.email ? meta.email.split('@')[0] : 'Clinician'
+      };
+      sessionStore.setUser(fallbackProfile);
+      return fallbackProfile;
     }
 
     sessionStore.setUser(profile);
@@ -87,9 +126,24 @@ export async function ensureAuthenticatedSession(force = false) {
       userId: profile.id || null,
       email: profile.email || null
     });
+    console.log('[Dashboard] Authenticated staff profile loaded:', profile.username || profile.email, `(${role})`);
     return profile;
   } catch (error) {
-    console.error('[Dashboard] Session validation error:', error);
+    console.warn('[Dashboard] Session validation warning:', error?.message || error);
+    const meta = sessionAuth.getAuthSessionMeta();
+    const role = (sessionStorage.getItem('ukonek_role') || meta?.role || '').trim().toLowerCase();
+    if (role) {
+      console.log('[Dashboard] Recovered session from stored metadata:', role);
+      const fallbackProfile = {
+        id: meta?.userId || null,
+        email: meta?.email || 'clinician@ukonek.local',
+        role: role,
+        username: meta?.email ? meta.email.split('@')[0] : 'Clinician'
+      };
+      sessionStore.setUser(fallbackProfile);
+      return fallbackProfile;
+    }
+
     window.location.replace('./index.html');
     return null;
   }
@@ -112,6 +166,8 @@ if (typeof window !== 'undefined') {
   window.updateLabOrderStatus = updateLabOrderStatus;
   window.evaluateVitalsRisk = evaluateVitalsRisk;
   window.ensureAuthenticatedSession = ensureAuthenticatedSession;
+  window.openPrescriptionModalForPatient = openPrescriptionModalForPatient;
+  window.closePrescriptionModal = closePrescriptionModal;
 
   // Polyfill dynamic module promises if legacy callers invoke them
   window.loadSupabaseModule = async () => ({ supabase });
@@ -124,8 +180,22 @@ if (typeof window !== 'undefined') {
  * Bootstrap the application, register section hooks, and initialize controllers.
  */
 async function bootstrapDashboard() {
+  console.log('[Dashboard] Bootstrap starting...');
   try {
-    // 1. Authenticate user session
+    // Immediate fast-path: if session metadata already exists in sessionStorage,
+    // apply role access and dismiss header skeletons in 0ms without waiting for network.
+    const fastMeta = sessionAuth.getAuthSessionMeta();
+    const fastRole = (sessionStorage.getItem('ukonek_role') || fastMeta?.role || '').trim().toLowerCase();
+    if (fastRole) {
+      applyRoleAccess({
+        id: fastMeta?.userId || null,
+        email: fastMeta?.email || null,
+        role: fastRole,
+        username: fastMeta?.email ? fastMeta.email.split('@')[0] : 'Clinician'
+      });
+    }
+
+    // 1. Authenticate user session (with defensive timeout)
     const user = await ensureAuthenticatedSession();
     if (!user) return;
 
@@ -140,15 +210,23 @@ async function bootstrapDashboard() {
         loadConsultationData();
         initLabSection();
       },
-      'users-section': () => {
+      'users-section': (options = {}) => {
         loadStaffDirectory();
         loadCitizenDirectory();
+        if (options?.pane) {
+          switchUsersPane(options.pane);
+        }
       },
       'medicine-section': () => loadMedicinesCatalog(),
       'vitals-section': () => initTriageSection(),
-      'profile-section': () => {
+      'profile-section': (options = {}) => {
         const currentUser = sessionStore.getUser();
         if (currentUser) populateProfile(currentUser);
+        if (options?.pane) {
+          switchProfileSubpane(options.pane);
+        } else {
+          switchProfileSubpane('profile-pane-details');
+        }
       }
     });
 
@@ -160,21 +238,44 @@ async function bootstrapDashboard() {
     initTriageSection();
     initConsultationSection();
     initPharmacyModule();
-    await initQueueController();
+    initPrescriptionController();
+    
+    // Non-blocking queue controller init so realtime setup does not delay navigation
+    initQueueController().catch(e => console.warn('[Dashboard] Queue controller init warning:', e));
+
+    // Parallel background pre-load of directories so counters and metrics are immediately populated
+    Promise.all([
+      loadStaffDirectory().catch(e => console.warn('[Dashboard] Staff directory load warning:', e)),
+      loadCitizenDirectory().catch(e => console.warn('[Dashboard] Citizen directory load warning:', e))
+    ]);
 
     // 4. Resolve and display initial section based on URL hash or default
     const initialSection = getSectionFromHash() || DEFAULT_SECTION_ID;
-    showSection(initialSection);
+    console.log('[Dashboard] Navigating to initial section:', initialSection);
+    navigateToSection(initialSection);
   } catch (err) {
     console.error('[Dashboard] Bootstrap error:', err);
     showToast('Failed to initialize dashboard. Please refresh the page.', 'error');
   } finally {
     dismissPagePreloader();
+    console.log('[Dashboard] Bootstrap complete.');
   }
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', bootstrapDashboard);
-} else {
+let bootstrapStarted = false;
+function runBootstrapOnce() {
+  if (bootstrapStarted) return;
+  bootstrapStarted = true;
   bootstrapDashboard();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', runBootstrapOnce);
+}
+
+if (document.readyState !== 'loading') {
+  runBootstrapOnce();
+} else {
+  // Guaranteed failsafe in case DOMContentLoaded was already dispatched
+  setTimeout(runBootstrapOnce, 800);
 }

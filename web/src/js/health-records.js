@@ -521,9 +521,9 @@ function renderVitalsTab(rows, error, staffLookup) {
           'Heart Rate': r.heart_rate ? `${r.heart_rate} bpm` : '—',
           'Respiratory Rate': r.respiratory_rate ? `${r.respiratory_rate} breaths/min` : '—',
           'Oxygen Saturation (SpO2)': r.oxygen_saturation ? `${r.oxygen_saturation}%` : '—',
-          'Height': r.height ? `${r.height} cm` : '—',
-          'Weight': r.weight ? `${r.weight} kg` : '—',
-          'BMI': r.bmi || '—',
+          'Height': (r.height_cm ?? r.height) ? `${r.height_cm ?? r.height} cm` : '—',
+          'Weight': (r.weight_kg ?? r.weight) ? `${r.weight_kg ?? r.weight} kg` : '—',
+          'BMI': r.bmi ? `${r.bmi}` : '—',
           'Current Medications': r.current_medications || '—',
           'Notes': r.notes || '—'
         };

@@ -1,4 +1,4 @@
-﻿import 'package:intl/intl.dart';
+import 'package:intl/intl.dart';
 import '../utils/formatters.dart';
 class ScheduledMedicine {
   final int prescriptionItemId;
@@ -74,6 +74,12 @@ class ScheduledMedicine {
     return 1;
   }
 
+  bool get isDiscreteUnit {
+    final u = unit.toLowerCase().trim();
+    if (u.isEmpty) return true;
+    return RegExp(r'\b(tablet|tab|tablets|capsule|cap|capsules|pill|pills|piece|pieces|pc|pcs)\b').hasMatch(u);
+  }
+
   int get durationDays {
     final d = duration.toLowerCase();
     final match = RegExp(r'(\d+)').firstMatch(d);
@@ -85,7 +91,7 @@ class ScheduledMedicine {
         return val;
       }
     }
-    if (dailyDoseCount > 0 && quantity > 0) {
+    if (dailyDoseCount > 0 && quantity > 0 && isDiscreteUnit) {
       return (quantity / dailyDoseCount).ceil();
     }
     return 30; // Default to 30 active days for dispensed medicines
@@ -192,8 +198,25 @@ class ScheduledMedicine {
 
   int get totalPrescribedDoses {
     if (dailyDoseCount <= 0) return 0; // PRN
+
+    // For non-discrete packaging (bottles, syrups, drops, suspensions, inhalers, tubes, packs, boxes):
+    // quantity represents container count (e.g. 1 bottle), NOT dose count.
+    if (!isDiscreteUnit) {
+      if (durationDays > 0) return durationDays * dailyDoseCount;
+      return dailyDoseCount * 30;
+    }
+
+    // For discrete units (tablets, capsules):
+    if (durationDays > 0) {
+      final expectedDoses = durationDays * dailyDoseCount;
+      // If quantity is explicitly smaller (e.g. partial dispense), respect actual quantity
+      if (quantity > 0 && quantity < expectedDoses) {
+        return quantity;
+      }
+      return expectedDoses;
+    }
+
     if (quantity > 0) return quantity;
-    if (durationDays > 0) return durationDays * dailyDoseCount;
     return dailyDoseCount * 30;
   }
 

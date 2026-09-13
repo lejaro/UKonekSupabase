@@ -2,6 +2,7 @@ import '../utils/formatters.dart';
 
 class PrescriptionRecord {
   final int prescriptionId;
+  final int prescriptionItemId;
   final String prescriptionCode;
   final String dispensingStatus;
   final DateTime issuedAt;
@@ -22,6 +23,7 @@ class PrescriptionRecord {
 
   const PrescriptionRecord({
     required this.prescriptionId,
+    this.prescriptionItemId = 0,
     required this.prescriptionCode,
     required this.dispensingStatus,
     required this.issuedAt,
@@ -69,6 +71,7 @@ class PrescriptionRecord {
   factory PrescriptionRecord.fromMap(Map<String, dynamic> m) {
     return PrescriptionRecord(
       prescriptionId:   (m['prescription_id']   as num?)?.toInt() ?? (m['id'] as num?)?.toInt() ?? 0,
+      prescriptionItemId: (m['prescription_item_id'] as num?)?.toInt() ?? (m['item_id'] as num?)?.toInt() ?? 0,
       prescriptionCode: (m['prescription_code']  as String?) ?? '',
       dispensingStatus: (m['dispensing_status']  as String?) ?? 'pending',
       issuedAt:         DateTime.parse((m['issued_at'] as String?) ?? DateTime.now().toIso8601String()).toLocal(),

@@ -165,6 +165,9 @@ export async function listVitalSigns({ citizenId, since, limit = 50 } = {}) {
       temperature,
       oxygen_saturation,
       chief_complaint,
+      height_cm,
+      weight_kg,
+      bmi,
       citizen:citizens (
         id,
         firstname,
@@ -203,11 +206,22 @@ export async function listVitalSigns({ citizenId, since, limit = 50 } = {}) {
  * @param {string} [payload.chief_complaint]
  * @param {number} [payload.nurse_id]
  * @param {number} [payload.queue_ticket_id]
+ * @param {number|string} [payload.height_cm]
+ * @param {number|string} [payload.weight_kg]
+ * @param {number|string} [payload.bmi]
  * @returns {Promise<Object>}
  */
 export async function recordVitalSigns(payload) {
   if (!payload.citizen_id) {
     throw new Error('Citizen ID is required to record vital signs.');
+  }
+
+  const heightVal = payload.height_cm != null ? Number(payload.height_cm) : (payload.height != null ? Number(payload.height) : null);
+  const weightVal = payload.weight_kg != null ? Number(payload.weight_kg) : (payload.weight != null ? Number(payload.weight) : null);
+  let bmiVal = payload.bmi != null ? Number(payload.bmi) : null;
+  if (!bmiVal && heightVal && weightVal && heightVal > 0 && weightVal > 0) {
+    const hm = heightVal / 100;
+    bmiVal = Number((weightVal / (hm * hm)).toFixed(1));
   }
 
   const insertData = {
@@ -220,6 +234,9 @@ export async function recordVitalSigns(payload) {
     chief_complaint: (payload.chief_complaint || '').trim() || null,
     nurse_id: payload.nurse_id || null,
     queue_ticket_id: payload.queue_ticket_id || null,
+    height_cm: heightVal,
+    weight_kg: weightVal,
+    bmi: bmiVal
   };
 
   const { data, error } = await supabase

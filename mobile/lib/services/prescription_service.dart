@@ -21,12 +21,16 @@ class PrescriptionService {
         .toList(growable: false);
   }
 
-  static Future<List<ScheduledMedicine>> getMedicineSchedule() async {
+  static Future<List<ScheduledMedicine>> getMedicineSchedule({int? citizenId}) async {
     final user = _client.auth.currentUser;
     if (user == null) return [];
 
     try {
-      final response = await _client.rpc('get_my_medicine_schedule');
+      final params = <String, dynamic>{};
+      if (citizenId != null && citizenId > 0) {
+        params['p_citizen_id'] = citizenId;
+      }
+      final response = await _client.rpc('get_my_medicine_schedule', params: params.isNotEmpty ? params : null);
       final rows = (response as List<dynamic>?) ?? const <dynamic>[];
       return rows.whereType<Map<String, dynamic>>().map(ScheduledMedicine.fromMap).toList();
     } catch (e) {
@@ -35,12 +39,16 @@ class PrescriptionService {
     }
   }
 
-  static Future<List<PrescriptionRecord>> fetchPrescriptions({int limit = 50}) async {
+  static Future<List<PrescriptionRecord>> fetchPrescriptions({int limit = 50, int? citizenId}) async {
     final user = _client.auth.currentUser;
     if (user == null) return [];
 
     try {
-      final response = await _client.rpc('get_my_prescribed_medicines', params: {'p_limit': limit});
+      final params = <String, dynamic>{'p_limit': limit};
+      if (citizenId != null && citizenId > 0) {
+        params['p_citizen_id'] = citizenId;
+      }
+      final response = await _client.rpc('get_my_prescribed_medicines', params: params);
       final rows = (response as List<dynamic>?) ?? const [];
       return rows.whereType<Map<String, dynamic>>().map(PrescriptionRecord.fromMap).toList();
     } catch (e) {
@@ -66,11 +74,15 @@ class PrescriptionService {
       final qty = r.dispensedQuantity > 0 ? r.dispensedQuantity : r.quantity;
       final dispensedDate = r.dispensedAt ?? r.issuedAt;
 
+      final itemId = r.prescriptionItemId > 0
+          ? r.prescriptionItemId
+          : (r.prescriptionId * 1000 + syntheticId);
+
       logs.add(PrescriptionDispenseLog(
         dispenseId: r.prescriptionId * 1000 + (syntheticId++),
         prescriptionId: r.prescriptionId,
         prescriptionCode: r.prescriptionCode,
-        prescriptionItemId: r.prescriptionId * 1000 + syntheticId,
+        prescriptionItemId: itemId,
         medicineName: r.medicineName,
         dosage: r.dosage,
         dispensedQuantity: qty,
@@ -86,21 +98,24 @@ class PrescriptionService {
   }
 
   /// Synthesizes ScheduledMedicine items from dispensed prescription records.
-  /// Guarantees newly fulfilled dispensed medicines immediately populate
-  /// the Medicine Scheduler even before background RPC synchronization completes.
+  /// Uses actual prescription_item_id whenever available and guarantees unique synthetic IDs.
   static List<ScheduledMedicine> synthesizeScheduledMedicinesFromPrescriptions(
     List<PrescriptionRecord> prescriptions,
   ) {
     final List<ScheduledMedicine> meds = [];
+    int itemIdx = 1;
     for (final r in prescriptions) {
       final isDisp = r.isPrescriptionDispensed || r.isDispensed || r.dispensedQuantity > 0;
       if (!isDisp) continue;
 
       final qty = r.dispensedQuantity > 0 ? r.dispensedQuantity : r.quantity;
       final dispensedDate = r.dispensedAt ?? r.issuedAt;
+      final itemId = r.prescriptionItemId > 0
+          ? r.prescriptionItemId
+          : (r.prescriptionId * 1000 + (itemIdx++));
 
       meds.add(ScheduledMedicine(
-        prescriptionItemId: r.prescriptionId * 1000 + 1,
+        prescriptionItemId: itemId,
         prescriptionId: r.prescriptionId,
         prescriptionCode: r.prescriptionCode,
         dispensingStatus: r.dispensingStatus.isNotEmpty ? r.dispensingStatus : 'dispensed',
@@ -122,9 +137,45 @@ class PrescriptionService {
     return meds;
   }
 
+  /// Merges primary schedule medicines with fallback synthesized prescriptions
+  /// ensuring 100% completeness with ZERO duplicate cards.
+  static List<ScheduledMedicine> deduplicateMedicines(
+    List<ScheduledMedicine> primary, [
+    List<ScheduledMedicine> secondary = const [],
+  ]) {
+    final Map<int, ScheduledMedicine> map = {};
+    final Set<String> seenPrescriptionMedicineKeys = {};
+
+    for (final m in primary) {
+      if (!m.isDispensed) continue;
+      map[m.prescriptionItemId] = m;
+      final normName = m.medicineName.toLowerCase().trim();
+      if (m.prescriptionId > 0 && normName.isNotEmpty) {
+        seenPrescriptionMedicineKeys.add('${m.prescriptionId}_$normName');
+      }
+    }
+
+    for (final sm in secondary) {
+      if (!sm.isDispensed) continue;
+      final normName = sm.medicineName.toLowerCase().trim();
+      final rxKey = '${sm.prescriptionId}_$normName';
+
+      // Disallow exact prescriptionItemId match and (prescriptionId, medicineName) collision
+      if (!map.containsKey(sm.prescriptionItemId) && !seenPrescriptionMedicineKeys.contains(rxKey)) {
+        map[sm.prescriptionItemId] = sm;
+        if (sm.prescriptionId > 0 && normName.isNotEmpty) {
+          seenPrescriptionMedicineKeys.add(rxKey);
+        }
+      }
+    }
+
+    return map.values.toList();
+  }
+
   static Future<List<PrescriptionDispenseLog>> fetchPrescriptionDispenseLogs({
     int? prescriptionId,
     int limit = 50,
+    int? citizenId,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) return [];
@@ -132,6 +183,9 @@ class PrescriptionService {
     final params = <String, dynamic>{'p_limit': limit};
     if (prescriptionId != null) {
       params['p_prescription_id'] = prescriptionId;
+    }
+    if (citizenId != null && citizenId > 0) {
+      params['p_citizen_id'] = citizenId;
     }
 
     // 1. Try canonical function
@@ -166,6 +220,9 @@ class PrescriptionService {
     int? citizenId,
     String? intakeDate,
   }) async {
+    // OTC items have negative IDs and are tracked purely in local cache
+    if (prescriptionItemId <= 0) return;
+
     if (citizenId == null) {
       final profile = await CitizenProfileService.fetchMyCitizenProfile();
       citizenId = (profile['id'] as num).toInt();
@@ -191,6 +248,8 @@ class PrescriptionService {
     required String intakeDate,
     int? citizenId,
   }) async {
+    if (prescriptionItemId <= 0) return;
+
     if (citizenId == null) {
       final profile = await CitizenProfileService.fetchMyCitizenProfile();
       citizenId = (profile['id'] as num).toInt();

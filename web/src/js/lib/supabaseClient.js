@@ -1,4 +1,4 @@
-﻿import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getOrCreateTabId } from '../services/sessionAuth.js';
 
 const config = window.UKONEK_CONFIG || {};
@@ -33,12 +33,27 @@ const projectRef = (() => {
 const storage = getSessionStorageAdapter();
 const storageKey = `sb-${projectRef}-auth-tab-${tabId}`;
 
+// Fallback: If tab-scoped session is empty, check legacy default supabase key
+if (storage && !storage.getItem(storageKey)) {
+  try {
+    const legacyKey = `sb-${projectRef}-auth-token`;
+    const legacyVal = storage.getItem(legacyKey) || (typeof window !== 'undefined' && window.localStorage?.getItem(legacyKey));
+    if (legacyVal) {
+      storage.setItem(storageKey, legacyVal);
+    }
+  } catch (_) {}
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage,
     storageKey,
     persistSession: Boolean(storage),
     autoRefreshToken: true,
-    detectSessionInUrl: false
+    detectSessionInUrl: false,
+    lock: async (_name, _acquireTimeout, fn) => {
+      // Direct lock execution prevents navigator.locks deadlocks during Live Server reloads
+      return await fn();
+    }
   }
 });

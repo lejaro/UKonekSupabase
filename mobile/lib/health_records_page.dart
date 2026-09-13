@@ -369,6 +369,18 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
               Expanded(child: _vitalChip('SpO2', v.spo2 != null ? '${v.spo2}%' : '—', Icons.air_rounded, const Color(0xFF00897B))),
             ],
           ),
+          if (v.heightCm != null || v.weightKg != null || v.bmi != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _vitalChip('Height', v.heightCm != null ? '${v.heightCm} cm' : '—', Icons.height_rounded, const Color(0xFF6366F1))),
+                const SizedBox(width: 10),
+                Expanded(child: _vitalChip('Weight', v.weightKg != null ? '${v.weightKg} kg' : '—', Icons.monitor_weight_rounded, const Color(0xFF8B5CF6))),
+                const SizedBox(width: 10),
+                Expanded(child: _vitalChip('BMI', v.bmi != null ? '${v.bmi}' : '—', Icons.accessibility_new_rounded, const Color(0xFF0EA5E9))),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -650,6 +662,12 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
                       Expanded(child: _detailSection('Temperature', v.temp != null ? '${v.temp}°C' : '—')),
                     ]),
                     _detailSection('Oxygen Saturation (SpO2)', v.spo2 != null ? '${v.spo2}%' : '—'),
+                    if (v.heightCm != null || v.weightKg != null || v.bmi != null)
+                      Row(children: [
+                        Expanded(child: _detailSection('Height', v.heightCm != null ? '${v.heightCm} cm' : '—')),
+                        Expanded(child: _detailSection('Weight', v.weightKg != null ? '${v.weightKg} kg' : '—')),
+                        Expanded(child: _detailSection('BMI', v.bmi != null ? '${v.bmi}' : '—')),
+                      ]),
                     _detailSection('Current Medications', v.meds?.isNotEmpty == true ? v.meds! : 'None recorded'),
                   ] else if (c != null) ...[
                     if (c.allergies?.isNotEmpty == true)

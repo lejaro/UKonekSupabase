@@ -19,12 +19,13 @@ class QueueStepTracker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = queue.status.toLowerCase();
-    final bool vitalsDone = queue.hasVitals || status == 'serving' || status == 'completed';
+    final status = queue.status.toLowerCase().trim();
+    final bool isCompleted = queue.isCompleted;
+    final bool vitalsDone = queue.hasVitals || status == 'serving' || isCompleted;
     final bool vitalsActive = !vitalsDone && (isOnCall || status == 'on_call');
-    final bool consultDone = status == 'completed';
-    final bool consultActive = status == 'serving';
-    final bool allDone = status == 'completed';
+    final bool consultDone = isCompleted;
+    final bool consultActive = status == 'serving' && !isCompleted;
+    final bool allDone = isCompleted;
 
     // Step states:
     // Step 0: Ticket (Issued) -> Always completed for an active ticket

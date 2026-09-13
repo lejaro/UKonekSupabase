@@ -102,6 +102,9 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
     final cachedLogs = await MedicineCacheService.loadCachedIntakeLogs(widget.citizenId, dateKey);
 
     if (cachedMeds != null && cachedMeds.isNotEmpty && mounted) {
+      // Clean any historical duplicate entries stored in local cache
+      final cleanedCached = ApiService.deduplicateMedicines(cachedMeds);
+
       _persistedStartTimes.clear();
       _customDoseTimes.clear();
       _manuallySetDoseTimes.clear();
@@ -109,7 +112,7 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
       _takenTimestamps.clear();
       _dateShiftedDoseTimes.clear();
 
-      for (var med in cachedMeds) {
+      for (var med in cleanedCached) {
         String? start = prefs.getString('med_start_${med.prescriptionItemId}');
         if (start == null) {
           for (int i = 0; i < 4; i++) {
@@ -156,7 +159,7 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
       }
 
       setState(() {
-        _medicines = cachedMeds.where((m) => m.isDispensed).toList();
+        _medicines = cleanedCached.where((m) => m.isDispensed).toList();
         _loading = false;
       });
       _scheduleNotifications();
@@ -165,33 +168,32 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
     // 2. Fetch fresh schedule from remote Supabase (stale-while-revalidate)
     try {
       MedicineCacheService.syncPendingIntakeLogs();
+      final citizenIntId = int.tryParse(widget.citizenId);
 
-      final results = await Future.wait([
-        ApiService.getMedicineSchedule(),
-        ApiService.fetchConsultations(),
-        ApiService.fetchPrescriptions(),
-      ]);
+      // Resilient isolated fetches: a failure in one call does NOT break the schedule
+      final remoteMeds = await ApiService.getMedicineSchedule(citizenId: citizenIntId).catchError((e) {
+        debugPrint('Error fetching remote medicine schedule: $e');
+        return <ScheduledMedicine>[];
+      });
 
-      final remoteMeds = results[0] as List<ScheduledMedicine>;
-      final cons = results[1] as List<Consultation>;
-      final prescriptions = results[2] as List<PrescriptionRecord>;
+      final cons = await ApiService.fetchConsultations().catchError((e) {
+        debugPrint('Error fetching consultations: $e');
+        return <Consultation>[];
+      });
 
-      // Combine remote schedule with synthesized prescriptions for 100% completeness
-      final Map<int, ScheduledMedicine> mergedMap = {};
-      for (final m in remoteMeds) {
-        if (m.isDispensed) mergedMap[m.prescriptionItemId] = m;
-      }
+      final prescriptions = await ApiService.fetchPrescriptions(citizenId: citizenIntId).catchError((e) {
+        debugPrint('Error fetching prescriptions: $e');
+        return <PrescriptionRecord>[];
+      });
 
+      // Synthesize fallback items from prescriptions
       final synthesized = ApiService.synthesizeScheduledMedicinesFromPrescriptions(prescriptions);
-      for (final sm in synthesized) {
-        if (!mergedMap.containsKey(sm.prescriptionItemId)) {
-          mergedMap[sm.prescriptionItemId] = sm;
-        }
-      }
 
-      final meds = mergedMap.values.toList();
+      // Deduplicate: remoteMeds takes priority with real DB item IDs;
+      // synthesized fills in any newly dispensed Rx missing from remoteMeds WITHOUT doubling.
+      final meds = ApiService.deduplicateMedicines(remoteMeds, synthesized);
 
-      // Cache updated schedule locally
+      // Cache cleaned schedule locally
       await MedicineCacheService.saveSchedule(widget.citizenId, meds);
 
       if (mounted) {
@@ -300,7 +302,7 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
 
     // 2. Fetch fresh logs from Supabase
     try {
-      final logs = await ApiService.getIntakeLogsForDate(date);
+      final logs = await ApiService.getIntakeLogsForDate(date, citizenId: int.tryParse(widget.citizenId));
       await MedicineCacheService.saveIntakeLogs(widget.citizenId, dateKey, logs);
 
       if (mounted && DateUtils.isSameDay(_selectedDate, date)) {
@@ -797,11 +799,24 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
       return mins;
     }
 
+    // Final deduplication safeguard: ensure no two items have identical (med.prescriptionItemId, doseIndex)
+    final Set<String> seenDoseKeys = {};
+    final uniqueDoses = <Map<String, dynamic>>[];
+    for (final d in allDoses) {
+      final med = d['med'] as ScheduledMedicine;
+      final doseIdx = d['doseIndex'];
+      final doseKey = '${med.prescriptionItemId}_$doseIdx';
+      if (!seenDoseKeys.contains(doseKey)) {
+        seenDoseKeys.add(doseKey);
+        uniqueDoses.add(d);
+      }
+    }
+
     // Sort chronologically (00:00 to 24:00)
-    allDoses.sort((a, b) => getSortMins(a).compareTo(getSortMins(b)));
+    uniqueDoses.sort((a, b) => getSortMins(a).compareTo(getSortMins(b)));
 
     // Grouping logic
-    for (var dose in allDoses) {
+    for (var dose in uniqueDoses) {
       if (dose['time'] == 'Setup Required') {
         groups.putIfAbsent('Setup Required', () => []);
         groups['Setup Required']!.add(dose);

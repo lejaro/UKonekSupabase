@@ -36,6 +36,11 @@ class ApiCache {
     _cache.remove(key);
   }
 
+  /// Remove all cache entries matching a predicate.
+  static void removeWhere(bool Function(String key) predicate) {
+    _cache.removeWhere((key, _) => predicate(key));
+  }
+
   /// Clear all cached data.
   static void clear() {
     _cache.clear();

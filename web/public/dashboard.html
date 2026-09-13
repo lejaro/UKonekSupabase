@@ -9,6 +9,31 @@
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="../src/css/dashboard-layout.css" />
   <link rel="stylesheet" href="../src/css/print.css" media="print" />
+  <script>
+    window.__UKONEK_BOOTSTRAP_STAGE = 'head-loaded';
+    window.addEventListener('error', function (e) {
+      console.error('[Dashboard Diagnostic Error]', e.message, e.filename, e.lineno, e.error);
+      var banner = document.getElementById('ukonek-diagnostic-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'ukonek-diagnostic-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#dc2626;color:#ffffff;padding:12px 18px;font-family:monospace;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.35);line-height:1.5;';
+        document.body ? document.body.prepend(banner) : document.documentElement.prepend(banner);
+      }
+      banner.innerHTML = '<strong>⚠️ JavaScript Initialization Error:</strong><br/>' + (e.message || 'Unknown error') + '<br/><small>' + (e.filename || '') + ':' + (e.lineno || '') + '</small>';
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      console.error('[Dashboard Diagnostic Unhandled Rejection]', e.reason);
+      var banner = document.getElementById('ukonek-diagnostic-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'ukonek-diagnostic-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#dc2626;color:#ffffff;padding:12px 18px;font-family:monospace;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.35);line-height:1.5;';
+        document.body ? document.body.prepend(banner) : document.documentElement.prepend(banner);
+      }
+      banner.innerHTML = '<strong>⚠️ Unhandled Promise Rejection:</strong><br/>' + (e.reason && (e.reason.message || e.reason.stack) ? (e.reason.message || e.reason.stack) : String(e.reason));
+    });
+  </script>
 </head>
 
 <body>
@@ -193,7 +218,10 @@
                 <div class="user-name"><span class="skeleton-shimmer user-name-skeleton"></span></div>
                 <div class="user-pos"><span class="skeleton-shimmer user-pos-skeleton"></span></div>
               </div>
-              <span class="profile-arrow" aria-hidden="true">â–¾</span>
+              <svg class="profile-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
             </button>
 
             <div id="user-profile-popover" class="user-profile-popover hidden" role="menu">
@@ -260,7 +288,7 @@
           </div>
           <div class="hero-actions">
             <span class="panel-hint" id="dashboard-last-sync"
-              style="margin: 0 4px 0 0; font-size: 12.5px; color: #64748b;">Last synced: â€”</span>
+              style="margin: 0 4px 0 0; font-size: 12.5px; color: #64748b;">Last synced: &mdash;</span>
             <button id="dash-refresh-btn" class="chip-btn" title="Refresh dashboard data">Refresh Data</button>
           </div>
         </div>
@@ -314,7 +342,7 @@
                 </svg>
               </span>
               <div>
-                <p class="stat-label">Triage Assessments</p>
+                <p class="stat-label">Triage Assessments Today</p>
                 <p id="stat-vitals-today" class="stat-value"><span class="skeleton-shimmer stat-skeleton"></span></p>
               </div>
             </div>
@@ -332,35 +360,16 @@
                 </svg>
               </span>
               <div>
-                <p class="stat-label">Medicines Dispensed</p>
+                <p class="stat-label">Medicines Dispensed Today</p>
                 <p id="stat-dispenses-today" class="stat-value"><span class="skeleton-shimmer stat-skeleton"></span></p>
               </div>
             </div>
-            <p class="stat-foot">Prescriptions & OTC fulfilled</p>
-          </article>
-
-          <article class="stat-card fade-in-up" id="stat-card-patients" style="animation-delay: 0.12s; cursor:pointer;"
-            title="View registered citizens">
-            <div class="stat-card-metric">
-              <span class="stat-card-icon stat-icon-slate" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                  stroke-linejoin="round">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-              </span>
-              <div>
-                <p class="stat-label">Registered Citizens</p>
-                <p id="stat-citizens" class="stat-value"><span class="skeleton-shimmer stat-skeleton"></span></p>
-              </div>
-            </div>
-            <p class="stat-foot">Active resident profiles</p>
+            <p class="stat-foot">Prescriptions & OTC fulfilled today</p>
           </article>
         </div>
 
-        <div class="panel stats-chart-panel fade-in-up clinical-only" id="clinical-encounters-panel" style="animation-delay: 0.06s;">
+        <div class="panel stats-chart-panel fade-in-up clinical-only" id="clinical-encounters-panel"
+          style="animation-delay: 0.06s;">
           <div class="panel-head">
             <div>
               <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;">
@@ -404,7 +413,8 @@
                     </svg>
                   </div>
                   <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Live Queue Call <span class="launchpad-card-arrow">â†’</span></div>
+                    <div class="launchpad-card-title">Live Queue Call <span class="launchpad-card-arrow">&rarr;</span>
+                    </div>
                     <div class="launchpad-card-desc">Call next patient & triage intake</div>
                   </div>
                 </div>
@@ -419,7 +429,8 @@
                     </svg>
                   </div>
                   <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Doctor Consultation <span class="launchpad-card-arrow">â†’</span>
+                    <div class="launchpad-card-title">Doctor Consultation <span
+                        class="launchpad-card-arrow">&rarr;</span>
                     </div>
                     <div class="launchpad-card-desc">Diagnose, clinical notes & Rx orders</div>
                   </div>
@@ -433,7 +444,8 @@
                     </svg>
                   </div>
                   <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Triage & Vitals <span class="launchpad-card-arrow">â†’</span></div>
+                    <div class="launchpad-card-title">Triage & Vitals <span class="launchpad-card-arrow">&rarr;</span>
+                    </div>
                     <div class="launchpad-card-desc">Scan citizen QR & record vitals</div>
                   </div>
                 </div>
@@ -446,7 +458,8 @@
                     </svg>
                   </div>
                   <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Pharmacy & OTC <span class="launchpad-card-arrow">â†’</span></div>
+                    <div class="launchpad-card-title">Pharmacy & OTC <span class="launchpad-card-arrow">&rarr;</span>
+                    </div>
                     <div class="launchpad-card-desc">Dispense doctor Rx or OTC meds</div>
                   </div>
                 </div>
@@ -461,7 +474,7 @@
                     </svg>
                   </div>
                   <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Citizen Directory <span class="launchpad-card-arrow">â†’</span>
+                    <div class="launchpad-card-title">Citizen Directory <span class="launchpad-card-arrow">&rarr;</span>
                     </div>
                     <div class="launchpad-card-desc">Patient search & health histories</div>
                   </div>
@@ -477,7 +490,8 @@
                     </svg>
                   </div>
                   <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Staff On-Duty <span class="launchpad-card-arrow">â†’</span></div>
+                    <div class="launchpad-card-title">Staff On-Duty <span class="launchpad-card-arrow">&rarr;</span>
+                    </div>
                     <div class="launchpad-card-desc">Doctor & nurse active availability</div>
                   </div>
                 </div>
@@ -499,15 +513,15 @@
               restricted to doctor accounts.</p>
             <div class="modal-group">
               <label class="modal-label">Username</label>
-              <p class="modal-text" id="non-admin-username">â€”</p>
+              <p class="modal-text" id="non-admin-username">&mdash;</p>
             </div>
             <div class="modal-group">
               <label class="modal-label">Role</label>
-              <p class="modal-text" id="non-admin-role">â€”</p>
+              <p class="modal-text" id="non-admin-role">&mdash;</p>
             </div>
             <div class="modal-group">
               <label class="modal-label">Email</label>
-              <p class="modal-text" id="non-admin-email">â€”</p>
+              <p class="modal-text" id="non-admin-email">&mdash;</p>
             </div>
           </div>
         </div>
@@ -668,7 +682,7 @@
                       <th>Blood Pressure</th>
                       <th>Heart Rate</th>
                       <th>Temp</th>
-                      <th>SpOâ‚‚</th>
+                      <th>SpO<sub>2</sub></th>
                       <th>Triage Status</th>
                     </tr>
                   </thead>
@@ -1399,7 +1413,7 @@
                     <button type="button" class="ph-filter-chip is-active" data-rating="all">All Feedback</button>
                     <button type="button" class="ph-filter-chip" data-rating="5">5/5 Excellent</button>
                     <button type="button" class="ph-filter-chip" data-rating="4">4/5 Good</button>
-                    <button type="button" class="ph-filter-chip" data-rating="3">â‰¤ 3/5 Needs Attention</button>
+                    <button type="button" class="ph-filter-chip" data-rating="3">&le; 3/5 Needs Attention</button>
                   </div>
                 </div>
               </div>
@@ -1473,7 +1487,7 @@
                       <div>
                         <span
                           style="font-size: 11.5px; color: #9f1239; font-weight: 700; text-transform: uppercase; letter-spacing:0.04em;">Hypertensive
-                          Patients (BP â‰¥ 140/90)</span>
+                          Patients (BP &ge; 140/90)</span>
                         <div id="hypertension-count"
                           style="font-size: 26px; font-weight: 800; color: #be123c; margin-top: 4px;"><span
                             class="skeleton-shimmer stat-skeleton"></span></div>
@@ -1778,7 +1792,7 @@
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
               <span id="consult-desk-status-pill" class="consult-desk-pill ready">
                 <span class="consult-desk-dot"></span>
-                <span id="consult-desk-status-text">Station Ready â€¢ Waiting for Patient</span>
+                <span id="consult-desk-status-text">Station Ready &bull; Waiting for Patient</span>
               </span>
               <button id="open-consult-modal-btn" class="chip-btn"
                 style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px;">
@@ -1869,7 +1883,7 @@
                 <select id="consult-sort-select" class="chip-btn chip-btn-outline">
                   <option value="date-desc">Newest First</option>
                   <option value="date-asc">Oldest First</option>
-                  <option value="name-asc">Name (Aâ€“Z)</option>
+                  <option value="name-asc">Name (A-Z)</option>
                 </select>
               </div>
               <button id="consult-date-clear" class="chip-btn chip-btn-outline" title="Clear date filter">Clear</button>
@@ -1909,7 +1923,7 @@
             </div>
             <div>
               <div class="ph-telemetry-lbl">Total Catalog</div>
-              <div class="ph-telemetry-val blue" id="ph-stat-total">â€”</div>
+              <div class="ph-telemetry-val blue" id="ph-stat-total">&mdash;</div>
               <div class="ph-telemetry-sub">Registered formulations</div>
             </div>
           </div>
@@ -1924,7 +1938,7 @@
             </div>
             <div>
               <div class="ph-telemetry-lbl">Adequate Stock</div>
-              <div class="ph-telemetry-val green" id="ph-stat-instock">â€”</div>
+              <div class="ph-telemetry-val green" id="ph-stat-instock">&mdash;</div>
               <div class="ph-telemetry-sub">Above safety threshold</div>
             </div>
           </div>
@@ -1940,8 +1954,8 @@
             </div>
             <div>
               <div class="ph-telemetry-lbl">Low Stock Alert</div>
-              <div class="ph-telemetry-val amber" id="ph-stat-low">â€”</div>
-              <div class="ph-telemetry-sub">â‰¤ 5 units remaining</div>
+              <div class="ph-telemetry-val amber" id="ph-stat-low">&mdash;</div>
+              <div class="ph-telemetry-sub">&le; 5 units remaining</div>
             </div>
           </div>
 
@@ -1957,7 +1971,7 @@
             </div>
             <div>
               <div class="ph-telemetry-lbl">Critical / Out of Stock</div>
-              <div class="ph-telemetry-val red" id="ph-stat-out">â€”</div>
+              <div class="ph-telemetry-val red" id="ph-stat-out">&mdash;</div>
               <div class="ph-telemetry-sub">Depleted or expired</div>
             </div>
           </div>
@@ -1974,23 +1988,6 @@
                 telemetry, and dispensation controls.</span>
             </div>
             <div class="management-actions">
-              <button id="open-add-medicine-btn" class="chip-btn"
-                style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                + Register Medicine
-              </button>
-              <button id="medicine-csv-import-btn" class="chip-btn chip-btn-outline"
-                style="display:inline-flex; align-items:center; gap:6px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                Import CSV
-              </button>
               <button id="medicine-csv-export-btn" class="chip-btn chip-btn-outline"
                 style="display:inline-flex; align-items:center; gap:6px;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2023,50 +2020,6 @@
           </div>
 
           <div class="p-20" style="padding-top:14px;">
-            <!-- Slide-Down Inline Add Medicine Panel -->
-            <div id="medicine-add-panel" class="ph-add-form-panel hidden">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5">
-                    <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" />
-                    <path d="m8.5 8.5 7 7" />
-                  </svg>
-                  <h4 style="margin:0; font-size:15px; font-weight:700; color:#0f172a;">Register New Medicine</h4>
-                </div>
-                <button type="button" id="medicine-add-cancel-btn" class="btn btn-sm btn-secondary"
-                  style="font-size:12px; padding:4px 10px;">Cancel</button>
-              </div>
-              <form id="medicine-form">
-                <div class="ph-form-grid">
-                  <div class="ph-field">
-                    <label for="medicine-name-input">Brand & Strength *</label>
-                    <input id="medicine-name-input" type="text" placeholder="e.g. Amoxicillin 500mg" required />
-                  </div>
-                  <div class="ph-field">
-                    <label for="medicine-desc-input">Generic / Notes</label>
-                    <input id="medicine-desc-input" type="text" placeholder="e.g. Antibiotic" />
-                  </div>
-                  <div class="ph-field">
-                    <label for="medicine-qty-input">Initial Stock *</label>
-                    <input id="medicine-qty-input" type="number" min="0" value="0" required />
-                  </div>
-                  <div class="ph-field">
-                    <label for="medicine-unit-input">Unit</label>
-                    <input id="medicine-unit-input" type="text" placeholder="e.g. capsule" />
-                  </div>
-                  <div class="ph-field">
-                    <label for="medicine-expiry-input">Expiration Date</label>
-                    <input id="medicine-expiry-input" type="date" />
-                  </div>
-                  <div>
-                    <button type="submit" class="btn"
-                      style="background:#16a34a; color:#fff; border:none; padding:9px 16px; font-weight:700;">
-                      Save Medicine
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
 
             <!-- 1-Click Status Filter Chips -->
             <div class="ph-filter-chips">
@@ -2077,7 +2030,7 @@
                 In Stock <span class="chip-count" id="chip-count-instock">0</span>
               </button>
               <button type="button" class="ph-filter-chip" data-filter="low_stock">
-                Low Stock (â‰¤5) <span class="chip-count" id="chip-count-low">0</span>
+                Low Stock (&le;5) <span class="chip-count" id="chip-count-low">0</span>
               </button>
               <button type="button" class="ph-filter-chip" data-filter="expiring">
                 Expiring Soon <span class="chip-count" id="chip-count-expiring">0</span>
@@ -2162,7 +2115,7 @@
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <span id="queue-current-serving-badge" class="queue-station-pill ready">
                 <span class="queue-station-dot"></span>
-                <span>Station Ready â€¢ Queue Clear</span>
+                <span>Station Ready &bull; Queue Clear</span>
               </span>
               <span id="queue-summary-badge" class="queue-summary-pill">
                 Waiting: 0 | On Call: 0 | Serving: 0
@@ -2302,8 +2255,8 @@
                 </svg>
               </div>
               <div class="patient-details">
-                <div class="patient-name" id="vital-modal-patient-name">â€”</div>
-                <div class="patient-meta" id="vital-modal-patient-meta">â€”</div>
+                <div class="patient-name" id="vital-modal-patient-name">&mdash;</div>
+                <div class="patient-meta" id="vital-modal-patient-meta">&mdash;</div>
               </div>
             </div>
             <div id="vital-modal-existing-badge" class="vital-update-badge" style="display:none;">
@@ -2312,7 +2265,7 @@
                 <line x1="12" y1="9" x2="12" y2="13" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
-              <span>Previous assessment found â€” submitting will update it</span>
+              <span>Previous assessment found &mdash; submitting will update it</span>
             </div>
           </div>
 
@@ -2332,7 +2285,8 @@
                 Patient Symptoms & Reason for Visit
               </label>
               <div id="va-patient-symptoms-display"
-                style="font-size:13px; color:#1b2e1e; font-weight:500; line-height:1.5; white-space:pre-wrap;">â€”</div>
+                style="font-size:13px; color:#1b2e1e; font-weight:500; line-height:1.5; white-space:pre-wrap;">&mdash;
+              </div>
             </div>
 
             <!-- Chief Complaint -->
@@ -2426,7 +2380,7 @@
                   </label>
                   <input id="va-temp" class="vital-input" type="number" step="0.1" min="30" max="45"
                     placeholder="36.5" />
-                  <span class="vital-unit">Â°C</span>
+                  <span class="vital-unit">°C</span>
                   <div id="va-temp-badge" class="vital-risk-badge hidden"></div>
                 </div>
 
@@ -2475,8 +2429,8 @@
                 <div class="vital-field bmi-display-field">
                   <label class="vital-label">Calculated BMI</label>
                   <div class="bmi-result-box">
-                    <span id="va-bmi-value" class="bmi-value">â€”</span>
-                    <span id="va-bmi-badge" class="bmi-category-badge hidden">â€”</span>
+                    <span id="va-bmi-value" class="bmi-value">&mdash;</span>
+                    <span id="va-bmi-badge" class="bmi-category-badge hidden">&mdash;</span>
                   </div>
                 </div>
               </div>
@@ -2609,7 +2563,7 @@
             </div>
             <div class="consult-patient-meta-pill">
               <span class="panel-hint" style="color:#f1f5f9 !important;">Patient ID: <span id="consult-display-id"
-                  style="color:#fef08a !important; font-weight:700;">â€”</span></span>
+                  style="color:#fef08a !important; font-weight:700;">&mdash;</span></span>
             </div>
             <button type="button" id="consult-modal-close-icon" class="modal-close"
               aria-label="Close modal">&times;</button>
@@ -2629,7 +2583,7 @@
                   </svg>
                   <strong>CRITICAL DRUG ALLERGIES</strong>
                 </div>
-                <div id="consult-allergy-text" class="allergy-body">â€”</div>
+                <div id="consult-allergy-text" class="allergy-body">&mdash;</div>
               </div>
 
               <!-- Vitals Summary from Nurse Assessment -->
@@ -2643,35 +2597,6 @@
                 <div id="consult-vitals-grid" class="consult-vitals-mini-grid"></div>
                 <div id="consult-vitals-complaint" class="consult-vitals-extra"></div>
                 <div id="consult-vitals-notes" class="consult-vitals-extra"></div>
-              </div>
-
-              <!-- Quick Common Diagnosis Presets -->
-              <div class="consult-quick-diag-card">
-                <div class="quick-diag-header">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16l4-3 4 3 4-3 4 3V8z" />
-                    <path d="M14 2v6h6" />
-                  </svg>
-                  <span>Common Diagnosis Presets (1-Click Fill)</span>
-                </div>
-                <div class="diag-chip-group">
-                  <button type="button" class="diag-chip" data-diag="Upper Respiratory Tract Infection (URTI)">URTI /
-                    Flu</button>
-                  <button type="button" class="diag-chip"
-                    data-diag="Essential (Primary) Hypertension Stage 2">Hypertension Stage 2</button>
-                  <button type="button" class="diag-chip" data-diag="Acute Gastroenteritis with Mild Dehydration">Acute
-                    Gastroenteritis</button>
-                  <button type="button" class="diag-chip" data-diag="Type 2 Diabetes Mellitus - Uncomplicated">Type 2
-                    Diabetes</button>
-                  <button type="button" class="diag-chip" data-diag="Urinary Tract Infection (UTI), Unspecified">Urinary
-                    Tract Infection</button>
-                  <button type="button" class="diag-chip" data-diag="Bronchial Asthma in Acute Exacerbation">Asthma
-                    Exacerbation</button>
-                  <button type="button" class="diag-chip" data-diag="Gastroesophageal Reflux Disease (GERD)">GERD /
-                    Dyspepsia</button>
-                  <button type="button" class="diag-chip" data-diag="Tension-Type Headache, Acute">Tension
-                    Headache</button>
-                </div>
               </div>
             </aside>
 
@@ -3137,7 +3062,7 @@
             <div class="field"
               style="margin-bottom:16px; padding:12px 16px; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
               <span style="font-size:12px; color:#64748b; display:block; margin-bottom:2px;">Prescribing for</span>
-              <strong id="prescription-patient-display" style="font-size:15px; color:#166534;">â€”</strong>
+              <strong id="prescription-patient-display" style="font-size:15px; color:#166534;">&mdash;</strong>
             </div>
             <!-- Prescription Allergy Banner -->
             <div id="prescription-allergy-banner" class="field"
@@ -3151,7 +3076,7 @@
                 </svg>
                 CRITICAL ALLERGY ALERT
               </span>
-              <strong id="prescription-allergy-text" style="font-size:13px; color:#9f1239;">â€”</strong>
+              <strong id="prescription-allergy-text" style="font-size:13px; color:#9f1239;">&mdash;</strong>
             </div>
             <form id="prescription-form">
               <input type="hidden" id="prescription-patient" />
@@ -3185,75 +3110,82 @@
 
             <!-- Predefined clinical suggestions -->
             <datalist id="medicine-list">
-              <option value="Amoxicillin 500 mg Capsule">Amoxicillin 500mg â€¢ Antibiotic</option>
-              <option value="Amoxicillin 250 mg / 5 mL Suspension">Amoxicillin 250mg/5mL â€¢ Pediatric Antibiotic</option>
-              <option value="Co-amoxiclav 625 mg Tablet">Co-amoxiclav 625mg â€¢ Broad-Spectrum Antibiotic</option>
-              <option value="Cefalexin 500 mg Capsule">Cefalexin 500mg â€¢ Antibiotic (Cephalosporin)</option>
-              <option value="Azithromycin 500 mg Tablet">Azithromycin 500mg â€¢ Macrolide Antibiotic</option>
-              <option value="Ciprofloxacin 500 mg Tablet">Ciprofloxacin 500mg â€¢ Quinolone Antibiotic</option>
-              <option value="Doxycycline 100 mg Capsule">Doxycycline 100mg â€¢ Tetracycline Antibiotic</option>
-              <option value="Metronidazole 500 mg Tablet">Metronidazole 500mg â€¢ Antiprotozoal / Antibacterial</option>
-              <option value="Co-trimoxazole 800/160 mg Tablet">Co-trimoxazole 800/160mg â€¢ Antibacterial</option>
-              <option value="Clindamycin 300 mg Capsule">Clindamycin 300mg â€¢ Lincosamide Antibiotic</option>
-              <option value="Erythromycin 500 mg Tablet">Erythromycin 500mg â€¢ Macrolide Antibiotic</option>
-              <option value="Paracetamol 500 mg Tablet">Paracetamol 500mg â€¢ Analgesic / Antipyretic</option>
-              <option value="Paracetamol 250 mg / 5 mL Syrup">Paracetamol 250mg/5mL â€¢ Pediatric Syrup</option>
-              <option value="Paracetamol 120 mg / 5 mL Drops">Paracetamol 120mg/5mL â€¢ Infant Drops</option>
-              <option value="Ibuprofen 400 mg Tablet">Ibuprofen 400mg â€¢ NSAID / Anti-inflammatory</option>
-              <option value="Ibuprofen 200 mg / 5 mL Suspension">Ibuprofen 200mg/5mL â€¢ Pediatric Suspension</option>
-              <option value="Mefenamic Acid 500 mg Capsule">Mefenamic Acid 500mg â€¢ Analgesic / NSAID</option>
-              <option value="Celecoxib 200 mg Capsule">Celecoxib 200mg â€¢ COX-2 Inhibitor NSAID</option>
-              <option value="Tramadol 50 mg Capsule">Tramadol 50mg â€¢ Opioid Analgesic</option>
-              <option value="Aspirin 80 mg Tablet">Aspirin 80mg â€¢ Antiplatelet</option>
-              <option value="Amlodipine 5 mg Tablet">Amlodipine 5mg â€¢ Antihypertensive (CCB)</option>
-              <option value="Amlodipine 10 mg Tablet">Amlodipine 10mg â€¢ Antihypertensive (CCB)</option>
-              <option value="Losartan 50 mg Tablet">Losartan 50mg â€¢ Antihypertensive (ARB)</option>
-              <option value="Losartan 100 mg Tablet">Losartan 100mg â€¢ Antihypertensive (ARB)</option>
-              <option value="Metoprolol Tartrate 50 mg Tablet">Metoprolol 50mg â€¢ Beta-Blocker</option>
-              <option value="Carvedilol 25 mg Tablet">Carvedilol 25mg â€¢ Beta-Blocker / Vasodilator</option>
-              <option value="Enalapril 10 mg Tablet">Enalapril 10mg â€¢ ACE Inhibitor</option>
-              <option value="Captopril 25 mg Tablet">Captopril 25mg â€¢ ACE Inhibitor</option>
-              <option value="Atorvastatin 20 mg Tablet">Atorvastatin 20mg â€¢ Statin / Lipid-lowering</option>
-              <option value="Simvastatin 20 mg Tablet">Simvastatin 20mg â€¢ Statin / Lipid-lowering</option>
-              <option value="Furosemide 40 mg Tablet">Furosemide 40mg â€¢ Loop Diuretic</option>
-              <option value="Hydrochlorothiazide 25 mg Tablet">Hydrochlorothiazide 25mg â€¢ Thiazide Diuretic</option>
-              <option value="Clonidine 75 mcg Tablet">Clonidine 75mcg â€¢ Central Alpha Agonist</option>
-              <option value="Metformin 500 mg Tablet">Metformin 500mg â€¢ Antidiabetic (Biguanide)</option>
-              <option value="Metformin 850 mg Tablet">Metformin 850mg â€¢ Antidiabetic (Biguanide)</option>
-              <option value="Gliclazide 30 mg MR Tablet">Gliclazide 30mg MR â€¢ Sulfonylurea Antidiabetic</option>
-              <option value="Gliclazide 80 mg Tablet">Gliclazide 80mg â€¢ Sulfonylurea Antidiabetic</option>
-              <option value="Salbutamol 2 mg Tablet">Salbutamol 2mg â€¢ Bronchodilator</option>
-              <option value="Salbutamol 2 mg / 5 mL Syrup">Salbutamol 2mg/5mL â€¢ Pediatric Bronchodilator</option>
-              <option value="Salbutamol Nebule 2.5 mg / 2.5 mL">Salbutamol Nebule â€¢ Inhalation Solution</option>
-              <option value="Cetirizine 10 mg Tablet">Cetirizine 10mg â€¢ Antihistamine</option>
-              <option value="Cetirizine 5 mg / 5 mL Syrup">Cetirizine 5mg/5mL â€¢ Pediatric Antihistamine</option>
-              <option value="Loratadine 10 mg Tablet">Loratadine 10mg â€¢ Non-sedating Antihistamine</option>
-              <option value="Diphenhydramine 25 mg Capsule">Diphenhydramine 25mg â€¢ Antihistamine</option>
-              <option value="Prednisone 20 mg Tablet">Prednisone 20mg â€¢ Corticosteroid</option>
-              <option value="Prednisone 5 mg Tablet">Prednisone 5mg â€¢ Corticosteroid</option>
-              <option value="Montelukast 10 mg Tablet">Montelukast 10mg â€¢ Leukotriene Receptor Antagonist</option>
-              <option value="Carbocisteine 500 mg Capsule">Carbocisteine 500mg â€¢ Mucolytic</option>
-              <option value="Lagundi 600 mg Tablet">Lagundi 600mg â€¢ Herbal Cough Relief</option>
-              <option value="Omeprazole 20 mg Capsule">Omeprazole 20mg â€¢ Proton Pump Inhibitor</option>
-              <option value="Omeprazole 40 mg Capsule">Omeprazole 40mg â€¢ Proton Pump Inhibitor</option>
-              <option value="Aluminum Hydroxide + Magnesium Hydroxide Tablet">Antacid (AlOH + MgOH) â€¢ Chewable</option>
-              <option value="Domperidone 10 mg Tablet">Domperidone 10mg â€¢ Antiemetic / Prokinetic</option>
-              <option value="Metoclopramide 10 mg Tablet">Metoclopramide 10mg â€¢ Antiemetic</option>
-              <option value="Hyoscine N-butylbromide 10 mg Tablet">Hyoscine N-butylbromide 10mg â€¢ Antispasmodic</option>
-              <option value="Oral Rehydration Salts (ORS) Sachet">ORS Sachet â€¢ Electrolyte Replacement</option>
-              <option value="Loperamide 2 mg Capsule">Loperamide 2mg â€¢ Antimotility</option>
-              <option value="Ascorbic Acid (Vitamin C) 500 mg Tablet">Vitamin C 500mg â€¢ Nutritional Supplement</option>
-              <option value="Multivitamins + Iron Capsule">Multivitamins with Iron â€¢ Nutritional</option>
-              <option value="Ferrous Sulfate 325 mg Tablet">Ferrous Sulfate 325mg â€¢ Iron Supplement</option>
-              <option value="Folic Acid 5 mg Tablet">Folic Acid 5mg â€¢ Prenatal / Hematologic</option>
-              <option value="Calcium Carbonate 500 mg Tablet">Calcium Carbonate 500mg â€¢ Mineral Supplement</option>
-              <option value="Vitamin B-Complex Tablet">Vitamin B-Complex â€¢ Neurotropic Vitamins</option>
-              <option value="Zinc Sulfate 20 mg Tablet">Zinc Sulfate 20mg â€¢ Mineral Supplement</option>
-              <option value="Mupirocin 2% Ointment">Mupirocin 2% â€¢ Topical Antibiotic</option>
-              <option value="Silver Sulfadiazine 1% Cream">Silver Sulfadiazine 1% â€¢ Burn Wound Care</option>
-              <option value="Hydrocortisone 1% Cream">Hydrocortisone 1% â€¢ Topical Anti-inflammatory</option>
-              <option value="Betamethasone 0.1% Cream">Betamethasone 0.1% â€¢ Topical Corticosteroid</option>
-              <option value="Neomycin + Polymyxin Eye Drops">Neomycin + Polymyxin â€¢ Ophthalmic Solution</option>
+              <option value="Amoxicillin 500 mg Capsule">Amoxicillin 500mg &bull; Antibiotic</option>
+              <option value="Amoxicillin 250 mg / 5 mL Suspension">Amoxicillin 250mg/5mL &bull; Pediatric Antibiotic
+              </option>
+              <option value="Co-amoxiclav 625 mg Tablet">Co-amoxiclav 625mg &bull; Broad-Spectrum Antibiotic</option>
+              <option value="Cefalexin 500 mg Capsule">Cefalexin 500mg &bull; Antibiotic (Cephalosporin)</option>
+              <option value="Azithromycin 500 mg Tablet">Azithromycin 500mg &bull; Macrolide Antibiotic</option>
+              <option value="Ciprofloxacin 500 mg Tablet">Ciprofloxacin 500mg &bull; Quinolone Antibiotic</option>
+              <option value="Doxycycline 100 mg Capsule">Doxycycline 100mg &bull; Tetracycline Antibiotic</option>
+              <option value="Metronidazole 500 mg Tablet">Metronidazole 500mg &bull; Antiprotozoal / Antibacterial
+              </option>
+              <option value="Co-trimoxazole 800/160 mg Tablet">Co-trimoxazole 800/160mg &bull; Antibacterial</option>
+              <option value="Clindamycin 300 mg Capsule">Clindamycin 300mg &bull; Lincosamide Antibiotic</option>
+              <option value="Erythromycin 500 mg Tablet">Erythromycin 500mg &bull; Macrolide Antibiotic</option>
+              <option value="Paracetamol 500 mg Tablet">Paracetamol 500mg &bull; Analgesic / Antipyretic</option>
+              <option value="Paracetamol 250 mg / 5 mL Syrup">Paracetamol 250mg/5mL &bull; Pediatric Syrup</option>
+              <option value="Paracetamol 120 mg / 5 mL Drops">Paracetamol 120mg/5mL &bull; Infant Drops</option>
+              <option value="Ibuprofen 400 mg Tablet">Ibuprofen 400mg &bull; NSAID / Anti-inflammatory</option>
+              <option value="Ibuprofen 200 mg / 5 mL Suspension">Ibuprofen 200mg/5mL &bull; Pediatric Suspension
+              </option>
+              <option value="Mefenamic Acid 500 mg Capsule">Mefenamic Acid 500mg &bull; Analgesic / NSAID</option>
+              <option value="Celecoxib 200 mg Capsule">Celecoxib 200mg &bull; COX-2 Inhibitor NSAID</option>
+              <option value="Tramadol 50 mg Capsule">Tramadol 50mg &bull; Opioid Analgesic</option>
+              <option value="Aspirin 80 mg Tablet">Aspirin 80mg &bull; Antiplatelet</option>
+              <option value="Amlodipine 5 mg Tablet">Amlodipine 5mg &bull; Antihypertensive (CCB)</option>
+              <option value="Amlodipine 10 mg Tablet">Amlodipine 10mg &bull; Antihypertensive (CCB)</option>
+              <option value="Losartan 50 mg Tablet">Losartan 50mg &bull; Antihypertensive (ARB)</option>
+              <option value="Losartan 100 mg Tablet">Losartan 100mg &bull; Antihypertensive (ARB)</option>
+              <option value="Metoprolol Tartrate 50 mg Tablet">Metoprolol 50mg &bull; Beta-Blocker</option>
+              <option value="Carvedilol 25 mg Tablet">Carvedilol 25mg &bull; Beta-Blocker / Vasodilator</option>
+              <option value="Enalapril 10 mg Tablet">Enalapril 10mg &bull; ACE Inhibitor</option>
+              <option value="Captopril 25 mg Tablet">Captopril 25mg &bull; ACE Inhibitor</option>
+              <option value="Atorvastatin 20 mg Tablet">Atorvastatin 20mg &bull; Statin / Lipid-lowering</option>
+              <option value="Simvastatin 20 mg Tablet">Simvastatin 20mg &bull; Statin / Lipid-lowering</option>
+              <option value="Furosemide 40 mg Tablet">Furosemide 40mg &bull; Loop Diuretic</option>
+              <option value="Hydrochlorothiazide 25 mg Tablet">Hydrochlorothiazide 25mg &bull; Thiazide Diuretic
+              </option>
+              <option value="Clonidine 75 mcg Tablet">Clonidine 75mcg &bull; Central Alpha Agonist</option>
+              <option value="Metformin 500 mg Tablet">Metformin 500mg &bull; Antidiabetic (Biguanide)</option>
+              <option value="Metformin 850 mg Tablet">Metformin 850mg &bull; Antidiabetic (Biguanide)</option>
+              <option value="Gliclazide 30 mg MR Tablet">Gliclazide 30mg MR &bull; Sulfonylurea Antidiabetic</option>
+              <option value="Gliclazide 80 mg Tablet">Gliclazide 80mg &bull; Sulfonylurea Antidiabetic</option>
+              <option value="Salbutamol 2 mg Tablet">Salbutamol 2mg &bull; Bronchodilator</option>
+              <option value="Salbutamol 2 mg / 5 mL Syrup">Salbutamol 2mg/5mL &bull; Pediatric Bronchodilator</option>
+              <option value="Salbutamol Nebule 2.5 mg / 2.5 mL">Salbutamol Nebule &bull; Inhalation Solution</option>
+              <option value="Cetirizine 10 mg Tablet">Cetirizine 10mg &bull; Antihistamine</option>
+              <option value="Cetirizine 5 mg / 5 mL Syrup">Cetirizine 5mg/5mL &bull; Pediatric Antihistamine</option>
+              <option value="Loratadine 10 mg Tablet">Loratadine 10mg &bull; Non-sedating Antihistamine</option>
+              <option value="Diphenhydramine 25 mg Capsule">Diphenhydramine 25mg &bull; Antihistamine</option>
+              <option value="Prednisone 20 mg Tablet">Prednisone 20mg &bull; Corticosteroid</option>
+              <option value="Prednisone 5 mg Tablet">Prednisone 5mg &bull; Corticosteroid</option>
+              <option value="Montelukast 10 mg Tablet">Montelukast 10mg &bull; Leukotriene Receptor Antagonist</option>
+              <option value="Carbocisteine 500 mg Capsule">Carbocisteine 500mg &bull; Mucolytic</option>
+              <option value="Lagundi 600 mg Tablet">Lagundi 600mg &bull; Herbal Cough Relief</option>
+              <option value="Omeprazole 20 mg Capsule">Omeprazole 20mg &bull; Proton Pump Inhibitor</option>
+              <option value="Omeprazole 40 mg Capsule">Omeprazole 40mg &bull; Proton Pump Inhibitor</option>
+              <option value="Aluminum Hydroxide + Magnesium Hydroxide Tablet">Antacid (AlOH + MgOH) &bull; Chewable
+              </option>
+              <option value="Domperidone 10 mg Tablet">Domperidone 10mg &bull; Antiemetic / Prokinetic</option>
+              <option value="Metoclopramide 10 mg Tablet">Metoclopramide 10mg &bull; Antiemetic</option>
+              <option value="Hyoscine N-butylbromide 10 mg Tablet">Hyoscine N-butylbromide 10mg &bull; Antispasmodic
+              </option>
+              <option value="Oral Rehydration Salts (ORS) Sachet">ORS Sachet &bull; Electrolyte Replacement</option>
+              <option value="Loperamide 2 mg Capsule">Loperamide 2mg &bull; Antimotility</option>
+              <option value="Ascorbic Acid (Vitamin C) 500 mg Tablet">Vitamin C 500mg &bull; Nutritional Supplement
+              </option>
+              <option value="Multivitamins + Iron Capsule">Multivitamins with Iron &bull; Nutritional</option>
+              <option value="Ferrous Sulfate 325 mg Tablet">Ferrous Sulfate 325mg &bull; Iron Supplement</option>
+              <option value="Folic Acid 5 mg Tablet">Folic Acid 5mg &bull; Prenatal / Hematologic</option>
+              <option value="Calcium Carbonate 500 mg Tablet">Calcium Carbonate 500mg &bull; Mineral Supplement</option>
+              <option value="Vitamin B-Complex Tablet">Vitamin B-Complex &bull; Neurotropic Vitamins</option>
+              <option value="Zinc Sulfate 20 mg Tablet">Zinc Sulfate 20mg &bull; Mineral Supplement</option>
+              <option value="Mupirocin 2% Ointment">Mupirocin 2% &bull; Topical Antibiotic</option>
+              <option value="Silver Sulfadiazine 1% Cream">Silver Sulfadiazine 1% &bull; Burn Wound Care</option>
+              <option value="Hydrocortisone 1% Cream">Hydrocortisone 1% &bull; Topical Anti-inflammatory</option>
+              <option value="Betamethasone 0.1% Cream">Betamethasone 0.1% &bull; Topical Corticosteroid</option>
+              <option value="Neomycin + Polymyxin Eye Drops">Neomycin + Polymyxin &bull; Ophthalmic Solution</option>
             </datalist>
 
             <datalist id="dosage-list">
@@ -3380,8 +3312,10 @@
         <div class="modal-box vitals-triage-modal">
           <div class="vitals-modal-header">
             <div>
-              <h4 style="margin: 0; font-weight: 700; font-size: 16.5px; color: #0f172a; display: flex; align-items: center; gap: 8px;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <h4
+                style="margin: 0; font-weight: 700; font-size: 16.5px; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                 </svg>
                 Patient Triage Assessment
@@ -3392,7 +3326,8 @@
             </div>
           </div>
 
-          <form id="vitals-form" novalidate autocomplete="off" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
+          <form id="vitals-form" novalidate autocomplete="off"
+            style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
             <div class="vitals-modal-body">
               <input type="hidden" id="vitals-citizen-id" />
 
@@ -3422,19 +3357,22 @@
 
               <div class="field" style="margin-bottom: 18px;">
                 <label class="inputLabel" for="vitals-complaint">Chief Complaint</label>
-                <textarea id="vitals-complaint" class="manual-entry-input" rows="2" style="width: 100%; box-sizing: border-box;"
-                  placeholder="What is the patient feeling?"></textarea>
+                <textarea id="vitals-complaint" class="manual-entry-input" rows="2"
+                  style="width: 100%; box-sizing: border-box;" placeholder="What is the patient feeling?"></textarea>
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px; margin: 18px 0 14px;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5">
                   <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                 </svg>
-                <span style="font-weight: 700; font-size: 13.5px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.03em;">Vital Signs</span>
+                <span
+                  style="font-weight: 700; font-size: 13.5px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.03em;">Vital
+                  Signs</span>
                 <div style="flex: 1; height: 1px; background: #e2e8f0; margin-left: 6px;"></div>
               </div>
 
-              <div class="assessment-field-grid" style="grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px;">
+              <div class="assessment-field-grid"
+                style="grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px;">
                 <div class="field">
                   <label class="inputLabel" for="vitals-bp">BP (mmHg)</label>
                   <input id="vitals-bp" class="manual-entry-input" type="text" placeholder="120/80" />
@@ -3452,20 +3390,22 @@
                   <input id="vitals-temp" class="manual-entry-input" type="number" step="0.1" placeholder="36.5" />
                 </div>
                 <div class="field">
-                  <label class="inputLabel" for="vitals-spo2">SpOâ‚‚ (%)</label>
+                  <label class="inputLabel" for="vitals-spo2">SpO<sub>2</sub> (%)</label>
                   <input id="vitals-spo2" class="manual-entry-input" type="number" placeholder="98" />
                 </div>
               </div>
 
               <div class="field" style="margin-top: 10px;">
                 <label class="inputLabel" for="vitals-meds">Current Medications</label>
-                <textarea id="vitals-meds" class="manual-entry-input" rows="2" style="width: 100%; box-sizing: border-box;"
+                <textarea id="vitals-meds" class="manual-entry-input" rows="2"
+                  style="width: 100%; box-sizing: border-box;"
                   placeholder="List medications currently being taken..."></textarea>
               </div>
             </div>
 
             <div class="vitals-modal-footer">
-              <button type="button" id="vitals-cancel-form-btn" class="btn btn-secondary" style="width: auto;">Cancel</button>
+              <button type="button" id="vitals-cancel-form-btn" class="btn btn-secondary"
+                style="width: auto;">Cancel</button>
               <button type="button" id="vitals-reset-btn" class="chip-btn" style="padding: 8px 16px;">Reset</button>
               <button type="submit" id="vitals-submit-btn" class="btn" style="width: auto; padding: 9px 22px;">
                 <span class="btn-spinner" aria-hidden="true"></span>
@@ -3482,7 +3422,7 @@
   <script defer src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script src="../src/js/runtime-config.js?v=20260502b"></script>
   <script src="../src/js/csv-import.js?v=20260503a"></script>
-  <script type="module" src="../src/js/dashboard.js?v=20260911a"></script>
+  <script type="module" src="../src/js/dashboard.js?v=20260911g"></script>
   <script src="../src/js/health-records.js"></script>
   <script type="module" src="../src/js/reports-ui.js"></script>
 </body>

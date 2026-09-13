@@ -21,18 +21,26 @@ class ActiveTicketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isFinished = queue.isCompleted;
+    final isCancelled = queue.isCancelled;
     final ahead = (queue.myQueueNumber ?? 0) - (queue.currentlyServingQueueNumber ?? 0);
-    final isTurn = ahead <= 0;
-    final isOnCall = queue.isOnCall || queue.status.toLowerCase() == 'on_call';
-    final Color statusColor = isOnCall ? _C.warning : (isTurn ? _C.success : _C.primaryMid);
-    final String statusMsg = isOnCall
-        ? 'Please proceed to the nurse for vital assessment'
-        : (isTurn
-            ? 'Please proceed to the doctor\'s office for consultation'
-            : '$ahead ${ahead == 1 ? 'person' : 'people'} ahead of you');
-    final IconData statusIcon = isOnCall
-        ? Icons.campaign_rounded
-        : (isTurn ? Icons.check_circle_rounded : Icons.groups_rounded);
+    final isTurn = !isFinished && !isCancelled && ahead <= 0;
+    final isOnCall = !isFinished && !isCancelled && (queue.isOnCall || queue.status.toLowerCase() == 'on_call');
+    final Color statusColor = isFinished
+        ? _C.success
+        : (isOnCall ? _C.warning : (isTurn ? _C.success : _C.primaryMid));
+    final String statusMsg = isFinished
+        ? 'Your consultation has been completed. Prescriptions & instructions are ready.'
+        : (isOnCall
+            ? 'Please proceed to the nurse for vital assessment'
+            : (isTurn
+                ? 'Please proceed to the doctor\'s office for consultation'
+                : '$ahead ${ahead == 1 ? 'person' : 'people'} ahead of you'));
+    final IconData statusIcon = isFinished
+        ? Icons.task_alt_rounded
+        : (isOnCall
+            ? Icons.campaign_rounded
+            : (isTurn ? Icons.check_circle_rounded : Icons.groups_rounded));
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -66,11 +74,13 @@ class ActiveTicketCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isOnCall
-                            ? 'YOU ARE ON CALL'
-                            : (isTurn && queue.status == 'serving'
-                                ? 'YOU ARE NOW SERVING'
-                                : 'NOW SERVING #${(queue.currentlyServingQueueNumber ?? 0).toString().padLeft(3, '0')}'),
+                        isFinished
+                            ? 'CONSULTATION COMPLETED'
+                            : (isOnCall
+                                ? 'YOU ARE ON CALL'
+                                : (isTurn && queue.status.toLowerCase() == 'serving'
+                                    ? 'YOU ARE NOW SERVING'
+                                    : 'NOW SERVING #${(queue.currentlyServingQueueNumber ?? 0).toString().padLeft(3, '0')}')),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -95,6 +105,12 @@ class ActiveTicketCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(color: _C.warning, borderRadius: BorderRadius.circular(8)),
                     child: const Text('ON CALL', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                  ),
+                if (isFinished)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(color: _C.success, borderRadius: BorderRadius.circular(8)),
+                    child: const Text('DONE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
                   ),
               ],
             ),
@@ -259,20 +275,20 @@ class ActiveTicketCard extends StatelessWidget {
                       // Stats row
                       Row(
                         children: [
-                          _statChip(Icons.timer_outlined, 'Est. Wait', '${queue.estimatedWaitMinutes} mins', _C.primaryMid),
+                          _statChip(Icons.timer_outlined, 'Est. Wait', '${isFinished ? 0 : queue.estimatedWaitMinutes} mins', _C.primaryMid),
                           const SizedBox(width: 12),
                           _statChip(
                             Icons.people_outline_rounded,
                             'People Ahead',
-                            '${ahead > 0 ? ahead : "0"}',
+                            '${(!isFinished && ahead > 0) ? ahead : "0"}',
                             _C.primaryMid,
                           ),
                         ],
                       ),
                       const SizedBox(height: 24),
 
-                      // Cancel button (Hidden when On Call or Serving)
-                      if (!isOnCall && !isTurn)
+                      // Cancel button (Hidden when On Call, Serving, or Finished)
+                      if (!isOnCall && !isTurn && !isFinished)
                         SizedBox(
                           width: double.infinity,
                           height: 52,

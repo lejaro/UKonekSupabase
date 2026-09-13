@@ -116,7 +116,11 @@ class QueueDashboardSnapshot {
     this.hasVitals = false,
   });
 
-  bool get hasActiveQueue => queueId != null && myQueueNumber != null;
+  bool get isCompleted => const {'completed', 'finished', 'done'}.contains(status.toLowerCase().trim());
+  bool get isCancelled => const {'cancelled', 'canceled'}.contains(status.toLowerCase().trim());
+  bool get isServing => status.toLowerCase().trim() == 'serving';
+  bool get isOnCallStatus => isOnCall || status.toLowerCase().trim() == 'on_call';
+  bool get hasActiveQueue => queueId != null && myQueueNumber != null && !isCompleted && !isCancelled;
 
   factory QueueDashboardSnapshot.fromMap(Map<String, dynamic> map, {bool hasVitals = false}) {
     final dateRaw = map['r_queue_date'] ?? map['queue_date'];

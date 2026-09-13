@@ -141,6 +141,44 @@ export function evaluateVitalsRisk() {
       spo2Badge.classList.add('hidden');
     }
   }
+
+  // 6. Anthropometrics & BMI Calculation
+  const heightInput = document.getElementById('va-height') || document.getElementById('vitals-height');
+  const weightInput = document.getElementById('va-weight') || document.getElementById('vitals-weight');
+  const bmiValEl = document.getElementById('va-bmi-value');
+  const bmiBadgeEl = document.getElementById('va-bmi-badge');
+
+  if (bmiValEl && bmiBadgeEl) {
+    const h = heightInput ? parseFloat(heightInput.value) : NaN;
+    const w = weightInput ? parseFloat(weightInput.value) : NaN;
+
+    if (!isNaN(h) && !isNaN(w) && h > 0 && w > 0) {
+      const hMeters = h / 100;
+      const bmi = w / (hMeters * hMeters);
+      const roundedBmi = Math.round(bmi * 10) / 10;
+
+      bmiValEl.textContent = roundedBmi.toFixed(1);
+
+      bmiBadgeEl.className = 'bmi-category-badge';
+      if (roundedBmi < 18.5) {
+        bmiBadgeEl.classList.add('bmi-underweight');
+        bmiBadgeEl.textContent = 'Underweight (<18.5)';
+      } else if (roundedBmi < 25.0) {
+        bmiBadgeEl.classList.add('bmi-normal');
+        bmiBadgeEl.textContent = 'Normal (18.5 - 24.9)';
+      } else if (roundedBmi < 30.0) {
+        bmiBadgeEl.classList.add('bmi-overweight');
+        bmiBadgeEl.textContent = 'Overweight (25.0 - 29.9)';
+      } else {
+        bmiBadgeEl.classList.add('bmi-obese');
+        bmiBadgeEl.textContent = 'Obese (≥30.0)';
+      }
+    } else {
+      bmiValEl.innerHTML = '&mdash;';
+      bmiBadgeEl.className = 'bmi-category-badge hidden';
+      bmiBadgeEl.innerHTML = '&mdash;';
+    }
+  }
 }
 
 export function setVitalsStationStatus(status, label) {

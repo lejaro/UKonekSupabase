@@ -9,6 +9,9 @@ class VitalSigns {
   final int? rr;
   final double? temp;
   final int? spo2;
+  final double? heightCm;
+  final double? weightKg;
+  final double? bmi;
   final String? meds;
   final DateTime createdAt;
 
@@ -21,6 +24,9 @@ class VitalSigns {
     this.rr,
     this.temp,
     this.spo2,
+    this.heightCm,
+    this.weightKg,
+    this.bmi,
     this.meds,
     required this.createdAt,
   });
@@ -35,6 +41,9 @@ class VitalSigns {
       rr: (map['respiratory_rate'] as num?)?.toInt(),
       temp: (map['temperature'] as num?)?.toDouble(),
       spo2: (map['oxygen_saturation'] as num?)?.toInt(),
+      heightCm: (map['height_cm'] as num?)?.toDouble(),
+      weightKg: (map['weight_kg'] as num?)?.toDouble(),
+      bmi: (map['bmi'] as num?)?.toDouble(),
       meds: map['current_medications'],
       createdAt: DateTime.parse(map['created_at']),
     );

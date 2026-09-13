@@ -108,6 +108,8 @@ export async function openVitalAssessmentModal(ticket) {
       if (document.getElementById('va-rr')) document.getElementById('va-rr').value = existing.respiratory_rate || '';
       if (document.getElementById('va-temp')) document.getElementById('va-temp').value = existing.temperature || '';
       if (document.getElementById('va-spo2')) document.getElementById('va-spo2').value = existing.oxygen_saturation || '';
+      if (document.getElementById('va-height')) document.getElementById('va-height').value = existing.height_cm != null ? existing.height_cm : '';
+      if (document.getElementById('va-weight')) document.getElementById('va-weight').value = existing.weight_kg != null ? existing.weight_kg : '';
       if (document.getElementById('va-meds')) document.getElementById('va-meds').value = existing.current_medications || '';
       if (document.getElementById('va-notes')) document.getElementById('va-notes').value = existing.notes || '';
     } else {
@@ -137,6 +139,11 @@ export function closeVitalAssessmentModal() {
     vaModal.classList.add('hidden');
     vaModal.style.display = 'none';
   }
+  const vaForm = document.getElementById('vital-assessment-form');
+  if (vaForm) {
+    vaForm.reset();
+  }
+  evaluateVitalsRisk();
 }
 
 export function initVitalAssessmentModal() {
@@ -153,6 +160,15 @@ export function initVitalAssessmentModal() {
       if (e.target === vaModal) closeVitalAssessmentModal();
     });
   }
+
+  // Wire real-time risk assessment and BMI calculation listeners
+  ['va-bp', 'va-hr', 'va-rr', 'va-temp', 'va-spo2', 'va-height', 'va-weight'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.riskBound) {
+      el.addEventListener('input', evaluateVitalsRisk);
+      el.dataset.riskBound = 'true';
+    }
+  });
 
   if (vaForm && !vaForm.dataset.bound) {
     vaForm.dataset.bound = 'true';
@@ -265,6 +281,40 @@ export function initVitalAssessmentModal() {
         }
       }
 
+      const heightInputVal = document.getElementById('va-height')?.value?.trim();
+      let parsedHeight = null;
+      if (heightInputVal !== undefined && heightInputVal !== null && heightInputVal !== '') {
+        parsedHeight = parseFloat(heightInputVal);
+        if (isNaN(parsedHeight) || parsedHeight <= 0) {
+          showToast('Height must be a valid positive number.', 'warning');
+          return;
+        }
+        if (parsedHeight < 30 || parsedHeight > 250) {
+          showToast('Height must be between 30 and 250 cm.', 'warning');
+          return;
+        }
+      }
+
+      const weightInputVal = document.getElementById('va-weight')?.value?.trim();
+      let parsedWeight = null;
+      if (weightInputVal !== undefined && weightInputVal !== null && weightInputVal !== '') {
+        parsedWeight = parseFloat(weightInputVal);
+        if (isNaN(parsedWeight) || parsedWeight <= 0) {
+          showToast('Weight must be a valid positive number.', 'warning');
+          return;
+        }
+        if (parsedWeight < 1 || parsedWeight > 300) {
+          showToast('Weight must be between 1 and 300 kg.', 'warning');
+          return;
+        }
+      }
+
+      let computedBmi = null;
+      if (parsedHeight && parsedWeight) {
+        const hm = parsedHeight / 100;
+        computedBmi = Number((parsedWeight / (hm * hm)).toFixed(1));
+      }
+
       setLoading(submitBtn, true);
       try {
         const rpcPayload = {
@@ -277,7 +327,10 @@ export function initVitalAssessmentModal() {
           p_respiratory_rate: rrVal ? parseInt(rrVal, 10) : null,
           p_oxygen_saturation: spo2Val ? parseInt(spo2Val, 10) : null,
           p_current_medications: document.getElementById('va-meds')?.value || null,
-          p_notes: document.getElementById('va-notes')?.value || null
+          p_notes: document.getElementById('va-notes')?.value || null,
+          p_height_cm: parsedHeight,
+          p_weight_kg: parsedWeight,
+          p_bmi: computedBmi
         };
 
         const { data: rpcRes, error: rpcError } = await supabase.rpc('upsert_vital_assessment', rpcPayload);
@@ -297,21 +350,34 @@ export function initVitalAssessmentModal() {
   }
 }
 
+export function teardownQueueRealtime() {
+  if (queueBoardChannel) {
+    try {
+      supabase.removeChannel(queueBoardChannel);
+      console.log('[Queue] Realtime channel unsubscribed.');
+    } catch (_) {}
+    queueBoardChannel = null;
+  }
+}
+
 export async function setupRealtime() {
   try {
-    if (queueBoardChannel) {
-      try { supabase.removeChannel(queueBoardChannel); } catch (_) {}
-      queueBoardChannel = null;
-    }
-    const today = new Date();
-    const queueDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    teardownQueueRealtime();
+
+    const manilaTodayStr = new Intl.DateTimeFormat('fr-CA', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date());
+
     queueBoardChannel = supabase
       .channel('queue-board-updates')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'queue_tickets',
-        filter: `queue_date=eq.${queueDate}`
+        filter: `queue_date=eq.${manilaTodayStr}`
       }, (payload) => {
         console.log('[Queue] Realtime update:', payload.eventType);
         loadQueueTickets();
@@ -322,6 +388,10 @@ export async function setupRealtime() {
   } catch (err) {
     console.error('[Queue] Failed to setup realtime:', err);
   }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', teardownQueueRealtime);
 }
 
 export async function loadQueueTickets() {
@@ -340,18 +410,17 @@ export async function loadQueueTickets() {
   }
 
   try {
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const yesterdayStr = new Intl.DateTimeFormat('fr-CA', {
+    const manilaTodayStr = new Intl.DateTimeFormat('fr-CA', {
       timeZone: 'Asia/Manila',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
-    }).format(yesterday);
+    }).format(new Date());
 
     const { data, error } = await supabase
       .from('queue_tickets')
       .select('id, queue_number, ticket_code, status, queue_date, citizen_type, service_label, symptoms, reason, citizen:citizens(id, firstname, surname, age, sex, contact_number), vitals:vital_signs(id)')
-      .gte('queue_date', yesterdayStr)
+      .eq('queue_date', manilaTodayStr)
       .in('status', ['waiting', 'on_call', 'serving'])
       .order('queue_date', { ascending: true })
       .order('queue_number', { ascending: true });
@@ -430,35 +499,7 @@ export function renderLane(id, list) {
   const container = document.getElementById(id);
   if (!container) return;
   if (list.length === 0) {
-    let emptyIcon = '';
-    let emptyTitle = 'Queue Clear';
-    let emptySubtitle = 'No tickets currently in this lane.';
-    let iconClass = 'waiting-icon';
-
-    if (id === 'queue-waiting-list') {
-      iconClass = 'waiting-icon';
-      emptyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
-      emptyTitle = 'Lobby Queue Clear';
-      emptySubtitle = 'No patients currently waiting. New check-ins and appointments will appear here.';
-    } else if (id === 'queue-oncall-list') {
-      iconClass = 'oncall-icon';
-      emptyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
-      emptyTitle = 'No Active Calls';
-      emptySubtitle = 'Called patients holding for triage arrival and vitals checking will appear here.';
-    } else if (id === 'queue-serving-list') {
-      iconClass = 'serving-icon';
-      emptyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`;
-      emptyTitle = 'Station Ready';
-      emptySubtitle = 'No consultation in progress. Call or serve a patient to begin clinical evaluation.';
-    }
-
-    container.innerHTML = `
-      <div class="queue-lane-empty-state">
-        <div class="empty-state-icon ${iconClass}">${emptyIcon}</div>
-        <div class="empty-state-title">${emptyTitle}</div>
-        <div class="empty-state-subtitle">${emptySubtitle}</div>
-      </div>
-    `;
+    container.innerHTML = '';
     return;
   }
 

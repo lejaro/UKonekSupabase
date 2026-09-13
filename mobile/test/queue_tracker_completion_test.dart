@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ukonekmobile/models/queue_ticket.dart';
 
 void main() {
   group('Queue Tracker Completion & Reset Tests', () {
@@ -81,6 +82,57 @@ void main() {
       };
 
       expect(isCompleted(completedTicketMap), isTrue);
+    });
+
+    test('QueueDashboardSnapshot hasActiveQueue returns false for completed or cancelled tickets', () {
+      final activeSnapshot = QueueDashboardSnapshot.fromMap({
+        'queue_id': 10,
+        'service_key': 'general',
+        'service_label': 'General Consultation',
+        'ticket_code': 'Q-010',
+        'my_queue_number': 5,
+        'currently_serving_queue_number': 5,
+        'status': 'serving',
+      });
+      expect(activeSnapshot.hasActiveQueue, isTrue);
+      expect(activeSnapshot.isCompleted, isFalse);
+      expect(activeSnapshot.isServing, isTrue);
+
+      final completedSnapshot = QueueDashboardSnapshot.fromMap({
+        'queue_id': 10,
+        'service_key': 'general',
+        'service_label': 'General Consultation',
+        'ticket_code': 'Q-010',
+        'my_queue_number': 5,
+        'currently_serving_queue_number': 6,
+        'status': 'completed',
+      });
+      expect(completedSnapshot.hasActiveQueue, isFalse);
+      expect(completedSnapshot.isCompleted, isTrue);
+
+      final finishedSnapshot = QueueDashboardSnapshot.fromMap({
+        'queue_id': 10,
+        'service_key': 'general',
+        'service_label': 'General Consultation',
+        'ticket_code': 'Q-010',
+        'my_queue_number': 5,
+        'currently_serving_queue_number': 6,
+        'status': 'finished',
+      });
+      expect(finishedSnapshot.hasActiveQueue, isFalse);
+      expect(finishedSnapshot.isCompleted, isTrue);
+
+      final cancelledSnapshot = QueueDashboardSnapshot.fromMap({
+        'queue_id': 10,
+        'service_key': 'general',
+        'service_label': 'General Consultation',
+        'ticket_code': 'Q-010',
+        'my_queue_number': 5,
+        'currently_serving_queue_number': 6,
+        'status': 'cancelled',
+      });
+      expect(cancelledSnapshot.hasActiveQueue, isFalse);
+      expect(cancelledSnapshot.isCancelled, isTrue);
     });
   });
 }
