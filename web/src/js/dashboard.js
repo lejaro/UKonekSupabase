@@ -74,6 +74,10 @@ import {
   openVitalAssessmentModal,
   closeVitalAssessmentModal
 } from './controllers/queueController.js';
+import {
+  initPromoPosterController,
+  loadPromoPosters
+} from './controllers/promoPosterController.js';
 
 function withTimeout(promise, timeoutMs, timeoutMessage) {
   return Promise.race([
@@ -168,6 +172,7 @@ if (typeof window !== 'undefined') {
   window.ensureAuthenticatedSession = ensureAuthenticatedSession;
   window.openPrescriptionModalForPatient = openPrescriptionModalForPatient;
   window.closePrescriptionModal = closePrescriptionModal;
+  window.loadPromoPosters = loadPromoPosters;
 
   // Polyfill dynamic module promises if legacy callers invoke them
   window.loadSupabaseModule = async () => ({ supabase });
@@ -219,6 +224,7 @@ async function bootstrapDashboard() {
       },
       'medicine-section': () => loadMedicinesCatalog(),
       'vitals-section': () => initTriageSection(),
+      'reports-section': () => loadPromoPosters(),
       'profile-section': (options = {}) => {
         const currentUser = sessionStore.getUser();
         if (currentUser) populateProfile(currentUser);
@@ -239,6 +245,7 @@ async function bootstrapDashboard() {
     initConsultationSection();
     initPharmacyModule();
     initPrescriptionController();
+    initPromoPosterController();
     
     // Non-blocking queue controller init so realtime setup does not delay navigation
     initQueueController().catch(e => console.warn('[Dashboard] Queue controller init warning:', e));

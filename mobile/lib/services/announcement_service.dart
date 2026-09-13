@@ -11,7 +11,7 @@ class AnnouncementService {
     try {
       final response = await _client
           .from('announcements')
-          .select('id,title,content,visibility,created_at')
+          .select('id,title,content,visibility,image_url,created_at')
           .inFilter('visibility', ['all', 'citizen'])
           .order('created_at', ascending: false)
           .limit(10);

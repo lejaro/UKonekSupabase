@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'services/api_service.dart';
-import 'dashboard_page.dart';
 import 'main_shell_page.dart';
 import 'registration/register_wrapper.dart';
 import 'menu_page.dart';

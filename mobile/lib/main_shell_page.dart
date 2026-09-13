@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'services/medicine_cache_service.dart';
@@ -11,10 +10,9 @@ import 'dashboard_page.dart';
 import 'medicine_scheduler_page.dart';
 import 'join_queue_page.dart';
 import 'profile_page.dart';
-
 import 'core/navigation/shell_navigation.dart';
-import 'core/session/patient_session.dart';
 import 'widgets/prescription_details_sheet.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 /// Unified persistent App Shell for uKonek.
 /// Hosts Dashboard, Medicine Scheduler, Queue, and Profile tabs without route pushing.
@@ -56,7 +54,6 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
   static const Color _primary      = Color(0xFF059669);
   static const Color _primaryLight = Color(0xFFECFDF5);
   static const Color _textDark     = Color(0xFF0F172A);
-  static const Color _shadow       = Color(0x0A0F172A);
 
   late int _selectedTab;
   late final List<Widget> _pages;
@@ -255,73 +252,263 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
   }
 
   Widget _buildBottomNav() {
-    final tabs = [
-      {'icon': Icons.home_rounded, 'label': 'Home'},
-      {'icon': Icons.event_note_rounded, 'label': 'Medicine'},
-      {'icon': Icons.confirmation_number_rounded, 'label': 'Queue'},
-      {'icon': Icons.person_outline_rounded, 'label': 'Profile'},
-    ];
+    const Color barColor = Color(0xFF1E4E2B); // Dark green background
+    final currentTab = _selectedTab;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
-        border: Border(
-          top: BorderSide(color: Color(0xFFF1F5F9), width: 1),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: _shadow,
-            blurRadius: 20,
-            offset: Offset(0, -4),
-          )
-        ],
-      ),
+      color: barColor,
       child: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            children: List.generate(tabs.length, (i) {
-              final isSelected = _selectedTab == i;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => selectTab(i),
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isSelected ? _primaryLight : Colors.transparent,
-                      borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          height: 66,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // 1. Home
+                    _buildNavCircleButton(
+                      icon: Icons.home_rounded,
+                      isSelected: currentTab == ShellNavigation.tabDashboard,
+                      onTap: () => selectTab(ShellNavigation.tabDashboard),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          tabs[i]['icon'] as IconData,
-                          color: isSelected ? _primary : const Color(0xFF94A3B8),
-                          size: 22,
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          tabs[i]['label'] as String,
-                          style: TextStyle(
-                            color: isSelected ? _primary : const Color(0xFF94A3B8),
-                            fontSize: 11,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          ),
+                    // 2. Schedule
+                    _buildNavCircleButton(
+                      icon: Icons.calendar_month_rounded,
+                      isSelected: currentTab == ShellNavigation.tabMedicineScheduler,
+                      onTap: () => selectTab(ShellNavigation.tabMedicineScheduler),
+                    ),
+                    // Gap for center QR
+                    const SizedBox(width: 54),
+                    // 4. Queue
+                    _buildNavCircleButton(
+                      icon: Icons.confirmation_number_rounded,
+                      isSelected: currentTab == ShellNavigation.tabQueue,
+                      onTap: () => selectTab(ShellNavigation.tabQueue),
+                    ),
+                    // 5. Profile
+                    _buildNavCircleButton(
+                      icon: Icons.person_rounded,
+                      isSelected: currentTab == ShellNavigation.tabProfile,
+                      onTap: () => selectTab(ShellNavigation.tabProfile),
+                    ),
+                  ],
+                ),
+              ),
+              // Prominent Raised Center QR Button
+              Positioned(
+                top: -12,
+                child: GestureDetector(
+                  onTap: _showPatientQrModal,
+                  child: Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x33000000),
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
                         ),
                       ],
                     ),
+                    child: const Icon(
+                      Icons.qr_code_scanner_rounded,
+                      color: barColor,
+                      size: 34,
+                    ),
                   ),
                 ),
-              );
-            }),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavCircleButton({
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: isSelected
+              ? const [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
+                  )
+                ]
+              : null,
+        ),
+        child: Icon(
+          icon,
+          color: const Color(0xFF1E4E2B),
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  void _showPatientQrModal() {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(28),
+            topRight: Radius.circular(28),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x1F000000),
+              blurRadius: 30,
+              offset: Offset(0, -6),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _primaryLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Image.asset(
+                    'assets/icons/patient_id_icon.png',
+                    width: 24,
+                    height: 24,
+                    fit: BoxFit.contain,
+                    errorBuilder: (ctx, err, stack) => const Icon(Icons.badge_rounded, color: _primary, size: 22),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Patient Digital Pass',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _textDark,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Present this QR code at clinic reception or triage for instant check-in',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF64748B), fontSize: 12, height: 1.4),
+            ),
+            const SizedBox(height: 22),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x08000000),
+                    blurRadius: 16,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  QrImageView(
+                    data: widget.citizenId.isNotEmpty ? widget.citizenId : 'UKONEK-PATIENT',
+                    version: QrVersions.auto,
+                    size: 190.0,
+                    eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF064E3B)),
+                    dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Color(0xFF064E3B)),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    widget.fullname.isNotEmpty ? widget.fullname : widget.username,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: _textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _primaryLight,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'CITIZEN ID: #${widget.citizenId}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                        letterSpacing: 0.8,
+                        color: _primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primary,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

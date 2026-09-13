@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'menu_page.dart';
-import 'dashboard_page.dart';
 import 'main_shell_page.dart';
 import 'change_password_page.dart';
 import 'config/supabase_config.dart';

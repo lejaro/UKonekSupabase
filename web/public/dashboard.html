@@ -1309,7 +1309,7 @@
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                   </svg>
-                  Announcements <span class="tab-badge" id="hub-count-announcements">0</span>
+                  Promo Posters & Announcements <span class="tab-badge" id="hub-count-announcements">0</span>
                 </button>
                 <button type="button" class="personnel-tab-btn" id="hub-tab-feedback" data-pane="feedback-pane">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1347,37 +1347,26 @@
                       <line x1="21" y1="21" x2="16.65" y2="16.65" />
                     </svg>
                     <input type="search" id="announcements-search-input" class="search-input"
-                      placeholder="Search announcements..." aria-label="Search announcements" />
+                      placeholder="Search promo posters..." aria-label="Search promo posters" />
                   </div>
                   <div class="ph-filter-chips" id="announcement-filter-chips" style="margin-bottom:0;">
                     <button type="button" class="ph-filter-chip is-active" data-filter="all">All <span
                         class="chip-count" id="ann-count-all">0</span></button>
-                    <button type="button" class="ph-filter-chip" data-filter="all_users">Public <span class="chip-count"
-                        id="ann-count-public">0</span></button>
-                    <button type="button" class="ph-filter-chip" data-filter="citizen">Citizens Only <span
+                    <button type="button" class="ph-filter-chip" data-filter="citizen">Citizens (Mobile) <span
                         class="chip-count" id="ann-count-citizens">0</span></button>
-                    <button type="button" class="ph-filter-chip" data-filter="staff">Staff Only <span class="chip-count"
-                        id="ann-count-staff">0</span></button>
+                    <button type="button" class="ph-filter-chip" data-filter="all_users">All Users <span class="chip-count"
+                        id="ann-count-public">0</span></button>
                   </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-                  <button id="announcement-csv-import-btn" class="chip-btn chip-btn-outline" type="button"
-                    style="display:inline-flex; align-items:center; gap:6px;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="17 8 12 3 7 8" />
-                      <line x1="12" y1="3" x2="12" y2="15" />
-                    </svg>
-                    Import CSV
-                  </button>
-                  <button id="create-announcement-topright" class="chip-btn" type="button"
-                    style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px;">
+                  <button id="create-announcement-topright" class="chip-btn clinical-only" type="button"
+                    style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px; font-weight:700;">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                       stroke-width="2.5">
                       <line x1="12" y1="5" x2="12" y2="19" />
                       <line x1="5" y1="12" x2="19" y2="12" />
                     </svg>
-                    New Announcement
+                    New Promo Poster
                   </button>
                 </div>
               </div>
@@ -1385,10 +1374,12 @@
                 <table class="accounts-table">
                   <thead>
                     <tr class="table-header-row">
-                      <th class="table-header-cell" style="text-align:left;">Announcement Title</th>
-                      <th class="table-header-cell" style="width:140px; text-align:center;">Target Audience</th>
-                      <th class="table-header-cell" style="width:180px; text-align:center;">Date Posted</th>
-                      <th class="table-header-cell" style="width:110px; text-align:right;">Actions</th>
+                      <th class="table-header-cell" style="width:70px; text-align:center;">Poster</th>
+                      <th class="table-header-cell" style="text-align:left;">Promo Title & Message</th>
+                      <th class="table-header-cell" style="width:130px; text-align:center;">Target Audience</th>
+                      <th class="table-header-cell" style="width:150px; text-align:center;">Posted By</th>
+                      <th class="table-header-cell" style="width:150px; text-align:center;">Date Posted</th>
+                      <th class="table-header-cell" style="width:90px; text-align:center;">Actions</th>
                     </tr>
                   </thead>
                   <tbody id="announcements-tbody"></tbody>
@@ -3413,6 +3404,155 @@
               </button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <!-- Doctor & Nurse Promo Poster Modal -->
+      <div id="promo-poster-modal" class="modal-overlay hidden" style="z-index: 93000;">
+        <div class="modal-box" style="max-width: 680px; width: 95%; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; border-radius: 18px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+          <!-- Header -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 20px 24px 16px; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 42px; height: 42px; border-radius: 12px; background: #dcfce7; display: flex; align-items: center; justify-content: center; color: #166534; flex-shrink: 0;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+              </div>
+              <div>
+                <h4 style="margin: 0; font-size: 17px; font-weight: 800; color: #0f172a; letter-spacing: -0.3px;">New Mobile Promo Poster</h4>
+                <p style="margin: 3px 0 0; font-size: 12.5px; color: #64748b;">Publish health campaigns & announcements to patient mobile app</p>
+              </div>
+            </div>
+            <button type="button" id="promo-close-modal-btn" class="icon-btn" aria-label="Close modal" style="width: 32px; height: 32px; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div style="padding: 22px 24px; overflow-y: auto; flex: 1;">
+            <form id="promo-poster-form" novalidate autocomplete="off">
+              <!-- Title -->
+              <div class="field" style="margin-bottom: 16px;">
+                <label class="inputLabel" for="promo-title" style="display: flex; justify-content: space-between; font-weight: 700; font-size: 13px; color: #1e293b; margin-bottom: 6px;">
+                  <span>Promo Title <span style="color: #ef4444;">*</span></span>
+                  <span style="font-size: 11px; color: #94a3b8; font-weight: 500;">Max 60 chars</span>
+                </label>
+                <input id="promo-title" class="manual-entry-input" type="text" placeholder="e.g., Free Pediatric Health Checkup & Vaccination" maxlength="80" required style="width: 100%; box-sizing: border-box; padding: 10px 14px; font-size: 14px; border-radius: 10px; border: 1.5px solid #cbd5e1;" />
+              </div>
+
+              <!-- Content / Message -->
+              <div class="field" style="margin-bottom: 18px;">
+                <label class="inputLabel" for="promo-content" style="display: flex; justify-content: space-between; font-weight: 700; font-size: 13px; color: #1e293b; margin-bottom: 6px;">
+                  <span>Announcement Details / Description <span style="color: #ef4444;">*</span></span>
+                  <span style="font-size: 11px; color: #94a3b8; font-weight: 500;">Concise summary</span>
+                </label>
+                <textarea id="promo-content" class="manual-entry-input" rows="3" placeholder="Briefly explain the promo, clinic schedule, instructions, or clinic service..." required style="width: 100%; box-sizing: border-box; padding: 10px 14px; font-size: 13.5px; border-radius: 10px; border: 1.5px solid #cbd5e1; resize: vertical; line-height: 1.4;"></textarea>
+              </div>
+
+              <!-- Poster Image Source Tabs -->
+              <div class="field" style="margin-bottom: 18px;">
+                <label class="inputLabel" style="font-weight: 700; font-size: 13px; color: #1e293b; margin-bottom: 8px; display: block;">
+                  Poster Image (Upload Photo or Provide Web Link)
+                </label>
+                
+                <!-- Toggle Tabs: Upload vs Link -->
+                <div style="display: inline-flex; background: #f1f5f9; padding: 3px; border-radius: 10px; margin-bottom: 12px; gap: 4px;">
+                  <button type="button" id="promo-tab-upload" class="chip-btn" style="background: #fff; font-weight: 700; font-size: 12px; border-radius: 8px; border: 1px solid #cbd5e1; color: #0f172a; padding: 6px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    Upload Photo
+                  </button>
+                  <button type="button" id="promo-tab-url" class="chip-btn" style="background: transparent; font-weight: 600; font-size: 12px; border: 1px solid transparent; color: #64748b; padding: 6px 14px;">
+                    Paste Image Link
+                  </button>
+                </div>
+
+                <!-- Pane A: File Upload Area -->
+                <div id="promo-upload-pane" style="border: 2px dashed #cbd5e1; border-radius: 14px; padding: 20px; text-align: center; background: #f8fafc; cursor: pointer; transition: border-color 0.2s;">
+                  <input type="file" id="promo-file-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display: none;" />
+                  <div id="promo-upload-dropzone" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                    <div style="width: 44px; height: 44px; border-radius: 50%; background: #e0f2fe; display: flex; align-items: center; justify-content: center; color: #0284c7;">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                      </svg>
+                    </div>
+                    <div style="font-size: 13.5px; font-weight: 700; color: #0f172a;">Click or drag photo here to upload</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Supports PNG, JPG, or WEBP (Max 10MB)</div>
+                  </div>
+                </div>
+
+                <!-- Pane B: Image URL Link Input -->
+                <div id="promo-url-pane" class="hidden" style="margin-top: 4px;">
+                  <div style="position: relative;">
+                    <input id="promo-url-input" class="manual-entry-input" type="url" placeholder="https://example.com/images/health-poster.jpg" style="width: 100%; box-sizing: border-box; padding: 10px 14px 10px 38px; font-size: 13.5px; border-radius: 10px; border: 1.5px solid #cbd5e1;" />
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%);">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                  </div>
+                </div>
+
+                <!-- Image Selected / Uploaded Preview Box -->
+                <div id="promo-image-preview-container" class="hidden" style="margin-top: 12px; display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;">
+                  <img id="promo-preview-thumb" src="" alt="Poster preview" style="width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #86efac;" />
+                  <div style="flex: 1; min-width: 0;">
+                    <div id="promo-preview-filename" style="font-size: 12.5px; font-weight: 700; color: #166534; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Photo attached</div>
+                    <div style="font-size: 11px; color: #15803d;">Will appear on mobile home screen promo carousel</div>
+                  </div>
+                  <button type="button" id="promo-remove-img-btn" class="chip-btn" style="background: #fff; border: 1px solid #fca5a5; color: #dc2626; padding: 4px 10px; font-size: 11.5px; border-radius: 6px;">
+                    Remove
+                  </button>
+                </div>
+              </div>
+
+              <!-- Target Audience -->
+              <div class="field" style="margin-bottom: 20px;">
+                <label class="inputLabel" for="promo-visibility" style="font-weight: 700; font-size: 13px; color: #1e293b; margin-bottom: 6px; display: block;">
+                  Target Audience
+                </label>
+                <select id="promo-visibility" style="width: 100%; box-sizing: border-box; padding: 10px 14px; font-size: 13.5px; border-radius: 10px; border: 1.5px solid #cbd5e1; background: #fff; font-weight: 600; color: #334155;">
+                  <option value="citizen" selected>Patients & Citizens (Mobile App Home Screen)</option>
+                  <option value="all">All Users (Mobile Patients + Clinic Staff)</option>
+                </select>
+              </div>
+
+              <!-- Mobile Live Preview Mockup -->
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px 16px; margin-bottom: 6px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                  <span style="font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    Mobile App Live Preview
+                  </span>
+                  <span style="font-size: 10px; background: #dcfce7; color: #15803d; font-weight: 800; padding: 2px 6px; border-radius: 4px;">CAROUSEL CARD</span>
+                </div>
+                <!-- Card mockup -->
+                <div style="background: #fff; border-radius: 14px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 10px; border: 1px solid #f1f5f9;">
+                  <div id="promo-live-img-box" style="width: 100%; height: 115px; border-radius: 10px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #e2e8f0;">
+                    <svg id="promo-live-fallback-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <img id="promo-live-img" src="" alt="preview" style="width: 100%; height: 100%; object-fit: cover; display: none;" />
+                  </div>
+                  <div>
+                    <div id="promo-live-title" style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-bottom: 4px; line-height: 1.2;">Your Promo Title</div>
+                    <div id="promo-live-desc" style="font-size: 11px; color: #64748b; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">Announcement details will be summarized here on the patient's phone.</div>
+                  </div>
+                </div>
+              </div>
+
+            </form>
+          </div>
+
+          <!-- Footer -->
+          <div style="padding: 14px 24px 18px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end; align-items: center; gap: 10px;">
+            <button type="button" id="promo-cancel-btn" class="btn btn-secondary" style="width: auto; padding: 8px 18px; font-size: 13px; font-weight: 600;">Cancel</button>
+            <button type="button" id="promo-submit-btn" class="btn" style="width: auto; padding: 9px 24px; font-size: 13px; font-weight: 700; background: #16a34a; border-color: #16a34a; color: #fff; display: inline-flex; align-items: center; gap: 8px;">
+              <span class="btn-spinner" id="promo-submit-spinner" style="display: none; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;" aria-hidden="true"></span>
+              <span id="promo-submit-label">Publish Promo Poster</span>
+            </button>
+          </div>
         </div>
       </div>
 
