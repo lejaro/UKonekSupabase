@@ -112,9 +112,9 @@ export function toggleChartSkeleton(chartCanvasId, isLoading) {
       wrapper = document.createElement('div');
       wrapper.className = 'skeleton-chart-wrapper';
 
-      const isCircular = chartCanvasId === 'dashboard-chart';
+      const isCircular = chartCanvasId === 'dashboard-chart' || chartCanvasId === 'diagnoses-chart';
       if (isCircular) {
-        wrapper.style.cssText = 'width:100%; height:200px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; position:relative; overflow:hidden;';
+        wrapper.style.cssText = 'width:100%; height:240px; max-height:240px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; position:relative; overflow:hidden;';
         wrapper.innerHTML = `
           <div class="skeleton-shimmer" style="width: 140px; height: 140px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 4px 12px rgba(15,23,42,0.03);">
             <div style="width: 82px; height: 82px; border-radius: 50%; background: #ffffff; box-shadow: inset 0 2px 6px rgba(15,23,42,0.06); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2;">
@@ -124,9 +124,9 @@ export function toggleChartSkeleton(chartCanvasId, isLoading) {
           </div>
         `;
       } else {
-        wrapper.style.cssText = 'width:100%; height:200px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; position:relative; overflow:hidden;';
+        wrapper.style.cssText = 'width:100%; height:240px; max-height:240px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; position:relative; overflow:hidden;';
         wrapper.innerHTML = `
-          <div style="display:flex;align-items:flex-end;gap:12px;height:120px;width:80%;justify-content:center;">
+          <div style="display:flex;align-items:flex-end;gap:12px;height:140px;width:80%;justify-content:center;">
             <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 40%; width: 24px; height: 40px; border-radius: 4px 4px 0 0;"></div>
             <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 70%; width: 24px; height: 75px; border-radius: 4px 4px 0 0;"></div>
             <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 50%; width: 24px; height: 55px; border-radius: 4px 4px 0 0;"></div>

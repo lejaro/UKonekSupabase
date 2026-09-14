@@ -6899,3 +6899,11 @@ body.dashboard-loading {
     border-color: #16a34a;
     box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
 }
+
+/* Analytics Hub Chart Bounds - Prevents Chart.js infinite resize loop */
+#diagnoses-chart,
+#consults-chart {
+    max-height: 240px !important;
+    width: 100% !important;
+    display: block !important;
+}

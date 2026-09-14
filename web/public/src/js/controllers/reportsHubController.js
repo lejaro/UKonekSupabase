@@ -423,10 +423,12 @@ export async function renderClinicalStats() {
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            resizeDelay: 200,
+            animation: { duration: 300 },
             plugins: {
               legend: {
                 position: 'bottom',
-                labels: { boxWidth: 12, font: { size: 11 } }
+                labels: { boxWidth: 12, font: { size: 11 }, padding: 8 }
               }
             }
           }
@@ -465,6 +467,8 @@ export async function renderClinicalStats() {
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            resizeDelay: 200,
+            animation: { duration: 300 },
             scales: {
               y: {
                 beginAtZero: true,
