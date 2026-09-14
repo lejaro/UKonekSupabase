@@ -12,6 +12,7 @@ import { formatPhysicalExam, cleanNone } from '../utils/clinicalFormatters.js';
 import { attachDetailRow, sanitizeText } from '../utils/dataDetailModal.js';
 import { showSection } from './navigationController.js';
 import { openPrescriptionModalForPatient, resolveCitizenId } from './prescriptionController.js';
+import { exportConsultationReport } from '../reports.js';
 
 export let consultations = [];
 export let consultationQueueTickets = [];
@@ -223,6 +224,39 @@ export function initConsultationTabs() {
   updateButtons(activeTabId);
 }
 
+export async function handleDoctorConsultationReport(btn) {
+  if (!btn) return;
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `
+    <span class="loading-spinner" style="width:13px; height:13px; border:2px solid #cbd5e1; border-top-color:#0284c7; border-radius:50%; display:inline-block; animation:spin 0.8s linear infinite;"></span>
+    <span>Exporting...</span>
+  `;
+
+  try {
+    const dateFromInput = document.getElementById('consult-date-from');
+    const dateToInput = document.getElementById('consult-date-to');
+    const startDate = dateFromInput?.value || null;
+    const endDate = dateToInput?.value || null;
+    const searchInput = document.getElementById('consult-search-input');
+    const searchQuery = searchInput?.value || consultSearchQuery || '';
+
+    const result = await exportConsultationReport(startDate, endDate, searchQuery);
+
+    if (result && result.count > 0) {
+      showToast(`Consultation report exported successfully! (${result.count} records)`, 'success');
+    } else {
+      showToast('No consultation records found matching current criteria.', 'info');
+    }
+  } catch (err) {
+    console.error('Failed to export consultation report:', err);
+    showToast(err.message || 'Unable to generate consultation report.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+}
+
 export function initConsultationToolbar() {
   const searchInput = document.getElementById('consult-search-input');
   if (searchInput && !searchInput.dataset.initialized) {
@@ -294,6 +328,15 @@ export function initConsultationToolbar() {
   if (sortSelect && !sortSelect.dataset.bound) {
     sortSelect.dataset.bound = 'true';
     sortSelect.addEventListener('change', () => renderConsultations());
+  }
+
+  const reportBtn = document.getElementById('consult-report-btn');
+  if (reportBtn && !reportBtn.dataset.bound) {
+    reportBtn.dataset.bound = 'true';
+    reportBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      handleDoctorConsultationReport(reportBtn);
+    });
   }
 }
 

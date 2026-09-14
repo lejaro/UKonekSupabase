@@ -178,7 +178,7 @@ export async function exportPatientReport(startDate = null, endDate = null) {
  * 2. CONSULTATION REPORT
  * Exports all consultations with patient and doctor details
  */
-export async function exportConsultationReport(startDate = null, endDate = null) {
+export async function exportConsultationReport(startDate = null, endDate = null, searchQuery = '') {
   try {
     const { supabase } = await loadSupabaseModule();
     
@@ -195,25 +195,50 @@ export async function exportConsultationReport(startDate = null, endDate = null)
       .order('consulted_at', { ascending: false });
     
     // Apply date filter
-    if (startDate) {
-      const startIso = startDate.includes('T') ? startDate : `${startDate}T00:00:00`;
-      query = query.gte('consulted_at', startIso);
-    }
-    if (endDate) {
-      const endIso = endDate.includes('T') ? endDate : `${endDate}T23:59:59`;
-      query = query.lte('consulted_at', endIso);
+    const startIso = startDate ? (startDate.includes('T') ? startDate : `${startDate}T00:00:00`) : null;
+    const endIso = endDate ? (endDate.includes('T') ? endDate : `${endDate}T23:59:59`) : null;
+
+    if (startIso) query = query.gte('consulted_at', startIso);
+    if (endIso) query = query.lte('consulted_at', endIso);
+    
+    let data = [];
+    const res = await query.limit(1000);
+    
+    if (res.error) {
+      console.warn('[Reports] Joined consultation query notice, falling back to flat select:', res.error.message);
+      let fallbackQuery = supabase
+        .from('consultations')
+        .select('*')
+        .order('consulted_at', { ascending: false });
+
+      if (startIso) fallbackQuery = fallbackQuery.gte('consulted_at', startIso);
+      if (endIso) fallbackQuery = fallbackQuery.lte('consulted_at', endIso);
+
+      const fallbackRes = await fallbackQuery.limit(1000);
+      if (fallbackRes.error) {
+        throw new Error(`Failed to fetch consultation data: ${fallbackRes.error.message}`);
+      }
+      data = fallbackRes.data || [];
+    } else {
+      data = res.data || [];
     }
     
-    const { data, error } = await query.limit(1000);
-    
-    if (error) {
-      throw new Error(`Failed to fetch consultation data: ${error.message}`);
+    // Filter by search term if provided
+    let exportRows = data;
+    if (searchQuery && String(searchQuery).trim()) {
+      const q = String(searchQuery).trim().toLowerCase();
+      exportRows = data.filter((c) => {
+        const pName = `${c.citizen?.firstname || ''} ${c.citizen?.surname || ''} ${c.patient_identifier || ''}`.toLowerCase();
+        const diag = String(c.diagnosis || '').toLowerCase();
+        const sym = String(c.symptoms || '').toLowerCase();
+        return pName.includes(q) || diag.includes(q) || sym.includes(q);
+      });
     }
-    
-    console.log(`[Reports] Found ${data.length} consultations`);
+
+    console.log(`[Reports] Found ${exportRows.length} consultations for export`);
     
     // Transform data for CSV
-    const csvData = data.map(consult => ({
+    const csvData = exportRows.map(consult => ({
       'Consultation ID': consult.id,
       'Consultation Date': consult.consulted_at ? new Date(consult.consulted_at).toLocaleString() : '',
       'Patient ID': consult.citizen?.id || consult.patient_citizen_id || '',
@@ -256,7 +281,7 @@ export async function exportConsultationReport(startDate = null, endDate = null)
     downloadCSV(csv, filename);
     
     console.log(`[Reports] Consultation Report exported: ${filename}`);
-    return { success: true, count: data.length, filename };
+    return { success: true, count: exportRows.length, filename };
     
   } catch (error) {
     console.error('[Reports] Consultation Report error:', error);
