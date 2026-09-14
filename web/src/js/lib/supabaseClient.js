@@ -1,13 +1,15 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient as createClientFromCdn } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { getOrCreateTabId } from '../services/sessionAuth.js';
 
-const config = window.UKONEK_CONFIG || {};
-const supabaseUrl = String(config.SUPABASE_URL || '').trim();
-const supabaseAnonKey = String(config.SUPABASE_ANON_KEY || '').trim();
+const DEFAULT_SUPABASE_URL = 'https://dqjxpwbsbzagbjtulhue.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxanhwd2JzYnphZ2JqdHVsaHVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNTM5ODUsImV4cCI6MjA4OTgyOTk4NX0.0Gvbjf2qrcVy9VF5QCKWaHXw19rVOsOTBz9DmHWPX9g';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase runtime config. Update web/src/js/runtime-config.js');
-}
+const config = (typeof window !== 'undefined' && window.UKONEK_CONFIG) || {};
+const supabaseUrl = String(config.SUPABASE_URL || DEFAULT_SUPABASE_URL).trim();
+const supabaseAnonKey = String(config.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY).trim();
+const directSupabaseUrl = String(config.DIRECT_SUPABASE_URL || DEFAULT_SUPABASE_URL).trim();
+
+const createClient = (typeof window !== 'undefined' && window.supabase?.createClient) || createClientFromCdn;
 
 function getSessionStorageAdapter() {
   try {
@@ -24,7 +26,7 @@ function getSessionStorageAdapter() {
 const tabId = getOrCreateTabId();
 const projectRef = (() => {
   try {
-    return new URL(supabaseUrl).hostname.split('.')[0] || 'ukonek';
+    return new URL(directSupabaseUrl).hostname.split('.')[0] || 'ukonek';
   } catch (_) {
     return 'ukonek';
   }

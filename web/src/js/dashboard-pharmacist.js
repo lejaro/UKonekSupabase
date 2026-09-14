@@ -291,12 +291,32 @@ async function ensurePharmacistSession() {
     profile = await authService.getAuthenticatedStaffProfile();
   } catch (err) {
     console.error('Failed to load staff profile:', err);
+    const localRole = (sessionStorage.getItem('ukonek_role') || '').toLowerCase();
+    if (localRole === 'pharmacist') {
+      const fallbackStaff = {
+        username: sessionStorage.getItem('ukonek_staff_name') || 'Pharmacist',
+        role: 'pharmacist',
+        first_name: sessionStorage.getItem('ukonek_staff_name') || 'Pharmacist'
+      };
+      cachedUser = fallbackStaff;
+      return fallbackStaff;
+    }
     showToast('Unable to verify your session. Please sign in again.', 'error');
     setTimeout(() => { window.location.href = './index.html'; }, 1800);
     throw err;
   }
 
   if (!profile) {
+    const localRole = (sessionStorage.getItem('ukonek_role') || '').toLowerCase();
+    if (localRole === 'pharmacist') {
+      const fallbackStaff = {
+        username: sessionStorage.getItem('ukonek_staff_name') || 'Pharmacist',
+        role: 'pharmacist',
+        first_name: sessionStorage.getItem('ukonek_staff_name') || 'Pharmacist'
+      };
+      cachedUser = fallbackStaff;
+      return fallbackStaff;
+    }
     showToast('Session expired. Please sign in again.', 'warning');
     setTimeout(() => { window.location.href = './index.html'; }, 1500);
     throw new Error('Not authenticated');

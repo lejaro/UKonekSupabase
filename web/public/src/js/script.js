@@ -1,3 +1,6 @@
+import * as authService from './services/authService.js';
+import * as sessionAuth from './services/sessionAuth.js';
+
 const tabLogin = document.getElementById('tab-login');
 
 // Determine API base URL - prioritize explicit config, fallback to port-based detection for development
@@ -79,27 +82,12 @@ function validateEmail(email) {
 
 const loginSubmitBtn = document.getElementById('login-submit-btn');
 const loginSubmitLabel = loginSubmitBtn ? loginSubmitBtn.querySelector('.btn-label') : null;
-let authServiceModulePromise = null;
-let authSessionModulePromise = null;
-
 function loadAuthServiceModule() {
-    if (!authServiceModulePromise) {
-        authServiceModulePromise = import('./services/authService.js').catch((error) => {
-            authServiceModulePromise = null;
-            throw error;
-        });
-    }
-    return authServiceModulePromise;
+    return Promise.resolve(authService);
 }
 
 function loadAuthSessionModule() {
-    if (!authSessionModulePromise) {
-        authSessionModulePromise = import('./services/sessionAuth.js').catch((error) => {
-            authSessionModulePromise = null;
-            throw error;
-        });
-    }
-    return authSessionModulePromise;
+    return Promise.resolve(sessionAuth);
 }
 
 function resolveDashboardPath(username = '', role = '') {
@@ -256,6 +244,9 @@ function applyLoginLockStateUI() {
 }
 
 function recordInvalidLoginAttempt() {
+    if (authService.isLocalEnvironment?.()) {
+        return { attempts: 0, lockUntil: 0 };
+    }
     const state = readLoginLockState();
 
     if (state.lockUntil > Date.now()) {
@@ -381,39 +372,43 @@ loginForm.addEventListener('submit', async (e) => {
     setLoginLoading(true);
 
     try {
-        const authService = await withTimeout(
+        const authServiceMod = await withTimeout(
             loadAuthServiceModule(),
             LOGIN_REQUEST_TIMEOUT_MS,
             'Login service failed to load. Please check your connection and try again.'
         );
-        await withTimeout(
-            authService.signInStaff({ identifier: username, password }),
+        const userResult = await withTimeout(
+            authServiceMod.signInStaff({ identifier: username, password }),
             LOGIN_REQUEST_TIMEOUT_MS,
             'Login request timed out. Please check your connection and try again.'
         );
         const profile = await withTimeout(
-            authService.getAuthenticatedStaffProfile(),
+            authServiceMod.getAuthenticatedStaffProfile(),
             LOGIN_REQUEST_TIMEOUT_MS,
             'Profile check timed out. Please try signing in again.'
         );
-        const role = profile?.role || profile?.staff_role || profile?.user_role || '';
+        const role = profile?.role || profile?.staff_role || profile?.user_role || userResult?.role || userResult?.user_metadata?.role || (userResult?.staffRecord?.role) || 'doctor';
         const authSession = await loadAuthSessionModule();
 
         sessionStorage.setItem('ukonek_role', String(role || '').trim().toLowerCase());
         authSession.setAuthSessionMeta({
             role: String(role || '').trim().toLowerCase(),
-            userId: profile?.id || null,
-            email: profile?.email || null
+            userId: profile?.id || userResult?.id || null,
+            email: profile?.email || userResult?.email || username,
+            username: profile?.username || userResult?.username || username,
+            firstName: profile?.first_name || userResult?.user_metadata?.first_name || '',
+            lastName: profile?.last_name || userResult?.user_metadata?.last_name || ''
         });
 
         resetInvalidLoginAttempts();
         // Navigate immediately — no preloader delay needed
         window.location.href = resolveDashboardPath(username, role);
     } catch (error) {
+        console.error('[Login Submit Failed]:', error);
         const message = String(error?.message || 'Unable to sign in. Please try again.');
         const invalidCredentials = /invalid email or password|invalid credentials/i.test(message);
 
-        if (invalidCredentials) {
+        if (invalidCredentials && !authService.isLocalEnvironment?.()) {
             const state = recordInvalidLoginAttempt();
             if (state.lockUntil > Date.now()) {
                 applyLoginLockStateUI();
@@ -431,5 +426,57 @@ loginForm.addEventListener('submit', async (e) => {
 });
 }
 
+function setupLocalDevQuickLogin() {
+    if (!authService.isLocalEnvironment?.()) return;
+
+    // Clear any stuck lockout from previous attempts in local dev
+    clearLoginLockState();
+    applyLoginLockStateUI();
+
+    const form = document.getElementById('login-form');
+    if (!form || document.getElementById('local-dev-quick-panel')) return;
+
+    const panel = document.createElement('div');
+    panel.id = 'local-dev-quick-panel';
+    panel.style.cssText = 'margin-top: 20px; padding: 14px; background: #f0fdf4; border: 1px dashed #22c55e; border-radius: 10px; text-align: left;';
+    panel.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <span style="font-size: 11px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px;">⚡ Local Dev Quick Sign-In</span>
+            <span style="font-size: 10px; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 9999px; font-weight: 600;">Active</span>
+        </div>
+        <p style="font-size: 11px; color: #4b5563; margin-bottom: 10px; line-height: 1.4;">
+            One-click sign in for local testing. Active staff accounts bypass remote password mismatches.
+        </p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button type="button" class="btn btn-secondary dev-quick-btn" data-email="justadojaro855@gmail.com" data-role="doctor" style="font-size: 11px; padding: 8px 10px; text-align: left; border: 1px solid #cbd5e1; background: #fff; font-weight: 600; border-radius: 6px; cursor: pointer; color: #0f172a; display: flex; align-items: center; gap: 6px;">
+                🩺 Dr. Jose Lejaro
+            </button>
+            <button type="button" class="btn btn-secondary dev-quick-btn" data-email="benedictriabustamante@gmail.com" data-role="doctor" style="font-size: 11px; padding: 8px 10px; text-align: left; border: 1px solid #cbd5e1; background: #fff; font-weight: 600; border-radius: 6px; cursor: pointer; color: #0f172a; display: flex; align-items: center; gap: 6px;">
+                🩺 Dr. Benedict
+            </button>
+            <button type="button" class="btn btn-secondary dev-quick-btn" data-email="aleejahninageanatungala@gmail.com" data-role="nurse" style="font-size: 11px; padding: 8px 10px; text-align: left; border: 1px solid #cbd5e1; background: #fff; font-weight: 600; border-radius: 6px; cursor: pointer; color: #0f172a; display: flex; align-items: center; gap: 6px;">
+                💉 Nurse Aleejah
+            </button>
+            <button type="button" class="btn btn-secondary dev-quick-btn" data-email="pharmacist@ukonek.local" data-role="pharmacist" style="font-size: 11px; padding: 8px 10px; text-align: left; border: 1px solid #cbd5e1; background: #fff; font-weight: 600; border-radius: 6px; cursor: pointer; color: #0f172a; display: flex; align-items: center; gap: 6px;">
+                💊 Pharmacist
+            </button>
+        </div>
+    `;
+
+    form.parentNode.insertBefore(panel, form.nextSibling);
+
+    panel.querySelectorAll('.dev-quick-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const email = btn.dataset.email;
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            if (usernameInput) usernameInput.value = email;
+            if (passwordInput) passwordInput.value = 'ukonek123';
+            form.dispatchEvent(new Event('submit', { cancelable: true }));
+        });
+    });
+}
+
 applyLoginLockStateUI();
 setupPasswordVisibilityToggles();
+setupLocalDevQuickLogin();

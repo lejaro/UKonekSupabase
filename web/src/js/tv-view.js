@@ -1,8 +1,13 @@
 // TV View — uses get_tv_queue_display RPC (security definer, anon-accessible)
 // No login session required. Optimized for TV display boards.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient as createClientFromCdn } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { playHospitalChime, unlockAudioContext } from './utils/audio-chime.js';
+
+const DEFAULT_SUPABASE_URL = 'https://dqjxpwbsbzagbjtulhue.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxanhwd2JzYnphZ2JqdHVsaHVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNTM5ODUsImV4cCI6MjA4OTgyOTk4NX0.0Gvbjf2qrcVy9VF5QCKWaHXw19rVOsOTBz9DmHWPX9g';
+
+const createClient = (typeof window !== 'undefined' && window.supabase?.createClient) || createClientFromCdn;
 
 let supabaseClient = null;
 let lastServingIds = new Set();
@@ -24,14 +29,9 @@ const tvView = (() => {
     const getSupabaseClient = () => {
         if (supabaseClient) return supabaseClient;
         
-        const config = window.UKONEK_CONFIG || {};
-        const url    = String(config.SUPABASE_URL    || '').trim();
-        const key    = String(config.SUPABASE_ANON_KEY || '').trim();
-        
-        if (!url || !key) {
-            console.error('[TV View] Missing Supabase runtime config.');
-            return null;
-        }
+        const config = (typeof window !== 'undefined' && window.UKONEK_CONFIG) || {};
+        const url    = String(config.SUPABASE_URL || DEFAULT_SUPABASE_URL).trim();
+        const key    = String(config.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY).trim();
         
         supabaseClient = createClient(url, key, {
             auth: { persistSession: false, autoRefreshToken: false }

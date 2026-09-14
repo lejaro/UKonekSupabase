@@ -3,6 +3,10 @@
   "cleanUrls": false,
   "rewrites": [
     {
+      "source": "/api/supabase/:path*",
+      "destination": "https://dqjxpwbsbzagbjtulhue.supabase.co/:path*"
+    },
+    {
       "source": "/",
       "destination": "/web/public/index.html"
     },
