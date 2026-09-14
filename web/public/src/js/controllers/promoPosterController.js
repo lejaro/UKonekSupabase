@@ -53,14 +53,6 @@ function setupActionButtons() {
       newBtn.style.display = 'none';
     }
   }
-
-  // Refresh hub button
-  const refreshBtn = document.getElementById('reports-hub-refresh-btn');
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', () => {
-      loadPromoPosters();
-    });
-  }
 }
 
 /**

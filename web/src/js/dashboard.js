@@ -78,6 +78,13 @@ import {
   initPromoPosterController,
   loadPromoPosters
 } from './controllers/promoPosterController.js';
+import {
+  initReportsHubController,
+  switchReportsHubPane,
+  refreshActiveReportsHubPane,
+  loadFeedback,
+  renderClinicalStats
+} from './controllers/reportsHubController.js';
 
 function withTimeout(promise, timeoutMs, timeoutMessage) {
   return Promise.race([
@@ -173,6 +180,10 @@ if (typeof window !== 'undefined') {
   window.openPrescriptionModalForPatient = openPrescriptionModalForPatient;
   window.closePrescriptionModal = closePrescriptionModal;
   window.loadPromoPosters = loadPromoPosters;
+  window.switchReportsHubPane = switchReportsHubPane;
+  window.refreshActiveReportsHubPane = refreshActiveReportsHubPane;
+  window.loadFeedback = loadFeedback;
+  window.renderClinicalStats = renderClinicalStats;
 
   // Polyfill dynamic module promises if legacy callers invoke them
   window.loadSupabaseModule = async () => ({ supabase });
@@ -224,7 +235,13 @@ async function bootstrapDashboard() {
       },
       'medicine-section': () => loadMedicinesCatalog(),
       'vitals-section': () => initTriageSection(),
-      'reports-section': () => loadPromoPosters(),
+      'reports-section': (options = {}) => {
+        if (options?.pane) {
+          switchReportsHubPane(options.pane);
+        } else {
+          refreshActiveReportsHubPane();
+        }
+      },
       'profile-section': (options = {}) => {
         const currentUser = sessionStore.getUser();
         if (currentUser) populateProfile(currentUser);
@@ -246,6 +263,7 @@ async function bootstrapDashboard() {
     initPharmacyModule();
     initPrescriptionController();
     initPromoPosterController();
+    initReportsHubController();
     
     // Non-blocking queue controller init so realtime setup does not delay navigation
     initQueueController().catch(e => console.warn('[Dashboard] Queue controller init warning:', e));

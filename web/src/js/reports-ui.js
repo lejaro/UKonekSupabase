@@ -56,6 +56,10 @@ document.getElementById('clear-date-range-btn')?.addEventListener('click', () =>
   const endInput = document.getElementById('export-end-date');
   if (startInput) startInput.value = '';
   if (endInput) endInput.value = '';
+  document.querySelectorAll('#export-presets .ph-filter-chip').forEach(c => {
+    c.classList.toggle('is-active', c.getAttribute('data-preset') === 'all');
+  });
+  loadStaffLogsVisual();
 });
 
 // Patient Report
@@ -207,9 +211,14 @@ function debounceLogViewer(func, wait) {
 document.getElementById('staff-logs-refresh-btn')?.addEventListener('click', loadStaffLogsVisual);
 document.getElementById('staff-logs-search')?.addEventListener('input', debounceLogViewer(loadStaffLogsVisual, 350));
 
-// Auto-load logs on click of exports tab
-document.getElementById('tab-exports')?.addEventListener('click', () => {
+// Auto-load logs on click of exports tab (supporting both legacy and hub IDs)
+const exportsTab = document.getElementById('hub-tab-exports') || document.getElementById('tab-exports');
+exportsTab?.addEventListener('click', () => {
   setTimeout(loadStaffLogsVisual, 100);
 });
+
+// Expose globally for reportsHubController
+window.loadStaffLogsVisual = loadStaffLogsVisual;
+export { loadStaffLogsVisual };
 
 console.log('[Reports] CSV Export UI module loaded and wired');
