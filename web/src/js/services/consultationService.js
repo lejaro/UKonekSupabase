@@ -64,7 +64,22 @@ export async function listConsultations({
 
   const { data, error } = await query;
   if (error) {
-    throw new Error(error.message || 'Failed to list consultations.');
+    console.warn('[ConsultationService] Joined consultation query error, falling back to flat select:', error.message);
+    let flatQuery = supabase
+      .from('consultations')
+      .select('*')
+      .order('consulted_at', { ascending: false })
+      .limit(limit);
+
+    if (patientCitizenId) flatQuery = flatQuery.eq('patient_citizen_id', patientCitizenId);
+    if (doctorStaffId) flatQuery = flatQuery.eq('doctor_staff_id', doctorStaffId);
+    if (since) flatQuery = flatQuery.gte('consulted_at', since);
+
+    const flatRes = await flatQuery;
+    if (flatRes.error) {
+      throw new Error(flatRes.error.message || 'Failed to list consultations.');
+    }
+    return flatRes.data || [];
   }
 
   return data || [];

@@ -328,9 +328,12 @@ export async function renderClinicalStats() {
   try {
     // 1. Fetch consultations and vital signs
     const [consultsRes, vitalsRes] = await Promise.all([
-      supabase.from('consultations').select('diagnosis, consulted_at').order('consulted_at', { ascending: false }).limit(200),
+      supabase.from('consultations').select('diagnosis, consulted_at, created_at').order('consulted_at', { ascending: false }).limit(200),
       supabase.from('vital_signs').select('temperature, blood_pressure').order('created_at', { ascending: false }).limit(200)
     ]);
+
+    if (consultsRes.error) console.warn('[ReportsHub] Clinical stats consults fetch notice:', consultsRes.error.message);
+    if (vitalsRes.error) console.warn('[ReportsHub] Clinical stats vitals fetch notice:', vitalsRes.error.message);
 
     const consults = consultsRes.data || [];
     const vitals = vitalsRes.data || [];
@@ -356,8 +359,9 @@ export async function renderClinicalStats() {
 
     last7Days.forEach((day) => { dailyMap[day] = 0; });
     consults.forEach((c) => {
-      if (c.consulted_at) {
-        const day = c.consulted_at.split('T')[0];
+      const ts = c.consulted_at || c.created_at;
+      if (ts) {
+        const day = ts.split('T')[0];
         if (dailyMap.hasOwnProperty(day)) dailyMap[day]++;
       }
     });

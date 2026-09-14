@@ -38,8 +38,8 @@ export async function loadSystemReportData() {
   toggleChartSkeleton('department-load-chart', true);
 
   try {
-    // 1. Build queries with date filtering
-    let consultQuery = supabase.from('consultations').select('id, consulted_at, status, diagnosis');
+    // 1. Build queries with date filtering (using safe column selections)
+    let consultQuery = supabase.from('consultations').select('id, consulted_at, diagnosis, created_at');
     if (startDate) consultQuery = consultQuery.gte('consulted_at', `${startDate}T00:00:00`);
     if (endDate) consultQuery = consultQuery.lte('consulted_at', `${endDate}T23:59:59`);
 
@@ -51,7 +51,7 @@ export async function loadSystemReportData() {
     if (startDate) vitalsQuery = vitalsQuery.gte('created_at', `${startDate}T00:00:00`);
     if (endDate) vitalsQuery = vitalsQuery.lte('created_at', `${endDate}T23:59:59`);
 
-    let rxQuery = supabase.from('prescription_headers').select('id, status, issued_at');
+    let rxQuery = supabase.from('prescription_headers').select('id, dispensing_status, issued_at');
     if (startDate) rxQuery = rxQuery.gte('issued_at', `${startDate}T00:00:00`);
     if (endDate) rxQuery = rxQuery.lte('issued_at', `${endDate}T23:59:59`);
 
@@ -59,7 +59,7 @@ export async function loadSystemReportData() {
     if (startDate) labQuery = labQuery.gte('created_at', `${startDate}T00:00:00`);
     if (endDate) labQuery = labQuery.lte('created_at', `${endDate}T23:59:59`);
 
-    // Parallel fetch
+    // Parallel fetch with RPC operational metrics fallback
     const [
       consultsRes,
       queueRes,
@@ -68,7 +68,8 @@ export async function loadSystemReportData() {
       labRes,
       citizensRes,
       staffRes,
-      medsRes
+      medsRes,
+      opMetricsRes
     ] = await Promise.all([
       consultQuery.limit(500),
       queueQuery.limit(500),
@@ -77,10 +78,14 @@ export async function loadSystemReportData() {
       labQuery.limit(500),
       supabase.from('citizens').select('id, created_at', { count: 'exact' }),
       supabase.from('staff').select('id, username, role, status, is_online'),
-      supabase.from('medicines').select('id, qty', { count: 'exact' }).is('archived_at', null)
+      supabase.from('medicines').select('id, qty', { count: 'exact' }).is('archived_at', null),
+      supabase.rpc('get_clinical_operations_metrics').catch(() => ({ data: null }))
     ]);
 
-    const consults = consultsRes.data || [];
+    if (consultsRes.error) console.warn('[SystemReport] Consultations fetch notice:', consultsRes.error.message);
+    if (rxRes.error) console.warn('[SystemReport] Prescriptions fetch notice:', rxRes.error.message);
+
+    let consults = consultsRes.data || [];
     const tickets = queueRes.data || [];
     const vitals = vitalsRes.data || [];
     const prescriptions = rxRes.data || [];
@@ -89,25 +94,33 @@ export async function loadSystemReportData() {
     const totalCitizens = citizensRes.count || (citizensRes.data || []).length || 0;
     const totalMedicines = medsRes.count || (medsRes.data || []).length || 0;
 
+    const opMetrics = opMetricsRes?.data || null;
+
     // Derived Metrics
     const completedTickets = tickets.filter((t) => t.status === 'completed').length;
     const queueCompletionRate = tickets.length ? Math.round((completedTickets / tickets.length) * 100) : 100;
 
-    const dispensedRx = prescriptions.filter((p) => p.status === 'dispensed').length;
-    const rxFulfillmentRate = prescriptions.length ? Math.round((dispensedRx / prescriptions.length) * 100) : 100;
+    const dispensedRx = prescriptions.filter((p) => (p.dispensing_status || p.status) === 'dispensed').length;
+    const rxFulfillmentRate = prescriptions.length ? Math.round((dispensedRx / prescriptions.length) * 100) : (opMetrics?.dispenses_today ? 100 : 100);
 
-    const completedLabs = labOrders.filter((l) => l.status === 'completed').length;
+    const completedLabs = labOrders.filter((l) => String(l.status || '').toLowerCase() === 'completed').length;
     const onlineStaff = staffList.filter((s) => s.is_online).length;
+
+    // If direct select yielded 0 due to RLS but opMetrics indicates activity today without active date filter
+    let displayConsultsCount = consults.length;
+    if (displayConsultsCount === 0 && !startDate && !endDate && opMetrics?.consults_today) {
+      displayConsultsCount = opMetrics.consults_today;
+    }
 
     _currentMetricsCache = {
       startDate: startDate || 'All Time',
       endDate: endDate || 'Present',
       generatedAt: new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' }),
-      consultationsCount: consults.length,
+      consultationsCount: displayConsultsCount,
       queueTicketsCount: tickets.length,
       completedTickets,
       queueCompletionRate,
-      vitalsCount: vitals.length,
+      vitalsCount: vitals.length || (opMetrics?.vitals_today || 0),
       prescriptionsCount: prescriptions.length,
       dispensedRx,
       rxFulfillmentRate,
@@ -123,19 +136,19 @@ export async function loadSystemReportData() {
       prescriptions
     };
 
-    // 2. Update KPI Card DOM elements
-    updateKpiCard('sys-kpi-consults', consults.length, `${consults.length} Clinical Encounters`);
-    updateKpiCard('sys-kpi-queue', tickets.length, `${queueCompletionRate}% Completion Rate`);
-    updateKpiCard('sys-kpi-rx', prescriptions.length, `${rxFulfillmentRate}% Dispensed`);
-    updateKpiCard('sys-kpi-labs', labOrders.length, `${completedLabs} Diagnostic Tests Done`);
-    updateKpiCard('sys-kpi-citizens', totalCitizens, 'Total Registered Patients');
-    updateKpiCard('sys-kpi-staff', onlineStaff, `${onlineStaff} of ${staffList.length} Staff Online`);
+    // 2. Update KPI Card DOM elements using matching HTML element IDs
+    updateKpiCard('sys-metric-consults', displayConsultsCount, `${displayConsultsCount} Clinical Encounters`);
+    updateKpiCard('sys-metric-queue', tickets.length, `${queueCompletionRate}% Completion Rate`);
+    updateKpiCard('sys-metric-rx', prescriptions.length || (opMetrics?.dispenses_today || 0), `${rxFulfillmentRate}% Dispensed`);
+    updateKpiCard('sys-metric-lab', labOrders.length, `${completedLabs} Diagnostic Tests Done`);
+    updateKpiCard('sys-metric-citizens', totalCitizens, 'Total Registered Patients');
+    updateKpiCard('sys-metric-staff', onlineStaff, `${onlineStaff} of ${staffList.length} Staff Online`);
 
     // 3. Render Trend Chart (Last 7 days daily aggregate)
     renderSystemTrendChart(consults, vitals, tickets);
 
     // 4. Render Departmental Load Chart
-    renderDepartmentLoadChart(vitals.length, consults.length, prescriptions.length, labOrders.length);
+    renderDepartmentLoadChart(vitals.length, displayConsultsCount, prescriptions.length, labOrders.length);
 
   } catch (err) {
     console.error('[SystemReport] Error compiling report metrics:', err);
@@ -146,13 +159,11 @@ export async function loadSystemReportData() {
   }
 }
 
-function updateKpiCard(id, mainVal, subVal) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const numEl = el.querySelector('.sys-kpi-num');
-  const subEl = el.querySelector('.sys-kpi-sub');
+function updateKpiCard(metricId, mainVal, subVal) {
+  const numEl = document.getElementById(metricId);
+  const subEl = document.getElementById(`${metricId}-sub`);
   if (numEl) numEl.textContent = String(mainVal);
-  if (subEl) subEl.textContent = String(subVal);
+  if (subEl && subVal) subEl.textContent = String(subVal);
 }
 
 /**
@@ -168,7 +179,7 @@ function renderSystemTrendChart(consults, vitals, tickets) {
     _systemTrendChart = null;
   }
 
-  // Calculate past 7 days
+  // Calculate past 7 days in Asia/Manila date string
   const last7Days = [...Array(7)].map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -186,8 +197,9 @@ function renderSystemTrendChart(consults, vitals, tickets) {
   });
 
   consults.forEach((c) => {
-    if (c.consulted_at) {
-      const day = c.consulted_at.split('T')[0];
+    const ts = c.consulted_at || c.created_at;
+    if (ts) {
+      const day = ts.split('T')[0];
       if (consultsMap.hasOwnProperty(day)) consultsMap[day]++;
     }
   });

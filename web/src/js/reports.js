@@ -196,10 +196,12 @@ export async function exportConsultationReport(startDate = null, endDate = null)
     
     // Apply date filter
     if (startDate) {
-      query = query.gte('consulted_at', startDate);
+      const startIso = startDate.includes('T') ? startDate : `${startDate}T00:00:00`;
+      query = query.gte('consulted_at', startIso);
     }
     if (endDate) {
-      query = query.lte('consulted_at', endDate);
+      const endIso = endDate.includes('T') ? endDate : `${endDate}T23:59:59`;
+      query = query.lte('consulted_at', endIso);
     }
     
     const { data, error } = await query.limit(1000);
@@ -287,14 +289,17 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
     
     const doctorIds = doctors.map(d => d.id);
     
+    const startIso = startDate ? (startDate.includes('T') ? startDate : `${startDate}T00:00:00`) : null;
+    const endIso = endDate ? (endDate.includes('T') ? endDate : `${endDate}T23:59:59`) : null;
+
     // Batch fetch all activities across doctors in 3 queries instead of N*3 sequential queries
     let consultQuery = supabase.from('consultations').select('id, doctor_staff_id, consulted_at').in('doctor_staff_id', doctorIds);
-    if (startDate) consultQuery = consultQuery.gte('consulted_at', startDate);
-    if (endDate) consultQuery = consultQuery.lte('consulted_at', endDate);
+    if (startIso) consultQuery = consultQuery.gte('consulted_at', startIso);
+    if (endIso) consultQuery = consultQuery.lte('consulted_at', endIso);
     
     let rxQuery = supabase.from('prescription_headers').select('id, doctor_staff_id, issued_at').in('doctor_staff_id', doctorIds);
-    if (startDate) rxQuery = rxQuery.gte('issued_at', startDate);
-    if (endDate) rxQuery = rxQuery.lte('issued_at', endDate);
+    if (startIso) rxQuery = rxQuery.gte('issued_at', startIso);
+    if (endIso) rxQuery = rxQuery.lte('issued_at', endIso);
     
     let schedQuery = supabase.from('doctor_schedules').select('id, doctor_staff_id, schedule_date, start_time, end_time').in('doctor_staff_id', doctorIds);
     if (startDate) schedQuery = schedQuery.gte('schedule_date', startDate);

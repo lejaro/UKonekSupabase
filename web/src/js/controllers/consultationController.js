@@ -56,12 +56,25 @@ export function renderConsultations() {
     const diagnosis = String(c.diagnosis || '').toLowerCase();
     const matchesSearch = !consultSearchQuery || patientName.includes(consultSearchQuery) || diagnosis.includes(consultSearchQuery);
 
-    const cDate = c.consulted_at ? c.consulted_at.slice(0, 10) : '';
+    const cDate = (c.consulted_at || c.created_at || '').slice(0, 10);
     let matchesDate = true;
     if (fromDate && cDate < fromDate) matchesDate = false;
     if (toDate && cDate > toDate) matchesDate = false;
 
     return matchesSearch && matchesDate;
+  });
+
+  const sortSelect = document.getElementById('consult-sort-select');
+  const sortVal = sortSelect?.value || 'date-desc';
+  filtered.sort((a, b) => {
+    if (sortVal === 'date-asc') {
+      return (a.consulted_at || a.created_at || '').localeCompare(b.consulted_at || b.created_at || '');
+    } else if (sortVal === 'name-asc') {
+      const nameA = `${a.patient?.firstname || ''} ${a.patient?.surname || ''}`.trim() || a.patient_identifier || '';
+      const nameB = `${b.patient?.firstname || ''} ${b.patient?.surname || ''}`.trim() || b.patient_identifier || '';
+      return nameA.localeCompare(nameB);
+    }
+    return (b.consulted_at || b.created_at || '').localeCompare(a.consulted_at || a.created_at || '');
   });
 
   if (!filtered.length) {
@@ -236,6 +249,16 @@ export function initConsultationToolbar() {
         if (consultActiveFilterRange === 'today') {
           if (dateFromInput) dateFromInput.value = todayStr;
           if (dateToInput) dateToInput.value = todayStr;
+        } else if (consultActiveFilterRange === 'week') {
+          const d = new Date();
+          d.setDate(d.getDate() - 7);
+          if (dateFromInput) dateFromInput.value = d.toISOString().slice(0, 10);
+          if (dateToInput) dateToInput.value = todayStr;
+        } else if (consultActiveFilterRange === 'month') {
+          const d = new Date();
+          d.setDate(d.getDate() - 30);
+          if (dateFromInput) dateFromInput.value = d.toISOString().slice(0, 10);
+          if (dateToInput) dateToInput.value = todayStr;
         } else {
           if (dateFromInput) dateFromInput.value = '';
           if (dateToInput) dateToInput.value = '';
@@ -244,6 +267,34 @@ export function initConsultationToolbar() {
       });
     }
   });
+
+  const dateFromInput = document.getElementById('consult-date-from');
+  const dateToInput = document.getElementById('consult-date-to');
+  const clearBtn = document.getElementById('consult-date-clear');
+  const sortSelect = document.getElementById('consult-sort-select');
+
+  if (dateFromInput && !dateFromInput.dataset.bound) {
+    dateFromInput.dataset.bound = 'true';
+    dateFromInput.addEventListener('change', () => renderConsultations());
+  }
+  if (dateToInput && !dateToInput.dataset.bound) {
+    dateToInput.dataset.bound = 'true';
+    dateToInput.addEventListener('change', () => renderConsultations());
+  }
+  if (clearBtn && !clearBtn.dataset.bound) {
+    clearBtn.dataset.bound = 'true';
+    clearBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (dateFromInput) dateFromInput.value = '';
+      if (dateToInput) dateToInput.value = '';
+      chips.forEach((c) => c.classList.toggle('is-active', c.dataset.range === 'all'));
+      renderConsultations();
+    });
+  }
+  if (sortSelect && !sortSelect.dataset.bound) {
+    sortSelect.dataset.bound = 'true';
+    sortSelect.addEventListener('change', () => renderConsultations());
+  }
 }
 
 export async function initLabSection() {
