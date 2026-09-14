@@ -1331,7 +1331,7 @@
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
-                  Data Export Center
+                  System Reports &amp; Data Center
                 </button>
               </div>
             </div>
@@ -1531,6 +1531,94 @@
                   <button id="clear-date-range-btn" class="chip-btn chip-btn-outline" type="button"
                     style="height:38px;">Clear Dates</button>
                 </div>
+              </div>
+
+              <!-- Executive Telemetry Header & DOH Census Action -->
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+                <div>
+                  <h4 style="margin:0 0 4px; font-size:16px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2">
+                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                    </svg>
+                    Clinic Operational Intelligence &amp; Census
+                  </h4>
+                  <p style="margin:0; font-size:12.5px; color:#64748b;">Live departmental telemetry, patient flow metrics, and DOH-accredited executive reporting.</p>
+                </div>
+                <button type="button" id="btn-print-official-census" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:600; border-radius:8px; background:#1e293b; color:#ffffff; border:none; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                  </svg>
+                  Generate Official DOH Census
+                </button>
+              </div>
+
+              <!-- Executive Metric KPI Cards -->
+              <div class="sys-kpi-grid" style="margin-bottom:20px;">
+                <div class="sys-kpi-card">
+                  <div class="sys-kpi-label">Total Consultations</div>
+                  <div class="sys-kpi-num" id="sys-metric-consults">--</div>
+                  <div class="sys-kpi-sub" id="sys-metric-consults-sub">Completed clinical encounters</div>
+                </div>
+                <div class="sys-kpi-card">
+                  <div class="sys-kpi-label">Queue Throughput</div>
+                  <div class="sys-kpi-num" id="sys-metric-queue">--</div>
+                  <div class="sys-kpi-sub" id="sys-metric-queue-sub">0% completion rate</div>
+                </div>
+                <div class="sys-kpi-card">
+                  <div class="sys-kpi-label">Pharmacy Fulfillment</div>
+                  <div class="sys-kpi-num" id="sys-metric-rx">--</div>
+                  <div class="sys-kpi-sub" id="sys-metric-rx-sub">0% dispensed rate</div>
+                </div>
+                <div class="sys-kpi-card">
+                  <div class="sys-kpi-label">Laboratory Orders</div>
+                  <div class="sys-kpi-num" id="sys-metric-lab">--</div>
+                  <div class="sys-kpi-sub" id="sys-metric-lab-sub">Diagnostic requests logged</div>
+                </div>
+                <div class="sys-kpi-card">
+                  <div class="sys-kpi-label">Registered Citizens</div>
+                  <div class="sys-kpi-num" id="sys-metric-citizens">--</div>
+                  <div class="sys-kpi-sub">Active community database</div>
+                </div>
+                <div class="sys-kpi-card">
+                  <div class="sys-kpi-label">Staff On Duty</div>
+                  <div class="sys-kpi-num" id="sys-metric-staff">--</div>
+                  <div class="sys-kpi-sub" id="sys-metric-staff-sub">0 active personnel</div>
+                </div>
+              </div>
+
+              <!-- Operational Trend & Load Charts Row -->
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; margin-bottom:24px;">
+                <div style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:12px; padding:18px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div>
+                      <h5 style="margin:0 0 2px; font-size:14px; font-weight:700; color:#0f172a;">Weekly Operational Velocity</h5>
+                      <span style="font-size:11.5px; color:#64748b;">Daily volume across Queue, Triage &amp; Consultations</span>
+                    </div>
+                  </div>
+                  <div style="position:relative; height:240px; max-height:240px; width:100%; overflow:hidden;">
+                    <canvas id="system-trend-chart" style="max-height:240px;"></canvas>
+                  </div>
+                </div>
+                <div style="background:#ffffff; border:1.5px solid #e2e8f0; border-radius:12px; padding:18px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div>
+                      <h5 style="margin:0 0 2px; font-size:14px; font-weight:700; color:#0f172a;">Departmental Workload Distribution</h5>
+                      <span style="font-size:11.5px; color:#64748b;">Activity share by clinical station</span>
+                    </div>
+                  </div>
+                  <div style="position:relative; height:240px; max-height:240px; width:100%; overflow:hidden; display:flex; justify-content:center; align-items:center;">
+                    <canvas id="department-load-chart" style="max-height:240px;"></canvas>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CSV Raw Data Exports Section Heading -->
+              <div style="margin-bottom:14px;">
+                <h4 style="margin:0 0 4px; font-size:15px; font-weight:700; color:#0f172a;">Data Export Center &amp; Raw Datasets</h4>
+                <p style="margin:0; font-size:12.5px; color:#64748b;">Export raw transactional data to CSV for external audits, research, and offline archiving.</p>
               </div>
 
               <!-- Export Cards Grid -->
@@ -3042,6 +3130,39 @@
           </div>
           <div class="actions" style="margin-top:8px; justify-content:flex-end;">
             <button id="feedback-detail-delete-btn" type="button" class="btn btn-delete">Delete Feedback</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Official DOH Clinic Census & Executive Report Modal -->
+      <div id="system-census-modal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width: 860px; max-height: 92vh; display: flex; flex-direction: column;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+              </svg>
+              <h3 style="margin:0; font-size:16px; font-weight:700; color:#0f172a;">Official Clinic Census &amp; Executive Report</h3>
+            </div>
+            <button id="census-modal-close-btn" class="modal-close" type="button">&times;</button>
+          </div>
+          <div style="overflow-y: auto; flex:1; padding-right:6px; margin-bottom:14px;">
+            <div id="census-printable-sheet" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px;">
+              <!-- Dynamic census rendered here -->
+            </div>
+          </div>
+          <div class="actions" style="margin-top:0; padding-top:12px; border-top:1px solid #e2e8f0; justify-content:flex-end; gap:10px;">
+            <button type="button" class="btn btn-outline" id="census-modal-cancel-btn" onclick="document.getElementById('system-census-modal').classList.add('hidden')">Close</button>
+            <button type="button" class="btn btn-primary" id="census-modal-print-btn" style="display:inline-flex; align-items:center; gap:6px; background:#1e293b;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+              </svg>
+              Print Official Report (PDF)
+            </button>
           </div>
         </div>
       </div>

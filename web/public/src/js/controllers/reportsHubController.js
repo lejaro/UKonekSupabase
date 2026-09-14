@@ -10,6 +10,7 @@
 import { supabase } from '../lib/supabaseClient.js';
 import { showToast, toggleChartSkeleton, renderTableSkeleton } from '../utils/uiHelpers.js';
 import { loadPromoPosters } from './promoPosterController.js';
+import { loadSystemReportData, initSystemReportController } from './systemReportController.js';
 
 let _feedbacks = [];
 let _feedbackSearch = '';
@@ -63,6 +64,7 @@ export function switchReportsHubPane(targetPaneId) {
   } else if (targetPaneId === 'stats-pane') {
     renderClinicalStats();
   } else if (targetPaneId === 'exports-pane') {
+    loadSystemReportData();
     if (typeof window.loadStaffLogsVisual === 'function') {
       window.loadStaffLogsVisual();
     }
@@ -618,6 +620,9 @@ export function initReportsHubController() {
   // 4. Setup export date presets
   setupExportDatePresets();
 
-  // 5. Initial background load of feedback count to populate badge
+  // 5. Initialize System Report & Executive Intelligence
+  initSystemReportController();
+
+  // 6. Initial background load of feedback count to populate badge
   loadFeedback().catch((e) => console.warn('[ReportsHub] Feedback count preload warning:', e));
 }
