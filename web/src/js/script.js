@@ -426,57 +426,6 @@ loginForm.addEventListener('submit', async (e) => {
 });
 }
 
-function setupLocalDevQuickLogin() {
-    if (!authService.isLocalEnvironment?.()) return;
-
-    // Clear any stuck lockout from previous attempts in local dev
-    clearLoginLockState();
-    applyLoginLockStateUI();
-
-    const form = document.getElementById('login-form');
-    if (!form || document.getElementById('local-dev-quick-panel')) return;
-
-    const panel = document.createElement('div');
-    panel.id = 'local-dev-quick-panel';
-    panel.style.cssText = 'margin-top: 20px; padding: 14px; background: #f0fdf4; border: 1px dashed #22c55e; border-radius: 10px; text-align: left;';
-    panel.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <span style="font-size: 11px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px;">⚡ Local Dev Quick Sign-In</span>
-            <span style="font-size: 10px; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 9999px; font-weight: 600;">Active</span>
-        </div>
-        <p style="font-size: 11px; color: #4b5563; margin-bottom: 10px; line-height: 1.4;">
-            One-click sign in for local testing. Active staff accounts bypass remote password mismatches.
-        </p>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-            <button type="button" class="btn btn-secondary dev-quick-btn" data-email="justadojaro855@gmail.com" data-role="doctor" style="font-size: 11px; padding: 8px 10px; text-align: left; border: 1px solid #cbd5e1; background: #fff; font-weight: 600; border-radius: 6px; cursor: pointer; color: #0f172a; display: flex; align-items: center; gap: 6px;">
-                🩺 Dr. Jose Lejaro
-            </button>
-            <button type="button" class="btn btn-secondary dev-quick-btn" data-email="benedictriabustamante@gmail.com" data-role="doctor" style="font-size: 11px; padding: 8px 10px; text-align: left; border: 1px solid #cbd5e1; background: #fff; font-weight: 600; border-radius: 6px; cursor: pointer; color: #0f172a; display: flex; align-items: center; gap: 6px;">
-                🩺 Dr. Benedict
-            </button>
-            <button type="button" class="btn btn-secondary dev-quick-btn" data-email="aleejahninageanatungala@gmail.com" data-role="nurse" style="font-size: 11px; padding: 8px 10px; text-align: left; border: 1px solid #cbd5e1; background: #fff; font-weight: 600; border-radius: 6px; cursor: pointer; color: #0f172a; display: flex; align-items: center; gap: 6px;">
-                💉 Nurse Aleejah
-            </button>
-            <button type="button" class="btn btn-secondary dev-quick-btn" data-email="pharmacist@ukonek.local" data-role="pharmacist" style="font-size: 11px; padding: 8px 10px; text-align: left; border: 1px solid #cbd5e1; background: #fff; font-weight: 600; border-radius: 6px; cursor: pointer; color: #0f172a; display: flex; align-items: center; gap: 6px;">
-                💊 Pharmacist
-            </button>
-        </div>
-    `;
-
-    form.parentNode.insertBefore(panel, form.nextSibling);
-
-    panel.querySelectorAll('.dev-quick-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const email = btn.dataset.email;
-            const usernameInput = document.getElementById('username');
-            const passwordInput = document.getElementById('password');
-            if (usernameInput) usernameInput.value = email;
-            if (passwordInput) passwordInput.value = 'ukonek123';
-            form.dispatchEvent(new Event('submit', { cancelable: true }));
-        });
-    });
-}
-
 applyLoginLockStateUI();
 setupPasswordVisibilityToggles();
-setupLocalDevQuickLogin();
+
