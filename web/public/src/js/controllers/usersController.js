@@ -49,7 +49,7 @@ export async function listStaffFromSupabase() {
 export async function loadStaffData() {
   const accountsTbody = document.getElementById('accounts-tbody');
   if (accountsTbody) {
-    renderTableSkeleton(accountsTbody, 4, 5);
+    renderTableSkeleton(accountsTbody, 4, 4);
   }
 
   let staffList = [];
@@ -65,7 +65,7 @@ export async function loadStaffData() {
     swapContainer(accountsTbody, (fragment) => {
       if (latestStaffList.length === 0) {
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td class="table-cell" colspan="5" style="text-align:center; padding:32px 16px; color:#94a3b8;">No registered staff accounts found.</td>';
+        tr.innerHTML = '<td class="table-cell" colspan="4" style="text-align:center; padding:32px 16px; color:#94a3b8;">No registered staff accounts found.</td>';
         fragment.appendChild(tr);
         return;
       }
@@ -79,10 +79,6 @@ export async function loadStaffData() {
 
         const roleValue = user.role ? String(user.role).toLowerCase() : 'staff';
         const roleLabel = roleValue.charAt(0).toUpperCase() + roleValue.slice(1);
-        const statusValue = getStaffPresenceStatus(user);
-        const isDuty = statusValue.toLowerCase().includes('duty');
-        const isBreak = statusValue.toLowerCase().includes('break');
-        const dutyClass = isDuty ? 'on-duty' : (isBreak ? 'break' : 'off-duty');
 
         const initials = (user.username || 'ST').substring(0, 2).toUpperCase();
         const fullName = [user.firstname || user.first_name, user.surname || user.last_name].filter(Boolean).join(' ') || user.username || 'Medical Staff';
@@ -107,12 +103,6 @@ export async function loadStaffData() {
           </td>
           <td class="table-cell"><span class="employee-badge">${sanitizeText(user.employee_id || 'EMP-—')}</span></td>
           <td class="table-cell"><span class="staff-role-badge role-${roleValue}">${sanitizeText(roleLabel)}</span></td>
-          <td class="table-cell">
-            <span class="duty-status-badge ${dutyClass}">
-              <span class="duty-dot ${dutyClass}"></span>
-              ${sanitizeText(statusValue)}
-            </span>
-          </td>
           <td class="table-cell" style="text-align:right;">
             <button type="button" class="btn small outline" data-action="view-staff" data-id="${sanitizeText(identifier)}" style="padding:3px 10px; font-size:11.5px; border-radius:9999px;">View Profile</button>
           </td>
