@@ -724,6 +724,90 @@ export async function exportStaffLoginLogsReport(startDate = null, endDate = nul
   }
 }
 
+/**
+ * 7. MEDICINE INVENTORY REPORT
+ * Exports complete pharmacy medicines catalog, classification, and stock telemetry
+ */
+export async function exportMedicineInventoryReport(filter = 'all', searchQuery = '') {
+  try {
+    const { supabase } = await loadSupabaseModule();
+    console.log('[Reports] Generating Medicine Inventory Report...');
+
+    let query = supabase
+      .from('medicines')
+      .select('*')
+      .is('archived_at', null)
+      .order('name', { ascending: true })
+      .limit(1000);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    let items = data || [];
+
+    // Filter by search
+    if (searchQuery && String(searchQuery).trim()) {
+      const q = String(searchQuery).trim().toLowerCase();
+      items = items.filter(m => {
+        const name = String(m.name || m.brand_name || '').toLowerCase();
+        const desc = String(m.description || m.generic_name || '').toLowerCase();
+        return name.includes(q) || desc.includes(q);
+      });
+    }
+
+    // Filter by stock status
+    if (filter === 'in_stock' || filter === 'instock') {
+      items = items.filter(m => (m.qty || 0) > 5);
+    } else if (filter === 'low_stock' || filter === 'lowstock') {
+      items = items.filter(m => (m.qty || 0) > 0 && (m.qty || 0) <= 5);
+    } else if (filter === 'out_of_stock' || filter === 'critical') {
+      items = items.filter(m => (m.qty || 0) === 0);
+    } else if (filter === 'otc') {
+      items = items.filter(m => String(m.drug_classification || '').toLowerCase() === 'otc');
+    }
+
+    const csvData = items.map(m => {
+      const qty = Number(m.qty ?? 0);
+      let status = 'In Stock';
+      if (qty === 0) status = 'Out of Stock';
+      else if (qty <= 5) status = 'Low Stock';
+
+      return {
+        'Medicine ID': m.id || '',
+        'Medicine Name': m.name || m.brand_name || '',
+        'Classification': (m.drug_classification || 'rx').toUpperCase(),
+        'Generic / Formulation': m.generic_name || m.description || '',
+        'Stock Quantity': qty,
+        'Unit': m.unit || 'units',
+        'Expiration Date': m.expiry_date ? String(m.expiry_date).split('T')[0] : '',
+        'Inventory Status': status
+      };
+    });
+
+    const headers = [
+      'Medicine ID',
+      'Medicine Name',
+      'Classification',
+      'Generic / Formulation',
+      'Stock Quantity',
+      'Unit',
+      'Expiration Date',
+      'Inventory Status'
+    ];
+
+    const csv = convertToCSV(csvData, headers);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const filename = `Medicine_Inventory_Report_${todayStr}_${Date.now()}.csv`;
+
+    downloadCSV(csv, filename);
+    console.log(`[Reports] Medicine Inventory Report exported: ${filename}`);
+    return { success: true, count: items.length, filename };
+  } catch (error) {
+    console.error('[Reports] Medicine Inventory Report error:', error);
+    throw error;
+  }
+}
+
 let _supabaseModulePromise = null;
 async function loadSupabaseModule() {
   if (!_supabaseModulePromise) {
@@ -740,5 +824,6 @@ export default {
   exportQueueReport,
   exportSystemUsageReport,
   fetchStaffLoginLogs,
-  exportStaffLoginLogsReport
+  exportStaffLoginLogsReport,
+  exportMedicineInventoryReport
 };

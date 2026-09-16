@@ -6959,7 +6959,7 @@ body.dashboard-loading {
     margin-top: 4px;
 }
 
-/* Print CSS for Official Census Document */
+/* Print CSS for Official Census & Medicine Reports */
 @media print {
     body * {
         visibility: hidden !important;
@@ -6967,10 +6967,15 @@ body.dashboard-loading {
     #system-census-modal,
     #system-census-modal *,
     #census-printable-sheet,
-    #census-printable-sheet * {
+    #census-printable-sheet *,
+    #medicine-report-modal,
+    #medicine-report-modal *,
+    #medicine-printable-sheet,
+    #medicine-printable-sheet * {
         visibility: visible !important;
     }
-    #system-census-modal {
+    #system-census-modal,
+    #medicine-report-modal {
         position: absolute !important;
         left: 0 !important;
         top: 0 !important;
@@ -6980,7 +6985,8 @@ body.dashboard-loading {
         margin: 0 !important;
         display: block !important;
     }
-    #system-census-modal .modal-box {
+    #system-census-modal .modal-box,
+    #medicine-report-modal .modal-box {
         max-width: 100% !important;
         box-shadow: none !important;
         border: none !important;
@@ -6988,7 +6994,10 @@ body.dashboard-loading {
     }
     #census-modal-close-btn,
     #census-modal-print-btn,
-    .census-modal-actions {
+    .census-modal-actions,
+    #medicine-modal-close-btn,
+    #medicine-modal-print-btn,
+    .medicine-modal-actions {
         display: none !important;
     }
 }

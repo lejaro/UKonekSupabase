@@ -1360,23 +1360,112 @@ if (closeScannerBtn) closeScannerBtn.addEventListener('click', stopQrScanner);
 
 // ── Reports & Exports ────────────────────────────────────────────────────────
 function generateReport(title, headers, rows) {
-  const win = window.open('', '_blank');
-  if (!win) { showToast('Popup blocked. Allow popups for report generation.', 'error'); return; }
-  const html = [];
-  html.push('<html><head><title>' + title + '</title>');
-  html.push('<style>body{font-family:Arial,Helvetica,sans-serif;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f4f4f4}</style>');
-  html.push('</head><body>');
-  html.push('<h1>' + title + '</h1>');
-  html.push('<table><thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead>');
-  html.push('<tbody>');
-  rows.forEach(r => {
-    html.push('<tr>' + r.map(c => `<td>${String(c)}</td>`).join('') + '</tr>');
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', {
+    timeZone: 'Asia/Manila',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
   });
-  html.push('</tbody></table>');
-  html.push('</body></html>');
-  win.document.write(html.join(''));
-  win.document.close();
-  setTimeout(() => { win.print(); }, 500);
+  const timeStr = now.toLocaleTimeString('en-US', {
+    timeZone: 'Asia/Manila',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const printHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>${title}</title>
+      <style>
+        @page { size: portrait; margin: 12mm; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 14px; font-size: 11.5px; line-height: 1.4; }
+        .report-header { text-align: center; border-bottom: 2.5px solid #0284c7; padding-bottom: 12px; margin-bottom: 16px; }
+        .clinic-sub { font-size: 10px; font-weight: 700; color: #0284c7; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 2px; }
+        .clinic-title { font-size: 20px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin: 0; }
+        .clinic-meta { font-size: 11px; color: #475569; margin: 3px 0; }
+        .report-title { font-size: 15px; font-weight: 800; color: #0284c7; margin-top: 8px; text-transform: uppercase; }
+        .meta-box { display: flex; justify-content: space-between; font-size: 11px; color: #475569; background: #f8fafc; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }
+        th { background: #f1f5f9; color: #334155; font-weight: 700; border: 1px solid #cbd5e1; padding: 7px 8px; text-align: left; }
+        td { border: 1px solid #e2e8f0; padding: 6px 8px; vertical-align: top; }
+        tr:nth-child(even) td { background: #f8fafc; }
+        .signatures { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
+        .sig-block { width: 200px; text-align: center; font-size: 11px; }
+        .sig-line { border-bottom: 1px solid #0f172a; margin-bottom: 4px; }
+      </style>
+    </head>
+    <body>
+      <div class="report-header">
+        <div class="clinic-sub">Republic of the Philippines &bull; Department of Health Accredited</div>
+        <h1 class="clinic-title">AFM Roquero Medical Clinic</h1>
+        <div class="clinic-meta">Poblacion Ward, San Jose del Monte, Bulacan &bull; License No. DOH-03-0491</div>
+        <div class="report-title">${title}</div>
+      </div>
+      <div class="meta-box">
+        <div><strong>Generated:</strong> ${dateStr}, ${timeStr}</div>
+        <div><strong>Total Records:</strong> ${rows.length} items</div>
+        <div><strong>Facility:</strong> Dispensary &amp; Pharmacy Unit</div>
+      </div>
+      <table>
+        <thead>
+          <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `<tr>${r.map(c => `<td>${String(c)}</td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="signatures">
+        <div class="sig-block">
+          <div class="sig-line">&nbsp;</div>
+          <div style="font-weight:700;">Pharmacist-on-Duty</div>
+          <div style="color:#64748b; font-size:10px;">Prepared by</div>
+        </div>
+        <div class="sig-block">
+          <div class="sig-line">&nbsp;</div>
+          <div style="font-weight:700;">Medical Director</div>
+          <div style="color:#64748b; font-size:10px;">Verified &amp; Approved</div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  let printFrame = document.getElementById('ph-print-iframe');
+  if (!printFrame) {
+    printFrame = document.createElement('iframe');
+    printFrame.id = 'ph-print-iframe';
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+  }
+
+  try {
+    const doc = printFrame.contentWindow.document;
+    doc.open();
+    doc.write(printHtml);
+    doc.close();
+    showToast('Opening print dialog for Medicine Report (PDF)...', 'info');
+    setTimeout(() => {
+      printFrame.contentWindow.focus();
+      printFrame.contentWindow.print();
+    }, 300);
+  } catch (frameErr) {
+    console.warn('Iframe print fallback to window.open:', frameErr);
+    const win = window.open('', '_blank');
+    if (!win) {
+      showToast('Popup blocked. Allow popups for report generation.', 'error');
+      return;
+    }
+    win.document.write(printHtml);
+    win.document.close();
+    setTimeout(() => { win.print(); }, 500);
+  }
 }
 
 const sortSelect = document.getElementById('ph-sort-select');
@@ -1390,6 +1479,10 @@ const pdfExportBtn = document.getElementById('ph-pdf-export-btn');
 if (pdfExportBtn) {
   pdfExportBtn.addEventListener('click', () => {
     const listToExport = filteredMedicines.length > 0 ? filteredMedicines : medicines;
+    if (!listToExport.length) {
+      showToast('No medicines found matching criteria to print.', 'warning');
+      return;
+    }
     const headers = ['Medicine', 'Classification', 'Description', 'Quantity', 'Unit', 'Expiry Date', 'Status'];
     const rows = listToExport.map(m => {
       const stock = computeStockStatus(m.qty);
@@ -1412,34 +1505,45 @@ const csvExportBtn = document.getElementById('ph-csv-export-btn');
 if (csvExportBtn) {
   csvExportBtn.addEventListener('click', () => {
     const listToExport = filteredMedicines.length > 0 ? filteredMedicines : medicines;
+    if (!listToExport.length) {
+      showToast('No medicines available to export.', 'warning');
+      return;
+    }
+
     const headers = ['Medicine', 'Classification', 'Description', 'Quantity', 'Unit', 'Expiry Date', 'Stock Status', 'Expiry Status'];
-    let csvContent = headers.join(',') + '\n';
-    
+    const rows = [headers.join(',')];
+
     listToExport.forEach(m => {
       const stock = computeStockStatus(m.qty);
       const expiry = computeExpiryStatus(m.expiry_date);
-      const row = [
-        `"${m.name}"`,
-        `"${(m.drug_classification || 'rx').toUpperCase()}"`,
-        `"${m.description || ''}"`,
-        m.qty,
-        `"${m.unit || ''}"`,
-        `"${m.expiry_date || ''}"`,
-        `"${stock.label}"`,
-        `"${expiry.label}"`
+      const values = [
+        m.name || '',
+        (m.drug_classification || 'rx').toUpperCase(),
+        m.description || '',
+        m.qty ?? 0,
+        m.unit || '',
+        m.expiry_date || '',
+        stock.label || '',
+        expiry.label || ''
       ];
-      csvContent += row.join(',') + '\n';
+      const escaped = values.map(v => `"${String(v).replace(/"/g, '""')}"`);
+      rows.push(escaped.join(','));
     });
 
+    const csvContent = '\uFEFF' + rows.join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `pharmacy_inventory_${new Date().toISOString().split('T')[0]}.csv`);
+    const todayStr = new Date().toISOString().split('T')[0];
+    link.setAttribute('download', `pharmacy_inventory_${todayStr}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast(`Inventory exported to CSV successfully! (${listToExport.length} items)`, 'success');
   });
 }
 
