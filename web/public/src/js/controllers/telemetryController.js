@@ -80,6 +80,10 @@ export async function loadClinicalOperationsMetrics() {
       };
     }
 
+    try {
+      await loadDashboardAnalyticsData();
+    } catch (_) {}
+
     renderClinicalMetrics();
   } catch (err) {
     console.warn('Failed to load clinical operations metrics:', err);
@@ -140,53 +144,370 @@ export function renderClinicalMetrics() {
   }
 }
 
+// -------------------------------------------------------------
+// Multi-Chart Analytics Engine (Line, Bar, Pie)
+// -------------------------------------------------------------
 
-let activeChartInstance = null;
+export let analyticsDataCache = {
+  lineTrend: { labels: [], queueCounts: [], consultCounts: [] },
+  topDiagnoses: { labels: [], counts: [] },
+  priorityDist: { labels: [], counts: [] }
+};
+
+export async function loadDashboardAnalyticsData() {
+  try {
+    const dates = [];
+    const dayLabels = [];
+    const dailyQueueMap = {};
+    const dailyConsultMap = {};
+
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 86400000);
+      const isoDate = new Intl.DateTimeFormat('fr-CA', {
+        timeZone: 'Asia/Manila',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(d);
+      dates.push(isoDate);
+      const parts = isoDate.split('-');
+      dayLabels.push(`${Number(parts[1])}/${Number(parts[2])}`);
+      dailyQueueMap[isoDate] = 0;
+      dailyConsultMap[isoDate] = 0;
+    }
+
+    const sevenDaysAgoStart = `${dates[0]}T00:00:00+08:00`;
+
+    const [queueRes, consultsRes] = await Promise.all([
+      supabase
+        .from('queue_tickets')
+        .select('queue_date, created_at, citizen_type, service_label')
+        .gte('created_at', sevenDaysAgoStart),
+      supabase
+        .from('consultations')
+        .select('consulted_at, created_at, diagnosis')
+        .gte('created_at', sevenDaysAgoStart)
+    ]);
+
+    const queueTickets = queueRes.data || [];
+    const consults = consultsRes.data || [];
+
+    // 1. Line Chart Data: Daily Volume & Consults
+    queueTickets.forEach(t => {
+      const qDate = t.queue_date || (t.created_at ? t.created_at.slice(0, 10) : '');
+      if (dailyQueueMap.hasOwnProperty(qDate)) {
+        dailyQueueMap[qDate]++;
+      }
+    });
+
+    consults.forEach(c => {
+      const cDate = (c.consulted_at || c.created_at || '').slice(0, 10);
+      if (dailyConsultMap.hasOwnProperty(cDate)) {
+        dailyConsultMap[cDate]++;
+      }
+    });
+
+    const queueCounts = dates.map(d => dailyQueueMap[d] || 0);
+    const consultCounts = dates.map(d => dailyConsultMap[d] || 0);
+
+    // 2. Bar Chart Data: Top 5 Diagnoses
+    const diagCounts = {};
+    consults.forEach(c => {
+      const diag = String(c.diagnosis || '').trim();
+      if (diag && diag !== '—' && diag.toLowerCase() !== 'none' && diag.toLowerCase() !== 'n/a' && diag.toLowerCase() !== 'null') {
+        diagCounts[diag] = (diagCounts[diag] || 0) + 1;
+      }
+    });
+
+    const sortedDiags = Object.entries(diagCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    // 3. Pie Chart Data: Patient Priority
+    const priorityCounts = {
+      'Regular': 0,
+      'Senior Citizen': 0,
+      'PWD': 0,
+      'Pregnant': 0
+    };
+
+    queueTickets.forEach(t => {
+      const type = String(t.citizen_type || '').toLowerCase();
+      const sLabel = String(t.service_label || '').toLowerCase();
+      if (type === 'senior' || sLabel.includes('senior')) {
+        priorityCounts['Senior Citizen']++;
+      } else if (type === 'pwd' || sLabel.includes('pwd')) {
+        priorityCounts['PWD']++;
+      } else if (type === 'pregnant' || sLabel.includes('pregnant')) {
+        priorityCounts['Pregnant']++;
+      } else {
+        priorityCounts['Regular']++;
+      }
+    });
+
+    analyticsDataCache = {
+      lineTrend: {
+        labels: dayLabels,
+        queueCounts,
+        consultCounts
+      },
+      topDiagnoses: {
+        labels: sortedDiags.map(d => d[0]),
+        counts: sortedDiags.map(d => d[1])
+      },
+      priorityDist: {
+        labels: Object.keys(priorityCounts),
+        counts: Object.values(priorityCounts)
+      }
+    };
+  } catch (err) {
+    console.warn('[Telemetry] Analytics load notice:', err);
+  }
+}
+
+let activeVolumeLineChart = null;
+let activeDiagnosesBarChart = null;
+let activePriorityPieChart = null;
 
 export function renderDashboardInsights() {
-  const canvas = document.getElementById('dashboard-chart');
-  if (!canvas || typeof Chart === 'undefined') return;
+  if (typeof Chart === 'undefined') return;
 
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+  renderVolumeLineChart();
+  renderDiagnosesBarChart();
+  renderPriorityPieChart();
+}
 
-  if (activeChartInstance) {
-    activeChartInstance.destroy();
-    activeChartInstance = null;
+function renderVolumeLineChart() {
+  const canvas = document.getElementById('chart-volume-trend');
+  if (!canvas) return;
+
+  if (activeVolumeLineChart) {
+    activeVolumeLineChart.destroy();
+    activeVolumeLineChart = null;
   }
 
-  const { waiting, consultsToday, vitalsToday, dispensesToday } = clinicalMetricsCache;
+  const { labels, queueCounts, consultCounts } = analyticsDataCache.lineTrend;
+  const hasData = (queueCounts && queueCounts.some(c => c > 0)) || (consultCounts && consultCounts.some(c => c > 0));
+  const emptyNote = document.getElementById('chart-volume-empty');
+  if (emptyNote) emptyNote.classList.toggle('hidden', hasData);
 
-  activeChartInstance = new Chart(ctx, {
-    type: 'doughnut',
+  const displayLabels = labels.length ? labels : ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'];
+  const displayQueue = queueCounts.length ? queueCounts : [0, 0, 0, 0, 0, 0, 0];
+  const displayConsults = consultCounts.length ? consultCounts : [0, 0, 0, 0, 0, 0, 0];
+
+  const ctx = canvas.getContext('2d');
+  activeVolumeLineChart = new Chart(ctx, {
+    type: 'line',
     data: {
-      labels: ['In Queue', 'Consultations', 'Vitals Triage', 'Dispenses'],
+      labels: displayLabels,
+      datasets: [
+        {
+          label: 'Queue Intake',
+          data: displayQueue,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.08)',
+          borderWidth: 2.5,
+          tension: 0.35,
+          fill: true,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#3b82f6'
+        },
+        {
+          label: 'Consultations',
+          data: displayConsults,
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.08)',
+          borderWidth: 2.5,
+          tension: 0.35,
+          fill: true,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#10b981'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleFont: { family: "'Inter', sans-serif", size: 12 },
+          bodyFont: { family: "'Inter', sans-serif", size: 11.5 },
+          padding: 10,
+          cornerRadius: 8
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false
+          },
+          ticks: {
+            font: { family: "'Inter', sans-serif", size: 11 },
+            color: '#64748b'
+          }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1,
+            precision: 0,
+            font: { family: "'Inter', sans-serif", size: 11 },
+            color: '#64748b'
+          },
+          grid: {
+            color: '#f1f5f9'
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderDiagnosesBarChart() {
+  const canvas = document.getElementById('chart-diagnoses-bar');
+  if (!canvas) return;
+
+  if (activeDiagnosesBarChart) {
+    activeDiagnosesBarChart.destroy();
+    activeDiagnosesBarChart = null;
+  }
+
+  const { labels, counts } = analyticsDataCache.topDiagnoses;
+  const hasData = labels && labels.length > 0 && counts.some(c => c > 0);
+  const emptyNote = document.getElementById('chart-diagnoses-empty');
+  if (emptyNote) emptyNote.classList.toggle('hidden', hasData);
+
+  const displayLabels = hasData ? labels : ['No diagnoses logged yet'];
+  const displayCounts = hasData ? counts : [0];
+
+  const ctx = canvas.getContext('2d');
+  activeDiagnosesBarChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: displayLabels,
       datasets: [{
-        data: [waiting, consultsToday, vitalsToday, dispensesToday],
+        label: 'Cases',
+        data: displayCounts,
         backgroundColor: [
-          '#3b82f6',
           '#10b981',
-          '#f59e0b',
-          '#8b5cf6'
+          '#059669',
+          '#34d399',
+          '#6ee7b7',
+          '#a7f3d0'
         ],
-        borderWidth: 2,
-        borderColor: '#ffffff'
+        borderRadius: 6,
+        borderSkipped: false,
+        maxBarThickness: 32
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleFont: { family: "'Inter', sans-serif", size: 12 },
+          bodyFont: { family: "'Inter', sans-serif", size: 11.5 },
+          padding: 10,
+          cornerRadius: 8
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            font: { family: "'Inter', sans-serif", size: 10.5 },
+            color: '#64748b',
+            callback: function(val, index) {
+              const label = this.getLabelForValue(index);
+              return (label && label.length > 15) ? label.slice(0, 13) + '…' : label;
+            }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1,
+            precision: 0,
+            font: { family: "'Inter', sans-serif", size: 11 },
+            color: '#64748b'
+          },
+          grid: { color: '#f1f5f9' }
+        }
+      }
+    }
+  });
+}
+
+function renderPriorityPieChart() {
+  const canvas = document.getElementById('chart-priority-pie');
+  if (!canvas) return;
+
+  if (activePriorityPieChart) {
+    activePriorityPieChart.destroy();
+    activePriorityPieChart = null;
+  }
+
+  const { labels, counts } = analyticsDataCache.priorityDist;
+  const total = counts ? counts.reduce((a, b) => a + b, 0) : 0;
+  const hasData = total > 0;
+  const emptyNote = document.getElementById('chart-priority-empty');
+  if (emptyNote) emptyNote.classList.toggle('hidden', hasData);
+
+  const displayLabels = hasData ? labels : ['No queue activity'];
+  const displayCounts = hasData ? counts : [1];
+  const bgColors = hasData
+    ? ['#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899']
+    : ['#e2e8f0'];
+
+  const ctx = canvas.getContext('2d');
+  activePriorityPieChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: displayLabels,
+      datasets: [{
+        data: displayCounts,
+        backgroundColor: bgColors,
+        borderWidth: 2,
+        borderColor: '#ffffff',
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: {
         legend: {
           position: 'bottom',
           labels: {
-            font: { size: 11, family: "'Inter', sans-serif" },
-            boxWidth: 12,
-            padding: 14
+            boxWidth: 11,
+            font: { family: "'Inter', sans-serif", size: 11 },
+            padding: 10,
+            color: '#475569'
           }
+        },
+        tooltip: {
+          enabled: hasData,
+          backgroundColor: '#0f172a',
+          titleFont: { family: "'Inter', sans-serif", size: 12 },
+          bodyFont: { family: "'Inter', sans-serif", size: 11.5 },
+          padding: 10,
+          cornerRadius: 8
         }
-      },
-      cutout: '68%'
+      }
     }
   });
 }
@@ -198,6 +519,7 @@ export function startAdminDashboardAutoRefresh() {
     adminDashboardRefreshInFlight = true;
     try {
       await loadClinicalOperationsMetrics();
+      renderDashboardInsights();
     } catch (_) {}
     finally {
       adminDashboardRefreshInFlight = false;
@@ -231,10 +553,16 @@ export function initTelemetry() {
     dashRefreshBtn.addEventListener('click', async () => {
       dashRefreshBtn.disabled = true;
       toggleStatsSkeleton(true);
+      toggleChartSkeleton('chart-volume-trend', true);
+      toggleChartSkeleton('chart-diagnoses-bar', true);
+      toggleChartSkeleton('chart-priority-pie', true);
       try {
         await loadClinicalOperationsMetrics();
         renderDashboardInsights();
       } finally {
+        toggleChartSkeleton('chart-volume-trend', false);
+        toggleChartSkeleton('chart-diagnoses-bar', false);
+        toggleChartSkeleton('chart-priority-pie', false);
         toggleStatsSkeleton(false);
         dashRefreshBtn.disabled = false;
       }
@@ -247,9 +575,25 @@ export function initTelemetry() {
 export const initTelemetryController = initTelemetry;
 
 export async function refreshAdminDashboard() {
-  // Instantly render cache/default metrics so skeletons are dismissed without waiting
-  renderClinicalMetrics();
-  await loadClinicalOperationsMetrics();
-  renderDashboardInsights();
+  const isFirstLoad = !analyticsDataCache.lineTrend.labels.length;
+  if (isFirstLoad) {
+    toggleStatsSkeleton(true);
+    toggleChartSkeleton('chart-volume-trend', true);
+    toggleChartSkeleton('chart-diagnoses-bar', true);
+    toggleChartSkeleton('chart-priority-pie', true);
+  }
+  try {
+    renderClinicalMetrics();
+    await loadClinicalOperationsMetrics();
+    renderDashboardInsights();
+  } finally {
+    if (isFirstLoad) {
+      toggleChartSkeleton('chart-volume-trend', false);
+      toggleChartSkeleton('chart-diagnoses-bar', false);
+      toggleChartSkeleton('chart-priority-pie', false);
+      toggleStatsSkeleton(false);
+    }
+  }
 }
+
 

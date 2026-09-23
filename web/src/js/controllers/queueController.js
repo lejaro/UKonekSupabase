@@ -462,25 +462,6 @@ export function renderQueueBoard() {
   updateText('queue-serving-count', lanes.serving.length);
   updateText('queue-summary-badge', `Waiting: ${lanes.waiting.length} | On Call: ${lanes.on_call.length} | Serving: ${lanes.serving.length}`);
 
-  const servingNumbers = lanes.serving.map(t => `#${String(t.queue_number).padStart(3, '0')}`);
-  const servingBadge = document.getElementById('queue-current-serving-badge');
-  if (servingBadge) {
-    if (servingNumbers.length > 0) {
-      servingBadge.className = 'queue-station-pill active';
-      servingBadge.innerHTML = `
-        <span class="queue-station-dot"></span>
-        <span><strong>Now Serving:</strong> <span style="background:#2563eb;color:#fff;padding:1px 7px;border-radius:6px;font-family:monospace;font-size:11.5px;margin-left:2px;">${servingNumbers.join(', ')}</span></span>
-      `;
-      servingBadge.style.display = 'inline-flex';
-    } else {
-      servingBadge.className = 'queue-station-pill ready';
-      servingBadge.innerHTML = `
-        <span class="queue-station-dot"></span>
-        <span>Station Ready • Queue Clear</span>
-      `;
-    }
-  }
-
   const consultServingBtn = document.getElementById('queue-consult-serving-btn');
   if (consultServingBtn) {
     if (lanes.serving.length > 0 && canConsultPatients()) {

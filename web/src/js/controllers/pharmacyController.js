@@ -29,7 +29,7 @@ export async function refreshMedicineData() {
   } catch (err) {
     console.warn('Error loading medicine catalog:', err);
     medicines = [];
-    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:24px; color:#94a3b8;">No medicines registered.</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:24px; color:#94a3b8;">No medicines registered.</td></tr>';
   }
 }
 
@@ -64,7 +64,7 @@ export function getFilteredMedicines() {
   const searchInput = document.getElementById('medicine-search-input');
   const query = String(searchInput?.value || '').trim().toLowerCase();
 
-  return medicines.filter((m) => {
+  const filtered = medicines.filter((m) => {
     const name = String(m.name || m.brand_name || '').toLowerCase();
     const desc = String(m.description || m.generic_name || '').toLowerCase();
     const matchesQuery = !query || name.includes(query) || desc.includes(query);
@@ -77,6 +77,37 @@ export function getFilteredMedicines() {
 
     return matchesQuery && matchesFilter;
   });
+
+  const sortSelect = document.getElementById('medicine-sort-select');
+  const sortVal = sortSelect?.value || 'name-asc';
+
+  filtered.sort((a, b) => {
+    const nameA = String(a.name || a.brand_name || '').toLowerCase();
+    const nameB = String(b.name || b.brand_name || '').toLowerCase();
+    const qtyA = Number(a.qty ?? 0);
+    const qtyB = Number(b.qty ?? 0);
+    const expA = a.expiry_date ? new Date(a.expiry_date).getTime() : Infinity;
+    const expB = b.expiry_date ? new Date(b.expiry_date).getTime() : Infinity;
+
+    switch (sortVal) {
+      case 'name-asc':
+        return nameA.localeCompare(nameB);
+      case 'name-desc':
+        return nameB.localeCompare(nameA);
+      case 'stock-desc':
+        return qtyB - qtyA;
+      case 'stock-asc':
+        return qtyA - qtyB;
+      case 'expiry-asc':
+        return expA - expB;
+      case 'expiry-desc':
+        return (expB === Infinity ? -Infinity : expB) - (expA === Infinity ? -Infinity : expA);
+      default:
+        return nameA.localeCompare(nameB);
+    }
+  });
+
+  return filtered;
 }
 
 export function renderMedicines() {
@@ -86,7 +117,7 @@ export function renderMedicines() {
   const filtered = getFilteredMedicines();
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:28px; color:#94a3b8;">No medicines matching criteria found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:28px; color:#94a3b8;">No medicines matching criteria found.</td></tr>';
     return;
   }
 
@@ -102,18 +133,14 @@ export function renderMedicines() {
     else if (qty <= 5) statusBadge = '<span class="badge badge-warning" style="background:#fef3c7; color:#92400e; font-weight:600; padding:2px 8px; border-radius:9999px;">Low Stock</span>';
 
     return `
-      <tr>
+      <tr style="cursor: pointer;">
         <td class="table-cell">
           <strong style="color:#0f172a;">${sanitizeText(name)}</strong>
-          <div style="font-size:11px; color:#64748b;">${sanitizeText(generic)}</div>
         </td>
-        <td class="table-cell">${sanitizeText(generic)}</td>
-        <td class="table-cell"><strong>${qty}</strong> ${sanitizeText(unit)}</td>
+        <td class="table-cell" style="color:#475569;">${sanitizeText(generic)}</td>
+        <td class="table-cell"><strong>${qty}</strong> <span style="font-size:12px; color:#64748b;">${sanitizeText(unit)}</span></td>
         <td class="table-cell">${statusBadge}</td>
-        <td class="table-cell">${sanitizeText(expiry)}</td>
-        <td class="table-cell" style="text-align:right;">
-          <button type="button" class="btn small outline" data-action="adjust-stock" data-name="${sanitizeText(name)}" style="padding:3px 10px; font-size:11px; border-radius:9999px;">Adjust</button>
-        </td>
+        <td class="table-cell" style="color:#64748b; font-size:12.5px;">${sanitizeText(expiry)}</td>
       </tr>
     `;
   }).join('');
@@ -386,6 +413,13 @@ export function initPharmacySection() {
   if (searchInput && !searchInput.dataset.bound) {
     searchInput.dataset.bound = 'true';
     searchInput.addEventListener('input', renderMedicines);
+  }
+
+  // Sort dropdown
+  const sortSelect = document.getElementById('medicine-sort-select');
+  if (sortSelect && !sortSelect.dataset.bound) {
+    sortSelect.dataset.bound = 'true';
+    sortSelect.addEventListener('change', renderMedicines);
   }
 
   // CSV Export Button

@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>U-Konek+ — Dashboard</title>
+  <title>U-Konek — Dashboard</title>
   <link rel="stylesheet" href="../src/css/style.css?v=20260902d" />
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="../src/css/dashboard-layout.css" />
@@ -58,7 +58,7 @@
         <div class="brand-row">
           <div class="logo"><img class="logo" src="./U-KonekLogo-transparent.png" alt="U-Konek Logo" /></div>
           <div class="brand-stack">
-            <h3 class="brand-text">U-Konek+</h3>
+            <h3 class="brand-text">U-Konek</h3>
             <p class="brand-subtext">Medical Workspace</p>
           </div>
           <div class="control-btns">
@@ -91,29 +91,29 @@
             <span class="label">Dashboard</span>
           </a>
 
-          <a href="#" class="nav-item full-access" data-section="schedule-section" title="Availability">
+          <a href="#" class="nav-item full-access" data-section="schedule-section" title="Availability Schedule">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="4" width="18" height="18" rx="2" />
                 <path d="M16 2v4M8 2v4M3 10h18" />
               </svg>
             </span>
-            <span class="label">Availability</span>
+            <span class="label">Availability Schedule</span>
           </a>
 
           <p class="sidebar-section-label clinical-only">Clinical Workflow</p>
 
-          <a href="#" class="nav-item clinical-only" data-section="queue-section" title="Queue Management">
+          <a href="#" class="nav-item clinical-only" data-section="queue-section" title="Live Patient Queue">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 6v6l4 2" />
               </svg>
             </span>
-            <span class="label">Live Queue</span>
+            <span class="label">Live Patient Queue</span>
           </a>
 
-          <a href="#" class="nav-item clinical-only" data-section="vitals-section" title="Vitals Assessment">
+          <a href="#" class="nav-item clinical-only" data-section="vitals-section" title="Vitals Triage">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
@@ -132,10 +132,10 @@
             <span class="label">Consultations</span>
           </a>
 
-          <a href="#" class="nav-item clinical-only" data-section="medicine-section" title="Medicine Inventory">
+          <a href="#" class="nav-item clinical-only" data-section="medicine-section" title="Pharmacy & Stock">
             <span class="nav-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="m10.5 20.5 9-9a3.54 3.54 0 1 0-5-5l-9 9a3.54 3.54 0 1 0 5 5Z" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" />
                 <path d="m8.5 8.5 7 7" />
               </svg>
             </span>
@@ -156,25 +156,24 @@
             <span class="label">Personnel & Citizens</span>
           </a>
 
-          <a href="#" class="nav-item full-access" data-section="reports-section" title="Reports & Feedback">
+          <a href="#" class="nav-item full-access" data-section="reports-section" title="Reports & Analytics">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16l4-3 4 3 4-3 4 3V8z" />
                 <path d="M14 2v6h6" />
               </svg>
             </span>
-            <span class="label">Reports & Feedback</span>
+            <span class="label">Reports & Analytics</span>
           </a>
 
-          <a href="#" class="nav-item" data-section="profile-section" title="Profile & Security">
+          <a href="#" class="nav-item" data-section="profile-section" title="Profile">
             <span class="nav-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3" />
-                <path
-                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-.33-1 1.65 1.65 0 0 0-1-.6 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1-.33H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1-.33 1.65 1.65 0 0 0 .6-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .33-1V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 .33 1 1.65 1.65 0 0 0 1 .6 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.13.32.2.66.2 1s-.07.68-.2 1z" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
               </svg>
             </span>
-            <span class="label">Profile & Security</span>
+            <span class="label">Profile</span>
           </a>
         </nav>
 
@@ -226,44 +225,53 @@
 
             <div id="user-profile-popover" class="user-profile-popover hidden" role="menu">
               <div class="popover-user-header">
-                <div class="popover-user-name user-name-full"><span
-                    class="skeleton-shimmer user-fullname-skeleton"></span></div>
-                <div class="popover-user-meta">
-                  <span class="duty-badge"><span class="status-pulse-dot"
-                      style="width:6px;height:6px;margin-right:4px;"></span> On Duty</span>
-                  <span class="user-role-label user-pos"><span class="skeleton-shimmer user-pos-skeleton"></span></span>
+                <div class="popover-user-row">
+                  <div class="popover-user-info">
+                    <div class="popover-user-name user-name-full"><span
+                        class="skeleton-shimmer user-fullname-skeleton"></span></div>
+                    <div class="popover-user-role user-pos"><span class="skeleton-shimmer user-pos-skeleton"></span></div>
+                  </div>
+                  <span class="duty-badge"><span class="status-pulse-dot"></span> On Duty</span>
                 </div>
               </div>
               <div class="popover-divider"></div>
               <a href="#" class="popover-item nav-item" data-section="profile-section" role="menuitem">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-                My Profile
+                <span class="popover-item-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </span>
+                <span class="popover-item-text">My Profile</span>
               </a>
               <a href="#" class="popover-item nav-item" data-section="security-section" role="menuitem">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-                Change Password
+                <span class="popover-item-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </span>
+                <span class="popover-item-text">Change Password</span>
               </a>
               <a href="#" class="popover-item nav-item full-access" data-section="schedule-section" role="menuitem">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                  <rect x="3" y="4" width="18" height="18" rx="2" />
-                  <path d="M16 2v4M8 2v4M3 10h18" />
-                </svg>
-                Availability Schedule
+                <span class="popover-item-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <path d="M16 2v4M8 2v4M3 10h18" />
+                  </svg>
+                </span>
+                <span class="popover-item-text">Availability Schedule</span>
               </a>
               <div class="popover-divider"></div>
               <button id="logout-btn" class="popover-item popover-logout" role="menuitem">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                Sign Out
+                <span class="popover-item-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                </span>
+                <span class="popover-item-text">Sign Out</span>
               </button>
             </div>
           </div>
@@ -278,23 +286,25 @@
       </div>
 
       <section class="section-top full-access" id="dashboard-section">
-        <div class="dashboard-hero fade-in-up">
-          <div>
-            <p class="section-kicker" id="dash-kicker">Clinical Operations Flow</p>
-            <h2 class="section-title" id="main-dashboard-title"><span class="skeleton-shimmer title-skeleton"></span>
-            </h2>
-            <p class="section-subtitle" id="dash-subtitle">Real-time clinical patient throughput, triage assessments,
-              and healthcare workstation operations.</p>
+        <div class="panel dashboard-main-panel fade-in-up">
+          <div class="panel-head dashboard-header-row">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <h2 class="section-title" id="main-dashboard-title"><span class="skeleton-shimmer title-skeleton"></span></h2>
+            </div>
+            <div class="hero-actions">
+              <span class="panel-hint" id="dashboard-last-sync"
+                style="margin: 0 4px 0 0; font-size: 12.5px; color: #64748b;">Last synced: &mdash;</span>
+              <button id="dash-refresh-btn" class="chip-btn chip-btn-outline" title="Refresh dashboard data">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:3px;">
+                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                </svg>
+                Refresh Data
+              </button>
+            </div>
           </div>
-          <div class="hero-actions">
-            <span class="panel-hint" id="dashboard-last-sync"
-              style="margin: 0 4px 0 0; font-size: 12.5px; color: #64748b;">Last synced: &mdash;</span>
-            <button id="dash-refresh-btn" class="chip-btn" title="Refresh dashboard data">Refresh Data</button>
-          </div>
-        </div>
 
-        <!-- 1. Clinical Operations Stats Grid (Default) -->
-        <div class="stats-grid" id="clinical-stats-grid">
+          <!-- 1. Clinical Operations Stats Grid (Default) -->
+          <div class="stats-grid" id="clinical-stats-grid">
           <article class="stat-card fade-in-up" id="stat-card-queue" style="animation-delay: 0.02s; cursor:pointer;"
             title="View patient queue">
             <div class="stat-card-metric">
@@ -368,138 +378,186 @@
           </article>
         </div>
 
-        <div class="panel stats-chart-panel fade-in-up clinical-only" id="clinical-encounters-panel"
+        <div class="stats-chart-section stats-chart-panel clinical-only" id="clinical-encounters-panel"
           style="animation-delay: 0.06s;">
-          <div class="panel-head">
+          <div class="panel-head" style="margin-bottom: 18px;">
             <div>
               <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;">
-                Clinical Encounters Breakdown</h3>
+                Clinical Analytics & Operations Intelligence</h3>
               <span class="panel-hint" style="display: block; margin-top: 3px; font-size: 12px; color: #64748b;">Live
-                snapshot of patient consultations, triage vitals, and pharmacy dispenses.</span>
+                7-day patient volume trends, community morbidity patterns, and queue priority allocation.</span>
             </div>
           </div>
-          <div class="stats-chart-content">
-            <!-- Left: Donut Chart & Live Legend -->
-            <div class="stats-chart-visual-area">
-              <div class="stats-chart-visual">
-                <canvas id="dashboard-chart" class="stats-chart-canvas" width="200" height="200" role="img"
-                  aria-label="Clinical encounters statistics chart"></canvas>
-                <p id="dashboard-chart-empty" class="note hidden">No encounters recorded today yet.</p>
+
+          <!-- Multi-Chart Analytics Grid -->
+          <div class="analytics-charts-grid">
+            <!-- 1. Full-Width Line Graph: 7-Day Patient Volume & Consultation Flow -->
+            <div class="chart-card chart-card-wide">
+              <div class="chart-card-head">
+                <div>
+                  <h4 class="chart-card-title">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 3v18h18" />
+                      <path d="m19 9-5 5-4-4-3 3" />
+                    </svg>
+                    7-Day Patient Volume & Consultation Flow
+                  </h4>
+                  <p class="chart-card-subtitle">Daily intake vs completed doctor consultations over the past week</p>
+                </div>
+                <div class="chart-card-legend-pills" id="line-chart-legend">
+                  <span class="legend-pill" style="--pill-color: #3b82f6;"><span class="legend-dot"></span> Queue Intake</span>
+                  <span class="legend-pill" style="--pill-color: #10b981;"><span class="legend-dot"></span> Consultations</span>
+                </div>
               </div>
-              <ul id="dashboard-chart-legend" class="stats-chart-legend"></ul>
+              <div class="chart-canvas-wrapper" style="height: 200px; position: relative;">
+                <canvas id="chart-volume-trend" role="img" aria-label="7-Day Patient Volume and Consultation Flow Line Chart"></canvas>
+                <p id="chart-volume-empty" class="chart-empty-note hidden">No patient activity recorded in the past 7 days.</p>
+              </div>
             </div>
 
-            <!-- Right: Clinical Quick Action Launchpad -->
-            <div class="clinical-launchpad-area">
-              <div class="launchpad-header">
-                <div class="launchpad-title-group">
-                  <h4>
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5">
-                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                    </svg>
-                    Clinical Station Shortcuts
-                  </h4>
-                  <p>1-click launchpad to active healthcare workstations & patient queues.</p>
+            <!-- 2. Dual-Column Row: Bar Chart & Pie Chart -->
+            <div class="charts-dual-row">
+              <!-- Left: Top 5 Diagnoses Bar Chart -->
+              <div class="chart-card">
+                <div class="chart-card-head">
+                  <div>
+                    <h4 class="chart-card-title">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="20" x2="18" y2="10" />
+                        <line x1="12" y1="20" x2="12" y2="4" />
+                        <line x1="6" y1="20" x2="6" y2="14" />
+                      </svg>
+                      Top 5 Clinical Diagnoses
+                    </h4>
+                    <p class="chart-card-subtitle">Most prevalent morbidities diagnosed by attending physicians</p>
+                  </div>
                 </div>
-                <span class="launchpad-badge"><span class="launchpad-pulse-dot"></span> Workstation Ready</span>
+                <div class="chart-canvas-wrapper" style="height: 220px; position: relative;">
+                  <canvas id="chart-diagnoses-bar" role="img" aria-label="Top 5 Clinical Diagnoses Bar Chart"></canvas>
+                  <p id="chart-diagnoses-empty" class="chart-empty-note hidden">No clinical diagnoses logged yet.</p>
+                </div>
               </div>
 
-              <div class="clinical-launchpad-grid">
-                <div class="launchpad-action-card" id="launchpad-call-queue" title="Open live queue management">
-                  <div class="launchpad-card-icon" style="background:#dcfce7; color:#15803d;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M12 6v6l4 2" />
-                    </svg>
-                  </div>
-                  <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Live Queue Call <span class="launchpad-card-arrow">&rarr;</span>
-                    </div>
-                    <div class="launchpad-card-desc">Call next patient & triage intake</div>
-                  </div>
-                </div>
-
-                <div class="launchpad-action-card" id="launchpad-consultation"
-                  title="Open doctor consultation workstation">
-                  <div class="launchpad-card-icon" style="background:#e0e7ff; color:#4338ca;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M6 3v6a6 6 0 0 0 12 0V3" />
-                      <path d="M9 17v2a3 3 0 0 0 6 0v-2" />
-                      <circle cx="15" cy="17" r="1.5" />
-                    </svg>
-                  </div>
-                  <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Doctor Consultation <span
-                        class="launchpad-card-arrow">&rarr;</span>
-                    </div>
-                    <div class="launchpad-card-desc">Diagnose, clinical notes & Rx orders</div>
+              <!-- Right: Patient Triage & Priority Distribution Pie Chart -->
+              <div class="chart-card">
+                <div class="chart-card-head">
+                  <div>
+                    <h4 class="chart-card-title">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+                        <path d="M22 12A10 10 0 0 0 12 2v10z" />
+                      </svg>
+                      Patient Priority Distribution
+                    </h4>
+                    <p class="chart-card-subtitle">Queue segmentation across special priority lanes</p>
                   </div>
                 </div>
-
-                <div class="launchpad-action-card" id="launchpad-vitals"
-                  title="Open vital signs assessment & QR scanner">
-                  <div class="launchpad-card-icon" style="background:#dcfce7; color:#15803d;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                    </svg>
-                  </div>
-                  <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Triage & Vitals <span class="launchpad-card-arrow">&rarr;</span>
-                    </div>
-                    <div class="launchpad-card-desc">Scan citizen QR & record vitals</div>
-                  </div>
+                <div class="chart-canvas-wrapper" style="height: 220px; position: relative;">
+                  <canvas id="chart-priority-pie" role="img" aria-label="Patient Priority Distribution Pie Chart"></canvas>
+                  <p id="chart-priority-empty" class="chart-empty-note hidden">No active queue tickets recorded yet.</p>
                 </div>
+              </div>
+            </div>
+          </div>
 
-                <div class="launchpad-action-card" id="launchpad-pharmacy" title="Open pharmacy dispensary & stock">
-                  <div class="launchpad-card-icon" style="background:#f3e8ff; color:#7e22ce;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M10.5 20.5l10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7z" />
-                      <line x1="8.5" y1="8.5" x2="15.5" y2="15.5" />
-                    </svg>
-                  </div>
-                  <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Pharmacy & OTC <span class="launchpad-card-arrow">&rarr;</span>
-                    </div>
-                    <div class="launchpad-card-desc">Dispense doctor Rx or OTC meds</div>
-                  </div>
+          <!-- Compact Quick Action Launchpad Strip -->
+          <div class="clinical-launchpad-compact-strip">
+            <div class="launchpad-compact-header">
+              <h4>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+                Clinical Station Shortcuts
+              </h4>
+            </div>
+
+            <div class="clinical-launchpad-grid compact-grid">
+              <div class="launchpad-action-card" id="launchpad-call-queue" title="Open live queue management">
+                <div class="launchpad-card-icon" style="background:#dcfce7; color:#15803d;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 6v6l4 2" />
+                  </svg>
                 </div>
-
-                <div class="launchpad-action-card" id="launchpad-citizens" title="Open citizen health records">
-                  <div class="launchpad-card-icon" style="background:#f1f5f9; color:#334155;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                  </div>
-                  <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Citizen Directory <span class="launchpad-card-arrow">&rarr;</span>
-                    </div>
-                    <div class="launchpad-card-desc">Patient search & health histories</div>
-                  </div>
+                <div class="launchpad-card-info">
+                  <div class="launchpad-card-title">Live Queue Call <svg class="launchpad-card-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg></div>
+                  <div class="launchpad-card-desc">Call next patient & triage intake</div>
                 </div>
+              </div>
 
-                <div class="launchpad-action-card" id="launchpad-schedule" title="View staff on-duty roster">
-                  <div class="launchpad-card-icon" style="background:#fef3c7; color:#b45309;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <rect x="3" y="4" width="18" height="18" rx="2" />
-                      <line x1="16" y1="2" x2="16" y2="6" />
-                      <line x1="8" y1="2" x2="8" y2="6" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                  </div>
-                  <div class="launchpad-card-info">
-                    <div class="launchpad-card-title">Staff On-Duty <span class="launchpad-card-arrow">&rarr;</span>
-                    </div>
-                    <div class="launchpad-card-desc">Doctor & nurse active availability</div>
-                  </div>
+              <div class="launchpad-action-card" id="launchpad-consultation" title="Open doctor consultation workstation">
+                <div class="launchpad-card-icon" style="background:#e0e7ff; color:#4338ca;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 3v6a6 6 0 0 0 12 0V3" />
+                    <path d="M9 17v2a3 3 0 0 0 6 0v-2" />
+                    <circle cx="15" cy="17" r="1.5" />
+                  </svg>
+                </div>
+                <div class="launchpad-card-info">
+                  <div class="launchpad-card-title">Doctor Consultation <svg class="launchpad-card-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg></div>
+                  <div class="launchpad-card-desc">Diagnose, notes & Rx orders</div>
+                </div>
+              </div>
+
+              <div class="launchpad-action-card" id="launchpad-vitals" title="Open vital signs assessment & QR scanner">
+                <div class="launchpad-card-icon" style="background:#dcfce7; color:#15803d;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                  </svg>
+                </div>
+                <div class="launchpad-card-info">
+                  <div class="launchpad-card-title">Triage & Vitals <svg class="launchpad-card-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg></div>
+                  <div class="launchpad-card-desc">Scan QR & record vitals</div>
+                </div>
+              </div>
+
+              <div class="launchpad-action-card" id="launchpad-pharmacy" title="Open pharmacy dispensary & stock">
+                <div class="launchpad-card-icon" style="background:#f3e8ff; color:#7e22ce;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.5 20.5l10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7z" />
+                    <line x1="8.5" y1="8.5" x2="15.5" y2="15.5" />
+                  </svg>
+                </div>
+                <div class="launchpad-card-info">
+                  <div class="launchpad-card-title">Pharmacy & OTC <svg class="launchpad-card-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg></div>
+                  <div class="launchpad-card-desc">Dispense Rx or OTC meds</div>
+                </div>
+              </div>
+
+              <div class="launchpad-action-card" id="launchpad-citizens" title="Open citizen health records">
+                <div class="launchpad-card-icon" style="background:#f1f5f9; color:#334155;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                </div>
+                <div class="launchpad-card-info">
+                  <div class="launchpad-card-title">Citizen Directory <svg class="launchpad-card-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg></div>
+                  <div class="launchpad-card-desc">Patient search & records</div>
+                </div>
+              </div>
+
+              <div class="launchpad-action-card" id="launchpad-schedule" title="View staff on-duty roster">
+                <div class="launchpad-card-icon" style="background:#fef3c7; color:#b45309;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </div>
+                <div class="launchpad-card-info">
+                  <div class="launchpad-card-title">Staff On-Duty <svg class="launchpad-card-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg></div>
+                  <div class="launchpad-card-desc">Doctor & nurse availability</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
       <section id="non-admin-section" class="section-top hidden">
         <div class="panel">
@@ -531,16 +589,10 @@
         <div class="panel">
           <div class="panel-head vitals-header-row">
             <div>
-              <h3 style="margin:0 0 4px; font-size:18px; font-weight:700; color:#0f172a;">Vitals Triage & Assessment
-              </h3>
-              <span class="panel-hint" style="font-size:13px; color:#64748b;">Record baseline clinical indicators,
-                patient vitals, and initial health complaints.</span>
+              <h3>Vitals Triage</h3>
+              <p class="panel-subtitle">Record patient vitals and triage assessments.</p>
             </div>
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-              <span id="vitals-station-status" class="vitals-status-pill ready">
-                <span class="vitals-status-dot"></span>
-                <span>Ready for Intake</span>
-              </span>
               <span id="vitals-today-count-pill" class="vitals-counter-pill">
                 <strong id="vitals-today-count">0</strong> Triaged Today
               </span>
@@ -548,148 +600,122 @@
           </div>
 
           <div id="qr-scanner-container" class="p-20" style="padding-top:14px;">
-            <!-- 3-Card Intake Hub -->
-            <div class="triage-intake-grid">
-              <!-- Card 1: QR Scanner -->
-              <div class="triage-intake-card card-scanner">
-                <div class="triage-card-header">
-                  <div class="triage-card-icon scanner-icon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"
-                      stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                      <circle cx="12" cy="13" r="4" />
-                    </svg>
+            <div class="vitals-workspace-layout">
+              <!-- Left: Intake Station -->
+              <div class="vitals-intake-column">
+                <!-- 3-Card Intake Hub -->
+                <div class="triage-intake-grid">
+                  <!-- Card 1: QR Scanner -->
+                  <div class="triage-intake-card card-scanner">
+                    <div class="triage-card-header">
+                      <div class="triage-card-icon scanner-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"
+                          stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                          <circle cx="12" cy="13" r="4" />
+                        </svg>
+                      </div>
+                      <div class="triage-card-text">
+                        <h4>Scan QR Code</h4>
+                        <p>Scan citizen mobile ID or printed queue slip</p>
+                      </div>
+                    </div>
+                    <div class="triage-card-action-wrap">
+                      <button id="start-scanner-btn" type="button" class="btn-intake-action btn-scanner">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          stroke-width="2.5">
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                          <circle cx="12" cy="13" r="4" />
+                        </svg>
+                        Start Camera
+                      </button>
+                      <button id="stop-scanner-btn" type="button" class="btn-intake-action btn-danger hidden">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          stroke-width="2.5">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        </svg>
+                        Stop Camera
+                      </button>
+                      <div id="qr-status" class="triage-card-status">Scanner idle</div>
+                    </div>
                   </div>
-                  <div class="triage-card-text">
-                    <h4>Scan QR Code</h4>
-                    <p>Scan citizen mobile ID or printed queue slip</p>
+
+                  <!-- Card 3: Manual Walk-In Entry -->
+                  <div class="triage-intake-card card-manual">
+                    <div class="triage-card-header">
+                      <div class="triage-card-icon manual-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"
+                          stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </div>
+                      <div class="triage-card-text">
+                        <h4>Walk-In / Manual</h4>
+                        <p>Direct intake for citizens without mobile ticket</p>
+                      </div>
+                    </div>
+                    <div class="triage-card-action-wrap">
+                      <button id="manual-entry-btn" type="button" class="btn-intake-action btn-manual">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          stroke-width="2.5">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                        New Walk-In Intake
+                      </button>
+                      <div class="triage-card-status">Opens assessment modal</div>
+                    </div>
                   </div>
                 </div>
-                <div class="triage-card-action-wrap">
-                  <button id="start-scanner-btn" type="button" class="btn-intake-action btn-scanner">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                      stroke-width="2.5">
-                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                      <circle cx="12" cy="13" r="4" />
-                    </svg>
-                    Start Camera
-                  </button>
-                  <button id="stop-scanner-btn" type="button" class="btn-intake-action btn-danger hidden">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                      stroke-width="2.5">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    </svg>
-                    Stop Camera
-                  </button>
-                  <div id="qr-status" class="triage-card-status">Scanner idle</div>
+
+                <!-- Expandable Camera Viewfinder -->
+                <div id="reader"
+                  style="width: 100%; max-width: 480px; margin: 0 auto 16px; border-radius: 14px; overflow: hidden; border: 2px solid transparent; transition: all 0.3s ease;">
                 </div>
               </div>
 
-              <!-- Card 2: Select from Queue -->
-              <div class="triage-intake-card card-queue">
-                <div class="triage-card-header">
-                  <div class="triage-card-icon queue-icon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"
-                      stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                      <line x1="9" y1="12" x2="15" y2="12" />
-                      <line x1="9" y1="16" x2="13" y2="16" />
-                    </svg>
+              <!-- Right: Activity Feed -->
+              <div class="vitals-feed-column">
+                <!-- Today's Triage Activity Feed -->
+                <div id="vitals-recent-container" class="vitals-recent-block">
+                  <div class="vitals-recent-header">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                      </svg>
+                      <div>
+                        <h4 style="margin:0; font-size:15px; font-weight:700; color:#0f172a;">Today's Triaged Patients</h4>
+                        <span style="font-size:12px; color:#64748b;">Completed vital assessments for the current shift</span>
+                      </div>
+                    </div>
+                    <span class="vitals-feed-hint">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="16" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                      </svg>
+                      Click row for full telemetry
+                    </span>
                   </div>
-                  <div class="triage-card-text">
-                    <h4>Select from Queue</h4>
-                    <p>Pick waiting patient from today's active lobby</p>
-                  </div>
-                </div>
-                <div class="triage-card-action-wrap">
-                  <button id="vitals-select-queue-btn" type="button" class="btn-intake-action btn-queue">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                      stroke-width="2.5">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                    Browse Waiting Queue
-                  </button>
-                  <div class="triage-card-status">Instant triage link</div>
-                </div>
-              </div>
 
-              <!-- Card 3: Manual Walk-In Entry -->
-              <div class="triage-intake-card card-manual">
-                <div class="triage-card-header">
-                  <div class="triage-card-icon manual-icon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"
-                      stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                  </div>
-                  <div class="triage-card-text">
-                    <h4>Walk-In / Manual</h4>
-                    <p>Direct intake for citizens without mobile ticket</p>
-                  </div>
-                </div>
-                <div class="triage-card-action-wrap">
-                  <button id="manual-entry-btn" type="button" class="btn-intake-action btn-manual">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                      stroke-width="2.5">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                    New Walk-In Intake
-                  </button>
-                  <div class="triage-card-status">Opens assessment modal</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Expandable Camera Viewfinder -->
-            <div id="reader"
-              style="width: 100%; max-width: 480px; margin: 0 auto 16px; border-radius: 14px; overflow: hidden; border: 2px solid transparent; transition: all 0.3s ease;">
-            </div>
-
-            <!-- Today's Triage Activity Feed -->
-            <div id="vitals-recent-container" class="vitals-recent-block">
-              <div class="vitals-recent-header">
-                <div style="display:flex; align-items:center; gap:10px;">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                  </svg>
-                  <div>
-                    <h4 style="margin:0; font-size:15px; font-weight:700; color:#0f172a;">Today's Triaged Patients</h4>
-                    <span style="font-size:12px; color:#64748b;">Completed vital assessments for the current
-                      shift</span>
+                  <div class="table-wrap vitals-table-wrap" style="border-radius:12px; border:1px solid #e2e8f0; overflow:hidden;">
+                    <table class="accounts-table compact-table vitals-table">
+                      <thead>
+                        <tr class="table-header-row">
+                          <th class="table-header-cell vitals-col-time">Time</th>
+                          <th class="table-header-cell vitals-col-patient">Patient Name</th>
+                          <th class="table-header-cell vitals-col-bp">Blood Pressure</th>
+                          <th class="table-header-cell vitals-col-status">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody id="vitals-recent-tbody">
+                        <!-- Populated dynamically -->
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-                <div class="vitals-feed-stats">
-                  <span class="vitals-stat-chip chip-normal"><span class="chip-dot dot-normal"></span> <span
-                      id="vitals-stat-normal">0</span> Normal</span>
-                  <span class="vitals-stat-chip chip-flagged"><span class="chip-dot dot-flagged"></span> <span
-                      id="vitals-stat-flagged">0</span> Flagged BP/Fever</span>
-                </div>
-              </div>
-
-              <div class="table-wrap" style="border-radius:12px; border:1px solid #e2e8f0; overflow:hidden;">
-                <table class="accounts-table compact-table">
-                  <thead>
-                    <tr class="table-header-row">
-                      <th>Time</th>
-                      <th>Patient Name</th>
-                      <th>Blood Pressure</th>
-                      <th>Heart Rate</th>
-                      <th>Temp</th>
-                      <th>SpO<sub>2</sub></th>
-                      <th>Triage Status</th>
-                    </tr>
-                  </thead>
-                  <tbody id="vitals-recent-tbody">
-                    <!-- Populated dynamically -->
-                  </tbody>
-                </table>
               </div>
             </div>
           </div>
@@ -700,9 +726,8 @@
         <div class="panel">
           <div class="panel-head" style="margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid #f1f5f9;">
             <div>
-              <h3 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 4px;">Profile & Security</h3>
-              <span class="panel-hint" style="font-size: 13px; color: #64748b;">Manage your clinician identity details
-                and account password credentials.</span>
+              <h3>Profile</h3>
+              <p class="panel-subtitle">Manage account details and security settings.</p>
             </div>
           </div>
 
@@ -766,14 +791,6 @@
                     </div>
                   </div>
                 </div>
-
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                  <span
-                    style="display: inline-flex; align-items: center; gap: 7px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 9999px;">
-                    <span style="width: 7px; height: 7px; border-radius: 50%; background: #16a34a;"></span>
-                    Active Workstation Session
-                  </span>
-                </div>
               </div>
 
               <!-- Profile Form Grid (2 Columns on Desktop) -->
@@ -789,8 +806,7 @@
                     </label>
                     <input id="profile-name" type="text" placeholder="Enter your full name"
                       style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; box-sizing: border-box;" />
-                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Your public
-                      clinician name shown across consultation records and logs.</span>
+                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Shown on consultation records and reports.</span>
                   </div>
 
                   <div class="field" style="margin: 0;">
@@ -802,8 +818,7 @@
                     </label>
                     <input id="profile-email" type="email" readonly
                       style="width: 100%; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; cursor: not-allowed; box-sizing: border-box;" />
-                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Primary
-                      authentication email registered for system notifications.</span>
+                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Used for system notifications.</span>
                   </div>
 
                   <div class="field" style="margin: 0;">
@@ -816,8 +831,7 @@
                     </label>
                     <input id="profile-role" type="text" readonly
                       style="width: 100%; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; cursor: not-allowed; text-transform: capitalize; box-sizing: border-box;" />
-                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Determines
-                      clinical workflow access, patient triage privileges, and prescription scope.</span>
+                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Controls clinical and administrative privileges.</span>
                   </div>
 
                   <div class="field" style="margin: 0;">
@@ -830,8 +844,7 @@
                     </label>
                     <input id="profile-employee-id" type="text" readonly value="STF-DOC-01"
                       style="width: 100%; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #334155; font-family: 'JetBrains Mono', monospace; font-weight: 600; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; cursor: not-allowed; box-sizing: border-box;" />
-                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Unique clinical
-                      employee identifier maintained by facility administration.</span>
+                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Maintained by clinic administration.</span>
                   </div>
                 </div>
 
@@ -848,11 +861,11 @@
                       logs.</span>
                   </div>
                   <div style="display: flex; align-items: center; gap: 10px;">
-                    <button type="button" id="profile-cancel-btn" class="chip-btn"
+                    <button type="button" id="profile-cancel-btn" class="chip-btn chip-btn-outline"
                       style="border-radius: 8px; padding: 9px 20px; font-size: 13px; min-width: 90px; display: inline-flex; align-items: center; justify-content: center; text-align: center;">
                       Reset
                     </button>
-                    <button type="submit" id="profile-save-btn" class="btn"
+                    <button type="submit" id="profile-save-btn" class="btn btn-primary"
                       style="width: auto; border-radius: 8px; padding: 9px 24px; font-size: 13px; font-weight: 600; min-width: 150px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-align: center;">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                         stroke-width="2.5">
@@ -997,10 +1010,8 @@
         <div class="panel">
           <div class="panel-head schedule-header-row">
             <div>
-              <h3 style="margin:0 0 4px; font-size:18px; font-weight:700; color:#0f172a;">Staff Availability & Duty
-                Status</h3>
-              <span class="panel-hint" style="font-size:13px; color:#64748b;">Real-time clinical presence, consultation
-                availability, and staff shift control.</span>
+              <h3>Availability Schedule</h3>
+              <p class="panel-subtitle">Manage clinical availability and staff duty status.</p>
             </div>
             <div id="schedule-roster-summary" class="roster-summary-bar">
               <span class="roster-summary-pill pill-avail"><span class="roster-pill-dot"></span> <strong
@@ -1013,49 +1024,48 @@
           </div>
 
           <div class="p-20" style="padding-top: 14px;">
-            <!-- Doctors Department -->
-            <div class="schedule-dept-block">
-              <div class="schedule-dept-header">
-                <div class="schedule-dept-title">
-                  <span class="schedule-dept-icon doctor">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"
-                      stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 2v20M2 12h20" />
-                    </svg>
-                  </span>
-                  <div>
-                    <h4>Medical Doctors</h4>
-                    <span style="font-size:11.5px; color:#64748b;">Attending physicians & clinical specialists</span>
+            <div class="schedule-departments-wrap">
+              <!-- Doctors Department -->
+              <div class="schedule-dept-block">
+                <div class="schedule-dept-header">
+                  <div class="schedule-dept-title">
+                    <span class="schedule-dept-icon doctor">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2v20M2 12h20" />
+                      </svg>
+                    </span>
+                    <div>
+                      <h4>Medical Doctors</h4>
+                      <span style="font-size:11.5px; color:#64748b;">Attending physicians & clinical specialists</span>
+                    </div>
                   </div>
                 </div>
-                <span id="doctors-count-badge" class="dept-count-badge">0 on duty</span>
+                <div id="schedule-doctors-grid" class="staff-cards-grid">
+                  <!-- Doctor workstation cards rendered dynamically -->
+                </div>
               </div>
-              <div id="schedule-doctors-grid" class="staff-cards-grid">
-                <!-- Doctor workstation cards rendered dynamically -->
-              </div>
-            </div>
 
-            <!-- Nurses Department -->
-            <div class="schedule-dept-block"
-              style="border-top: 1.5px solid #f1f5f9; padding-top: 24px; margin-top: 24px;">
-              <div class="schedule-dept-header">
-                <div class="schedule-dept-title">
-                  <span class="schedule-dept-icon nurse">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2"
-                      stroke-linecap="round" stroke-linejoin="round">
-                      <path
-                        d="M18 2l4 4M17 7l3-3M19 9l-8.5 8.5a2.12 2.12 0 0 1-3 0l-2-2a2.12 2.12 0 0 1 0-3L14 4M5 19l-3 3" />
-                    </svg>
-                  </span>
-                  <div>
-                    <h4>Triage & Ward Nurses</h4>
-                    <span style="font-size:11.5px; color:#64748b;">Patient assessment, vitals triage & ward care</span>
+              <!-- Nurses Department -->
+              <div class="schedule-dept-block">
+                <div class="schedule-dept-header">
+                  <div class="schedule-dept-title">
+                    <span class="schedule-dept-icon nurse">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                          d="M18 2l4 4M17 7l3-3M19 9l-8.5 8.5a2.12 2.12 0 0 1-3 0l-2-2a2.12 2.12 0 0 1 0-3L14 4M5 19l-3 3" />
+                      </svg>
+                    </span>
+                    <div>
+                      <h4>Triage & Ward Nurses</h4>
+                      <span style="font-size:11.5px; color:#64748b;">Patient assessment, vitals triage & ward care</span>
+                    </div>
                   </div>
                 </div>
-                <span id="nurses-count-badge" class="dept-count-badge">0 on duty</span>
-              </div>
-              <div id="schedule-nurses-grid" class="staff-cards-grid">
-                <!-- Nurse workstation cards rendered dynamically -->
+                <div id="schedule-nurses-grid" class="staff-cards-grid">
+                  <!-- Nurse workstation cards rendered dynamically -->
+                </div>
               </div>
             </div>
           </div>
@@ -1068,21 +1078,18 @@
           <div class="panel-head"
             style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px;">
             <div>
-              <h3 id="user-mgmt-title" style="margin:0 0 4px; font-size:18px; font-weight:700; color:#0f172a;">Personnel
-                & Citizens Registry</h3>
-              <span class="panel-hint" style="font-size:13px; color:#64748b;">Manage medical staff accounts and citizen health records.</span>
+              <h3 id="user-mgmt-title">Personnel & Citizens</h3>
+              <p class="panel-subtitle">Manage medical staff and citizen records.</p>
             </div>
             <div class="management-actions">
-              <button id="staff-register-btn" class="chip-btn admin-only" type="button"
-                style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px;">
+              <button id="staff-register-btn" class="chip-btn chip-btn-primary admin-only" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
                 Register Staff
               </button>
-              <button id="refresh-accounts-btn" class="chip-btn chip-btn-outline"
-                style="display:inline-flex; align-items:center; gap:6px;">
+              <button id="refresh-accounts-btn" class="chip-btn chip-btn-outline" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="23 4 23 10 17 10" />
                   <polyline points="1 20 1 14 7 14" />
@@ -1280,14 +1287,11 @@
           <div class="panel-head"
             style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px;">
             <div>
-              <h3 id="reports-hub-title" style="margin:0 0 4px; font-size:18px; font-weight:700; color:#0f172a;">
-                Reports, Analytics & Communications</h3>
-              <span class="panel-hint" id="reports-hub-hint" style="font-size:13px; color:#64748b;">Manage clinic
-                announcements, citizen service feedback, clinical analytics, and system audit exports.</span>
+              <h3 id="reports-hub-title">Reports & Analytics</h3>
+              <p class="panel-subtitle" id="reports-hub-hint">Clinic announcements, feedback, analytics, and exports.</p>
             </div>
             <div class="management-actions" id="reports-hub-actions">
-              <button id="reports-hub-refresh-btn" class="chip-btn" type="button"
-                style="display:inline-flex; align-items:center; gap:6px;">
+              <button id="reports-hub-refresh-btn" class="chip-btn chip-btn-outline" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M23 4v6h-6" />
                   <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
@@ -1357,8 +1361,7 @@
                   </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-                  <button id="create-announcement-topright" class="chip-btn clinical-only" type="button"
-                    style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px; font-weight:700;">
+                  <button id="create-announcement-topright" class="chip-btn chip-btn-primary clinical-only" type="button">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                       stroke-width="2.5">
                       <line x1="12" y1="5" x2="12" y2="19" />
@@ -1543,7 +1546,7 @@
                   </h4>
                   <p style="margin:0; font-size:12.5px; color:#64748b;">Live departmental telemetry, patient flow metrics, and DOH-accredited executive reporting.</p>
                 </div>
-                <button type="button" id="btn-print-official-census" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:600; border-radius:8px; background:#1e293b; color:#ffffff; border:none; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                <button type="button" id="btn-print-official-census" class="btn btn-dark" style="display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="6 9 6 2 18 2 18 9"></polyline>
                     <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
@@ -1801,11 +1804,15 @@
                     <p style="margin:0; font-size:12.5px; color:#64748b;">Real-time audit log of staff logins, logouts,
                       and station sessions.</p>
                   </div>
-                  <div style="display:flex; gap:8px;">
-                    <input type="text" id="staff-logs-search" placeholder="Search by name, email, or role..."
-                      style="padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; width:240px; height:38px; box-sizing:border-box;" />
-                    <button id="staff-logs-refresh-btn" class="chip-btn" type="button" style="height:38px;">Refresh
-                      Logs</button>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <div class="consult-search-box" style="width:260px;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      <input type="search" id="staff-logs-search" class="search-input" placeholder="Search by name, email, role..." aria-label="Search staff security logs" />
+                    </div>
+                    <button id="staff-logs-refresh-btn" class="chip-btn chip-btn-outline" type="button" style="height:38px;">Refresh Logs</button>
                   </div>
                 </div>
 
@@ -1861,18 +1868,11 @@
         <div class="panel" style="margin-bottom: 20px;">
           <div class="panel-head consult-desk-header">
             <div>
-              <h3 style="margin:0 0 4px; font-size:18px; font-weight:700; color:#0f172a;">Physician Consultation Desk
-              </h3>
-              <span class="panel-hint" style="font-size:13px; color:#64748b;">Active patient call station, triage
-                telemetry preview, and clinical intake.</span>
+              <h3>Consultation Desk</h3>
+              <p class="panel-subtitle">Active patient charting, notes, and prescriptions.</p>
             </div>
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-              <span id="consult-desk-status-pill" class="consult-desk-pill ready">
-                <span class="consult-desk-dot"></span>
-                <span id="consult-desk-status-text">Station Ready &bull; Waiting for Patient</span>
-              </span>
-              <button id="open-consult-modal-btn" class="chip-btn"
-                style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px;">
+              <button id="open-consult-modal-btn" class="chip-btn chip-btn-primary" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
@@ -1909,14 +1909,11 @@
         <div class="panel">
           <div class="panel-head consult-records-header">
             <div>
-              <h3 style="margin:0 0 4px; font-size:18px; font-weight:700; color:#0f172a;">Consultation & Clinical
-                History</h3>
-              <span class="panel-hint" style="font-size:13px; color:#64748b;">Comprehensive patient assessment logs,
-                medical prescriptions, and follow-up schedules.</span>
+              <h3>Consultation History</h3>
+              <p class="panel-subtitle">Comprehensive consultation records and prescription logs.</p>
             </div>
             <div class="management-actions">
-              <button id="consult-report-btn" class="chip-btn chip-btn-outline"
-                style="display:inline-flex; align-items:center; gap:6px;">
+              <button id="consult-report-btn" class="chip-btn chip-btn-outline" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
@@ -1931,7 +1928,7 @@
           <!-- Search & Filter Toolbar -->
           <div class="consult-toolbar-wrap">
             <div class="consult-search-box">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2"
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -1976,7 +1973,6 @@
                   <th class="table-header-cell">Clinical Diagnosis</th>
                   <th class="table-header-cell">Follow-Up Date</th>
                   <th class="table-header-cell">Consulted Date</th>
-                  <th class="table-header-cell" style="text-align:right;">Actions</th>
                 </tr>
               </thead>
               <tbody id="consultations-tbody"></tbody>
@@ -2059,10 +2055,8 @@
           <div class="panel-head"
             style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px;">
             <div>
-              <h3 style="margin:0 0 4px; font-size:18px; font-weight:700; color:#0f172a;">Pharmacy Inventory & Stock
-                Dispensary</h3>
-              <span class="panel-hint" style="font-size:13px; color:#64748b;">Real-time pharmaceutical supplies, batch
-                telemetry, and dispensation controls.</span>
+              <h3>Pharmacy & Stock</h3>
+              <p class="panel-subtitle">Pharmaceutical inventory, batch telemetry, and dispensation.</p>
             </div>
             <div class="management-actions">
               <button id="medicine-csv-export-btn" class="chip-btn chip-btn-outline"
@@ -2119,9 +2113,9 @@
 
             <!-- Search and Sort Toolbar -->
             <div
-              style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
-              <div class="consult-search-box" style="max-width:400px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2"
+              style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
+              <div class="consult-search-box" style="max-width:300px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2"
                   stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -2132,7 +2126,7 @@
               <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-size:12px; font-weight:600; color:#64748b;">Sort:</span>
                 <select id="medicine-sort-select" class="chip-btn chip-btn-outline"
-                  style="cursor: pointer; padding:5px 10px;">
+                  style="cursor: pointer; padding:4px 10px; font-size:12px; height:34px; border-radius:8px;">
                   <option value="name-asc">Name (A-Z)</option>
                   <option value="name-desc">Name (Z-A)</option>
                   <option value="stock-desc">Highest Stock</option>
@@ -2147,12 +2141,11 @@
               <table class="accounts-table">
                 <thead>
                   <tr class="table-header-row">
-                    <th class="table-header-cell">Medicine & Formulation</th>
-                    <th class="table-header-cell">Stock Level Capacity</th>
-                    <th class="table-header-cell">Unit</th>
-                    <th class="table-header-cell" id="medicine-th-expiry">Expiration Urgency</th>
+                    <th class="table-header-cell">Medicine Name</th>
+                    <th class="table-header-cell">Generic / Description</th>
+                    <th class="table-header-cell">Stock Level</th>
                     <th class="table-header-cell">Status</th>
-                    <th class="table-header-cell" id="medicine-th-actions" style="text-align:right;">Actions</th>
+                    <th class="table-header-cell" id="medicine-th-expiry">Expiration Date</th>
                   </tr>
                 </thead>
                 <tbody id="medicine-tbody"></tbody>
@@ -2185,27 +2178,22 @@
           <div class="panel-head"
             style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;">
             <div>
-              <h3 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#0f172a;">Live Patient Queue</h3>
-              <span class="panel-hint" style="font-size:13px;color:#64748b;">Real-time triage dispatch, active ticket
-                broadcast, and patient flow tracking.</span>
+              <h3>Live Patient Queue</h3>
+              <p class="panel-subtitle">Real-time ticket dispatch and patient flow tracking.</p>
             </div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <span id="queue-current-serving-badge" class="queue-station-pill ready">
-                <span class="queue-station-dot"></span>
-                <span>Station Ready &bull; Queue Clear</span>
-              </span>
               <span id="queue-summary-badge" class="queue-summary-pill">
                 Waiting: 0 | On Call: 0 | Serving: 0
               </span>
-              <button id="queue-consult-serving-btn" class="chip-btn"
-                style="background:#16a34a;color:#fff;border-color:#16a34a;display:none;">
+              <button id="queue-consult-serving-btn" class="chip-btn chip-btn-primary"
+                style="display:none;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                   style="vertical-align:-1px;margin-right:4px;">
                   <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                 </svg>
                 Consultation
               </button>
-              <button id="queue-refresh-btn" class="chip-btn" title="Refresh live queue">
+              <button id="queue-refresh-btn" class="chip-btn chip-btn-outline" title="Refresh live queue">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                   style="margin-right:3px;">
                   <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
@@ -2284,14 +2272,13 @@
           <h3 class="modal-heading">Queue Ticket Details</h3>
           <div id="queue-ticket-detail-body" class="modal-group"></div>
           <div class="actions" style="justify-content:space-between; margin-top:14px; gap:8px; flex-wrap:wrap;">
-            <button id="queue-ticket-delete-btn" type="button" class="btn"
-              style="background:#ef4444; color:#fff; border:none;">
+            <button id="queue-ticket-delete-btn" type="button" class="btn btn-danger">
               <span class="btn-spinner" aria-hidden="true"></span>
               <span class="btn-label">Delete Ticket</span>
             </button>
             <div style="display:flex; gap:8px; margin-left:auto;">
-              <button id="queue-ticket-consult-btn" type="button" class="btn"
-                style="background:#16a34a; color:#fff; border:none; display:none;">
+              <button id="queue-ticket-consult-btn" type="button" class="btn btn-primary"
+                style="display:none;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                   style="vertical-align:-1px; margin-right:4px;">
                   <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
@@ -2411,7 +2398,6 @@
                   <input id="va-bp" class="vital-input" type="text" placeholder="120/80"
                     pattern="[0-9]{2,3}/[0-9]{2,3}" />
                   <span class="vital-unit">mmHg</span>
-                  <div id="va-bp-badge" class="vital-risk-badge hidden"></div>
                 </div>
 
                 <!-- Heart Rate -->
@@ -2425,7 +2411,6 @@
                   </label>
                   <input id="va-hr" class="vital-input" type="number" min="20" max="300" placeholder="72" />
                   <span class="vital-unit">bpm</span>
-                  <div id="va-hr-badge" class="vital-risk-badge hidden"></div>
                 </div>
 
                 <!-- Respiratory Rate -->
@@ -2443,7 +2428,6 @@
                   </label>
                   <input id="va-rr" class="vital-input" type="number" min="1" max="100" placeholder="16" />
                   <span class="vital-unit">bpm</span>
-                  <div id="va-rr-badge" class="vital-risk-badge hidden"></div>
                 </div>
 
                 <!-- Temperature -->
@@ -2458,7 +2442,6 @@
                   <input id="va-temp" class="vital-input" type="number" step="0.1" min="30" max="45"
                     placeholder="36.5" />
                   <span class="vital-unit">°C</span>
-                  <div id="va-temp-badge" class="vital-risk-badge hidden"></div>
                 </div>
 
                 <!-- Oxygen Saturation -->
@@ -2475,7 +2458,6 @@
                   </label>
                   <input id="va-spo2" class="vital-input" type="number" min="1" max="100" placeholder="98" />
                   <span class="vital-unit">%</span>
-                  <div id="va-spo2-badge" class="vital-risk-badge hidden"></div>
                 </div>
               </div>
             </div>
@@ -2507,7 +2489,6 @@
                   <label class="vital-label">Calculated BMI</label>
                   <div class="bmi-result-box">
                     <span id="va-bmi-value" class="bmi-value">&mdash;</span>
-                    <span id="va-bmi-badge" class="bmi-category-badge hidden">&mdash;</span>
                   </div>
                 </div>
               </div>
@@ -2590,7 +2571,7 @@
             <div class="actions" style="gap:12px;">
               <button type="submit" class="btn">Save</button>
               <button type="button" id="sched-delete-btn" class="btn btn-delete admin-only">Delete</button>
-              <button type="button" id="sched-cancel-btn" class="btn" style="background:#64748b;">Cancel</button>
+              <button type="button" id="sched-cancel-btn" class="btn btn-secondary">Cancel</button>
             </div>
           </form>
         </div>
@@ -2600,7 +2581,7 @@
         <div class="modal-box" style="max-width:420px;">
           <h3 class="modal-heading">Schedule Creation Successful</h3>
           <div class="actions" style="justify-content:center;">
-            <button id="schedule-success-ok-btn" type="button" class="chip-btn">OK</button>
+            <button id="schedule-success-ok-btn" type="button" class="chip-btn chip-btn-primary">OK</button>
           </div>
         </div>
       </div>
@@ -2622,7 +2603,7 @@
             </div>
             <div class="actions" style="gap:12px;">
               <button type="submit" class="btn">Update</button>
-              <button type="button" id="queue-cancel-btn" class="btn" style="background:#64748b;">Cancel</button>
+              <button type="button" id="queue-cancel-btn" class="btn btn-secondary">Cancel</button>
             </div>
           </form>
         </div>
@@ -3098,8 +3079,8 @@
           <div id="announcement-detail-body" class="detail-body"></div>
           <div class="actions"
             style="margin-top:24px; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:16px;">
-            <button id="announcement-detail-edit-btn" type="button" class="btn"
-              style="background:#16a34a; color:#fff; border-color:#16a34a; display:inline-flex; align-items:center; gap:6px;">
+            <button id="announcement-detail-edit-btn" type="button" class="btn btn-primary"
+              style="display:inline-flex; align-items:center; gap:6px;">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 20h9" />
                 <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
@@ -3153,7 +3134,7 @@
           </div>
           <div class="actions" style="margin-top:0; padding-top:12px; border-top:1px solid #e2e8f0; justify-content:flex-end; gap:10px;">
             <button type="button" class="btn btn-outline" id="census-modal-cancel-btn" onclick="document.getElementById('system-census-modal').classList.add('hidden')">Close</button>
-            <button type="button" class="btn btn-primary" id="census-modal-print-btn" style="display:inline-flex; align-items:center; gap:6px; background:#1e293b;">
+            <button type="button" class="btn btn-dark" id="census-modal-print-btn" style="display:inline-flex; align-items:center; gap:6px;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="6 9 6 2 18 2 18 9"></polyline>
                 <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
@@ -3187,7 +3168,7 @@
           </div>
           <div class="actions medicine-modal-actions" style="margin-top:0; padding-top:12px; border-top:1px solid #e2e8f0; justify-content:flex-end; gap:10px;">
             <button type="button" class="btn btn-outline" id="medicine-modal-cancel-btn">Close</button>
-            <button type="button" class="btn btn-primary" id="medicine-modal-print-btn" style="display:inline-flex; align-items:center; gap:6px; background:#0284c7;">
+            <button type="button" class="btn btn-info" id="medicine-modal-print-btn" style="display:inline-flex; align-items:center; gap:6px;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="6 9 6 2 18 2 18 9"></polyline>
                 <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
@@ -3244,7 +3225,7 @@
 
               <div id="prescription-lines"></div>
               <div class="field">
-                <button type="button" id="add-prescription-line" class="chip-btn">Add Medicine</button>
+                <button type="button" id="add-prescription-line" class="chip-btn chip-btn-outline">Add Medicine</button>
               </div>
               <div class="actions">
                 <button type="submit" class="btn">Create Prescription</button>
@@ -3550,8 +3531,8 @@
             <div class="vitals-modal-footer">
               <button type="button" id="vitals-cancel-form-btn" class="btn btn-secondary"
                 style="width: auto;">Cancel</button>
-              <button type="button" id="vitals-reset-btn" class="chip-btn" style="padding: 8px 16px;">Reset</button>
-              <button type="submit" id="vitals-submit-btn" class="btn" style="width: auto; padding: 9px 22px;">
+              <button type="button" id="vitals-reset-btn" class="btn btn-secondary" style="width: auto;">Reset</button>
+              <button type="submit" id="vitals-submit-btn" class="btn btn-primary" style="width: auto; padding: 9px 22px;">
                 <span class="btn-spinner" aria-hidden="true"></span>
                 <span class="btn-label">SUBMIT ASSESSMENT</span>
               </button>

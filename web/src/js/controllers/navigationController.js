@@ -32,18 +32,18 @@ export const SECTION_ROLE_RULES = {
 };
 
 export const SECTION_BREADCRUMBS = {
-  'dashboard-section': 'Doctor Dashboard Overview',
+  'dashboard-section': 'Dashboard Overview',
   'schedule-section': 'Availability Schedule',
   'queue-section': 'Live Patient Queue',
-  'vitals-section': 'Vitals Triage & Assessment',
-  'consultation-section': 'Consultation & Clinical Notes',
-  'medicine-section': 'Pharmacy Inventory & Stock',
-  'users-section': 'Personnel & Citizen Directory',
+  'vitals-section': 'Vitals Triage',
+  'consultation-section': 'Consultations',
+  'medicine-section': 'Pharmacy & Stock',
+  'users-section': 'Personnel & Citizens',
   'announcements-section': 'Clinic Announcements',
-  'feedback-section': 'Patient & Citizen Feedback',
-  'stats-section': 'Clinical Statistics & Analytics',
-  'reports-section': 'System Reports & CSV Exports',
-  'profile-section': 'Personal Profile',
+  'feedback-section': 'Citizen Feedback',
+  'stats-section': 'Clinical Analytics',
+  'reports-section': 'Reports & Analytics',
+  'profile-section': 'Profile',
   'security-section': 'Change Password'
 };
 

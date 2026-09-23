@@ -39,7 +39,7 @@ export async function loadConsultationData() {
   } catch (err) {
     console.error('Failed to load consultations:', err);
     consultations = [];
-    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:24px; color:#94a3b8;">No consultations recorded.</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:24px; color:#94a3b8;">No consultations recorded.</td></tr>';
   }
 }
 
@@ -79,7 +79,7 @@ export function renderConsultations() {
   });
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:28px; color:#94a3b8;">No matching consultation records found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:28px; color:#94a3b8;">No matching consultation records found.</td></tr>';
     return;
   }
 
@@ -97,9 +97,6 @@ export function renderConsultations() {
         <td class="table-cell"><span class="clinical-diagnosis-pill">${sanitizeText(diagnosis)}</span></td>
         <td class="table-cell">${sanitizeText(followUp)}</td>
         <td class="table-cell">${sanitizeText(consultedDate)}</td>
-        <td class="table-cell" style="text-align:right;">
-          <button type="button" class="btn small outline" data-action="view-consult" data-id="${c.id}" style="padding:3px 10px; font-size:11.5px; border-radius:9999px;">View Notes</button>
-        </td>
       </tr>
     `;
   }).join('');

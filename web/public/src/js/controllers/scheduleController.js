@@ -7,6 +7,7 @@
 import { supabase } from '../lib/supabaseClient.js';
 import { sessionStore } from '../services/sessionStore.js';
 import * as scheduleService from '../services/scheduleService.js';
+import * as staffService from '../services/staffService.js';
 import { showToast, swapContainer, withTimeout } from '../utils/uiHelpers.js';
 import { attachDetailRow } from '../utils/dataDetailModal.js';
 import { openDialogModal, toTitleCase, getDoctorDisplayName, isDoctorRole, isScheduleRole } from './navigationController.js';
@@ -199,6 +200,39 @@ export async function updateStaffAvailabilityById(staffId, status) {
   return true;
 }
 
+export function updateScheduleSummaryCounts(staffList = cachedScheduleStaff) {
+  const list = Array.isArray(staffList) ? staffList : (cachedScheduleStaff || []);
+  const doctors = list.filter((s) => isDoctorRole(s?.role));
+  const nurses = list.filter((s) => {
+    const r = String(s?.role || '').toLowerCase();
+    return r === 'nurse' || r === 'staff';
+  });
+  const clinicalRoster = [...doctors, ...nurses];
+
+  let availCount = 0;
+  let breakCount = 0;
+  let offCount = 0;
+
+  clinicalRoster.forEach((staff) => {
+    const status = normalizeAvailabilityStatus(staff?.availability_status || staff?.availabilityStatus);
+    if (status === 'available') {
+      availCount++;
+    } else if (status === 'on_break') {
+      breakCount++;
+    } else {
+      offCount++;
+    }
+  });
+
+  const availNode = document.getElementById('summary-avail-count');
+  const breakNode = document.getElementById('summary-break-count');
+  const offNode = document.getElementById('summary-off-count');
+
+  if (availNode) availNode.textContent = String(availCount);
+  if (breakNode) breakNode.textContent = String(breakCount);
+  if (offNode) offNode.textContent = String(offCount);
+}
+
 export function updateAvailabilityInCaches(staffId, status, newRow = null) {
   const normalized = normalizeAvailabilityStatus(status);
   const updateList = (list) => {
@@ -211,6 +245,13 @@ export function updateAvailabilityInCaches(staffId, status, newRow = null) {
 
   updateList(cachedScheduleStaff);
   updateList(cachedScheduleDoctors);
+
+  const user = sessionStore.getUser();
+  if (user && String(user.id) === String(staffId)) {
+    user.availability_status = normalized;
+  }
+
+  updateScheduleSummaryCounts(cachedScheduleStaff);
 }
 
 export async function handleAvailabilityToggle(staff, nextStatus, toggleGroup) {
@@ -222,7 +263,7 @@ export async function handleAvailabilityToggle(staff, nextStatus, toggleGroup) {
     String(staffId) === String(user.id) || 
     (staff.email && user.email && String(staff.email).toLowerCase() === String(user.email).toLowerCase())
   );
-  if (!isSelf && !sessionStore.isAdmin(user) && !sessionStore.isDoctor(user) && !sessionStore.isNurse(user)) {
+  if (!isSelf) {
     showToast('You can only update your own availability.', 'error');
     return;
   }
@@ -230,6 +271,7 @@ export async function handleAvailabilityToggle(staff, nextStatus, toggleGroup) {
   const normalizedNext = normalizeAvailabilityStatus(nextStatus);
   if (prevStatus === normalizedNext) return;
 
+  staff.availability_status = normalizedNext;
   applyAvailabilityToggleState(toggleGroup, normalizedNext);
   updateAvailabilityInCaches(staffId, normalizedNext);
 
@@ -237,11 +279,12 @@ export async function handleAvailabilityToggle(staff, nextStatus, toggleGroup) {
     await updateStaffAvailabilityById(staffId, normalizedNext);
     const statusNode = toggleGroup.closest('.staff-station-card')?.querySelector('.station-status-pill');
     if (statusNode) {
-      statusNode.className = `station-status-pill status-${normalizedNext}`;
+      statusNode.className = `station-status-pill status-${normalizedNext} ${normalizedNext === 'on_break' ? 'status-break' : ''}`;
       const label = AVAILABILITY_LABELS[normalizedNext] || (normalizedNext === 'on_break' ? 'On Break' : 'Off Duty');
       statusNode.innerHTML = `<span class="pill-dot"></span> ${label}`;
     }
   } catch (error) {
+    staff.availability_status = prevStatus;
     updateAvailabilityInCaches(staffId, prevStatus);
     applyAvailabilityToggleState(toggleGroup, prevStatus);
     showToast(error?.message || 'Unable to update availability.', 'error');
@@ -258,11 +301,12 @@ function applyAvailabilityToggleState(toggleGroup, status) {
 
   const card = toggleGroup.closest('.staff-station-card');
   if (card) {
-    card.classList.remove('card-available', 'card-break', 'card-unavailable');
+    card.classList.remove('card-available', 'card-break', 'card-on_break', 'card-unavailable');
     card.classList.add(`card-${normalized}`);
+    if (normalized === 'on_break') card.classList.add('card-break');
     const pill = card.querySelector('.station-status-pill');
     if (pill) {
-      pill.className = `station-status-pill status-${normalized}`;
+      pill.className = `station-status-pill status-${normalized} ${normalized === 'on_break' ? 'status-break' : ''}`;
       const label = AVAILABILITY_LABELS[normalized] || (normalized === 'on_break' ? 'On Break' : 'Off Duty');
       pill.innerHTML = `<span class="pill-dot"></span> ${label}`;
     }
@@ -289,7 +333,16 @@ export function renderScheduleDoctors(staffList, user) {
       return;
     }
 
-    list.forEach((staff) => {
+    // Sort so the logged-in user's card appears first
+    const sortedList = [...list].sort((a, b) => {
+      const aIsSelf = user && (String(a.id) === String(user.id) || (a.email && user.email && String(a.email).toLowerCase() === String(user.email).toLowerCase()));
+      const bIsSelf = user && (String(b.id) === String(user.id) || (b.email && user.email && String(b.email).toLowerCase() === String(user.email).toLowerCase()));
+      if (aIsSelf) return -1;
+      if (bIsSelf) return 1;
+      return 0;
+    });
+
+    sortedList.forEach((staff) => {
       const displayName = getDoctorDisplayName(staff);
       const email = staff.email || '—';
       const availabilityStatus = normalizeAvailabilityStatus(staff?.availability_status || staff?.availabilityStatus);
@@ -297,10 +350,11 @@ export function renderScheduleDoctors(staffList, user) {
         String(staff.id) === String(user.id) ||
         (staff.email && user.email && String(staff.email).toLowerCase() === String(user.email).toLowerCase())
       );
-      const canEditAvailability = isSelf || sessionStore.isAdmin(user) || sessionStore.isDoctor(user) || sessionStore.isNurse(user);
+      // ONLY the owner of the card has availability toggle buttons
+      const canEditAvailability = Boolean(isSelf);
 
       const card = document.createElement('div');
-      card.className = `staff-station-card card-${availabilityStatus} ${isSelf ? 'card-is-self' : ''}`;
+      card.className = `staff-station-card card-${availabilityStatus} ${availabilityStatus === 'on_break' ? 'card-break' : ''} ${isSelf ? 'card-is-self' : ''}`;
       card.dataset.staffId = String(staff.id || '');
 
       const avatarClass = isDoctor ? 'doctor-avatar' : 'nurse-avatar';
@@ -311,7 +365,7 @@ export function renderScheduleDoctors(staffList, user) {
       if (canEditAvailability) {
         actionsHtml = `
           <div class="staff-card-actions">
-            <span class="staff-card-actions-label">${isSelf ? 'Your Shift Control' : (sessionStore.isAdmin(user) ? 'Shift Control (Admin)' : 'Shift Control')}</span>
+            <span class="staff-card-actions-label">Your Shift Control</span>
             <div class="availability-segmented-control" data-staff-id="${staff.id}">
               <button type="button" class="availability-segmented-btn btn-available ${availabilityStatus === 'available' ? 'is-active' : ''}" data-status="available">
                 <span class="pill-dot" style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;"></span> Available
@@ -326,10 +380,22 @@ export function renderScheduleDoctors(staffList, user) {
           </div>
         `;
       } else {
+        const todayKey = getTodayScheduleDateKey();
+        const todayShift = (cachedScheduleEntries || []).find((s) =>
+          String(s.doctor_staff_id) === String(staff.id) && s.schedule_date === todayKey
+        );
+        const shiftInfo = todayShift
+          ? `Shift: ${formatScheduleTime(todayShift.start_time)} – ${formatScheduleTime(todayShift.end_time)}`
+          : (availabilityStatus === 'available' ? 'On active clinical duty' : (availabilityStatus === 'on_break' ? 'Temporarily on break' : 'Off duty today'));
+
         actionsHtml = `
           <div class="staff-card-actions">
             <div class="staff-card-footer-info">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Status updated by staff member
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 16 14" />
+              </svg>
+              <span>${shiftInfo}</span>
             </div>
           </div>
         `;
@@ -350,7 +416,7 @@ export function renderScheduleDoctors(staffList, user) {
               <div class="staff-card-email" title="${email}">${email}</div>
             </div>
           </div>
-          <span class="station-status-pill status-${availabilityStatus}">
+          <span class="station-status-pill status-${availabilityStatus} ${availabilityStatus === 'on_break' ? 'status-break' : ''}">
             <span class="pill-dot"></span>
             ${statusLabel}
           </span>
@@ -374,6 +440,7 @@ export function renderScheduleDoctors(staffList, user) {
 
   swapContainer(doctorGrid, buildCards(doctors, true, 'No registered doctor accounts found.'));
   swapContainer(nurseGrid, buildCards(nurses, false, 'No registered nurse accounts found.'));
+  updateScheduleSummaryCounts(staffList);
 }
 
 export function renderSchedules(schedules, user, doctors = []) {
@@ -521,15 +588,31 @@ export async function loadSchedules(user) {
   if (doctorGrid) renderCardsSkeleton(doctorGrid, 2);
   if (nurseGrid) renderCardsSkeleton(nurseGrid, 2);
 
+  if (cachedScheduleStaff && cachedScheduleStaff.length > 0) {
+    updateScheduleSummaryCounts(cachedScheduleStaff);
+  }
+
   let schedules = [];
   let staffRoster = [];
   let doctors = [];
 
   try {
     const staffRpc = await supabase.rpc('list_staff_accounts');
-    const staff = !staffRpc.error
+    let staff = !staffRpc.error
       ? (Array.isArray(staffRpc.data) ? staffRpc.data : [])
       : [];
+
+    if (!staff.length) {
+      try {
+        const fallback = await staffService.listStaff();
+        if (Array.isArray(fallback) && fallback.length) {
+          staff = fallback;
+        }
+      } catch (fallbackErr) {
+        console.warn('Fallback staff fetch failed:', fallbackErr);
+      }
+    }
+
     staffRoster = staff;
     doctors = staffRoster.filter((item) => isDoctorRole(item?.role));
 
@@ -555,6 +638,7 @@ export async function loadSchedules(user) {
   cachedScheduleStaff = Array.isArray(staffRoster) ? staffRoster.filter((item) => isScheduleRole(item?.role)) : [];
   cachedScheduleDoctors = Array.isArray(doctors) ? [...doctors] : [];
 
+  updateScheduleSummaryCounts(cachedScheduleStaff);
   populateScheduleDoctorSelect();
   renderScheduleDoctors(cachedScheduleStaff, user);
   renderSchedules(schedules, user, cachedScheduleDoctors);

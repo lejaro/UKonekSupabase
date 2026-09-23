@@ -105,38 +105,104 @@ export function toggleChartSkeleton(chartCanvasId, isLoading) {
   const canvas = document.getElementById(chartCanvasId);
   if (!canvas) return;
 
-  let wrapper = canvas.parentElement.querySelector('.skeleton-chart-wrapper');
+  const parent = canvas.parentElement;
+  if (!parent) return;
+
+  let wrapper = parent.querySelector('.skeleton-chart-wrapper');
 
   if (isLoading) {
     if (!wrapper) {
       wrapper = document.createElement('div');
       wrapper.className = 'skeleton-chart-wrapper';
 
-      const isCircular = chartCanvasId === 'dashboard-chart' || chartCanvasId === 'diagnoses-chart';
-      if (isCircular) {
-        wrapper.style.cssText = 'width:100%; height:240px; max-height:240px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; position:relative; overflow:hidden;';
+      const idLower = String(chartCanvasId).toLowerCase();
+      const isLine = idLower.includes('volume') || idLower.includes('trend') || idLower.includes('line');
+      const isCircular = idLower.includes('pie') || idLower.includes('donut') || idLower.includes('priority');
+
+      if (isLine) {
         wrapper.innerHTML = `
-          <div class="skeleton-shimmer" style="width: 140px; height: 140px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 4px 12px rgba(15,23,42,0.03);">
-            <div style="width: 82px; height: 82px; border-radius: 50%; background: #ffffff; box-shadow: inset 0 2px 6px rgba(15,23,42,0.06); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2;">
-              <div class="skeleton-shimmer" style="width: 28px; height: 12px; border-radius: 3px; margin-bottom: 4px;"></div>
-              <div class="skeleton-shimmer" style="width: 36px; height: 8px; border-radius: 2px;"></div>
+          <div class="skeleton-line-chart">
+            <div class="skeleton-grid-lines">
+              <div class="skeleton-grid-line"></div>
+              <div class="skeleton-grid-line"></div>
+              <div class="skeleton-grid-line"></div>
+            </div>
+            <svg class="skeleton-line-svg" viewBox="0 0 500 120" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="skel-line-grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.18" />
+                  <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.01" />
+                </linearGradient>
+              </defs>
+              <path d="M0,95 C70,75 130,105 210,50 C290,15 370,70 500,32 L500,120 L0,120 Z" fill="url(#skel-line-grad)" />
+              <path d="M0,95 C70,75 130,105 210,50 C290,15 370,70 500,32" fill="none" stroke="#93c5fd" stroke-width="2.5" stroke-linecap="round" />
+            </svg>
+            <div class="skeleton-x-axis">
+              <span class="skeleton-shimmer skeleton-axis-tick"></span>
+              <span class="skeleton-shimmer skeleton-axis-tick"></span>
+              <span class="skeleton-shimmer skeleton-axis-tick"></span>
+              <span class="skeleton-shimmer skeleton-axis-tick"></span>
+              <span class="skeleton-shimmer skeleton-axis-tick"></span>
+              <span class="skeleton-shimmer skeleton-axis-tick"></span>
+              <span class="skeleton-shimmer skeleton-axis-tick"></span>
+            </div>
+          </div>
+        `;
+      } else if (isCircular) {
+        wrapper.innerHTML = `
+          <div class="skeleton-donut-chart">
+            <div class="skeleton-donut-ring skeleton-shimmer"></div>
+            <div class="skeleton-donut-legend">
+              <div class="skeleton-donut-legend-item">
+                <span class="skeleton-legend-dot" style="background:#3b82f6;"></span>
+                <span class="skeleton-shimmer skeleton-legend-text" style="width:46px;"></span>
+              </div>
+              <div class="skeleton-donut-legend-item">
+                <span class="skeleton-legend-dot" style="background:#10b981;"></span>
+                <span class="skeleton-shimmer skeleton-legend-text" style="width:62px;"></span>
+              </div>
+              <div class="skeleton-donut-legend-item">
+                <span class="skeleton-legend-dot" style="background:#f59e0b;"></span>
+                <span class="skeleton-shimmer skeleton-legend-text" style="width:38px;"></span>
+              </div>
+              <div class="skeleton-donut-legend-item">
+                <span class="skeleton-legend-dot" style="background:#8b5cf6;"></span>
+                <span class="skeleton-shimmer skeleton-legend-text" style="width:50px;"></span>
+              </div>
             </div>
           </div>
         `;
       } else {
-        wrapper.style.cssText = 'width:100%; height:240px; max-height:240px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; position:relative; overflow:hidden;';
+        // Bar Chart
         wrapper.innerHTML = `
-          <div style="display:flex;align-items:flex-end;gap:12px;height:140px;width:80%;justify-content:center;">
-            <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 40%; width: 24px; height: 40px; border-radius: 4px 4px 0 0;"></div>
-            <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 70%; width: 24px; height: 75px; border-radius: 4px 4px 0 0;"></div>
-            <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 50%; width: 24px; height: 55px; border-radius: 4px 4px 0 0;"></div>
-            <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 90%; width: 24px; height: 95px; border-radius: 4px 4px 0 0;"></div>
-            <div class="skeleton-shimmer skeleton-chart-bar" style="--h: 60%; width: 24px; height: 65px; border-radius: 4px 4px 0 0;"></div>
+          <div class="skeleton-bar-chart">
+            <div class="skeleton-bars-row">
+              <div class="skeleton-bar-group">
+                <div class="skeleton-shimmer skeleton-bar-column" style="height: 46%;"></div>
+                <span class="skeleton-shimmer skeleton-axis-tick"></span>
+              </div>
+              <div class="skeleton-bar-group">
+                <div class="skeleton-shimmer skeleton-bar-column" style="height: 82%;"></div>
+                <span class="skeleton-shimmer skeleton-axis-tick"></span>
+              </div>
+              <div class="skeleton-bar-group">
+                <div class="skeleton-shimmer skeleton-bar-column" style="height: 58%;"></div>
+                <span class="skeleton-shimmer skeleton-axis-tick"></span>
+              </div>
+              <div class="skeleton-bar-group">
+                <div class="skeleton-shimmer skeleton-bar-column" style="height: 92%;"></div>
+                <span class="skeleton-shimmer skeleton-axis-tick"></span>
+              </div>
+              <div class="skeleton-bar-group">
+                <div class="skeleton-shimmer skeleton-bar-column" style="height: 36%;"></div>
+                <span class="skeleton-shimmer skeleton-axis-tick"></span>
+              </div>
+            </div>
           </div>
         `;
       }
       canvas.style.display = 'none';
-      canvas.parentElement.appendChild(wrapper);
+      parent.appendChild(wrapper);
     }
   } else {
     if (wrapper) {
