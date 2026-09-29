@@ -35,7 +35,8 @@ import {
 } from './controllers/navigationController.js';
 import {
   initTelemetryController,
-  refreshAdminDashboard
+  refreshAdminDashboard,
+  bindLaunchpadActions
 } from './controllers/telemetryController.js';
 import {
   initScheduleController,
@@ -219,7 +220,10 @@ async function bootstrapDashboard() {
 
     // 2. Register lifecycle hooks for navigation transitions
     registerSectionHooks({
-      'dashboard-section': () => refreshAdminDashboard(),
+      'dashboard-section': () => {
+        refreshAdminDashboard();
+        bindLaunchpadActions();
+      },
       'queue-section': () => loadQueueTickets(),
       'schedule-section': () => loadDoctorSchedules(),
       'consultation-section': () => {

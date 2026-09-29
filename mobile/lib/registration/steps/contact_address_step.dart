@@ -74,9 +74,10 @@ class uKonekContactStep extends StatelessWidget {
                 _sectionSubLabel('Home Address'),
                 const SizedBox(height: 12),
                 _inputField(
-                    houseNumber, 'House Number', Icons.home_outlined),
+                    houseNumber, 'House / Bldg No. (Optional)', Icons.home_outlined,
+                    isRequired: false),
                 _inputField(
-                    street, 'Street Name', Icons.signpost_outlined),
+                    street, 'Street Name / Purok', Icons.signpost_outlined),
                 _barangayDropdown(), // Integrated Valenzuela Barangay Dropdown[cite: 1]
               ],
             ),
@@ -175,8 +176,7 @@ class uKonekContactStep extends StatelessWidget {
         controller: ctrl,
         keyboardType: TextInputType.phone,
         inputFormatters: [
-          FilteringTextInputFormatter.digitsOnly,
-          LengthLimitingTextInputFormatter(10),
+          _PhilippinePhoneFormatter(),
         ],
         style: const TextStyle(
           fontSize: 14,
@@ -212,11 +212,15 @@ class uKonekContactStep extends StatelessWidget {
           ),
         ),
         validator: (v) {
-          if (v == null || v.length != 10) {
-            return 'Enter 10-digit number';
+          final trimmed = v?.trim() ?? '';
+          if (trimmed.isEmpty) {
+            return 'Mobile number is required';
+          }
+          if (trimmed.length != 10 || !trimmed.startsWith('9')) {
+            return 'Enter 10 digits starting with 9 (e.g. 9123456789)';
           }
           if (customValidator != null) {
-            return customValidator(v);
+            return customValidator(trimmed);
           }
           return null;
         },
@@ -225,7 +229,7 @@ class uKonekContactStep extends StatelessWidget {
   }
 
   Widget _inputField(TextEditingController ctrl, String label, IconData icon,
-      {bool isEmail = false, bool enabled = true}) {
+      {bool isEmail = false, bool enabled = true, bool isRequired = true}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
@@ -235,8 +239,9 @@ class uKonekContactStep extends StatelessWidget {
             fontSize: 14, color: enabled ? _textDark : _textMuted),
         decoration: _decoration(label, icon),
         validator: (v) {
-          if (v == null || v.trim().isEmpty) return 'Required';
-          if (isEmail && (!v.contains('@') || !v.contains('.'))) {
+          final trimmed = v?.trim() ?? '';
+          if (isRequired && trimmed.isEmpty) return 'Required';
+          if (isEmail && trimmed.isNotEmpty && (!trimmed.contains('@') || !trimmed.contains('.'))) {
             return 'Invalid email';
           }
           return null;
@@ -335,6 +340,31 @@ class uKonekContactStep extends StatelessWidget {
       errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Colors.redAccent)),
+    );
+  }
+}
+
+/// Automatically handles Philippine mobile input by stripping leading '0' or '+63'
+/// and constraining length to 10 digits starting with 9.
+class _PhilippinePhoneFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    String text = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (text.startsWith('63') && text.length > 2) {
+      text = text.substring(2);
+    }
+    if (text.startsWith('0')) {
+      text = text.substring(1);
+    }
+    if (text.length > 10) {
+      text = text.substring(0, 10);
+    }
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }

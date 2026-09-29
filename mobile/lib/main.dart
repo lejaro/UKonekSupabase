@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:video_player/video_player.dart';
 import 'menu_page.dart';
 import 'main_shell_page.dart';
 import 'change_password_page.dart';
@@ -185,12 +187,109 @@ class RootHandler extends StatefulWidget {
 }
 
 class _RootHandlerState extends State<RootHandler> {
+  VideoPlayerController? _controller;
+  bool _isVideoInitialized = false;
+  bool _videoFinished = false;
+  bool _hasNavigated = false;
+  Widget? _targetPage;
+  Timer? _fallbackTimer;
+
   @override
   void initState() {
     super.initState();
+
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ));
+
+    _initVideo();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkSession();
     });
+
+    // Safety fallback timer: guarantee navigation within 5.5 seconds max
+    _fallbackTimer = Timer(const Duration(milliseconds: 5500), () {
+      if (mounted && !_hasNavigated) {
+        debugPrint('RootHandler: Fallback timer triggered.');
+        _videoFinished = true;
+        if (_targetPage != null) {
+          _performNavigation(_targetPage!);
+        }
+      }
+    });
+  }
+
+  Future<void> _initVideo() async {
+    try {
+      final controller = VideoPlayerController.asset('assets/videos/splashintro.mp4');
+      _controller = controller;
+
+      await controller.initialize();
+      if (!mounted) return;
+
+      controller.setLooping(false);
+      controller.addListener(_onVideoProgress);
+
+      setState(() {
+        _isVideoInitialized = true;
+      });
+
+      await controller.play();
+    } catch (e) {
+      debugPrint('RootHandler: Error loading splash video: $e');
+      if (mounted) {
+        _videoFinished = true;
+        if (_targetPage != null) {
+          _performNavigation(_targetPage!);
+        }
+      }
+    }
+  }
+
+  void _onVideoProgress() {
+    if (!mounted || _hasNavigated || _videoFinished) return;
+
+    final controller = _controller;
+    if (controller != null && controller.value.isInitialized) {
+      final value = controller.value;
+      final isNearEnd = value.duration > Duration.zero &&
+          value.position >= (value.duration - const Duration(milliseconds: 150));
+      final isEnded = !value.isPlaying &&
+          value.position > Duration.zero &&
+          value.position >= (value.duration - const Duration(milliseconds: 400));
+
+      if (isNearEnd || isEnded) {
+        _videoFinished = true;
+        if (_targetPage != null) {
+          _performNavigation(_targetPage!);
+        }
+      }
+    }
+  }
+
+  void _skipIntro() {
+    if (_hasNavigated) return;
+    _videoFinished = true;
+    if (_targetPage != null) {
+      _performNavigation(_targetPage!);
+    } else {
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _performNavigation(Widget page) {
+    if (_hasNavigated || !mounted) return;
+    _hasNavigated = true;
+    _fallbackTimer?.cancel();
+    _controller?.removeListener(_onVideoProgress);
+
+    Navigator.of(context).pushReplacement(
+      AppPageRoute.fadeThrough(page),
+    );
   }
 
   Future<void> _checkSession() async {
@@ -220,6 +319,8 @@ class _RootHandlerState extends State<RootHandler> {
 
     debugPrint('RootHandler: Checking session... ${session != null ? "Supabase OK" : "No Supabase"} | Token: ${sessionToken != null ? "Present" : "Missing"}');
 
+    Widget resolvedPage;
+
     if (session == null || sessionToken == null) {
       PatientSessionState.clearSession();
       if (session != null) {
@@ -227,56 +328,155 @@ class _RootHandlerState extends State<RootHandler> {
         debugPrint('RootHandler: Session mismatch, clearing Supabase session.');
         await ApiService.signOut();
       }
-      _navigate(const uKonekMenuPage());
-      return;
+      resolvedPage = const uKonekMenuPage();
+    } else {
+      try {
+        debugPrint('RootHandler: Fetching profile for user ${session.user.id}...');
+        final profile = await ApiService.fetchMyCitizenProfile();
+        debugPrint('RootHandler: Profile fetched successfully.');
+
+        final patientSession = PatientSession.fromProfile(profile);
+        PatientSessionState.setSession(patientSession);
+
+        final displayName = profile['username'] ?? session.user.email ?? 'User';
+
+        resolvedPage = uKonekMainShellPage(
+          username: displayName,
+          citizenId: profile['id'].toString(),
+          fullname: '${profile['firstname']} ${profile['surname']}',
+          email: profile['email'] ?? '',
+          phone: profile['contact_number'] ?? '',
+          address: profile['complete_address'] ?? '',
+        );
+      } catch (e) {
+        debugPrint('RootHandler: Error fetching profile: $e');
+        PatientSessionState.clearSession();
+        // If error (e.g. profile missing), clear session and go to onboarding
+        try {
+          await ApiService.signOut();
+        } catch (signOutError) {
+          debugPrint('RootHandler: SignOut error: $signOutError');
+        }
+        resolvedPage = const uKonekMenuPage();
+      }
     }
 
-    try {
-      debugPrint('RootHandler: Fetching profile for user ${session.user.id}...');
-      final profile = await ApiService.fetchMyCitizenProfile();
-      debugPrint('RootHandler: Profile fetched successfully.');
+    if (!mounted) return;
 
-      final patientSession = PatientSession.fromProfile(profile);
-      PatientSessionState.setSession(patientSession);
+    _targetPage = resolvedPage;
 
-      final displayName = profile['username'] ?? session.user.email ?? 'User';
-
-      _navigate(uKonekMainShellPage(
-        username: displayName,
-        citizenId: profile['id'].toString(),
-        fullname: '${profile['firstname']} ${profile['surname']}',
-        email: profile['email'] ?? '',
-        phone: profile['contact_number'] ?? '',
-        address: profile['complete_address'] ?? '',
-      ));
-    } catch (e) {
-      debugPrint('RootHandler: Error fetching profile: $e');
-      PatientSessionState.clearSession();
-      // If error (e.g. profile missing), clear session and go to onboarding
-      try {
-        await ApiService.signOut();
-      } catch (signOutError) {
-        debugPrint('RootHandler: SignOut error: $signOutError');
-      }
-      _navigate(const uKonekMenuPage());
+    // If the video already finished playing or was skipped, navigate now
+    if (_videoFinished) {
+      _performNavigation(_targetPage!);
     }
   }
 
-  void _navigate(Widget page) {
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      AppPageRoute.fadeThrough(page),
-    );
+  @override
+  void dispose() {
+    _fallbackTimer?.cancel();
+    _controller?.removeListener(_onVideoProgress);
+    _controller?.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF059669)),
+    final controller = _controller;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: GestureDetector(
+        onTap: _skipIntro,
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Center video
+            if (_isVideoInitialized && controller != null)
+              Center(
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: SizedBox(
+                    width: controller.value.size.width,
+                    height: controller.value.size.height,
+                    child: VideoPlayer(controller),
+                  ),
+                ),
+              ),
+
+            // Subtle Skip button
+            Positioned(
+              top: 12,
+              right: 16,
+              child: SafeArea(
+                child: AnimatedOpacity(
+                  opacity: _isVideoInitialized ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _skipIntro,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Skip',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 11,
+                              color: Colors.grey.shade700,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Subtle spinner if user skipped or video finished but network auth is still loading
+            if (_videoFinished && _targetPage == null)
+              Positioned(
+                bottom: 48,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        const Color(0xFF059669).withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 }
+

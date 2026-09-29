@@ -9,7 +9,7 @@ import { sessionStore } from '../services/sessionStore.js';
 import * as staffService from '../services/staffService.js';
 import { showToast, renderTableSkeleton, swapContainer } from '../utils/uiHelpers.js';
 import { attachDetailRow, openDataDetail, sanitizeText, formatDetailValue } from '../utils/dataDetailModal.js';
-import { openDialogModal, toTitleCase, navigateToSection } from './navigationController.js';
+import { openDialogModal, toTitleCase, navigateToSection, getDisplayFullName, getInitials } from './navigationController.js';
 import { updateRegisteredCitizensMetric } from './telemetryController.js';
 import { cleanNone, formatPhysicalExam } from '../utils/clinicalFormatters.js';
 
@@ -80,8 +80,8 @@ export async function loadStaffData() {
         const roleValue = user.role ? String(user.role).toLowerCase() : 'staff';
         const roleLabel = roleValue.charAt(0).toUpperCase() + roleValue.slice(1);
 
-        const initials = (user.username || 'ST').substring(0, 2).toUpperCase();
-        const fullName = [user.firstname || user.first_name, user.surname || user.last_name].filter(Boolean).join(' ') || user.username || 'Medical Staff';
+        const fullName = getDisplayFullName(user);
+        const initials = getInitials(fullName);
         const isSelf = isSelfUser(user);
         const youBadge = isSelf
           ? ` <span class="self-account-badge" style="display:inline-flex; align-items:center; gap:3px; font-size:10.5px; font-weight:700; color:#059669; background:#ecfdf5; border:1px solid #a7f3d0; padding:1px 7px; border-radius:9999px; margin-left:4px; vertical-align:middle;">You</span>`
@@ -711,6 +711,24 @@ export function initUsersSection() {
 
       if (!first_name || !last_name || !username || !email || !role || !password) {
         showToast('Please fill in all required registration fields.', 'error');
+        return;
+      }
+
+      // Email validation guard rail
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailPattern.test(email)) {
+        showToast('Please enter a valid email address.', 'error');
+        const emailErr = document.getElementById('err-reg-email');
+        if (emailErr) emailErr.classList.remove('hidden');
+        return;
+      } else {
+        const emailErr = document.getElementById('err-reg-email');
+        if (emailErr) emailErr.classList.add('hidden');
+      }
+
+      // Password strength guard rail
+      if (password.length < 8) {
+        showToast('Password must be at least 8 characters long.', 'error');
         return;
       }
 

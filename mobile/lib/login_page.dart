@@ -311,8 +311,12 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
               icon: Icons.person_outline_rounded,
               enabled: !_isLocked,
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Email is required';
-                if (!v.contains('@') || !v.contains('.')) return 'Enter a valid email address';
+                final trimmed = v?.trim() ?? '';
+                if (trimmed.isEmpty) return 'Email is required';
+                if (!trimmed.contains('@')) return 'Please sign in with your email address';
+                if (!RegExp(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$').hasMatch(trimmed)) {
+                  return 'Enter a valid email address';
+                }
                 return null;
               },
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'login_page.dart';
 import 'services/api_service.dart';
@@ -62,10 +63,11 @@ class _uKonekCredentialsPageState
     final p = passwordController.text;
     if (p.isEmpty) return 0;
     int score = 0;
-    if (p.length >= 8)                              score++;
-    if (p.contains(RegExp(r'[A-Z]')))              score++;
-    if (p.contains(RegExp(r'[0-9]')))              score++;
-    if (p.contains(RegExp(r'[!@#\$&*~]')))        score++;
+    if (p.length >= 8) score++;
+    if (p.contains(RegExp(r'[A-Z]'))) score++;
+    if (p.contains(RegExp(r'[0-9]'))) score++;
+    // Allow any standard symbol / punctuation
+    if (p.contains(RegExp(r'[^a-zA-Z0-9\s]'))) score++;
     return score;
   }
 
@@ -166,6 +168,12 @@ class _uKonekCredentialsPageState
 
   Future<void> _submitRegistration() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (passwordController.text != confirmPasswordController.text) {
+      _snackBar('Passwords do not match. Please verify your password.', Colors.redAccent);
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -174,9 +182,13 @@ class _uKonekCredentialsPageState
         throw Exception('Invalid birth date format. Please go back and select your date again.');
       }
 
+      final cleanSurname = widget.nameExtension.trim().isNotEmpty
+          ? '${widget.surname.trim()} ${widget.nameExtension.trim()}'
+          : widget.surname.trim();
+
       await ApiService.completeCitizenRegistration(payload: {
         'firstname': widget.firstName.trim(),
-        'surname': widget.surname.trim(),
+        'surname': cleanSurname,
         'middle_initial': widget.middleName.trim(),
         'date_of_birth': dateOfBirth,
         'age': int.tryParse(widget.age.trim()) ?? 0,
@@ -240,15 +252,13 @@ class _uKonekCredentialsPageState
                       )],
                     ),
                     child: Column(children: [
-                      _inputField('Username',
-                          usernameController,
-                          Icons.alternate_email_rounded),
+                      _usernameField(usernameController),
                       _passwordField(
                         'Password',
                         passwordController,
                         _obscurePassword,
-                            () => setState(() =>
-                        _obscurePassword = !_obscurePassword),
+                        () => setState(() =>
+                            _obscurePassword = !_obscurePassword),
                       ),
                       // Strength bar
                       if (passwordController.text.isNotEmpty)
@@ -286,8 +296,9 @@ class _uKonekCredentialsPageState
                         'Confirm Password',
                         confirmPasswordController,
                         _obscureConfirm,
-                            () => setState(() =>
-                        _obscureConfirm = !_obscureConfirm),
+                        () => setState(() =>
+                            _obscureConfirm = !_obscureConfirm),
+                        isConfirm: true,
                       ),
                     ]),
                   ),
@@ -464,24 +475,37 @@ class _uKonekCredentialsPageState
     );
   }
 
-  Widget _inputField(String label, TextEditingController ctrl,
-      IconData icon) {
+  Widget _usernameField(TextEditingController ctrl) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: ctrl,
         style: const TextStyle(fontSize: 14, color: _textDark),
-        decoration: _decoration(label, icon),
-        validator: (v) => (v == null || v.isEmpty)
-            ? 'Field required'
-            : null,
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9_.]')),
+          LengthLimitingTextInputFormatter(30),
+        ],
+        decoration: _decoration('Username', Icons.alternate_email_rounded).copyWith(
+          helperText: 'Used for clinic profile. Sign in will use your verified email.',
+          helperStyle: const TextStyle(fontSize: 11, color: _textMuted),
+        ),
+        validator: (v) {
+          final trimmed = v?.trim() ?? '';
+          if (trimmed.isEmpty) return 'Username is required';
+          if (trimmed.length < 4) return 'Min. 4 characters';
+          if (!RegExp(r'^[a-zA-Z0-9_.]+$').hasMatch(trimmed)) {
+            return 'Only letters, numbers, underscores, and dots';
+          }
+          return null;
+        },
       ),
     );
   }
 
+
   Widget _passwordField(String label,
       TextEditingController ctrl, bool obscure,
-      VoidCallback toggle) {
+      VoidCallback toggle, {bool isConfirm = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
@@ -504,10 +528,19 @@ class _uKonekCredentialsPageState
           ),
         ),
         validator: (v) {
-          if (v == null || v.isEmpty) return 'Password is required';
-          if (v.length < 8) return 'Min. 8 characters';
-          if (!v.contains(RegExp(r'[A-Z]'))) return 'Add at least one uppercase letter';
-          if (!v.contains(RegExp(r'[0-9]'))) return 'Add at least one number';
+          if (v == null || v.isEmpty) {
+            return isConfirm ? 'Please confirm your password' : 'Password is required';
+          }
+          if (isConfirm) {
+            if (v != passwordController.text) {
+              return 'Passwords do not match';
+            }
+          } else {
+            if (v.length < 8) return 'Min. 8 characters';
+            if (!v.contains(RegExp(r'[A-Z]'))) return 'Add at least one uppercase letter';
+            if (!v.contains(RegExp(r'[0-9]'))) return 'Add at least one number';
+            if (!v.contains(RegExp(r'[^a-zA-Z0-9\s]'))) return 'Add at least one symbol';
+          }
           return null;
         },
       ),
@@ -577,10 +610,10 @@ class _uKonekCredentialsPageState
                 color: _textDark,
               )),
           const SizedBox(height: 10),
-          const Text(
-              'Your email is verified and your profile is complete. You can now sign in.',
+          Text(
+              'Your email is verified and your profile is complete!\n\nPlease sign in with your email address:\n${widget.email}',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13,
                 color: _textMuted,
                 height: 1.5,
@@ -597,11 +630,17 @@ class _uKonekCredentialsPageState
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              onPressed: () => Navigator.pushAndRemoveUntil(
-                context,
-                AppPageRoute.fadeThrough(const uKonekLoginPage()),
-                (route) => false,
-              ),
+              onPressed: () async {
+                try {
+                  await ApiService.signOut();
+                } catch (_) {}
+                if (!mounted) return;
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  AppPageRoute.fadeThrough(const uKonekLoginPage()),
+                  (route) => false,
+                );
+              },
               child: const Text('GO TO SIGN IN',
                   style: TextStyle(
                     color: Colors.white,

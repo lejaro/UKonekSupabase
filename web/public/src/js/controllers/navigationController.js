@@ -22,11 +22,11 @@ export const SECTION_ROLE_RULES = {
   'feedback-section': ['admin', 'doctor', 'nurse'],
   'stats-section': ['admin', 'doctor', 'nurse'],
   'reports-section': ['admin', 'doctor', 'nurse'],
-  'medicine-section': ['doctor', 'nurse', 'pharmacist'],
-  'consultation-section': ['doctor', 'nurse', 'pharmacist'],
+  'medicine-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
+  'consultation-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
   'schedule-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
-  'vitals-section': ['doctor', 'nurse', 'pharmacist'],
-  'queue-section': ['doctor', 'nurse', 'pharmacist'],
+  'vitals-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
+  'queue-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
   'profile-section': ['admin', 'doctor', 'nurse', 'pharmacist'],
   'security-section': ['admin', 'doctor', 'nurse', 'pharmacist']
 };
@@ -132,12 +132,68 @@ export function toTitleCase(value) {
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
-export function getDisplayFirstName(user) {
-  const preferred = user?.first_name || user?.firstName || user?.firstname;
-  if (preferred && String(preferred).trim()) {
-    return String(preferred).trim();
+export function parseNameParts(fullName) {
+  const trimmed = String(fullName || '').trim();
+  if (!trimmed) return { firstName: '', lastName: '' };
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: '' };
   }
-  return String(user?.username || '').trim() || 'User';
+
+  if (parts.length > 2 && /^dr\.?$/i.test(parts[0])) {
+    const lastName = parts.pop();
+    const firstName = parts.join(' ');
+    return { firstName, lastName };
+  }
+
+  const lastName = parts.pop();
+  const firstName = parts.join(' ');
+  return { firstName, lastName };
+}
+
+export function getDisplayFullName(user) {
+  if (!user) return 'Clinical Personnel';
+  const first = String(user.first_name || user.firstName || user.firstname || '').trim();
+  const last = String(user.last_name || user.lastName || user.surname || '').trim();
+
+  if (first && last) {
+    if (first.toLowerCase() === last.toLowerCase()) {
+      return first;
+    }
+    if (first.toLowerCase().endsWith(last.toLowerCase())) {
+      return first;
+    }
+    return `${first} ${last}`;
+  }
+  return first || last || user.username || (user.email ? user.email.split('@')[0] : 'Clinical Personnel');
+}
+
+export function getDisplayFirstName(user) {
+  const preferred = String(user?.first_name || user?.firstName || user?.firstname || '').trim();
+  if (preferred) {
+    const parts = preferred.split(/\s+/);
+    if (parts.length > 1 && /^dr\.?$/i.test(parts[0])) {
+      return `${parts[0]} ${parts[1]}`;
+    }
+    return parts[0];
+  }
+  return String(user?.username || (user?.email ? user.email.split('@')[0] : 'User')).trim();
+}
+
+export function getInitials(fullName) {
+  const raw = String(fullName || '').trim();
+  if (!raw) return 'MD';
+
+  const cleaned = raw
+    .replace(/^(dr\.?|doctor|atty\.?|rn|md)\s+/i, '')
+    .replace(/,\s*(md|rn|fpa|fpcp|fpcr)$/i, '')
+    .trim();
+
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'MD';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 export function getRoleLogoConfig(roleValue) {
@@ -243,8 +299,7 @@ export function applyRoleAccess(user) {
 
   const fullNameNodes = document.querySelectorAll('.user-name-full');
   fullNameNodes.forEach(node => {
-    const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || 'Clinical Personnel';
-    node.textContent = fullName;
+    node.textContent = getDisplayFullName(user);
   });
 
   const userRoleNodes = document.querySelectorAll('.user-pos');
@@ -273,16 +328,30 @@ export function populateProfile(user) {
   const email = document.getElementById('profile-email');
   const role = document.getElementById('profile-role');
   const empIdInput = document.getElementById('profile-employee-id');
+  const usernameInput = document.getElementById('profile-username');
+  const specInput = document.getElementById('profile-specialization');
+  const specWrap = document.getElementById('profile-specialization-wrap');
 
-  const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || 'Clinician';
+  const fullDisplayName = getDisplayFullName(user);
   const displayEmail = user.email || 'clinician@ukonek.local';
   const displayRole = user.role || 'nurse';
   const displayEmpId = user.employee_id || (user.id ? `STF-${String(user.id).slice(0, 6).toUpperCase()}` : 'STF-01');
+  const displayUsername = user.username || (user.email ? user.email.split('@')[0] : '');
+  const displaySpec = user.doctor_specialization || '';
 
-  if (name) name.value = displayName;
+  if (name) name.value = fullDisplayName;
   if (email) email.value = displayEmail;
   if (role) role.value = toTitleCase(displayRole);
   if (empIdInput) empIdInput.value = displayEmpId;
+  if (usernameInput) usernameInput.value = displayUsername;
+
+  const isDoc = isDoctorRole(displayRole);
+  if (specWrap) {
+    specWrap.style.display = isDoc ? 'block' : 'none';
+  }
+  if (specInput) {
+    specInput.value = displaySpec;
+  }
 
   const heroName = document.getElementById('profile-hero-name');
   const heroAvatar = document.getElementById('profile-hero-avatar');
@@ -291,19 +360,14 @@ export function populateProfile(user) {
   const heroEmpId = document.getElementById('profile-hero-emp-id');
   const scopeDisplay = document.getElementById('profile-scope-display');
 
-  if (heroName) heroName.textContent = displayName;
+  if (heroName) heroName.textContent = fullDisplayName;
   if (heroAvatar) {
-    const initials = displayName
-      .split(' ')
-      .filter(Boolean)
-      .map((w) => w[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase() || 'MD';
-    heroAvatar.textContent = initials;
+    heroAvatar.textContent = getInitials(fullDisplayName);
   }
   if (heroRole) {
-    heroRole.textContent = displayRole === 'doctor' ? 'Attending Physician' : toTitleCase(displayRole);
+    heroRole.textContent = displayRole === 'doctor'
+      ? (displaySpec ? `Attending Physician • ${displaySpec}` : 'Attending Physician')
+      : toTitleCase(displayRole);
     heroRole.className = `staff-role-badge role-${displayRole}`;
   }
   if (heroEmail) heroEmail.textContent = displayEmail;
@@ -414,8 +478,16 @@ export function getDoctorDisplayName(doctor) {
   if (!doctor) return 'Doctor';
   const first = String(doctor.first_name || doctor.firstname || '').trim();
   const last = String(doctor.last_name || doctor.surname || '').trim();
-  const full = `${first} ${last}`.trim();
-  return full || doctor.username || 'Doctor';
+  if (first && last) {
+    if (first.toLowerCase() === last.toLowerCase()) {
+      return first;
+    }
+    if (first.toLowerCase().endsWith(last.toLowerCase())) {
+      return first;
+    }
+    return `${first} ${last}`;
+  }
+  return first || last || doctor.username || 'Doctor';
 }
 
 export function showSection(sectionId, options = {}) {
@@ -814,6 +886,7 @@ export function initProfileHandlers() {
 
   // Update password button handler
   const updatePasswordBtn = document.getElementById('profile-update-password-btn');
+  const updatePasswordBtnText = document.getElementById('profile-update-password-btn-text');
   if (updatePasswordBtn) {
     updatePasswordBtn.addEventListener('click', async (e) => {
       e.preventDefault();
@@ -822,15 +895,24 @@ export function initProfileHandlers() {
 
       if (!newPwd || newPwd.length < 8) {
         showToast('Password must be at least 8 characters in length.', 'error');
+        newPasswordInput?.focus();
+        return;
+      }
+      if (!/[A-Za-z]/.test(newPwd) || !/[0-9]/.test(newPwd)) {
+        showToast('Password must contain both letters and numbers.', 'error');
+        newPasswordInput?.focus();
         return;
       }
       if (newPwd !== confirmPwd) {
         showToast('Passwords do not match. Please verify.', 'error');
+        confirmPasswordInput?.focus();
         return;
       }
 
       try {
         updatePasswordBtn.disabled = true;
+        if (updatePasswordBtnText) updatePasswordBtnText.textContent = 'Updating...';
+
         const { error } = await supabase.auth.updateUser({ password: newPwd });
 
         if (error) {
@@ -842,10 +924,11 @@ export function initProfileHandlers() {
         if (confirmPasswordInput) confirmPasswordInput.value = '';
         updatePasswordValidationUI();
       } catch (err) {
-        console.error('Password update error:', err);
+        console.error('[Profile] Password update error:', err);
         showToast(err?.message || 'Unable to update password.', 'error');
       } finally {
         updatePasswordBtn.disabled = false;
+        if (updatePasswordBtnText) updatePasswordBtnText.textContent = 'Update Password';
       }
     });
   }
@@ -853,49 +936,119 @@ export function initProfileHandlers() {
   // Profile save button handler
   const profileForm = document.getElementById('profile-form');
   const profileSaveBtn = document.getElementById('profile-save-btn');
+  const profileSaveBtnText = document.getElementById('profile-save-btn-text');
   const profileCancelBtn = document.getElementById('profile-cancel-btn');
 
   async function handleProfileSave(e) {
     if (e) e.preventDefault();
     const nameInput = document.getElementById('profile-name');
+    const specInput = document.getElementById('profile-specialization');
     const displayName = String(nameInput?.value || '').trim();
+    const specialization = String(specInput?.value || '').trim();
 
     if (!displayName) {
       showToast('Display name cannot be empty.', 'error');
+      nameInput?.focus();
       return;
     }
 
+    const { firstName, lastName } = parseNameParts(displayName);
+    const currentUser = sessionStore.getUser() || {};
+    const isDoctor = isDoctorRole(currentUser.role);
+
     try {
-      if (profileSaveBtn) profileSaveBtn.disabled = true;
-
-      const { data, error } = await supabase.rpc('update_my_staff_profile', {
-        p_display_name: displayName
-      });
-
-      if (error) {
-        throw new Error(error.message || 'Failed to update profile.');
+      if (profileSaveBtn) {
+        profileSaveBtn.disabled = true;
+        if (profileSaveBtnText) profileSaveBtnText.textContent = 'Saving...';
       }
 
-      if (data?.error) {
-        throw new Error(data.error);
+      let saveSucceeded = false;
+      let returnedProfile = null;
+
+      // 1. Primary method: invoke update_my_staff_profile RPC
+      try {
+        const rpcPayload = {
+          p_display_name: firstName,
+          p_doctor_specialization: isDoctor && specialization ? specialization : null
+        };
+        const { data, error } = await supabase.rpc('update_my_staff_profile', rpcPayload);
+
+        if (!error && !data?.error) {
+          saveSucceeded = true;
+          returnedProfile = data?.profile || null;
+        } else if (data?.error) {
+          console.warn('[Profile] update_my_staff_profile returned note:', data.error);
+        }
+      } catch (rpcErr) {
+        console.warn('[Profile] RPC error, will attempt direct staff table update:', rpcErr);
       }
 
-      // Update current user in session store
-      const currentUser = sessionStore.getUser() || {};
+      // 2. Direct database update fallback if RPC didn't succeed (e.g. local dev, custom role)
+      if (!saveSucceeded) {
+        const updatePayload = {
+          first_name: firstName,
+          last_name: lastName || null,
+          ...(isDoctor ? { doctor_specialization: specialization || null } : {})
+        };
+
+        let query = supabase.from('staff').update(updatePayload);
+        if (currentUser.id) {
+          query = query.eq('id', currentUser.id);
+        } else if (currentUser.email) {
+          query = query.ilike('email', currentUser.email);
+        }
+
+        const { data: directData, error: directErr } = await query.select().maybeSingle();
+        if (directErr) {
+          console.warn('[Profile] Direct staff update warning:', directErr);
+        } else {
+          saveSucceeded = true;
+          returnedProfile = directData || null;
+        }
+      }
+
+      // 3. Keep Supabase Auth user metadata updated in sync
+      try {
+        await supabase.auth.updateUser({
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            full_name: displayName
+          }
+        });
+      } catch (authMetaErr) {
+        console.warn('[Profile] Supabase auth.updateUser metadata sync warning:', authMetaErr);
+      }
+
+      // 4. Update session store with clean name parts so last_name is NEVER duplicated
       const updatedUser = {
         ...currentUser,
-        first_name: displayName,
-        ...(data?.profile || {})
+        first_name: firstName,
+        last_name: lastName,
+        doctor_specialization: isDoctor ? specialization : (currentUser.doctor_specialization || null),
+        ...(returnedProfile || {})
       };
+
+      // Guarantee clean separated names on updatedUser
+      updatedUser.first_name = firstName;
+      updatedUser.last_name = lastName;
+      if (isDoctor) {
+        updatedUser.doctor_specialization = specialization;
+      }
+
       sessionStore.setUser(updatedUser);
       applyRoleAccess(updatedUser);
+      populateProfile(updatedUser);
 
       showToast('Profile updated successfully.', 'success');
     } catch (err) {
-      console.error('Profile save error:', err);
+      console.error('[Profile] Save error:', err);
       showToast(err?.message || 'Failed to save profile.', 'error');
     } finally {
-      if (profileSaveBtn) profileSaveBtn.disabled = false;
+      if (profileSaveBtn) {
+        profileSaveBtn.disabled = false;
+        if (profileSaveBtnText) profileSaveBtnText.textContent = 'Save Changes';
+      }
     }
   }
 

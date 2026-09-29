@@ -227,7 +227,6 @@ export async function loadDashboardAnalyticsData() {
     // 3. Pie Chart Data: Patient Priority
     const priorityCounts = {
       'Regular': 0,
-      'Senior Citizen': 0,
       'PWD': 0,
       'Pregnant': 0
     };
@@ -235,9 +234,7 @@ export async function loadDashboardAnalyticsData() {
     queueTickets.forEach(t => {
       const type = String(t.citizen_type || '').toLowerCase();
       const sLabel = String(t.service_label || '').toLowerCase();
-      if (type === 'senior' || sLabel.includes('senior')) {
-        priorityCounts['Senior Citizen']++;
-      } else if (type === 'pwd' || sLabel.includes('pwd')) {
+      if (type === 'pwd' || sLabel.includes('pwd')) {
         priorityCounts['PWD']++;
       } else if (type === 'pregnant' || sLabel.includes('pregnant')) {
         priorityCounts['Pregnant']++;
@@ -279,13 +276,20 @@ export function renderDashboardInsights() {
 }
 
 function renderVolumeLineChart() {
-  const canvas = document.getElementById('chart-volume-trend');
+  let canvas = document.getElementById('chart-volume-trend');
   if (!canvas) return;
 
   if (activeVolumeLineChart) {
     activeVolumeLineChart.destroy();
     activeVolumeLineChart = null;
   }
+
+  const newCanvas = document.createElement('canvas');
+  newCanvas.id = canvas.id;
+  newCanvas.setAttribute('role', canvas.getAttribute('role') || 'img');
+  newCanvas.setAttribute('aria-label', canvas.getAttribute('aria-label') || '');
+  canvas.replaceWith(newCanvas);
+  canvas = newCanvas;
 
   const { labels, queueCounts, consultCounts } = analyticsDataCache.lineTrend;
   const hasData = (queueCounts && queueCounts.some(c => c > 0)) || (consultCounts && consultCounts.some(c => c > 0));
@@ -375,13 +379,20 @@ function renderVolumeLineChart() {
 }
 
 function renderDiagnosesBarChart() {
-  const canvas = document.getElementById('chart-diagnoses-bar');
+  let canvas = document.getElementById('chart-diagnoses-bar');
   if (!canvas) return;
 
   if (activeDiagnosesBarChart) {
     activeDiagnosesBarChart.destroy();
     activeDiagnosesBarChart = null;
   }
+
+  const newCanvas = document.createElement('canvas');
+  newCanvas.id = canvas.id;
+  newCanvas.setAttribute('role', canvas.getAttribute('role') || 'img');
+  newCanvas.setAttribute('aria-label', canvas.getAttribute('aria-label') || '');
+  canvas.replaceWith(newCanvas);
+  canvas = newCanvas;
 
   const { labels, counts } = analyticsDataCache.topDiagnoses;
   const hasData = labels && labels.length > 0 && counts.some(c => c > 0);
@@ -452,13 +463,20 @@ function renderDiagnosesBarChart() {
 }
 
 function renderPriorityPieChart() {
-  const canvas = document.getElementById('chart-priority-pie');
+  let canvas = document.getElementById('chart-priority-pie');
   if (!canvas) return;
 
   if (activePriorityPieChart) {
     activePriorityPieChart.destroy();
     activePriorityPieChart = null;
   }
+
+  const newCanvas = document.createElement('canvas');
+  newCanvas.id = canvas.id;
+  newCanvas.setAttribute('role', canvas.getAttribute('role') || 'img');
+  newCanvas.setAttribute('aria-label', canvas.getAttribute('aria-label') || '');
+  canvas.replaceWith(newCanvas);
+  canvas = newCanvas;
 
   const { labels, counts } = analyticsDataCache.priorityDist;
   const total = counts ? counts.reduce((a, b) => a + b, 0) : 0;
@@ -469,7 +487,7 @@ function renderPriorityPieChart() {
   const displayLabels = hasData ? labels : ['No queue activity'];
   const displayCounts = hasData ? counts : [1];
   const bgColors = hasData
-    ? ['#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899']
+    ? ['#3b82f6', '#f59e0b', '#8b5cf6']
     : ['#e2e8f0'];
 
   const ctx = canvas.getContext('2d');
@@ -516,6 +534,9 @@ export function startAdminDashboardAutoRefresh() {
   stopAdminDashboardAutoRefresh();
   adminDashboardRefreshTimer = setInterval(async () => {
     if (adminDashboardRefreshInFlight || document.visibilityState === 'hidden') return;
+    const dashSection = document.getElementById('dashboard-section');
+    if (dashSection && dashSection.classList.contains('hidden')) return;
+
     adminDashboardRefreshInFlight = true;
     try {
       await loadClinicalOperationsMetrics();
@@ -534,6 +555,58 @@ export function stopAdminDashboardAutoRefresh() {
   }
 }
 
+export function bindLaunchpadActions() {
+  const launchpadMappings = [
+    { id: 'launchpad-call-queue', section: 'queue-section' },
+    { id: 'launchpad-consultation', section: 'consultation-section' },
+    { id: 'launchpad-vitals', section: 'vitals-section' },
+    { id: 'launchpad-pharmacy', section: 'medicine-section' },
+    { id: 'launchpad-citizens', section: 'users-section', options: { pane: 'citizens-pane' } },
+    { id: 'launchpad-schedule', section: 'schedule-section' }
+  ];
+
+  launchpadMappings.forEach(({ id, section, options }) => {
+    const card = document.getElementById(id);
+    if (!card || card._launchpadBound) return;
+    card._launchpadBound = true;
+
+    const navigate = (e) => {
+      e?.preventDefault();
+      navigateToSection(section, options);
+    };
+
+    card.addEventListener('click', navigate);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        navigate(e);
+      }
+    });
+  });
+
+  // Also bind any launchpad cards with data-section attributes
+  document.querySelectorAll('.launchpad-action-card[data-section]').forEach((card) => {
+    if (card._launchpadBound) return;
+    card._launchpadBound = true;
+
+    const targetSection = card.getAttribute('data-section');
+    const pane = card.getAttribute('data-pane') || card.dataset.pane;
+    const tab = card.getAttribute('data-tab') || card.dataset.tab;
+    const options = { ...(pane ? { pane } : {}), ...(tab ? { tab } : {}) };
+
+    const navigate = (e) => {
+      e?.preventDefault();
+      navigateToSection(targetSection, options);
+    };
+
+    card.addEventListener('click', navigate);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        navigate(e);
+      }
+    });
+  });
+}
+
 export function initTelemetry() {
   // Wire clickable stat cards to jump to corresponding clinical workflows
   const cardQueue = document.getElementById('stat-queue-waiting')?.closest('.stat-card');
@@ -547,6 +620,9 @@ export function initTelemetry() {
   if (cardVitals) cardVitals.addEventListener('click', () => navigateToSection('vitals-section'));
   if (cardDispenses) cardDispenses.addEventListener('click', () => navigateToSection('medicine-section'));
   if (cardCitizens) cardCitizens.addEventListener('click', () => navigateToSection('users-section', { pane: 'citizens-pane' }));
+
+  // Wire clinical station shortcut launchpad cards
+  bindLaunchpadActions();
 
   const dashRefreshBtn = document.getElementById('dash-refresh-btn');
   if (dashRefreshBtn) {

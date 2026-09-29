@@ -97,7 +97,7 @@ export async function loadRecentVitals() {
       const patientName = citizen ? `${citizen.firstname || ''} ${citizen.surname || ''}`.trim() : 'Walk-in Patient';
       const time = new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      const statusBadge = '<span class="vitals-tag-normal"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> Recorded</span>';
+      const statusBadge = '<span>Recorded</span>';
 
       const complaintSnippet = v.chief_complaint ? String(v.chief_complaint).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') : '';
 

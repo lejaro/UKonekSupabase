@@ -176,13 +176,17 @@ class uKonekPreviewPage extends StatelessWidget {
         Expanded(child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('$firstName $surname',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: _textDark,
-                  letterSpacing: -0.3,
-                )),
+            Text(
+              [firstName, surname, nameExtension]
+                  .where((s) => s.trim().isNotEmpty)
+                  .join(' '),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: _textDark,
+                letterSpacing: -0.3,
+              ),
+            ),
             const SizedBox(height: 2),
             Text(email,
                 style: const TextStyle(
@@ -288,6 +292,7 @@ class uKonekPreviewPage extends StatelessWidget {
               firstName:        firstName,
               middleName:       middleName,
               surname:          surname,
+              nameExtension:    nameExtension,
               dob:              dob,
               age:              age,
               contact:          contact,

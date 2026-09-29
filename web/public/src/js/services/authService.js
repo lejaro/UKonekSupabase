@@ -167,7 +167,31 @@ export async function getAuthenticatedStaffProfile() {
     return null;
   }
 
-  return typeof profile === 'string' ? JSON.parse(profile) : profile;
+  const parsedProfile = typeof profile === 'string' ? JSON.parse(profile) : profile;
+
+  // Enrich with employee_id and doctor_specialization if missing from get_staff_profile
+  if (parsedProfile && parsedProfile.id && (!parsedProfile.employee_id || !parsedProfile.doctor_specialization)) {
+    try {
+      const { data: staffExtra } = await supabase
+        .from('staff')
+        .select('employee_id, doctor_specialization')
+        .eq('id', parsedProfile.id)
+        .maybeSingle();
+
+      if (staffExtra) {
+        if (staffExtra.employee_id && !parsedProfile.employee_id) {
+          parsedProfile.employee_id = staffExtra.employee_id;
+        }
+        if (staffExtra.doctor_specialization && !parsedProfile.doctor_specialization) {
+          parsedProfile.doctor_specialization = staffExtra.doctor_specialization;
+        }
+      }
+    } catch (_) {
+      // Non-blocking enrichment
+    }
+  }
+
+  return parsedProfile;
 }
 
 export async function signOutStaff() {

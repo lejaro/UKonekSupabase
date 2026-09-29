@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'services/api_service.dart';
 import 'credentials_page.dart';
@@ -8,6 +9,7 @@ class uKonekOtpPage extends StatefulWidget {
   final String firstName;
   final String middleName;
   final String surname;
+  final String nameExtension;
   final String dob;
   final String age;
   final String contact;
@@ -23,6 +25,7 @@ class uKonekOtpPage extends StatefulWidget {
     required this.firstName,
     required this.middleName,
     required this.surname,
+    this.nameExtension = '',
     required this.dob,
     required this.age,
     required this.contact,
@@ -39,7 +42,7 @@ class uKonekOtpPage extends StatefulWidget {
 }
 
 class _uKonekOtpPageState extends State<uKonekOtpPage> {
-// ── Design Tokens ──────────────────────────────────────────────
+  // ── Design Tokens ──────────────────────────────────────────────
   static const _primary   = Color(0xFF059669); // Emerald 600
   static const _primary2  = Color(0xFF064E3B); // Forest Emerald 900
   static const _bg        = Color(0xFFF8FAFC); // Slate Background
@@ -49,14 +52,21 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
   static const _textMuted = Color(0xFF64748B); // Slate 500
   static const _divider   = Color(0xFFE2E8F0); // Slate 200
 
+  static const int _otpLength = 6;
+
   bool _isSending = false;
   bool _isChecking = false;
   bool _linkSent = false;
 
-  // ── OTP Controllers & Focus Nodes ──────────────────────────────
-  final List<TextEditingController> _otpControllers = List.generate(8, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(8, (_) => FocusNode());
-  final TextEditingController _hiddenOtpController = TextEditingController();
+  // ── Resend Countdown Timer ─────────────────────────────────────
+  Timer? _resendTimer;
+  int _resendCountdown = 60;
+
+  // ── OTP Controllers & Focus Nodes (6 digits) ───────────────────
+  final List<TextEditingController> _otpControllers =
+      List.generate(_otpLength, (_) => TextEditingController());
+  final List<FocusNode> _focusNodes =
+      List.generate(_otpLength, (_) => FocusNode());
 
   @override
   void initState() {
@@ -68,14 +78,31 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     for (var controller in _otpControllers) {
       controller.dispose();
     }
     for (var node in _focusNodes) {
       node.dispose();
     }
-    _hiddenOtpController.dispose();
     super.dispose();
+  }
+
+  void _startResendTimer() {
+    _resendTimer?.cancel();
+    setState(() => _resendCountdown = 60);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendCountdown <= 1) {
+        timer.cancel();
+        setState(() => _resendCountdown = 0);
+      } else {
+        setState(() => _resendCountdown--);
+      }
+    });
   }
 
   String? _toIsoDate(String date) {
@@ -89,7 +116,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
     return '${parsed.year.toString().padLeft(4, '0')}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _sendMagicLink() async {
+  Future<void> _sendMagicLink({bool isResend = false}) async {
     if (_isSending) return;
     final dateOfBirth = _toIsoDate(widget.dob);
 
@@ -100,9 +127,13 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
 
     setState(() => _isSending = true);
     try {
+      final cleanSurname = widget.nameExtension.trim().isNotEmpty
+          ? '${widget.surname.trim()} ${widget.nameExtension.trim()}'
+          : widget.surname.trim();
+
       await ApiService.startCitizenEmailVerification(payload: {
         'firstname': widget.firstName.trim(),
-        'surname': widget.surname.trim(),
+        'surname': cleanSurname,
         'middle_initial': widget.middleName.trim(),
         'date_of_birth': dateOfBirth,
         'age': int.tryParse(widget.age.trim()) ?? 0,
@@ -117,26 +148,50 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
 
       if (!mounted) return;
       setState(() => _linkSent = true);
-      _showSnack('Verification email sent. Check your inbox.');
+      _startResendTimer();
+      _showSnack(isResend
+          ? 'New verification code sent. Check your inbox.'
+          : 'Verification email sent. Check your inbox.');
     } catch (error) {
       if (!mounted) return;
-      _showSnack(error.toString().replaceFirst('Exception: ', ''), isError: true);
+      _showSnack(
+          error.toString().replaceFirst('Exception: ', ''),
+          isError: true);
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
   }
 
+  void _handlePaste(String pasted) {
+    final digitsOnly = pasted.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.isEmpty) return;
+
+    for (int i = 0; i < _otpLength; i++) {
+      if (i < digitsOnly.length) {
+        _otpControllers[i].text = digitsOnly[i];
+      } else {
+        _otpControllers[i].clear();
+      }
+    }
+
+    final targetIndex = digitsOnly.length < _otpLength
+        ? digitsOnly.length
+        : _otpLength - 1;
+    _focusNodes[targetIndex].requestFocus();
+    setState(() {});
+  }
+
   Future<void> _continueAfterVerification() async {
     if (_isChecking) return;
 
-    // Consolidate OTP from the 8 boxes
+    // Consolidate OTP from the 6 boxes
     String otp = "";
     for (var controller in _otpControllers) {
-      otp += controller.text;
+      otp += controller.text.trim();
     }
 
-    if (otp.length < 8) {
-      _showSnack('Please enter the full 8-digit OTP code.', isError: true);
+    if (otp.length < _otpLength) {
+      _showSnack('Please enter the full 6-digit OTP code.', isError: true);
       return;
     }
 
@@ -145,14 +200,16 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
       await ApiService.verifyCitizenEmailOtp(email: widget.email, otp: otp);
 
       if (!mounted) return;
-      Navigator.push(
+
+      // Use pushReplacement so user cannot navigate back to already-consumed OTP screen
+      Navigator.pushReplacement(
         context,
         AppPageRoute.slideRight(
           uKonekCredentialsPage(
             firstName: widget.firstName,
             middleName: widget.middleName,
             surname: widget.surname,
-            nameExtension: '',
+            nameExtension: widget.nameExtension,
             dob: widget.dob,
             age: widget.age,
             contact: widget.contact,
@@ -168,7 +225,9 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
       );
     } catch (error) {
       if (!mounted) return;
-      _showSnack(error.toString().replaceFirst('Exception: ', ''), isError: true);
+      _showSnack(
+          error.toString().replaceFirst('Exception: ', ''),
+          isError: true);
     } finally {
       if (mounted) setState(() => _isChecking = false);
     }
@@ -188,7 +247,9 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
     if (parts.length != 2) return email;
     final name = parts[0];
     final domain = parts[1];
-    return name.length <= 2 ? "${name[0]}***@$domain" : "${name.substring(0, 2)}***@$domain";
+    return name.length <= 2
+        ? "${name[0]}***@$domain"
+        : "${name.substring(0, 2)}***@$domain";
   }
 
   @override
@@ -207,17 +268,19 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
                   const SizedBox(height: 24),
                   _buildPhaseInfo(),
                   const SizedBox(height: 32),
-                  _buildOtpBoxGrid(), // The 8-box input section
-                  const SizedBox(height: 32),
+                  _buildOtpBoxGrid(), // 6-box input section
+                  const SizedBox(height: 24),
+                  _buildResendSection(),
+                  const SizedBox(height: 16),
                   _buildStatusMessages(),
                   _buildActionButton(),
                   const SizedBox(height: 24),
                   const Text(
-                    "Check your spam folder if the email doesn't appear.",
+                    "Check your spam or junk folder if the email doesn't appear.",
                     textAlign: TextAlign.center,
                     style: TextStyle(color: _textMuted, fontSize: 12),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
                   TextButton.icon(
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back_rounded, size: 18),
@@ -253,7 +316,8 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.mark_email_read_outlined, color: Colors.white, size: 36),
+              Icon(Icons.mark_email_read_outlined,
+                  color: Colors.white, size: 36),
               SizedBox(height: 12),
               Text(
                 "EMAIL VERIFICATION",
@@ -278,20 +342,31 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
       decoration: BoxDecoration(
         color: _surface,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: _textDark.withOpacity(0.05), blurRadius: 16, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+              color: _textDark.withOpacity(0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 4))
+        ],
         border: Border.all(color: _divider),
       ),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: _primary.withOpacity(0.08), shape: BoxShape.circle),
+            decoration: BoxDecoration(
+                color: _primary.withOpacity(0.08), shape: BoxShape.circle),
             child: const Icon(Icons.email_outlined, color: _primary, size: 28),
           ),
           const SizedBox(height: 16),
-          const Text("OTP code will be sent to", style: TextStyle(fontSize: 13, color: _textMuted)),
+          const Text("6-digit verification code sent to",
+              style: TextStyle(fontSize: 13, color: _textMuted)),
           const SizedBox(height: 6),
-          Text(_maskEmail(widget.email), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _textDark)),
+          Text(_maskEmail(widget.email),
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _textDark)),
         ],
       ),
     );
@@ -312,8 +387,9 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
           SizedBox(width: 12),
           Expanded(
             child: Text(
-              "Phase 1: Verify via OTP code\nPhase 2: Create your credentials",
-              style: TextStyle(fontSize: 12, color: Color(0xFF874D00), height: 1.5),
+              "Phase 1: Enter the 6-digit code sent to your email\nPhase 2: Set your password and credentials",
+              style: TextStyle(
+                  fontSize: 12, color: Color(0xFF874D00), height: 1.5),
             ),
           ),
         ],
@@ -324,55 +400,134 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
   Widget _buildOtpBoxGrid() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: List.generate(8, (index) {
+      children: List.generate(_otpLength, (index) {
         return SizedBox(
-          width: 38, // Optimized for 8 boxes on mobile
-          child: TextFormField(
-            controller: _otpControllers[index],
-            focusNode: _focusNodes[index],
-            keyboardType: TextInputType.number,
-            textAlign: TextAlign.center,
-            maxLength: 1,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark),
-            decoration: InputDecoration(
-              counterText: "",
-              filled: true,
-              fillColor: _fieldBg,
-              contentPadding: EdgeInsets.zero,
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _divider)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _primary, width: 2)),
-            ),
-            onChanged: (value) {
-              if (value.isNotEmpty && index < 7) {
-                _focusNodes[index + 1].requestFocus();
-              } else if (value.isEmpty && index > 0) {
-                _focusNodes[index - 1].requestFocus();
+          width: 46, // Comfortable 46px width for 6 boxes on mobile screens
+          height: 56,
+          child: Focus(
+            onKeyEvent: (node, event) {
+              if (event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.backspace) {
+                if (_otpControllers[index].text.isEmpty && index > 0) {
+                  _focusNodes[index - 1].requestFocus();
+                  _otpControllers[index - 1].clear();
+                  return KeyEventResult.handled;
+                }
               }
+              return KeyEventResult.ignored;
             },
+            child: TextFormField(
+              controller: _otpControllers[index],
+              focusNode: _focusNodes[index],
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: _textDark),
+              decoration: InputDecoration(
+                counterText: "",
+                filled: true,
+                fillColor: _fieldBg,
+                contentPadding: EdgeInsets.zero,
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _divider)),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: _primary, width: 2)),
+              ),
+              onChanged: (value) {
+                // Handle multi-character paste
+                if (value.length > 1) {
+                  _handlePaste(value);
+                  return;
+                }
+
+                if (value.isNotEmpty) {
+                  // Only allow digits
+                  if (!RegExp(r'^[0-9]$').hasMatch(value)) {
+                    _otpControllers[index].clear();
+                    return;
+                  }
+                  if (index < _otpLength - 1) {
+                    _focusNodes[index + 1].requestFocus();
+                  } else {
+                    _focusNodes[index].unfocus();
+                  }
+                } else if (value.isEmpty && index > 0) {
+                  _focusNodes[index - 1].requestFocus();
+                }
+              },
+            ),
           ),
         );
       }),
     );
   }
 
+  Widget _buildResendSection() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text(
+          "Didn't receive the code? ",
+          style: TextStyle(fontSize: 13, color: _textMuted),
+        ),
+        if (_resendCountdown > 0)
+          Text(
+            "Resend in ${_resendCountdown}s",
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: _textMuted,
+            ),
+          )
+        else
+          GestureDetector(
+            onTap: _isSending ? null : () => _sendMagicLink(isResend: true),
+            child: const Text(
+              "Resend Code",
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: _primary,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildStatusMessages() {
     if (_isSending) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 20),
+      return const Padding(
+        padding: EdgeInsets.only(bottom: 16),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: _primary)),
-            const SizedBox(width: 12),
-            Text('Sending code...', style: TextStyle(color: _textMuted, fontSize: 13)),
+            SizedBox(
+                height: 16,
+                width: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: _primary)),
+            SizedBox(width: 12),
+            Text('Sending code...',
+                style: TextStyle(color: _textMuted, fontSize: 13)),
           ],
         ),
       );
     }
-    if (_linkSent) {
+    if (_linkSent && _resendCountdown >= 50) {
       return const Padding(
-        padding: EdgeInsets.only(bottom: 20),
-        child: Text('Code has been sent successfully.', style: TextStyle(color: _primary, fontWeight: FontWeight.bold, fontSize: 13)),
+        padding: EdgeInsets.only(bottom: 16),
+        child: Text('Code sent successfully to your email.',
+            style: TextStyle(
+                color: _primary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13)),
       );
     }
     return const SizedBox.shrink();
@@ -387,12 +542,21 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
           backgroundColor: _primary,
           foregroundColor: Colors.white,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)),
         ),
-        onPressed: (_isSending || _isChecking) ? null : _continueAfterVerification,
+        onPressed: (_isSending || _isChecking)
+            ? null
+            : _continueAfterVerification,
         child: _isChecking
-            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-            : const Text('VERIFY & CONTINUE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2))
+            : const Text('VERIFY & CONTINUE',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 15)),
       ),
     );
   }

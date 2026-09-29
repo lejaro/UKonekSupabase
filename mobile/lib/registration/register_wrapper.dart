@@ -53,15 +53,16 @@ class _uKonekRegisterWrapperState
   ];
 
   Future<void> pickDate() async {
+    final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime(2000),
-      firstDate:   DateTime(1950),
-      lastDate:    DateTime.now(),
+      initialDate: selectedDate ?? DateTime(2000),
+      firstDate:   DateTime(1900),
+      lastDate:    now,
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
             colorScheme: const ColorScheme.light(
-                primary: _primary, // Now Green[cite: 1]
+                primary: _primary,
                 onPrimary: Colors.white,
                 surface: _surface,
                 onSurface: _textDark)),
@@ -71,10 +72,9 @@ class _uKonekRegisterWrapperState
     if (picked != null) {
       setState(() {
         selectedDate = picked;
-        int age = DateTime.now().year - picked.year;
-        if (DateTime.now().month < picked.month ||
-            (DateTime.now().month == picked.month &&
-                DateTime.now().day < picked.day)) {
+        int age = now.year - picked.year;
+        if (now.month < picked.month ||
+            (now.month == picked.month && now.day < picked.day)) {
           age--;
         }
         ageController.text = age.toString();
@@ -127,28 +127,43 @@ class _uKonekRegisterWrapperState
     ));
   }
 
+  String _formatFullAddress() {
+    final house = houseNumberController.text.trim();
+    final street = streetNameController.text.trim();
+    final brgy = barangayController.text.trim();
+    final streetAddress = [house, street].where((s) => s.isNotEmpty).join(' ');
+    if (streetAddress.isNotEmpty && brgy.isNotEmpty) {
+      return '$streetAddress, Brgy. $brgy';
+    } else if (streetAddress.isNotEmpty) {
+      return streetAddress;
+    } else if (brgy.isNotEmpty) {
+      return 'Brgy. $brgy';
+    }
+    return '';
+  }
+
   void _navigateToPreview() {
     Navigator.push(
       context,
       AppPageRoute.slideRight(
         uKonekPreviewPage(
-          firstName:        firstNameController.text,
-          middleName:       middleNameController.text,
-          surname:          lastNameController.text,
-          nameExtension:    nameExtensionController.text,
+          firstName:        firstNameController.text.trim(),
+          middleName:       middleNameController.text.trim(),
+          surname:          lastNameController.text.trim(),
+          nameExtension:    nameExtensionController.text.trim(),
           dob:              selectedDate != null
               ? '${selectedDate!.month}/${selectedDate!.day}/${selectedDate!.year}'
               : '',
-          age:              ageController.text,
-          contact:          '+63${contactController.text}',
+          age:              ageController.text.trim(),
+          contact:          '+63${contactController.text.trim()}',
           sex:              selectedSex,
-          email:            emailController.text,
-          address: 'Brgy. ${barangayController.text}',
-          emergencyName:    emergencyNameController.text,
-          emergencyContact: emergencyContactController.text.isEmpty
+          email:            emailController.text.trim(),
+          address:          _formatFullAddress(),
+          emergencyName:    emergencyNameController.text.trim(),
+          emergencyContact: emergencyContactController.text.trim().isEmpty
               ? ''
-              : '+63${emergencyContactController.text}',
-          relation:         relationController.text,
+              : '+63${emergencyContactController.text.trim()}',
+          relation:         relationController.text.trim(),
         ),
       ),
     );

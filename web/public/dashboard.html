@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>U-Konek — Dashboard</title>
   <link rel="stylesheet" href="../src/css/style.css?v=20260902d" />
-  <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.js"></script>
   <link rel="stylesheet" href="../src/css/dashboard-layout.css" />
   <link rel="stylesheet" href="../src/css/print.css" media="print" />
   <script>
@@ -472,7 +472,7 @@
             </div>
 
             <div class="clinical-launchpad-grid compact-grid">
-              <div class="launchpad-action-card" id="launchpad-call-queue" title="Open live queue management">
+              <div class="launchpad-action-card" id="launchpad-call-queue" role="button" tabindex="0" data-section="queue-section" title="Open live queue management">
                 <div class="launchpad-card-icon" style="background:#dcfce7; color:#15803d;">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10" />
@@ -485,7 +485,7 @@
                 </div>
               </div>
 
-              <div class="launchpad-action-card" id="launchpad-consultation" title="Open doctor consultation workstation">
+              <div class="launchpad-action-card" id="launchpad-consultation" role="button" tabindex="0" data-section="consultation-section" title="Open doctor consultation workstation">
                 <div class="launchpad-card-icon" style="background:#e0e7ff; color:#4338ca;">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 3v6a6 6 0 0 0 12 0V3" />
@@ -499,7 +499,7 @@
                 </div>
               </div>
 
-              <div class="launchpad-action-card" id="launchpad-vitals" title="Open vital signs assessment & QR scanner">
+              <div class="launchpad-action-card" id="launchpad-vitals" role="button" tabindex="0" data-section="vitals-section" title="Open vital signs assessment & QR scanner">
                 <div class="launchpad-card-icon" style="background:#dcfce7; color:#15803d;">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
@@ -511,7 +511,7 @@
                 </div>
               </div>
 
-              <div class="launchpad-action-card" id="launchpad-pharmacy" title="Open pharmacy dispensary & stock">
+              <div class="launchpad-action-card" id="launchpad-pharmacy" role="button" tabindex="0" data-section="medicine-section" title="Open pharmacy dispensary & stock">
                 <div class="launchpad-card-icon" style="background:#f3e8ff; color:#7e22ce;">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M10.5 20.5l10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7z" />
@@ -524,7 +524,7 @@
                 </div>
               </div>
 
-              <div class="launchpad-action-card" id="launchpad-citizens" title="Open citizen health records">
+              <div class="launchpad-action-card" id="launchpad-citizens" role="button" tabindex="0" data-section="users-section" data-pane="citizens-pane" title="Open citizen health records">
                 <div class="launchpad-card-icon" style="background:#f1f5f9; color:#334155;">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -539,7 +539,7 @@
                 </div>
               </div>
 
-              <div class="launchpad-action-card" id="launchpad-schedule" title="View staff on-duty roster">
+              <div class="launchpad-action-card" id="launchpad-schedule" role="button" tabindex="0" data-section="schedule-section" title="View staff on-duty roster">
                 <div class="launchpad-card-icon" style="background:#fef3c7; color:#b45309;">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -842,9 +842,33 @@
                         style="font-size: 11px; color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 2px 7px; border-radius: 4px; font-weight: 500;">System
                         Assigned</span>
                     </label>
-                    <input id="profile-employee-id" type="text" readonly value="STF-DOC-01"
+                    <input id="profile-employee-id" type="text" readonly placeholder="STF-01"
                       style="width: 100%; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #334155; font-family: 'JetBrains Mono', monospace; font-weight: 600; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; cursor: not-allowed; box-sizing: border-box;" />
                     <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Maintained by clinic administration.</span>
+                  </div>
+
+                  <div class="field" style="margin: 0;">
+                    <label class="inputLabel" for="profile-username"
+                      style="display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; color: #334155; margin-bottom: 6px;">
+                      <span>System Username</span>
+                      <span
+                        style="font-size: 11px; color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 2px 7px; border-radius: 4px; font-weight: 500;">System Assigned</span>
+                    </label>
+                    <input id="profile-username" type="text" readonly placeholder="username"
+                      style="width: 100%; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; cursor: not-allowed; box-sizing: border-box;" />
+                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Unique clinician login identifier.</span>
+                  </div>
+
+                  <div class="field" id="profile-specialization-wrap" style="margin: 0; display: none;">
+                    <label class="inputLabel" for="profile-specialization"
+                      style="display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; color: #334155; margin-bottom: 6px;">
+                      <span>Clinical Specialization</span>
+                      <span
+                        style="font-size: 11px; color: #059669; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 2px 7px; border-radius: 4px; font-weight: 600;">Editable</span>
+                    </label>
+                    <input id="profile-specialization" type="text" placeholder="e.g. General Medicine, Pediatrics, Cardiology"
+                      style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; box-sizing: border-box;" />
+                    <span style="display: block; font-size: 11.5px; color: #64748b; margin-top: 5px;">Displayed on appointment rosters and medical records.</span>
                   </div>
                 </div>
 
@@ -871,7 +895,7 @@
                         stroke-width="2.5">
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
-                      Save Changes
+                      <span id="profile-save-btn-text">Save Changes</span>
                     </button>
                   </div>
                 </div>
@@ -928,14 +952,14 @@
                     </div>
 
                     <div style="padding-top: 14px; border-top: 1px solid #f1f5f9; margin-top: 4px;">
-                      <button type="button" id="profile-update-password-btn" class="btn"
+                      <button type="button" id="profile-update-password-btn" class="btn btn-primary"
                         style="width: 100%; border-radius: 8px; padding: 11px 20px; font-size: 13.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-align: center;">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                           stroke-width="2.2">
                           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                         </svg>
-                        Update Password
+                        <span id="profile-update-password-btn-text">Update Password</span>
                       </button>
                     </div>
                   </div>
