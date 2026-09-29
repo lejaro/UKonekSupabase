@@ -305,11 +305,10 @@ async function handleSubmitPromoPoster() {
 
   const titleInput = document.getElementById('promo-title');
   const contentInput = document.getElementById('promo-content');
-  const visibilitySelect = document.getElementById('promo-visibility');
 
   const title = titleInput?.value.trim() || '';
   const content = contentInput?.value.trim() || '';
-  const visibility = visibilitySelect?.value || 'citizen';
+  const visibility = 'citizen';
 
   if (!title) {
     showToast('Please enter a promo title.', 'error');
@@ -462,7 +461,7 @@ export async function loadPromoPosters() {
   try {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align:center; padding:32px; color:#64748b;">
+        <td colspan="5" style="text-align:center; padding:32px; color:#64748b;">
           <div style="display:inline-flex; align-items:center; gap:8px;">
             <span class="btn-spinner" style="display:inline-block; border-color:#16a34a; border-top-color:transparent;" aria-hidden="true"></span>
             Loading promo posters & announcements...
@@ -499,7 +498,7 @@ export async function loadPromoPosters() {
     console.error('[PromoPosters] Error loading promo posters:', err);
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align:center; padding:24px; color:#ef4444;">
+        <td colspan="5" style="text-align:center; padding:24px; color:#ef4444;">
           Failed to load promo posters: ${err.message || err}
         </td>
       </tr>
@@ -555,9 +554,9 @@ function renderPromoPostersTable() {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align:center; padding:36px 16px; color:#64748b;">
+        <td colspan="5" style="text-align:center; padding:36px 16px; color:#64748b;">
           <div style="font-size:14px; font-weight:700; color:#334155; margin-bottom:4px;">No promo posters found</div>
-          <div style="font-size:12px;">${_searchQuery ? 'Try adjusting your search query or filter.' : 'Click "+ New Promo Poster" above to create one.'}</div>
+          <div style="font-size:12px;">${_searchQuery ? 'Try adjusting your search query.' : 'Click "+ New Promo Poster" above to create one.'}</div>
         </td>
       </tr>
     `;
@@ -584,12 +583,6 @@ function renderPromoPostersTable() {
       authorRole = (item.staff.role || 'Staff').toUpperCase();
     }
 
-    // Audience badge
-    const isCitizenOnly = (item.visibility || '').toLowerCase() === 'citizen';
-    const audienceBadge = isCitizenOnly
-      ? '<span style="display:inline-block; background:#dcfce7; color:#166534; font-size:11px; font-weight:800; padding:3px 8px; border-radius:6px;">CITIZENS (MOBILE)</span>'
-      : '<span style="display:inline-block; background:#e0f2fe; color:#0369a1; font-size:11px; font-weight:800; padding:3px 8px; border-radius:6px;">ALL USERS</span>';
-
     // Thumbnail column
     const thumbnailHtml = imageUrl
       ? `<img src="${escapeHtml(imageUrl)}" alt="poster" style="width:48px; height:48px; object-fit:cover; border-radius:8px; border:1px solid #e2e8f0; display:block; margin:0 auto; cursor:pointer;" onclick="window.open('${escapeHtml(imageUrl)}', '_blank')" title="Click to view full image" />`
@@ -603,9 +596,6 @@ function renderPromoPostersTable() {
         <td style="padding:12px 14px;">
           <div style="font-weight:800; font-size:13.5px; color:#0f172a; margin-bottom:3px;">${title}</div>
           <div style="font-size:11.5px; color:#64748b; line-height:1.35; max-width:460px; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${content}</div>
-        </td>
-        <td style="text-align:center; padding:12px 8px;">
-          ${audienceBadge}
         </td>
         <td style="text-align:center; padding:12px 8px;">
           <div style="font-size:12px; font-weight:700; color:#334155;">${escapeHtml(authorName)}</div>

@@ -166,10 +166,17 @@ export function getDisplayFullName(user) {
     }
     return `${first} ${last}`;
   }
-  return first || last || user.username || (user.email ? user.email.split('@')[0] : 'Clinical Personnel');
+  const uname = String(user?.username || '').trim();
+  const validUsername = uname && !uname.includes('@') ? uname : '';
+  return validUsername || first || last || 'Clinical Personnel';
 }
 
 export function getDisplayFirstName(user) {
+  // If user has a valid username (not an email), use that directly
+  const uname = String(user?.username || '').trim();
+  if (uname && !uname.includes('@')) {
+    return uname;
+  }
   const preferred = String(user?.first_name || user?.firstName || user?.firstname || '').trim();
   if (preferred) {
     const parts = preferred.split(/\s+/);
@@ -178,7 +185,11 @@ export function getDisplayFirstName(user) {
     }
     return parts[0];
   }
-  return String(user?.username || (user?.email ? user.email.split('@')[0] : 'User')).trim();
+  const role = String(user?.role || '').trim();
+  if (role) {
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  }
+  return 'User';
 }
 
 export function getInitials(fullName) {
@@ -336,7 +347,8 @@ export function populateProfile(user) {
   const displayEmail = user.email || 'clinician@ukonek.local';
   const displayRole = user.role || 'nurse';
   const displayEmpId = user.employee_id || (user.id ? `STF-${String(user.id).slice(0, 6).toUpperCase()}` : 'STF-01');
-  const displayUsername = user.username || (user.email ? user.email.split('@')[0] : '');
+  const rawUsername = String(user.username || '').trim();
+  const displayUsername = rawUsername && !rawUsername.includes('@') ? rawUsername : '';
   const displaySpec = user.doctor_specialization || '';
 
   if (name) name.value = fullDisplayName;
@@ -969,6 +981,8 @@ export function initProfileHandlers() {
       try {
         const rpcPayload = {
           p_display_name: firstName,
+          p_last_name: lastName || null,
+          p_username: displayName,
           p_doctor_specialization: isDoctor && specialization ? specialization : null
         };
         const { data, error } = await supabase.rpc('update_my_staff_profile', rpcPayload);
@@ -988,6 +1002,7 @@ export function initProfileHandlers() {
         const updatePayload = {
           first_name: firstName,
           last_name: lastName || null,
+          username: displayName,
           ...(isDoctor ? { doctor_specialization: specialization || null } : {})
         };
 
@@ -1012,31 +1027,44 @@ export function initProfileHandlers() {
         await supabase.auth.updateUser({
           data: {
             first_name: firstName,
-            last_name: lastName,
-            full_name: displayName
+            last_name: lastName || '',
+            full_name: displayName,
+            username: displayName
           }
         });
       } catch (authMetaErr) {
         console.warn('[Profile] Supabase auth.updateUser metadata sync warning:', authMetaErr);
       }
 
-      // 4. Update session store with clean name parts so last_name is NEVER duplicated
+      // 4. Update session store and persistence with clean name parts and username
       const updatedUser = {
         ...currentUser,
         first_name: firstName,
-        last_name: lastName,
+        last_name: lastName || '',
+        username: displayName,
         doctor_specialization: isDoctor ? specialization : (currentUser.doctor_specialization || null),
         ...(returnedProfile || {})
       };
 
-      // Guarantee clean separated names on updatedUser
+      // Guarantee clean updated fields on updatedUser
       updatedUser.first_name = firstName;
-      updatedUser.last_name = lastName;
+      updatedUser.last_name = lastName || '';
+      updatedUser.username = displayName;
       if (isDoctor) {
         updatedUser.doctor_specialization = specialization;
       }
 
       sessionStore.setUser(updatedUser);
+      sessionAuth.setAuthSessionMeta({
+        username: displayName,
+        firstName: firstName,
+        first_name: firstName,
+        lastName: lastName || '',
+        last_name: lastName || '',
+        doctor_specialization: updatedUser.doctor_specialization
+      });
+      sessionStorage.setItem('ukonek_staff_name', displayName);
+
       applyRoleAccess(updatedUser);
       populateProfile(updatedUser);
 

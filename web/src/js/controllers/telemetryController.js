@@ -140,7 +140,7 @@ export function renderClinicalMetrics() {
 
   const syncElem = document.getElementById('dashboard-last-sync');
   if (syncElem) {
-    syncElem.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}`;
+    syncElem.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
   }
 }
 

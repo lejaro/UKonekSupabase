@@ -121,11 +121,17 @@ export async function ensureAuthenticatedSession(force = false) {
         return null;
       }
 
+      const fallbackUsername = (meta?.username && !meta.username.includes('@'))
+        ? meta.username
+        : (meta?.firstName || meta?.first_name || sessionStorage.getItem('ukonek_staff_name') || (role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Clinician'));
+
       const fallbackProfile = {
         id: meta?.userId || null,
         email: meta?.email || 'clinician@ukonek.local',
         role: role,
-        username: meta?.email ? meta.email.split('@')[0] : 'Clinician'
+        username: fallbackUsername,
+        first_name: meta?.firstName || meta?.first_name || fallbackUsername,
+        last_name: meta?.lastName || meta?.last_name || ''
       };
       sessionStore.setUser(fallbackProfile);
       return fallbackProfile;
@@ -133,11 +139,21 @@ export async function ensureAuthenticatedSession(force = false) {
 
     sessionStore.setUser(profile);
     const role = String(profile.role || 'nurse').toLowerCase();
+    const resolvedUsername = (profile.username && !profile.username.includes('@'))
+      ? profile.username
+      : (profile.first_name || 'Staff');
+
     sessionAuth.setAuthSessionMeta({
       role,
       userId: profile.id || null,
-      email: profile.email || null
+      email: profile.email || null,
+      username: resolvedUsername,
+      firstName: profile.first_name || null,
+      first_name: profile.first_name || null,
+      lastName: profile.last_name || null,
+      last_name: profile.last_name || null
     });
+    sessionStorage.setItem('ukonek_staff_name', resolvedUsername);
     console.log('[Dashboard] Authenticated staff profile loaded:', profile.username || profile.email, `(${role})`);
     return profile;
   } catch (error) {
@@ -146,11 +162,17 @@ export async function ensureAuthenticatedSession(force = false) {
     const role = (sessionStorage.getItem('ukonek_role') || meta?.role || '').trim().toLowerCase();
     if (role) {
       console.log('[Dashboard] Recovered session from stored metadata:', role);
+      const fallbackUsername = (meta?.username && !meta.username.includes('@'))
+        ? meta.username
+        : (meta?.firstName || meta?.first_name || sessionStorage.getItem('ukonek_staff_name') || (role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Clinician'));
+
       const fallbackProfile = {
         id: meta?.userId || null,
         email: meta?.email || 'clinician@ukonek.local',
         role: role,
-        username: meta?.email ? meta.email.split('@')[0] : 'Clinician'
+        username: fallbackUsername,
+        first_name: meta?.firstName || meta?.first_name || fallbackUsername,
+        last_name: meta?.lastName || meta?.last_name || ''
       };
       sessionStore.setUser(fallbackProfile);
       return fallbackProfile;
@@ -204,11 +226,17 @@ async function bootstrapDashboard() {
     const fastMeta = sessionAuth.getAuthSessionMeta();
     const fastRole = (sessionStorage.getItem('ukonek_role') || fastMeta?.role || '').trim().toLowerCase();
     if (fastRole) {
+      const fastUsername = (fastMeta?.username && !fastMeta.username.includes('@'))
+        ? fastMeta.username
+        : (fastMeta?.firstName || fastMeta?.first_name || sessionStorage.getItem('ukonek_staff_name') || (fastRole ? fastRole.charAt(0).toUpperCase() + fastRole.slice(1) : 'Clinician'));
+
       applyRoleAccess({
         id: fastMeta?.userId || null,
         email: fastMeta?.email || null,
         role: fastRole,
-        username: fastMeta?.email ? fastMeta.email.split('@')[0] : 'Clinician'
+        username: fastUsername,
+        first_name: fastMeta?.firstName || fastMeta?.first_name || fastUsername,
+        last_name: fastMeta?.lastName || fastMeta?.last_name || ''
       });
     }
 

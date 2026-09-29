@@ -419,7 +419,7 @@ export async function loadQueueTickets() {
 
     const { data, error } = await supabase
       .from('queue_tickets')
-      .select('id, queue_number, ticket_code, status, queue_date, citizen_type, service_label, symptoms, reason, citizen:citizens(id, firstname, surname, age, sex, contact_number), vitals:vital_signs(id)')
+      .select('id, queue_number, ticket_code, status, queue_date, created_at, citizen_type, service_label, symptoms, reason, citizen:citizens(id, firstname, surname, age, sex, contact_number), vitals:vital_signs(id)')
       .eq('queue_date', manilaTodayStr)
       .in('status', ['waiting', 'on_call', 'serving'])
       .order('queue_date', { ascending: true })
@@ -597,6 +597,17 @@ export function openQueueTicketDetail(id) {
   const gender = citizen.sex || 'Sex N/A';
   const phone = citizen.contact_number || 'No phone';
 
+  let timeFormatted = '--:--';
+  const rawDate = ticket.created_at || ticket.queue_date;
+  if (rawDate) {
+    const d = new Date(ticket.created_at ? ticket.created_at : `${rawDate}T00:00:00`);
+    if (!isNaN(d.getTime())) {
+      timeFormatted = ticket.created_at
+        ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  }
+
   body.innerHTML = `
     <div style="background:#f8fafc; border-radius:12px; padding:16px; margin-bottom:16px; border:1px solid #e2e8f0;">
       <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Patient Info</div>
@@ -615,8 +626,8 @@ export function openQueueTicketDetail(id) {
       </div>
       <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px;">
         <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Service</div>
-        <div style="font-size:14px; font-weight:700; color:#0f172a;">${ticket.service_label}</div>
-        <div style="font-size:12px; color:#64748b;">${new Date(ticket.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+        <div style="font-size:14px; font-weight:700; color:#0f172a;">${ticket.service_label || 'Medical Consultation'}</div>
+        <div style="font-size:12px; color:#64748b;">${timeFormatted}</div>
       </div>
     </div>
 

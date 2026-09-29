@@ -52,7 +52,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
   static const _textMuted = Color(0xFF64748B); // Slate 500
   static const _divider   = Color(0xFFE2E8F0); // Slate 200
 
-  static const int _otpLength = 6;
+  static const int _otpLength = 8;
 
   bool _isSending = false;
   bool _isChecking = false;
@@ -62,7 +62,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
   Timer? _resendTimer;
   int _resendCountdown = 60;
 
-  // ── OTP Controllers & Focus Nodes (6 digits) ───────────────────
+  // ── OTP Controllers & Focus Nodes (8 digits) ───────────────────
   final List<TextEditingController> _otpControllers =
       List.generate(_otpLength, (_) => TextEditingController());
   final List<FocusNode> _focusNodes =
@@ -191,7 +191,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
     }
 
     if (otp.length < _otpLength) {
-      _showSnack('Please enter the full 6-digit OTP code.', isError: true);
+      _showSnack('Please enter the full 8-digit OTP code.', isError: true);
       return;
     }
 
@@ -359,7 +359,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
             child: const Icon(Icons.email_outlined, color: _primary, size: 28),
           ),
           const SizedBox(height: 16),
-          const Text("6-digit verification code sent to",
+          const Text("8-digit verification code sent to",
               style: TextStyle(fontSize: 13, color: _textMuted)),
           const SizedBox(height: 6),
           Text(_maskEmail(widget.email),
@@ -387,7 +387,7 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
           SizedBox(width: 12),
           Expanded(
             child: Text(
-              "Phase 1: Enter the 6-digit code sent to your email\nPhase 2: Set your password and credentials",
+              "Phase 1: Enter the 8-digit code sent to your email\nPhase 2: Set your password and credentials",
               style: TextStyle(
                   fontSize: 12, color: Color(0xFF874D00), height: 1.5),
             ),
@@ -399,67 +399,70 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
 
   Widget _buildOtpBoxGrid() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: List.generate(_otpLength, (index) {
-        return SizedBox(
-          width: 46, // Comfortable 46px width for 6 boxes on mobile screens
-          height: 56,
-          child: Focus(
-            onKeyEvent: (node, event) {
-              if (event is KeyDownEvent &&
-                  event.logicalKey == LogicalKeyboardKey.backspace) {
-                if (_otpControllers[index].text.isEmpty && index > 0) {
-                  _focusNodes[index - 1].requestFocus();
-                  _otpControllers[index - 1].clear();
-                  return KeyEventResult.handled;
-                }
-              }
-              return KeyEventResult.ignored;
-            },
-            child: TextFormField(
-              controller: _otpControllers[index],
-              focusNode: _focusNodes[index],
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: _textDark),
-              decoration: InputDecoration(
-                counterText: "",
-                filled: true,
-                fillColor: _fieldBg,
-                contentPadding: EdgeInsets.zero,
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: _divider)),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: _primary, width: 2)),
-              ),
-              onChanged: (value) {
-                // Handle multi-character paste
-                if (value.length > 1) {
-                  _handlePaste(value);
-                  return;
-                }
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2.5),
+            child: SizedBox(
+              height: 52,
+              child: Focus(
+                onKeyEvent: (node, event) {
+                  if (event is KeyDownEvent &&
+                      event.logicalKey == LogicalKeyboardKey.backspace) {
+                    if (_otpControllers[index].text.isEmpty && index > 0) {
+                      _focusNodes[index - 1].requestFocus();
+                      _otpControllers[index - 1].clear();
+                      return KeyEventResult.handled;
+                    }
+                  }
+                  return KeyEventResult.ignored;
+                },
+                child: TextFormField(
+                  controller: _otpControllers[index],
+                  focusNode: _focusNodes[index],
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _textDark),
+                  decoration: InputDecoration(
+                    counterText: "",
+                    filled: true,
+                    fillColor: _fieldBg,
+                    contentPadding: EdgeInsets.zero,
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _divider)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide:
+                            const BorderSide(color: _primary, width: 2)),
+                  ),
+                  onChanged: (value) {
+                    // Handle multi-character paste
+                    if (value.length > 1) {
+                      _handlePaste(value);
+                      return;
+                    }
 
-                if (value.isNotEmpty) {
-                  // Only allow digits
-                  if (!RegExp(r'^[0-9]$').hasMatch(value)) {
-                    _otpControllers[index].clear();
-                    return;
-                  }
-                  if (index < _otpLength - 1) {
-                    _focusNodes[index + 1].requestFocus();
-                  } else {
-                    _focusNodes[index].unfocus();
-                  }
-                } else if (value.isEmpty && index > 0) {
-                  _focusNodes[index - 1].requestFocus();
-                }
-              },
+                    if (value.isNotEmpty) {
+                      // Only allow digits
+                      if (!RegExp(r'^[0-9]$').hasMatch(value)) {
+                        _otpControllers[index].clear();
+                        return;
+                      }
+                      if (index < _otpLength - 1) {
+                        _focusNodes[index + 1].requestFocus();
+                      } else {
+                        _focusNodes[index].unfocus();
+                      }
+                    } else if (value.isEmpty && index > 0) {
+                      _focusNodes[index - 1].requestFocus();
+                    }
+                  },
+                ),
+              ),
             ),
           ),
         );

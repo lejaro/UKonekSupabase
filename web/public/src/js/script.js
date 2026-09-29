@@ -390,19 +390,29 @@ loginForm.addEventListener('submit', async (e) => {
         const role = profile?.role || profile?.staff_role || profile?.user_role || userResult?.role || userResult?.user_metadata?.role || (userResult?.staffRecord?.role) || 'doctor';
         const authSession = await loadAuthSessionModule();
 
+        const rawCandidateUsername = profile?.username || userResult?.username || userResult?.staffRecord?.username || '';
+        const resolvedUsername = (rawCandidateUsername && !rawCandidateUsername.includes('@')) ? rawCandidateUsername : '';
+        const resolvedFirstName = profile?.first_name || userResult?.first_name || userResult?.user_metadata?.first_name || userResult?.staffRecord?.first_name || '';
+        const resolvedLastName = profile?.last_name || userResult?.last_name || userResult?.user_metadata?.last_name || userResult?.staffRecord?.last_name || '';
+
         sessionStorage.setItem('ukonek_role', String(role || '').trim().toLowerCase());
+        if (resolvedUsername || resolvedFirstName) {
+            sessionStorage.setItem('ukonek_staff_name', resolvedUsername || resolvedFirstName);
+        }
         authSession.setAuthSessionMeta({
             role: String(role || '').trim().toLowerCase(),
             userId: profile?.id || userResult?.id || null,
-            email: profile?.email || userResult?.email || username,
-            username: profile?.username || userResult?.username || username,
-            firstName: profile?.first_name || userResult?.user_metadata?.first_name || '',
-            lastName: profile?.last_name || userResult?.user_metadata?.last_name || ''
+            email: profile?.email || userResult?.email || (username.includes('@') ? username : ''),
+            username: resolvedUsername || resolvedFirstName,
+            firstName: resolvedFirstName,
+            first_name: resolvedFirstName,
+            lastName: resolvedLastName,
+            last_name: resolvedLastName
         });
 
         resetInvalidLoginAttempts();
         // Navigate immediately — no preloader delay needed
-        window.location.href = resolveDashboardPath(username, role);
+        window.location.href = resolveDashboardPath(resolvedUsername || username, role);
     } catch (error) {
         console.error('[Login Submit Failed]:', error);
         const message = String(error?.message || 'Unable to sign in. Please try again.');

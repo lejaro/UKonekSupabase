@@ -974,15 +974,21 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
     // Dynamic subtitle for Right Box (NOW SERVING)
     String servingSubtitle;
-    if (hasQueue && queue.myQueueNumber != null && servingNum != null && servingNum > 0) {
-      if (queue.myQueueNumber == servingNum) {
+    if (hasQueue) {
+      if (queue.isCurrentlyBeingServed) {
         servingSubtitle = "It's your turn!";
-      } else if (queue.myQueueNumber! > servingNum) {
-        final diff = queue.myQueueNumber! - servingNum - 1;
-        servingSubtitle = diff <= 0 ? "You're next in line" : "$diff patient${diff > 1 ? 's' : ''} ahead";
+      } else if (queue.isOnCallStatus) {
+        servingSubtitle = "On Call: Vitals";
+      } else if (queue.isNextInLine) {
+        servingSubtitle = "You're next in line";
+      } else if (queue.peopleAheadCount > 0) {
+        final ahead = queue.peopleAheadCount;
+        servingSubtitle = "$ahead patient${ahead > 1 ? 's' : ''} ahead";
       } else {
         servingSubtitle = "Station active";
       }
+    } else if (servingNum != null && servingNum > 0) {
+      servingSubtitle = "Serving #$servingNum";
     } else if (queue.waitingCount > 0) {
       servingSubtitle = "${queue.waitingCount} in line";
     } else {
@@ -994,10 +1000,12 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     if (hasQueue) {
       if (queue.isCompleted) {
         waitSubtitle = 'Completed';
-      } else if (queue.estimatedWaitMinutes > 0) {
-        waitSubtitle = '~${_formatWaitTime(queue.estimatedWaitMinutes)} wait';
+      } else if (queue.isCurrentlyBeingServed) {
+        waitSubtitle = 'Now serving';
+      } else if (queue.isOnCallStatus) {
+        waitSubtitle = 'In triage';
       } else {
-        waitSubtitle = 'Ready soon';
+        waitSubtitle = '~${queue.formattedWaitTime} wait';
       }
     } else {
       waitSubtitle = 'Not in queue';
@@ -2443,5 +2451,4 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   String _queueNumberText(int? n) => (n == null || n <= 0) ? '--' : '#${n.toString().padLeft(3, '0')}';
-  String _formatWaitTime(int m)   => (m ~/ 60) <= 0 ? '$m mins' : '${m ~/ 60} hr ${m % 60} mins';
 }

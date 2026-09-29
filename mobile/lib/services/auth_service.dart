@@ -96,9 +96,72 @@ class AuthService {
     return (user.email ?? '').trim().toLowerCase() == email.trim().toLowerCase();
   }
 
+  static Future<bool> isCitizenEmailAvailable(String email) async {
+    final normalized = email.trim().toLowerCase();
+    if (normalized.isEmpty || !normalized.contains('@')) return false;
+
+    try {
+      final response = await _client.rpc(
+        'is_citizen_email_available',
+        params: {'p_email': normalized},
+      );
+      if (response is bool) return response;
+      if (response == false) return false;
+      return true;
+    } catch (e) {
+      final err = e.toString().toLowerCase();
+      debugPrint('AuthService: is_citizen_email_available check: $e');
+
+      if (err.contains('already registered') || err.contains('already used')) {
+        return false;
+      }
+
+      if (err.contains('pgrst202') || err.contains('could not find the function') || err.contains('schema cache')) {
+        debugPrint('AuthService: is_citizen_email_available RPC not installed on remote DB yet.');
+        return true;
+      }
+
+      rethrow;
+    }
+  }
+
+  static Future<bool> isCitizenUsernameAvailable(String username) async {
+    final normalized = username.trim().toLowerCase();
+    if (normalized.isEmpty) return false;
+
+    try {
+      final response = await _client.rpc(
+        'is_citizen_username_available',
+        params: {'p_username': normalized},
+      );
+      if (response is bool) return response;
+      if (response == false) return false;
+      return true;
+    } catch (e) {
+      final err = e.toString().toLowerCase();
+      debugPrint('AuthService: is_citizen_username_available check: $e');
+
+      if (err.contains('already used') || err.contains('already taken')) {
+        return false;
+      }
+
+      if (err.contains('pgrst202') || err.contains('could not find the function') || err.contains('schema cache')) {
+        return true;
+      }
+
+      rethrow;
+    }
+  }
+
   static Future<void> startCitizenEmailVerification({required Map<String, dynamic> payload}) async {
     final email = (payload['email'] as String).trim().toLowerCase();
     final emailRedirectTo = _resolveEmailRedirectUrl();
+
+    // ── Guard: Pre-check email availability before sending OTP ─────────
+    final isAvailable = await isCitizenEmailAvailable(email);
+    if (!isAvailable) {
+      throw Exception('This email is already registered. Please sign in instead.');
+    }
 
     try {
       await _client.auth.signInWithOtp(
@@ -126,7 +189,9 @@ class AuthService {
       if (message.contains('otp_expired') || message.contains('token has expired') || message.contains('token has expired or is invalid')) {
         throw Exception('Verification link expired. Please request a new verification email and open the latest link only.');
       }
-      if (message.contains('already registered')) throw Exception('Email already used, please use other email.');
+      if (message.contains('already registered') || message.contains('user already registered')) {
+        throw Exception('This email is already registered. Please sign in instead.');
+      }
       if (message.contains('security purposes') || message.contains('rate limit') || code == '429') {
         throw Exception('Please wait about 55 seconds before requesting another verification email.');
       }
@@ -140,11 +205,33 @@ class AuthService {
     final password = payload['password'] as String;
 
     final user = _client.auth.currentUser;
-    if (user == null) throw Exception('Please verify your email first using the OTP magic link.');
+    if (user == null) throw Exception('Please verify your email first using the OTP code.');
 
     final sessionEmail = (user.email ?? '').trim().toLowerCase();
     if (sessionEmail != email) {
       throw Exception('Verified session email does not match registration email. Please verify the same email you entered.');
+    }
+
+    // ── CRITICAL SECURITY GUARD ──────────────────────────────────────────
+    // Prevent account hijacking / password overwriting:
+    // If a citizen record already exists for this authenticated user ID or email,
+    // this user is an EXISTING registered citizen, NOT a new registrant!
+    try {
+      final existingCitizen = await _client
+          .from('citizens')
+          .select('id, email, username')
+          .or('auth_user_id.eq.${user.id},email.eq.$email')
+          .maybeSingle();
+
+      if (existingCitizen != null) {
+        await _client.auth.signOut();
+        throw Exception('This email is already registered. Please sign in to your account.');
+      }
+    } on AuthException {
+      rethrow;
+    } catch (e) {
+      if (e.toString().contains('already registered')) rethrow;
+      debugPrint('AuthService: error verifying existing citizen: $e');
     }
 
     try {

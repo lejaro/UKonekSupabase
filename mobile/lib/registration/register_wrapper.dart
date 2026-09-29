@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../preview_page.dart';
 import '../utils/app_transitions.dart';
+import '../services/api_service.dart';
 import 'steps/personal_info_step.dart';
 import 'steps/contact_address_step.dart';
 
@@ -16,6 +17,7 @@ class _uKonekRegisterWrapperState
     extends State<uKonekRegisterWrapper> {
   final PageController _pageController = PageController();
   int _currentStep = 0;
+  bool _isValidating = false;
 
   final _step1Key = GlobalKey<FormState>();
   final _step2Key = GlobalKey<FormState>();
@@ -82,7 +84,8 @@ class _uKonekRegisterWrapperState
     }
   }
 
-  void _handleNext() {
+  Future<void> _handleNext() async {
+    if (_isValidating) return;
     bool canProceed = false;
     if (_currentStep == 0) {
       if (_step1Key.currentState!.validate()) {
@@ -103,6 +106,24 @@ class _uKonekRegisterWrapperState
           _snackBar('Emergency contact number must be different from your contact number');
           return;
         }
+
+        // ── Check email availability before proceeding ──────────
+        final email = emailController.text.trim().toLowerCase();
+        setState(() => _isValidating = true);
+        try {
+          final isAvailable = await ApiService.isCitizenEmailAvailable(email);
+          if (!mounted) return;
+          if (!isAvailable) {
+            _snackBar('This email is already registered. Please sign in instead.');
+            return;
+          }
+        } catch (e) {
+          debugPrint('Error validating email availability: $e');
+          // Allow proceeding if RPC check fails (will be caught later)
+        } finally {
+          if (mounted) setState(() => _isValidating = false);
+        }
+
         _navigateToPreview();
       } else {
         _snackBar('Please complete all required fields');
@@ -371,7 +392,7 @@ class _uKonekRegisterWrapperState
         width: double.infinity,
         height: 54,
         child: ElevatedButton(
-          onPressed: _handleNext,
+          onPressed: _isValidating ? null : _handleNext,
           style: ElevatedButton.styleFrom(
             backgroundColor: _primary, // Now Green[cite: 1]
             foregroundColor: Colors.white,
@@ -380,7 +401,12 @@ class _uKonekRegisterWrapperState
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16)),
           ),
-          child: Row(
+          child: _isValidating
+              ? const SizedBox(
+                  height: 20, width: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2))
+              : Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(

@@ -79,32 +79,38 @@ export async function loadSystemReportData() {
       supabase.from('citizens').select('id, created_at', { count: 'exact' }),
       supabase.from('staff').select('id, username, role, status, is_online'),
       supabase.from('medicines').select('id, qty', { count: 'exact' }).is('archived_at', null),
-      supabase.rpc('get_clinical_operations_metrics').catch(() => ({ data: null }))
+      (async () => {
+        try {
+          return await supabase.rpc('get_clinical_operations_metrics');
+        } catch (_) {
+          return { data: null };
+        }
+      })()
     ]);
 
-    if (consultsRes.error) console.warn('[SystemReport] Consultations fetch notice:', consultsRes.error.message);
-    if (rxRes.error) console.warn('[SystemReport] Prescriptions fetch notice:', rxRes.error.message);
+    if (consultsRes?.error) console.warn('[SystemReport] Consultations fetch notice:', consultsRes.error.message);
+    if (rxRes?.error) console.warn('[SystemReport] Prescriptions fetch notice:', rxRes.error.message);
 
-    let consults = consultsRes.data || [];
-    const tickets = queueRes.data || [];
-    const vitals = vitalsRes.data || [];
-    const prescriptions = rxRes.data || [];
-    const labOrders = labRes.data || [];
-    const staffList = staffRes.data || [];
-    const totalCitizens = citizensRes.count || (citizensRes.data || []).length || 0;
-    const totalMedicines = medsRes.count || (medsRes.data || []).length || 0;
+    let consults = consultsRes?.data || [];
+    const tickets = queueRes?.data || [];
+    const vitals = vitalsRes?.data || [];
+    const prescriptions = rxRes?.data || [];
+    const labOrders = labRes?.data || [];
+    const staffList = staffRes?.data || [];
+    const totalCitizens = citizensRes?.count || (citizensRes?.data || []).length || 0;
+    const totalMedicines = medsRes?.count || (medsRes?.data || []).length || 0;
 
     const opMetrics = opMetricsRes?.data || null;
 
     // Derived Metrics
-    const completedTickets = tickets.filter((t) => t.status === 'completed').length;
+    const completedTickets = tickets.filter((t) => t && t.status === 'completed').length;
     const queueCompletionRate = tickets.length ? Math.round((completedTickets / tickets.length) * 100) : 100;
 
-    const dispensedRx = prescriptions.filter((p) => (p.dispensing_status || p.status) === 'dispensed').length;
+    const dispensedRx = prescriptions.filter((p) => p && (p.dispensing_status || p.status) === 'dispensed').length;
     const rxFulfillmentRate = prescriptions.length ? Math.round((dispensedRx / prescriptions.length) * 100) : (opMetrics?.dispenses_today ? 100 : 100);
 
-    const completedLabs = labOrders.filter((l) => String(l.status || '').toLowerCase() === 'completed').length;
-    const onlineStaff = staffList.filter((s) => s.is_online).length;
+    const completedLabs = labOrders.filter((l) => l && String(l.status || '').toLowerCase() === 'completed').length;
+    const onlineStaff = staffList.filter((s) => s && s.is_online).length;
 
     // If direct select yielded 0 due to RLS but opMetrics indicates activity today without active date filter
     let displayConsultsCount = consults.length;
@@ -177,6 +183,10 @@ function renderSystemTrendChart(consults, vitals, tickets) {
   if (_systemTrendChart) {
     _systemTrendChart.destroy();
     _systemTrendChart = null;
+  }
+  if (window.Chart.getChart) {
+    const existing = window.Chart.getChart(canvas);
+    if (existing) existing.destroy();
   }
 
   // Calculate past 7 days in Asia/Manila date string
@@ -291,6 +301,10 @@ function renderDepartmentLoadChart(vitalsCount, consultsCount, rxCount, labCount
   if (_departmentLoadChart) {
     _departmentLoadChart.destroy();
     _departmentLoadChart = null;
+  }
+  if (window.Chart.getChart) {
+    const existing = window.Chart.getChart(canvas);
+    if (existing) existing.destroy();
   }
 
   const total = vitalsCount + consultsCount + rxCount + labCount;

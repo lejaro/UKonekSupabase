@@ -21,10 +21,11 @@ class QueueStepTracker extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = queue.status.toLowerCase().trim();
     final bool isCompleted = queue.isCompleted;
-    final bool vitalsDone = queue.hasVitals || status == 'serving' || isCompleted;
-    final bool vitalsActive = !vitalsDone && (isOnCall || status == 'on_call');
+    final bool isServing = queue.isCurrentlyBeingServed;
+    final bool vitalsDone = queue.hasVitals || isServing || isCompleted;
+    final bool vitalsActive = !vitalsDone && (isOnCall || queue.isOnCallStatus);
     final bool consultDone = isCompleted;
-    final bool consultActive = status == 'serving' && !isCompleted;
+    final bool consultActive = (isServing || status == 'serving') && !isCompleted;
     final bool allDone = isCompleted;
 
     // Step states:
@@ -38,7 +39,7 @@ class QueueStepTracker extends StatelessWidget {
         'desc': 'Issued',
         'icon': Icons.confirmation_number_outlined,
         'isDone': true,
-        'isCurrent': !vitalsActive && !vitalsDone && status == 'waiting',
+        'isCurrent': !vitalsActive && !vitalsDone && !isServing && !isCompleted,
       },
       {
         'label': 'Vitals',

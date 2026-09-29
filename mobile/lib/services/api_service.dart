@@ -60,6 +60,12 @@ class ApiService {
   static bool hasVerifiedSessionForEmail(String email) =>
       AuthService.hasVerifiedSessionForEmail(email);
 
+  static Future<bool> isCitizenEmailAvailable(String email) =>
+      AuthService.isCitizenEmailAvailable(email);
+
+  static Future<bool> isCitizenUsernameAvailable(String username) =>
+      AuthService.isCitizenUsernameAvailable(username);
+
   static Future<void> startCitizenEmailVerification({required Map<String, dynamic> payload}) =>
       AuthService.startCitizenEmailVerification(payload: payload);
 

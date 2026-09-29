@@ -122,6 +122,83 @@ class QueueDashboardSnapshot {
   bool get isOnCallStatus => isOnCall || status.toLowerCase().trim() == 'on_call';
   bool get hasActiveQueue => queueId != null && myQueueNumber != null && !isCompleted && !isCancelled;
 
+  /// True if this patient is currently being served by the doctor.
+  bool get isCurrentlyBeingServed {
+    if (isCompleted || isCancelled) return false;
+    if (isServing) return true;
+    if (myQueueNumber != null &&
+        currentlyServingQueueNumber != null &&
+        currentlyServingQueueNumber! > 0) {
+      return myQueueNumber == currentlyServingQueueNumber;
+    }
+    return false;
+  }
+
+  /// True if another patient is currently inside being served by the doctor ahead of this ticket.
+  bool get hasServingAhead {
+    if (myQueueNumber == null || currentlyServingQueueNumber == null) return false;
+    final serving = currentlyServingQueueNumber!;
+    return serving > 0 && serving < myQueueNumber!;
+  }
+
+  /// Accurate number of patients ahead who must be seen before this patient's consultation begins.
+  int get peopleAheadCount {
+    if (isCompleted || isCancelled || isCurrentlyBeingServed || isOnCallStatus) {
+      return 0;
+    }
+    // Database returns waiting_count (patients in waiting or on_call with queue_number < myQueueNumber).
+    // Plus 1 if a patient is currently inside being served ahead of this ticket.
+    final count = waitingCount + (hasServingAhead ? 1 : 0);
+    if (count > 0) return count;
+
+    // Fallback if waitingCount was 0/unpopulated but queue numbers indicate a gap ahead
+    if (myQueueNumber != null &&
+        currentlyServingQueueNumber != null &&
+        currentlyServingQueueNumber! > 0) {
+      final diff = myQueueNumber! - currentlyServingQueueNumber!;
+      if (diff > 0) return diff;
+    }
+    return 0;
+  }
+
+  /// True if this patient is next in line to be called.
+  bool get isNextInLine {
+    if (!hasActiveQueue || isCurrentlyBeingServed || isOnCallStatus) return false;
+    return peopleAheadCount <= 0 || (waitingCount == 0 && hasServingAhead);
+  }
+
+  /// Formatted estimated wait minutes (calculated or database fallback).
+  int get calculatedWaitMinutes {
+    if (isCompleted || isCancelled || isCurrentlyBeingServed || isOnCallStatus) {
+      return 0;
+    }
+    if (estimatedWaitMinutes > 0) {
+      return estimatedWaitMinutes;
+    }
+    // Fallback estimate: 10 minutes per person ahead
+    final ahead = peopleAheadCount;
+    if (ahead > 0) {
+      return ahead * 10;
+    }
+    // Up next: minimal wait
+    return 5;
+  }
+
+  /// Human-friendly display string for estimated wait (e.g. '10 mins', '1h 15m', '< 5 mins', 'Now serving').
+  String get formattedWaitTime {
+    if (isCompleted) return 'Completed';
+    if (isCancelled) return 'Cancelled';
+    if (isCurrentlyBeingServed) return 'Now serving';
+    if (isOnCallStatus) return 'In triage';
+    final mins = calculatedWaitMinutes;
+    if (mins <= 5 && isNextInLine) return '< 5 mins';
+    if (mins < 60) return '$mins mins';
+    final hours = mins ~/ 60;
+    final rem = mins % 60;
+    if (rem == 0) return '${hours}h';
+    return '${hours}h ${rem}m';
+  }
+
   factory QueueDashboardSnapshot.fromMap(Map<String, dynamic> map, {bool hasVitals = false}) {
     final dateRaw = map['r_queue_date'] ?? map['queue_date'];
     DateTime? parsedDate;

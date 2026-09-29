@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:video_player/video_player.dart';
 import 'menu_page.dart';
 import 'main_shell_page.dart';
 import 'change_password_page.dart';
@@ -187,12 +186,7 @@ class RootHandler extends StatefulWidget {
 }
 
 class _RootHandlerState extends State<RootHandler> {
-  VideoPlayerController? _controller;
-  bool _isVideoInitialized = false;
-  bool _videoFinished = false;
   bool _hasNavigated = false;
-  Widget? _targetPage;
-  Timer? _fallbackTimer;
 
   @override
   void initState() {
@@ -205,87 +199,14 @@ class _RootHandlerState extends State<RootHandler> {
       systemNavigationBarIconBrightness: Brightness.dark,
     ));
 
-    _initVideo();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkSession();
     });
-
-    // Safety fallback timer: guarantee navigation within 5.5 seconds max
-    _fallbackTimer = Timer(const Duration(milliseconds: 5500), () {
-      if (mounted && !_hasNavigated) {
-        debugPrint('RootHandler: Fallback timer triggered.');
-        _videoFinished = true;
-        if (_targetPage != null) {
-          _performNavigation(_targetPage!);
-        }
-      }
-    });
-  }
-
-  Future<void> _initVideo() async {
-    try {
-      final controller = VideoPlayerController.asset('assets/videos/splashintro.mp4');
-      _controller = controller;
-
-      await controller.initialize();
-      if (!mounted) return;
-
-      controller.setLooping(false);
-      controller.addListener(_onVideoProgress);
-
-      setState(() {
-        _isVideoInitialized = true;
-      });
-
-      await controller.play();
-    } catch (e) {
-      debugPrint('RootHandler: Error loading splash video: $e');
-      if (mounted) {
-        _videoFinished = true;
-        if (_targetPage != null) {
-          _performNavigation(_targetPage!);
-        }
-      }
-    }
-  }
-
-  void _onVideoProgress() {
-    if (!mounted || _hasNavigated || _videoFinished) return;
-
-    final controller = _controller;
-    if (controller != null && controller.value.isInitialized) {
-      final value = controller.value;
-      final isNearEnd = value.duration > Duration.zero &&
-          value.position >= (value.duration - const Duration(milliseconds: 150));
-      final isEnded = !value.isPlaying &&
-          value.position > Duration.zero &&
-          value.position >= (value.duration - const Duration(milliseconds: 400));
-
-      if (isNearEnd || isEnded) {
-        _videoFinished = true;
-        if (_targetPage != null) {
-          _performNavigation(_targetPage!);
-        }
-      }
-    }
-  }
-
-  void _skipIntro() {
-    if (_hasNavigated) return;
-    _videoFinished = true;
-    if (_targetPage != null) {
-      _performNavigation(_targetPage!);
-    } else {
-      if (mounted) setState(() {});
-    }
   }
 
   void _performNavigation(Widget page) {
     if (_hasNavigated || !mounted) return;
     _hasNavigated = true;
-    _fallbackTimer?.cancel();
-    _controller?.removeListener(_onVideoProgress);
 
     Navigator.of(context).pushReplacement(
       AppPageRoute.fadeThrough(page),
@@ -295,8 +216,6 @@ class _RootHandlerState extends State<RootHandler> {
   Future<void> _checkSession() async {
     // ── Guard: if a cold-start password recovery link was detected,
     // wait briefly for the auth event to fire and navigate on its own.
-    // We poll for up to 5 s; if the event fires, the auth listener will
-    // push the Change Password page before we do anything here.
     if (_UKonekAppState.pendingPasswordRecovery) {
       debugPrint('RootHandler: Waiting for password recovery deep link to be processed...');
       for (var i = 0; i < 50; i++) {
@@ -306,14 +225,12 @@ class _RootHandlerState extends State<RootHandler> {
           return;
         }
       }
-      // Timed out – recovery link processing failed; fall through to normal flow
       debugPrint('RootHandler: Timed out waiting for recovery, continuing normal flow.');
     }
 
     final authClient = Supabase.instance.client.auth;
     final session = authClient.currentSession;
 
-    // Explicit session token check for forced login on logged-out state
     final prefs = await SharedPreferences.getInstance();
     final sessionToken = prefs.getString('session_token');
 
@@ -324,7 +241,6 @@ class _RootHandlerState extends State<RootHandler> {
     if (session == null || sessionToken == null) {
       PatientSessionState.clearSession();
       if (session != null) {
-        // Mismatch: Supabase has session but our custom token is gone (happens after signOut)
         debugPrint('RootHandler: Session mismatch, clearing Supabase session.');
         await ApiService.signOut();
       }
@@ -351,7 +267,6 @@ class _RootHandlerState extends State<RootHandler> {
       } catch (e) {
         debugPrint('RootHandler: Error fetching profile: $e');
         PatientSessionState.clearSession();
-        // If error (e.g. profile missing), clear session and go to onboarding
         try {
           await ApiService.signOut();
         } catch (signOutError) {
@@ -362,118 +277,46 @@ class _RootHandlerState extends State<RootHandler> {
     }
 
     if (!mounted) return;
-
-    _targetPage = resolvedPage;
-
-    // If the video already finished playing or was skipped, navigate now
-    if (_videoFinished) {
-      _performNavigation(_targetPage!);
-    }
-  }
-
-  @override
-  void dispose() {
-    _fallbackTimer?.cancel();
-    _controller?.removeListener(_onVideoProgress);
-    _controller?.dispose();
-    super.dispose();
+    _performNavigation(resolvedPage);
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = _controller;
+    final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: GestureDetector(
-        onTap: _skipIntro,
-        behavior: HitTestBehavior.opaque,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Center video
-            if (_isVideoInitialized && controller != null)
-              Center(
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: SizedBox(
-                    width: controller.value.size.width,
-                    height: controller.value.size.height,
-                    child: VideoPlayer(controller),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 36.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Spacer(flex: 2),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: screenWidth * 0.76,
+                    maxHeight: 260,
+                  ),
+                  child: Image.asset(
+                    'assets/logo/splash_logo.png',
+                    fit: BoxFit.contain,
                   ),
                 ),
-              ),
-
-            // Subtle Skip button
-            Positioned(
-              top: 12,
-              right: 16,
-              child: SafeArea(
-                child: AnimatedOpacity(
-                  opacity: _isVideoInitialized ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 300),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _skipIntro,
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Skip',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade700,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.arrow_forward_ios_rounded,
-                              size: 11,
-                              color: Colors.grey.shade700,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                const Spacer(flex: 2),
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF059669),
+                    strokeWidth: 2.2,
                   ),
                 ),
-              ),
+                const SizedBox(height: 36),
+              ],
             ),
-
-            // Subtle spinner if user skipped or video finished but network auth is still loading
-            if (_videoFinished && _targetPage == null)
-              Positioned(
-                bottom: 48,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        const Color(0xFF059669).withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
+          ),
         ),
       ),
     );

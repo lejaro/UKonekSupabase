@@ -12,7 +12,6 @@ dependencies:
     sdk: flutter
 
   # Utility packages
-  flutter_native_splash: ^2.4.7
   qr_flutter: ^4.1.0
   flutter_multi_formatter: ^2.12.0
   image_picker: ^1.2.1
@@ -25,7 +24,6 @@ dependencies:
   timezone: ^0.11.0
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.1
-  video_player: ^2.14.0
 
 dev_dependencies:
   flutter_test:
@@ -38,23 +36,12 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/launcher icon/U-KOnekLogo.png"
 
-flutter_native_splash:
-  color: "#ffffff"
-  image: "assets/logo/splash_logo.png"
-  android_12:
-    image: "assets/logo/splash_logo.png"
-    icon_background_color: "#ffffff"
-    color: "#ffffff"
-  web: false
-
 flutter:
   uses-material-design: true
 
   assets:
     - assets/welcome_screen/welcomPhoto-removebg-preview.png
     - assets/launcher icon/U-KOnekLogo.png
-    - assets/logo/splash_logo.png
     - assets/logo/uKonekLogo.png
+    - assets/logo/splash_logo.png
     - assets/icons/
-    - assets/videos/splashintro.mp4
-    - assets/videos/

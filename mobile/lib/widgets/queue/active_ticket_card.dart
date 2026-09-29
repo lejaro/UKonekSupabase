@@ -23,24 +23,51 @@ class ActiveTicketCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isFinished = queue.isCompleted;
     final isCancelled = queue.isCancelled;
-    final ahead = (queue.myQueueNumber ?? 0) - (queue.currentlyServingQueueNumber ?? 0);
-    final isTurn = !isFinished && !isCancelled && ahead <= 0;
-    final isOnCall = !isFinished && !isCancelled && (queue.isOnCall || queue.status.toLowerCase() == 'on_call');
+    final isServing = queue.isCurrentlyBeingServed;
+    final isOnCall = !isFinished && !isCancelled && queue.isOnCallStatus;
+    final isNext = !isFinished && !isCancelled && !isServing && !isOnCall && queue.isNextInLine;
+    final isTurn = isServing || isNext;
+    final int ahead = queue.peopleAheadCount;
+
     final Color statusColor = isFinished
         ? _C.success
-        : (isOnCall ? _C.warning : (isTurn ? _C.success : _C.primaryMid));
+        : (isOnCall
+            ? _C.warning
+            : (isServing
+                ? _C.success
+                : _C.primaryMid));
+
     final String statusMsg = isFinished
         ? 'Your consultation has been completed. Prescriptions & instructions are ready.'
         : (isOnCall
-            ? 'Please proceed to the nurse for vital assessment'
-            : (isTurn
-                ? 'Please proceed to the doctor\'s office for consultation'
-                : '$ahead ${ahead == 1 ? 'person' : 'people'} ahead of you'));
+            ? 'Please proceed to the nurse station for vital signs assessment'
+            : (isServing
+                ? 'It\'s your turn! Please proceed to the doctor\'s office'
+                : (isNext
+                    ? (queue.hasServingAhead
+                        ? 'You\'re next in line! Doctor is currently serving #${queue.currentlyServingQueueNumber!.toString().padLeft(3, '0')}.'
+                        : 'You\'re next in line! Station is preparing to call your number.')
+                    : '$ahead ${ahead == 1 ? 'person' : 'people'} ahead of you in line')));
+
     final IconData statusIcon = isFinished
         ? Icons.task_alt_rounded
         : (isOnCall
             ? Icons.campaign_rounded
-            : (isTurn ? Icons.check_circle_rounded : Icons.groups_rounded));
+            : (isServing
+                ? Icons.check_circle_rounded
+                : (isNext ? Icons.notifications_active_rounded : Icons.groups_rounded)));
+
+    final String headerStatusTitle = isFinished
+        ? 'CONSULTATION COMPLETED'
+        : (isOnCall
+            ? 'YOU ARE ON CALL'
+            : (isServing
+                ? 'YOU ARE NOW SERVING'
+                : (isNext
+                    ? 'YOU ARE NEXT IN LINE'
+                    : (queue.currentlyServingQueueNumber != null && queue.currentlyServingQueueNumber! > 0
+                        ? 'NOW SERVING #${queue.currentlyServingQueueNumber!.toString().padLeft(3, '0')}'
+                        : 'STATION ACTIVE'))));
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -53,9 +80,9 @@ class ActiveTicketCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.10),
+              color: statusColor.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: statusColor.withOpacity(0.25)),
+              border: Border.all(color: statusColor.withValues(alpha: 0.25)),
             ),
             child: Row(
               children: [
@@ -63,7 +90,7 @@ class ActiveTicketCard extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.15),
+                    color: statusColor.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(statusIcon, color: statusColor, size: 22),
@@ -74,13 +101,7 @@ class ActiveTicketCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isFinished
-                            ? 'CONSULTATION COMPLETED'
-                            : (isOnCall
-                                ? 'YOU ARE ON CALL'
-                                : (isTurn && queue.status.toLowerCase() == 'serving'
-                                    ? 'YOU ARE NOW SERVING'
-                                    : 'NOW SERVING #${(queue.currentlyServingQueueNumber ?? 0).toString().padLeft(3, '0')}')),
+                        headerStatusTitle,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -275,12 +296,17 @@ class ActiveTicketCard extends StatelessWidget {
                       // Stats row
                       Row(
                         children: [
-                          _statChip(Icons.timer_outlined, 'Est. Wait', '${isFinished ? 0 : queue.estimatedWaitMinutes} mins', _C.primaryMid),
+                          _statChip(
+                            Icons.timer_outlined,
+                            'Est. Wait',
+                            queue.formattedWaitTime,
+                            _C.primaryMid,
+                          ),
                           const SizedBox(width: 12),
                           _statChip(
                             Icons.people_outline_rounded,
                             'People Ahead',
-                            '${(!isFinished && ahead > 0) ? ahead : "0"}',
+                            (isFinished || isServing || isOnCall) ? '0' : '$ahead',
                             _C.primaryMid,
                           ),
                         ],
@@ -288,7 +314,7 @@ class ActiveTicketCard extends StatelessWidget {
                       const SizedBox(height: 24),
 
                       // Cancel button (Hidden when On Call, Serving, or Finished)
-                      if (!isOnCall && !isTurn && !isFinished)
+                      if (!isOnCall && !isServing && !isFinished)
                         SizedBox(
                           width: double.infinity,
                           height: 52,
@@ -304,7 +330,7 @@ class ActiveTicketCard extends StatelessWidget {
                             label: const Text('LEAVE QUEUE', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: _C.danger,
-                              side: BorderSide(color: _C.danger.withOpacity(0.5), width: 1.5),
+                              side: BorderSide(color: _C.danger.withValues(alpha: 0.5), width: 1.5),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             ),
                           ),
@@ -325,9 +351,9 @@ class ActiveTicketCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.07),
+          color: color.withValues(alpha: 0.07),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.15)),
+          border: Border.all(color: color.withValues(alpha: 0.15)),
         ),
         child: Row(
           children: [
@@ -340,7 +366,7 @@ class ActiveTicketCard extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 9,
-                    color: color.withOpacity(0.7),
+                    color: color.withValues(alpha: 0.7),
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
                   ),

@@ -1375,14 +1375,6 @@
                     <input type="search" id="announcements-search-input" class="search-input"
                       placeholder="Search promo posters..." aria-label="Search promo posters" />
                   </div>
-                  <div class="ph-filter-chips" id="announcement-filter-chips" style="margin-bottom:0;">
-                    <button type="button" class="ph-filter-chip is-active" data-filter="all">All <span
-                        class="chip-count" id="ann-count-all">0</span></button>
-                    <button type="button" class="ph-filter-chip" data-filter="citizen">Citizens (Mobile) <span
-                        class="chip-count" id="ann-count-citizens">0</span></button>
-                    <button type="button" class="ph-filter-chip" data-filter="all_users">All Users <span class="chip-count"
-                        id="ann-count-public">0</span></button>
-                  </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
                   <button id="create-announcement-topright" class="chip-btn chip-btn-primary clinical-only" type="button">
@@ -1401,7 +1393,6 @@
                     <tr class="table-header-row">
                       <th class="table-header-cell" style="width:70px; text-align:center;">Poster</th>
                       <th class="table-header-cell" style="text-align:left;">Promo Title & Message</th>
-                      <th class="table-header-cell" style="width:130px; text-align:center;">Target Audience</th>
                       <th class="table-header-cell" style="width:150px; text-align:center;">Posted By</th>
                       <th class="table-header-cell" style="width:150px; text-align:center;">Date Posted</th>
                       <th class="table-header-cell" style="width:90px; text-align:center;">Actions</th>
@@ -3667,16 +3658,8 @@
                 </div>
               </div>
 
-              <!-- Target Audience -->
-              <div class="field" style="margin-bottom: 20px;">
-                <label class="inputLabel" for="promo-visibility" style="font-weight: 700; font-size: 13px; color: #1e293b; margin-bottom: 6px; display: block;">
-                  Target Audience
-                </label>
-                <select id="promo-visibility" style="width: 100%; box-sizing: border-box; padding: 10px 14px; font-size: 13.5px; border-radius: 10px; border: 1.5px solid #cbd5e1; background: #fff; font-weight: 600; color: #334155;">
-                  <option value="citizen" selected>Patients & Citizens (Mobile App Home Screen)</option>
-                  <option value="all">All Users (Mobile Patients + Clinic Staff)</option>
-                </select>
-              </div>
+              <!-- Target Audience: Defaulted to citizen -->
+              <input type="hidden" id="promo-visibility" value="citizen" />
 
               <!-- Mobile Live Preview Mockup -->
               <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px 16px; margin-bottom: 6px;">

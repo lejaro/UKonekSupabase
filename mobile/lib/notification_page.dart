@@ -84,9 +84,17 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
 
       // 2. Queue Notifications
       if (queue.hasActiveQueue) {
-        String body = 'Your current position is #${queue.waitingCount}.';
-        if (queue.status.toLowerCase() == 'on_call') {
-          body = 'You are being called! Please proceed to the nurse station.';
+        String body;
+        final status = queue.status.toLowerCase().trim();
+        if (queue.isCurrentlyBeingServed || status == 'serving') {
+          body = "It's your turn! Please proceed to the doctor's office for consultation.";
+        } else if (queue.isOnCallStatus || status == 'on_call') {
+          body = 'You are being called! Please proceed to the nurse station for vitals.';
+        } else if (queue.isNextInLine || queue.peopleAheadCount <= 0) {
+          body = "You're next in line! Please stay near the consultation area.";
+        } else {
+          final count = queue.peopleAheadCount;
+          body = 'There ${count == 1 ? 'is' : 'are'} $count patient${count == 1 ? '' : 's'} ahead of you in line.';
         }
         notifications.add({
           'id': 'queue_${queue.queueId}',

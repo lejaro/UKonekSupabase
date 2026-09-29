@@ -74,6 +74,9 @@ export async function signInStaff({ identifier, password }) {
             id: staffRecord.auth_user_id || `local-dev-${staffRecord.id}`,
             email: staffRecord.email,
             role: String(staffRecord.role || 'doctor').toLowerCase(),
+            username: staffRecord.username || staffRecord.first_name || '',
+            first_name: staffRecord.first_name || '',
+            last_name: staffRecord.last_name || '',
             user_metadata: {
               first_name: staffRecord.first_name,
               last_name: staffRecord.last_name,
@@ -141,13 +144,16 @@ export async function getAuthenticatedStaffProfile() {
       const meta = sessionAuth.getAuthSessionMeta();
       const role = (sessionStorage.getItem('ukonek_role') || meta?.role || '').trim().toLowerCase();
       if (role && meta?.email) {
+        const localUsername = (meta.username && !meta.username.includes('@'))
+          ? meta.username
+          : (meta.firstName || meta.first_name || sessionStorage.getItem('ukonek_staff_name') || (role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Staff'));
         return {
           id: meta.userId || 14,
           email: meta.email,
           role: role,
-          username: meta.username || meta.email.split('@')[0],
-          first_name: meta.firstName || 'Doctor',
-          last_name: meta.lastName || 'Staff'
+          username: localUsername,
+          first_name: meta.firstName || meta.first_name || localUsername,
+          last_name: meta.lastName || meta.last_name || ''
         };
       }
     }
