@@ -467,8 +467,8 @@ textarea:focus {
 }
 
 .btn-primary-auth {
-    background: var(--primary, #2D5A27);
-    box-shadow: 0 4px 14px rgba(45, 90, 39, 0.22);
+    background: var(--accent, #16a34a);
+    box-shadow: 0 4px 14px rgba(22, 163, 74, 0.22);
     font-size: 14px;
     font-weight: 600;
     letter-spacing: -0.01em;
@@ -478,21 +478,22 @@ textarea:focus {
     border: none;
     color: #ffffff;
     cursor: pointer;
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    width: 100%;
+    width: 100% !important;
+    box-sizing: border-box;
     transition: all var(--transition-fast, 0.18s ease);
 }
 
-.btn-primary-auth:hover {
-    background: var(--primary-dark, #1E3D1A);
-    box-shadow: 0 6px 18px rgba(45, 90, 39, 0.32);
+.btn-primary-auth:hover:not(:disabled) {
+    background: var(--accent-hover, #15803d);
+    box-shadow: 0 6px 18px rgba(22, 163, 74, 0.32);
     transform: translateY(-1px);
 }
 
-.btn-primary-auth:active {
+.btn-primary-auth:active:not(:disabled) {
     transform: translateY(0);
 }
 
@@ -698,6 +699,28 @@ textarea:focus {
 .btn-block,
 .btn-full {
     width: 100% !important;
+}
+
+.auth-action-row,
+.actions.auth-action-row {
+    display: block;
+    width: 100%;
+    margin-top: 24px;
+}
+
+.auth-action-row .btn,
+.auth-action-row .btn-primary-auth,
+.btn.btn-primary-auth,
+#login-submit-btn {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+    height: var(--btn-h-lg, 44px);
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: var(--btn-radius, 10px);
 }
 
 .btn-pill {
