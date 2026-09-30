@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>U-Konek — Administrator Command Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../src/css/style.css" />
+  <link rel="stylesheet" href="../src/css/admin.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.js"></script>
+</head>
+<body class="admin-body">
+
+  <!-- Header -->
+  <header class="admin-header">
+    <div class="admin-brand">
+      <img src="./U-KonekLogo-transparent.png" alt="U-Konek">
+      <div>
+        <h1>
+          U-Konek Medical Clinic
+          <span class="admin-badge-pill">Administrator</span>
+        </h1>
+        <span>Central Administrative & Intelligence Command Console</span>
+      </div>
+    </div>
+    <div class="admin-header-actions">
+      <div class="admin-user-pill">
+        <div class="avatar" id="admin-user-avatar">A</div>
+        <span id="admin-user-display">Loading Admin...</span>
+      </div>
+      <button type="button" class="admin-btn-header" id="btn-header-security" title="Security Settings">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Security
+      </button>
+      <button type="button" class="admin-btn-header admin-btn-logout" id="admin-logout-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+      </button>
+    </div>
+  </header>
+
+  <!-- Top Navigation Bar -->
+  <nav class="admin-nav-bar" id="admin-main-nav">
+    <button type="button" class="admin-nav-tab is-active" data-section="section-analytics">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      Dashboard & Analytics
+    </button>
+    <button type="button" class="admin-nav-tab" data-section="section-reports">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      System Reports & Exports
+    </button>
+    <button type="button" class="admin-nav-tab" data-section="section-users">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Users Management
+      <span class="tab-badge" id="nav-count-users">0</span>
+    </button>
+    <button type="button" class="admin-nav-tab" data-section="section-schedules">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Doctor Schedules & Roster
+    </button>
+    <button type="button" class="admin-nav-tab" data-section="section-announcements">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+      Announcements & Broadcasts
+    </button>
+    <button type="button" class="admin-nav-tab" data-section="section-backup">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Backup & Restore
+    </button>
+    <button type="button" class="admin-nav-tab" data-section="section-security">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Account Security
+    </button>
+  </nav>
+
+  <main class="admin-main">
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- SECTION 1: DASHBOARD & ANALYTICS                                   -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <section id="section-analytics" class="admin-view-section">
+      <div class="admin-section-header">
+        <div>
+          <h2>Operational Intelligence & Analytics</h2>
+          <p>Real-time clinic throughput, census telemetry, and clinical volume trends</p>
+        </div>
+        <div class="admin-header-controls">
+          <select id="analytics-time-filter" class="admin-select">
+            <option value="all">All Time History</option>
+            <option value="30">Last 30 Days</option>
+            <option value="7" selected>Last 7 Days</option>
+            <option value="today">Today Only</option>
+          </select>
+          <button type="button" class="admin-btn admin-btn-outline" id="btn-refresh-analytics">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Stat Cards Grid -->
+      <div class="admin-stats-grid">
+        <div class="admin-kpi-card">
+          <div class="admin-kpi-icon blue">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div class="admin-kpi-info">
+            <div class="admin-kpi-label">Registered Citizens</div>
+            <div class="admin-kpi-value" id="kpi-total-citizens">—</div>
+            <div class="admin-kpi-sub">Total community records</div>
+          </div>
+        </div>
+
+        <div class="admin-kpi-card">
+          <div class="admin-kpi-icon green">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <div class="admin-kpi-info">
+            <div class="admin-kpi-label">Consultations</div>
+            <div class="admin-kpi-value" id="kpi-total-consults">—</div>
+            <div class="admin-kpi-sub">Physician reviews completed</div>
+          </div>
+        </div>
+
+        <div class="admin-kpi-card">
+          <div class="admin-kpi-icon amber">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="admin-kpi-info">
+            <div class="admin-kpi-label">Queue Encounters</div>
+            <div class="admin-kpi-value" id="kpi-total-queue">—</div>
+            <div class="admin-kpi-sub">Patient service tickets issued</div>
+          </div>
+        </div>
+
+        <div class="admin-kpi-card">
+          <div class="admin-kpi-icon indigo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+          </div>
+          <div class="admin-kpi-info">
+            <div class="admin-kpi-label">Active Staff</div>
+            <div class="admin-kpi-value" id="kpi-active-staff">—</div>
+            <div class="admin-kpi-sub"><span id="kpi-online-staff">0</span> currently online</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Grid -->
+      <div class="admin-charts-grid">
+        <div class="admin-chart-box">
+          <div class="admin-chart-box-head">
+            <div>
+              <h4>Clinical Activity Trends</h4>
+              <span>Consultations, Vitals Triage, and Queue Traffic over time</span>
+            </div>
+          </div>
+          <div class="chart-container-wrap">
+            <canvas id="admin-trends-chart"></canvas>
+          </div>
+        </div>
+
+        <div class="admin-chart-box">
+          <div class="admin-chart-box-head">
+            <div>
+              <h4>Departmental Service Load</h4>
+              <span>Distribution across clinical encounters</span>
+            </div>
+          </div>
+          <div class="chart-container-wrap">
+            <canvas id="admin-dept-load-chart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- SECTION 2: SYSTEM REPORTS & CSV EXPORTS                             -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <section id="section-reports" class="admin-view-section hidden">
+      <div class="admin-section-header">
+        <div>
+          <h2>System Reports & CSV Export Center</h2>
+          <p>Extract official clinic data exports across specified date ranges in standardized CSV format</p>
+        </div>
+        <div class="admin-header-controls">
+          <button type="button" class="admin-btn admin-btn-emerald" id="btn-open-census-modal">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print Official Clinic Census
+          </button>
+        </div>
+      </div>
+
+      <!-- Date Period Filter Card -->
+      <div class="admin-panel">
+        <div class="admin-panel-body" style="padding: 18px 24px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+              <span style="font-size:12px; font-weight:700; color:#475569; text-transform:uppercase;">Time Period Filter:</span>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <label for="report-start-date" style="font-size:12px; font-weight:600; color:#64748b;">From:</label>
+                <input type="date" id="report-start-date" class="form-control" style="width:150px; padding:6px 10px; font-size:12.5px;" />
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <label for="report-end-date" style="font-size:12px; font-weight:600; color:#64748b;">To:</label>
+                <input type="date" id="report-end-date" class="form-control" style="width:150px; padding:6px 10px; font-size:12.5px;" />
+              </div>
+              <button type="button" class="admin-btn admin-btn-outline admin-btn-sm" id="btn-clear-report-dates">Clear Range</button>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;" id="report-preset-chips">
+              <button type="button" class="admin-filter-chip is-active" data-preset="all">All Time</button>
+              <button type="button" class="admin-filter-chip" data-preset="today">Today</button>
+              <button type="button" class="admin-filter-chip" data-preset="7d">Last 7 Days</button>
+              <button type="button" class="admin-filter-chip" data-preset="30d">Last 30 Days</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 Required Report Cards Grid -->
+      <div class="admin-reports-grid">
+        <!-- 1. Patient Report -->
+        <div class="admin-report-card">
+          <div>
+            <div class="admin-report-top">
+              <div class="admin-report-icon blue">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              </div>
+              <div class="admin-report-meta">
+                <h4>Patient Report</h4>
+                <p>Full citizen patient directory including demographic details, date of birth, emergency contacts, and registration timestamps.</p>
+              </div>
+            </div>
+          </div>
+          <div class="admin-report-footer">
+            <span class="admin-report-stat">Format: <strong>CSV</strong></span>
+            <button type="button" class="admin-btn admin-btn-primary admin-btn-sm" id="btn-export-patient">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Consultation Report -->
+        <div class="admin-report-card">
+          <div>
+            <div class="admin-report-top">
+              <div class="admin-report-icon green">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+              </div>
+              <div class="admin-report-meta">
+                <h4>Consultation Report</h4>
+                <p>Medical encounter records with diagnoses, clinical findings, physical exams, attending doctors, and SOAP chart notes.</p>
+              </div>
+            </div>
+          </div>
+          <div class="admin-report-footer">
+            <span class="admin-report-stat">Format: <strong>CSV</strong></span>
+            <button type="button" class="admin-btn admin-btn-primary admin-btn-sm" id="btn-export-consultation">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Doctors Activity Report -->
+        <div class="admin-report-card">
+          <div>
+            <div class="admin-report-top">
+              <div class="admin-report-icon indigo">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div class="admin-report-meta">
+                <h4>Doctors Activity Report</h4>
+                <p>Physician performance metrics: total consultations logged, prescriptions issued, duty hours scheduled, and activity timelines.</p>
+              </div>
+            </div>
+          </div>
+          <div class="admin-report-footer">
+            <span class="admin-report-stat">Format: <strong>CSV</strong></span>
+            <button type="button" class="admin-btn admin-btn-primary admin-btn-sm" id="btn-export-doctor-activity">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Queue Report -->
+        <div class="admin-report-card">
+          <div>
+            <div class="admin-report-top">
+              <div class="admin-report-icon amber">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
+              </div>
+              <div class="admin-report-meta">
+                <h4>Queue Report</h4>
+                <p>Patient flow metrics, service line ticket breakdown, computed wait durations, service handling times, and ticket outcomes.</p>
+              </div>
+            </div>
+          </div>
+          <div class="admin-report-footer">
+            <span class="admin-report-stat">Format: <strong>CSV</strong></span>
+            <button type="button" class="admin-btn admin-btn-primary admin-btn-sm" id="btn-export-queue">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- 5. System Usage Report -->
+        <div class="admin-report-card">
+          <div>
+            <div class="admin-report-top">
+              <div class="admin-report-icon rose">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              </div>
+              <div class="admin-report-meta">
+                <h4>System Usage Report</h4>
+                <p>Comprehensive clinic census: total staff accounts, citizen accounts, active staff, inventory status, announcements, and feedback.</p>
+              </div>
+            </div>
+          </div>
+          <div class="admin-report-footer">
+            <span class="admin-report-stat">Format: <strong>CSV</strong></span>
+            <button type="button" class="admin-btn admin-btn-primary admin-btn-sm" id="btn-export-system-usage">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- SECTION 3: USERS MANAGEMENT                                        -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <section id="section-users" class="admin-view-section hidden">
+      <div class="admin-section-header">
+        <div>
+          <h2>Staff Personnel & User Directory</h2>
+          <p>Create accounts, toggle access status, and manage security for Administrators, Doctors, Nurses, and Pharmacists</p>
+        </div>
+        <div class="admin-header-controls">
+          <button type="button" class="admin-btn admin-btn-primary" id="btn-open-create-staff-modal">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Create Staff Account
+          </button>
+        </div>
+      </div>
+
+      <div class="admin-panel">
+        <div class="admin-panel-head">
+          <div>
+            <h3>Registered Personnel</h3>
+            <span>Administrative authority to enable, disable, and reset staff credentials</span>
+          </div>
+        </div>
+        <div class="admin-panel-body">
+          <!-- Toolbar -->
+          <div class="admin-toolbar">
+            <div class="admin-search-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="staff-search-input" class="admin-search-input" placeholder="Search by name, username, or employee ID..." />
+            </div>
+            <div class="admin-filters-group" id="staff-role-chips">
+              <button type="button" class="admin-filter-chip is-active" data-role="all">All Roles</button>
+              <button type="button" class="admin-filter-chip" data-role="admin">Administrators</button>
+              <button type="button" class="admin-filter-chip" data-role="doctor">Doctors</button>
+              <button type="button" class="admin-filter-chip" data-role="nurse">Nurses</button>
+              <button type="button" class="admin-filter-chip" data-role="pharmacist">Pharmacists</button>
+            </div>
+          </div>
+
+          <!-- Staff Table -->
+          <div class="admin-table-wrap">
+            <table class="admin-table" id="staff-table">
+              <thead>
+                <tr>
+                  <th>Staff Member</th>
+                  <th>Employee ID</th>
+                  <th>Role</th>
+                  <th>Account Status</th>
+                  <th>Presence</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="staff-tbody">
+                <!-- Injected via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- SECTION 4: DOCTOR SCHEDULES & AVAILABILITY                         -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <section id="section-schedules" class="admin-view-section hidden">
+      <div class="admin-section-header">
+        <div>
+          <h2>Doctor Availability & Clinic Schedules</h2>
+          <p>Define physician duty rosters, scheduled consultation shifts, and operational availability</p>
+        </div>
+        <div class="admin-header-controls">
+          <button type="button" class="admin-btn admin-btn-primary" id="btn-open-add-schedule-modal">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Doctor Shift Slot
+          </button>
+        </div>
+      </div>
+
+      <div class="admin-panel">
+        <div class="admin-panel-head">
+          <div>
+            <h3>Physician Duty Roster</h3>
+            <span>Upcoming consultation coverage schedule</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <select id="schedule-doctor-filter" class="admin-select">
+              <option value="all">All Doctors</option>
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+        </div>
+        <div class="admin-panel-body">
+          <div class="admin-table-wrap">
+            <table class="admin-table" id="schedules-table">
+              <thead>
+                <tr>
+                  <th>Physician</th>
+                  <th>Specialization</th>
+                  <th>Date</th>
+                  <th>Shift Time</th>
+                  <th>Duty Notes</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="schedules-tbody">
+                <!-- Injected via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- SECTION 5: ANNOUNCEMENTS & BROADCASTS                              -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <section id="section-announcements" class="admin-view-section hidden">
+      <div class="admin-section-header">
+        <div>
+          <h2>Announcements & Broadcast Management</h2>
+          <p>Broadcast public health updates, clinic notices, and targeted bulletins to Citizens, Doctors, Nurses, or Pharmacists</p>
+        </div>
+        <div class="admin-header-controls">
+          <button type="button" class="admin-btn admin-btn-primary" id="btn-open-create-announcement-modal">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Create Announcement
+          </button>
+        </div>
+      </div>
+
+      <div class="admin-panel">
+        <div class="admin-panel-head">
+          <div>
+            <h3>Active Broadcasts</h3>
+            <span>Published notices and targeted notifications</span>
+          </div>
+          <div class="admin-filters-group" id="announcement-audience-chips">
+            <button type="button" class="admin-filter-chip is-active" data-audience="all">All Broadcasts</button>
+            <button type="button" class="admin-filter-chip" data-audience="citizen">Citizens</button>
+            <button type="button" class="admin-filter-chip" data-audience="doctor">Doctors</button>
+            <button type="button" class="admin-filter-chip" data-audience="nurse">Nurses</button>
+            <button type="button" class="admin-filter-chip" data-audience="pharmacist">Pharmacists</button>
+          </div>
+        </div>
+        <div class="admin-panel-body">
+          <div class="admin-table-wrap">
+            <table class="admin-table" id="announcements-table">
+              <thead>
+                <tr>
+                  <th style="width:60px; text-align:center;">Image</th>
+                  <th>Title & Notice Content</th>
+                  <th>Target Audience</th>
+                  <th>Author</th>
+                  <th>Published Date</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="announcements-tbody">
+                <!-- Injected via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- SECTION 6: SYSTEM BACKUP & RESTORE                                 -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <section id="section-backup" class="admin-view-section hidden">
+      <div class="admin-section-header">
+        <div>
+          <h2>System Data Backup & Disaster Recovery</h2>
+          <p>Export complete database snapshots or restore system datasets to safeguard operational continuity</p>
+        </div>
+      </div>
+
+      <div class="backup-card-grid">
+        <!-- Backup Card -->
+        <div class="backup-card highlight">
+          <div>
+            <div class="backup-card-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </div>
+            <h4>Full System Data Backup</h4>
+            <p>Generates a complete, verified snapshot containing core clinic datasets for disaster recovery and offline archives.</p>
+            <ul class="backup-table-checklist">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Citizens & Patient Profiles</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Physician Consultations & Diagnoses</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Nursing Vitals & Triage Assessments</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Doctor Schedules & Clinic Availability</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Prescriptions & Pharmacy Orders</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Clinic Staff Directory & Accounts</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Public & Staff Announcements</li>
+            </ul>
+          </div>
+          <div>
+            <button type="button" class="admin-btn admin-btn-primary" id="btn-generate-backup" style="width:100%;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download Full Backup Snapshot (.json)
+            </button>
+          </div>
+        </div>
+
+        <!-- Restore Card -->
+        <div class="backup-card">
+          <div>
+            <div class="backup-card-icon" style="background:#fef3c7; color:#d97706;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <h4>Restore Database from Backup</h4>
+            <p>Upload a previously exported U-Konek JSON backup file. The integrity validator inspects all payloads prior to database restoration.</p>
+            <div class="dropzone-box" id="backup-dropzone">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <div style="font-size:14px; font-weight:700; color:#1e293b; margin-bottom:4px;">Select or Drop Backup JSON File</div>
+              <div style="font-size:12px; color:#64748b;">Accepts .json backup files generated by U-Konek</div>
+              <input type="file" id="backup-file-input" accept=".json,application/json" style="display:none;" />
+            </div>
+
+            <div id="restore-preview-box" class="hidden" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:14px;">
+              <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#64748b;">Snapshot Verified:</div>
+              <div id="restore-summary-text" style="font-size:13px; font-weight:600; color:#0f172a; margin:4px 0 10px;">—</div>
+              <div class="progress-container hidden" id="restore-progress-wrap">
+                <div class="progress-bar-fill" id="restore-progress-bar"></div>
+              </div>
+              <div id="restore-status-message" style="font-size:12px; color:#64748b;"></div>
+            </div>
+          </div>
+          <div>
+            <button type="button" class="admin-btn admin-btn-emerald" id="btn-execute-restore" disabled style="width:100%;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              Verify & Restore Data
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- SECTION 7: ACCOUNT SECURITY & PASSWORD                             -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <section id="section-security" class="admin-view-section hidden">
+      <div class="admin-section-header">
+        <div>
+          <h2>Account Security & Administrative Credentials</h2>
+          <p>Update administrator credentials, protect your session, and manage administrative settings</p>
+        </div>
+      </div>
+
+      <div style="max-width:640px;">
+        <div class="admin-panel">
+          <div class="admin-panel-head">
+            <div>
+              <h3>Change Administrator Password</h3>
+              <span>Ensure your account is protected with strong credentials</span>
+            </div>
+          </div>
+          <div class="admin-panel-body">
+            <form id="admin-change-password-form">
+              <div class="admin-form-group">
+                <label for="admin-new-password">New Password</label>
+                <input type="password" id="admin-new-password" class="form-control" placeholder="Minimum 8 characters with letters & numbers" required />
+              </div>
+              <div class="admin-form-group">
+                <label for="admin-confirm-password">Confirm New Password</label>
+                <input type="password" id="admin-confirm-password" class="form-control" placeholder="Re-type new password" required />
+              </div>
+              <div style="display:flex; justify-content:flex-end; margin-top:20px;">
+                <button type="submit" class="admin-btn admin-btn-primary" id="btn-submit-password">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  Update Admin Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- MODAL: CREATE STAFF ACCOUNT                                        -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div id="modal-create-staff" class="admin-modal-overlay hidden">
+    <div class="admin-modal-box">
+      <div class="admin-modal-head">
+        <h3>Create New Staff Account</h3>
+        <button type="button" class="admin-modal-close-btn" data-close="modal-create-staff">&times;</button>
+      </div>
+      <form id="form-create-staff">
+        <div class="admin-modal-body">
+          <div class="admin-form-grid-2">
+            <div class="admin-form-group">
+              <label for="cs-first-name">First Name *</label>
+              <input type="text" id="cs-first-name" class="form-control" required />
+            </div>
+            <div class="admin-form-group">
+              <label for="cs-last-name">Last Name *</label>
+              <input type="text" id="cs-last-name" class="form-control" required />
+            </div>
+          </div>
+          <div class="admin-form-grid-2">
+            <div class="admin-form-group">
+              <label for="cs-username">Username *</label>
+              <input type="text" id="cs-username" class="form-control" required />
+            </div>
+            <div class="admin-form-group">
+              <label for="cs-email">Email Address *</label>
+              <input type="email" id="cs-email" class="form-control" required />
+            </div>
+          </div>
+          <div class="admin-form-grid-2">
+            <div class="admin-form-group">
+              <label for="cs-role">Role *</label>
+              <select id="cs-role" class="form-control" required>
+                <option value="doctor">Doctor</option>
+                <option value="nurse">Nurse</option>
+                <option value="pharmacist">Pharmacist</option>
+                <option value="admin">Administrator</option>
+              </select>
+            </div>
+            <div class="admin-form-group">
+              <label for="cs-employee-id">Employee ID</label>
+              <input type="text" id="cs-employee-id" class="form-control" placeholder="e.g. DOC-101" />
+            </div>
+          </div>
+          <div class="admin-form-grid-2">
+            <div class="admin-form-group">
+              <label for="cs-password">Temporary Password *</label>
+              <input type="password" id="cs-password" class="form-control" required minlength="8" />
+            </div>
+            <div class="admin-form-group">
+              <label for="cs-confirm-password">Confirm Password *</label>
+              <input type="password" id="cs-confirm-password" class="form-control" required minlength="8" />
+            </div>
+          </div>
+        </div>
+        <div class="admin-modal-foot">
+          <button type="button" class="admin-btn admin-btn-outline" data-close="modal-create-staff">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn-primary" id="btn-submit-create-staff">Create Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- MODAL: RESET STAFF PASSWORD                                        -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div id="modal-reset-staff-password" class="admin-modal-overlay hidden">
+    <div class="admin-modal-box" style="max-width:440px;">
+      <div class="admin-modal-head">
+        <h3>Reset Staff Password</h3>
+        <button type="button" class="admin-modal-close-btn" data-close="modal-reset-staff-password">&times;</button>
+      </div>
+      <form id="form-reset-staff-password">
+        <input type="hidden" id="reset-target-staff-id" />
+        <div class="admin-modal-body">
+          <p style="font-size:13.5px; color:#475569; margin:0 0 16px;">
+            Set a new temporary password for <strong id="reset-target-staff-name">—</strong>:
+          </p>
+          <div class="admin-form-group">
+            <label for="reset-new-password">New Password</label>
+            <input type="password" id="reset-new-password" class="form-control" placeholder="Minimum 8 characters" required minlength="8" />
+          </div>
+          <div class="admin-form-group">
+            <label for="reset-confirm-password">Confirm New Password</label>
+            <input type="password" id="reset-confirm-password" class="form-control" placeholder="Re-enter password" required minlength="8" />
+          </div>
+        </div>
+        <div class="admin-modal-foot">
+          <button type="button" class="admin-btn admin-btn-outline" data-close="modal-reset-staff-password">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn-danger" id="btn-submit-reset-password">Confirm Password Reset</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- MODAL: ADD / EDIT DOCTOR SCHEDULE                                  -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div id="modal-schedule-editor" class="admin-modal-overlay hidden">
+    <div class="admin-modal-box" style="max-width:500px;">
+      <div class="admin-modal-head">
+        <h3 id="schedule-modal-title">Add Doctor Schedule Slot</h3>
+        <button type="button" class="admin-modal-close-btn" data-close="modal-schedule-editor">&times;</button>
+      </div>
+      <form id="form-schedule-editor">
+        <input type="hidden" id="sched-id" />
+        <div class="admin-modal-body">
+          <div class="admin-form-group">
+            <label for="sched-doctor">Attending Physician *</label>
+            <select id="sched-doctor" class="form-control" required>
+              <option value="">Select Doctor...</option>
+            </select>
+          </div>
+          <div class="admin-form-group">
+            <label for="sched-date">Duty Date *</label>
+            <input type="date" id="sched-date" class="form-control" required />
+          </div>
+          <div class="admin-form-grid-2">
+            <div class="admin-form-group">
+              <label for="sched-start-time">Shift Start Time *</label>
+              <input type="time" id="sched-start-time" class="form-control" required />
+            </div>
+            <div class="admin-form-group">
+              <label for="sched-end-time">Shift End Time *</label>
+              <input type="time" id="sched-end-time" class="form-control" required />
+            </div>
+          </div>
+          <div class="admin-form-group">
+            <label for="sched-notes">Duty Notes / Consultation Room</label>
+            <input type="text" id="sched-notes" class="form-control" placeholder="e.g. Room 204 - General Medicine" />
+          </div>
+        </div>
+        <div class="admin-modal-foot">
+          <button type="button" class="admin-btn admin-btn-outline" data-close="modal-schedule-editor">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn-primary" id="btn-submit-schedule">Save Schedule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- MODAL: ADD / EDIT ANNOUNCEMENT                                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div id="modal-announcement-editor" class="admin-modal-overlay hidden">
+    <div class="admin-modal-box wide">
+      <div class="admin-modal-head">
+        <h3 id="announcement-modal-title">Create Announcement Notice</h3>
+        <button type="button" class="admin-modal-close-btn" data-close="modal-announcement-editor">&times;</button>
+      </div>
+      <form id="form-announcement-editor">
+        <input type="hidden" id="ann-id" />
+        <div class="admin-modal-body">
+          <div class="admin-form-grid-2">
+            <div class="admin-form-group">
+              <label for="ann-title">Announcement Title *</label>
+              <input type="text" id="ann-title" class="form-control" placeholder="e.g. Free Flu Vaccination Drive" required />
+            </div>
+            <div class="admin-form-group">
+              <label for="ann-visibility">Target Audience *</label>
+              <select id="ann-visibility" class="form-control" required>
+                <option value="all">All Users & Roles (Public + Staff)</option>
+                <option value="citizen">Citizens Only (Patient App)</option>
+                <option value="doctor">Doctors Only</option>
+                <option value="nurse">Nurses Only</option>
+                <option value="pharmacist">Pharmacists Only</option>
+                <option value="staff">Clinical Staff (Doctors, Nurses, Pharmacists)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="admin-form-group">
+            <label for="ann-content">Notice Content Details *</label>
+            <textarea id="ann-content" class="form-control" rows="4" placeholder="Enter the complete announcement details, dates, instructions, or venue..." required></textarea>
+          </div>
+
+          <div class="admin-form-group">
+            <label for="ann-image-url">Image Poster Banner (Optional URL or File Upload)</label>
+            <input type="url" id="ann-image-url" class="form-control" placeholder="https://example.com/poster.jpg" />
+          </div>
+        </div>
+        <div class="admin-modal-foot">
+          <button type="button" class="admin-btn admin-btn-outline" data-close="modal-announcement-editor">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn-primary" id="btn-submit-announcement">Publish Announcement</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- MODAL: OFFICIAL CLINIC CENSUS PRINT SHEET                         -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div id="modal-census-sheet" class="admin-modal-overlay hidden">
+    <div class="admin-modal-box wide">
+      <div class="admin-modal-head">
+        <h3>Official Clinic Health Census Document</h3>
+        <button type="button" class="admin-modal-close-btn" data-close="modal-census-sheet">&times;</button>
+      </div>
+      <div class="admin-modal-body" style="padding:0; overflow-y:auto; max-height:65vh;">
+        <div id="census-printable-sheet">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+      <div class="admin-modal-foot">
+        <button type="button" class="admin-btn admin-btn-outline" data-close="modal-census-sheet">Close</button>
+        <button type="button" class="admin-btn admin-btn-emerald" id="btn-print-census-sheet">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print Document
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" style="position:fixed; bottom:24px; right:24px; z-index:9999;"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../src/js/runtime-config.js"></script>
+  <script type="module" src="../src/js/dashboard-admin.js?v=20261001a"></script>
+</body>
+</html>

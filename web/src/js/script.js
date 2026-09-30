@@ -92,11 +92,12 @@ function loadAuthSessionModule() {
 
 function resolveDashboardPath(username = '', role = '') {
     const r = String(role || '').trim().toLowerCase();
+    if (r === 'admin') {
+        return './dashboard-admin.html';
+    }
     if (r === 'pharmacist') {
         return './dashboard-pharmacist.html';
     }
-    // Shared dashboard for all other staff roles. Role-based UI gating is
-    // handled inside dashboard.js via SECTION_ROLE_RULES and permissions.
     return './dashboard.html';
 }
 

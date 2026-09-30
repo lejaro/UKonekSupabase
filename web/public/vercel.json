@@ -6,6 +6,8 @@
     { "source": "/", "destination": "/index.html" },
     { "source": "/login", "destination": "/index.html" },
     { "source": "/dashboard", "destination": "/dashboard.html" },
+    { "source": "/dashboard-admin", "destination": "/dashboard-admin.html" },
+    { "source": "/dashboard-admin.html", "destination": "/dashboard-admin.html" },
     { "source": "/dashboard-pharmacist", "destination": "/dashboard-pharmacist.html" },
     { "source": "/tv-view", "destination": "/tv-view.html" },
     { "source": "/favicon.ico", "destination": "/U-KonekLogo-transparent.png" }

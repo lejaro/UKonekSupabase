@@ -8,6 +8,8 @@
     { "source": "/login", "destination": "/public/index.html" },
     { "source": "/dashboard", "destination": "/public/dashboard.html" },
     { "source": "/dashboard.html", "destination": "/public/dashboard.html" },
+    { "source": "/dashboard-admin", "destination": "/public/dashboard-admin.html" },
+    { "source": "/dashboard-admin.html", "destination": "/public/dashboard-admin.html" },
     { "source": "/dashboard-pharmacist", "destination": "/public/dashboard-pharmacist.html" },
     { "source": "/dashboard-pharmacist.html", "destination": "/public/dashboard-pharmacist.html" },
     { "source": "/tv-view", "destination": "/public/tv-view.html" },

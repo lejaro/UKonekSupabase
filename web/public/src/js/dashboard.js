@@ -225,6 +225,14 @@ async function bootstrapDashboard() {
     // apply role access and dismiss header skeletons in 0ms without waiting for network.
     const fastMeta = sessionAuth.getAuthSessionMeta();
     const fastRole = (sessionStorage.getItem('ukonek_role') || fastMeta?.role || '').trim().toLowerCase();
+    if (fastRole === 'admin') {
+      window.location.replace('./dashboard-admin.html');
+      return;
+    }
+    if (fastRole === 'pharmacist') {
+      window.location.replace('./dashboard-pharmacist.html');
+      return;
+    }
     if (fastRole) {
       const fastUsername = (fastMeta?.username && !fastMeta.username.includes('@'))
         ? fastMeta.username
@@ -243,6 +251,16 @@ async function bootstrapDashboard() {
     // 1. Authenticate user session (with defensive timeout)
     const user = await ensureAuthenticatedSession();
     if (!user) return;
+
+    const userRole = String(user.role || '').trim().toLowerCase();
+    if (userRole === 'admin') {
+      window.location.replace('./dashboard-admin.html');
+      return;
+    }
+    if (userRole === 'pharmacist') {
+      window.location.replace('./dashboard-pharmacist.html');
+      return;
+    }
 
     applyRoleAccess(user);
 
