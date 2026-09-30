@@ -763,6 +763,34 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- MODAL: SIGN OUT CONFIRMATION                                       -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div id="modal-signout-confirm" class="admin-modal-overlay hidden">
+    <div class="admin-modal-box" style="max-width:420px;">
+      <div class="admin-modal-head">
+        <h3>Sign Out Confirmation</h3>
+        <button type="button" class="admin-modal-close-btn" data-close="modal-signout-confirm">&times;</button>
+      </div>
+      <div class="admin-modal-body" style="text-align:center; padding: 24px 22px 18px;">
+        <div style="width:58px; height:58px; border-radius:50%; background:#fee2e2; color:#dc2626; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </div>
+        <h4 style="font-size:18px; font-weight:800; color:#0f172a; margin:0 0 8px;">Sign Out of Administrator Console?</h4>
+        <p style="font-size:13.5px; color:#475569; line-height:1.45; margin:0 0 16px;">
+          Are you sure you want to end your administrative session? You will need to sign back in with your administrator credentials to access the console.
+        </p>
+      </div>
+      <div class="admin-modal-foot" style="justify-content:space-between;">
+        <button type="button" class="admin-btn admin-btn-outline" data-close="modal-signout-confirm">Cancel</button>
+        <button type="button" class="admin-btn admin-btn-danger" id="btn-confirm-signout">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign Out
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
   <!-- MODAL: ADD / EDIT DOCTOR SCHEDULE                                  -->
   <!-- ══════════════════════════════════════════════════════════════════ -->
   <div id="modal-schedule-editor" class="admin-modal-overlay hidden">

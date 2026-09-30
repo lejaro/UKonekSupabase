@@ -149,14 +149,26 @@ function initNavigation() {
   });
 
   const logoutBtn = document.getElementById('admin-logout-btn');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', async () => {
+  const modalSignout = document.getElementById('modal-signout-confirm');
+  const btnConfirmSignout = document.getElementById('btn-confirm-signout');
+
+  if (logoutBtn && modalSignout) {
+    logoutBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      modalSignout.classList.remove('hidden');
+    });
+  }
+
+  if (btnConfirmSignout) {
+    btnConfirmSignout.addEventListener('click', async () => {
       try {
+        btnConfirmSignout.disabled = true;
+        btnConfirmSignout.innerHTML = '<span>Signing out...</span>';
         await supabase.auth.signOut();
         sessionStorage.clear();
         localStorage.removeItem('supabase.auth.token');
         showToast('Signed out successfully.', 'info');
-        setTimeout(() => { window.location.href = './index.html'; }, 600);
+        setTimeout(() => { window.location.href = './index.html'; }, 300);
       } catch (err) {
         window.location.href = './index.html';
       }
