@@ -2082,6 +2082,17 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     );
   }
 
+  IconData _medicineIconFor(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('syrup') ||
+        lower.contains('suspension') ||
+        lower.contains('liquid') ||
+        lower.contains('drops')) {
+      return Icons.medication_liquid_rounded;
+    }
+    return Icons.medication_rounded;
+  }
+
   Widget _buildPrescriptionRow(PrescriptionRecord record) {
     final name = record.medicineName;
     final sub = record.remainingQuantityLabel.isNotEmpty
@@ -2106,11 +2117,18 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         child: Row(
           children: [
             Container(
-              width: 24,
-              height: 24,
+              width: 26,
+              height: 26,
               decoration: BoxDecoration(
                 color: const Color(0xFF10B981),
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Center(
+                child: Icon(
+                  _medicineIconFor(name),
+                  color: Colors.white,
+                  size: 16,
+                ),
               ),
             ),
             const SizedBox(width: 12),
