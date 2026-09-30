@@ -340,6 +340,9 @@ export function initVitalAssessmentModal() {
         showToast('Vital signs saved successfully.', 'success');
         closeVitalAssessmentModal();
         await loadQueueTickets();
+        if (typeof window !== 'undefined' && window.loadTriagedWaitingPatients) {
+          window.loadTriagedWaitingPatients();
+        }
       } catch (err) {
         console.error('Vitals assessment submission error:', err);
         showToast(err.message || 'Failed to save vital signs.', 'error');

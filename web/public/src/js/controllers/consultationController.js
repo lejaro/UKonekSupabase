@@ -13,6 +13,7 @@ import { attachDetailRow, sanitizeText } from '../utils/dataDetailModal.js';
 import { showSection } from './navigationController.js';
 import { openPrescriptionModalForPatient, resolveCitizenId } from './prescriptionController.js';
 import { exportConsultationReport } from '../reports.js';
+import { evaluateBp, evaluateHr, evaluateTemp, evaluateSpo2 } from './triageController.js';
 
 export let consultations = [];
 export let consultationQueueTickets = [];
@@ -334,6 +335,366 @@ export function initConsultationToolbar() {
       e.preventDefault();
       handleDoctorConsultationReport(reportBtn);
     });
+  }
+}
+
+export let rawTriagedWaiting = [];
+let triagedWaitingSearchQuery = '';
+
+export async function loadTriagedWaitingPatients() {
+  const tbody = document.getElementById('triaged-waiting-tbody');
+  const countBadge = document.getElementById('triaged-waiting-count');
+  if (!tbody) return;
+
+  if (!rawTriagedWaiting || rawTriagedWaiting.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="10" style="text-align:center; padding:32px; color:#64748b;">
+          <span class="loading-spinner" style="width:16px; height:16px; border:2px solid #cbd5e1; border-top-color:#0284c7; border-radius:50%; display:inline-block; animation:spin 0.8s linear infinite; vertical-align:middle; margin-right:8px;"></span>
+          <span style="font-size:13px; font-weight:500;">Loading triaged patients awaiting consultation...</span>
+        </td>
+      </tr>
+    `;
+  }
+
+  try {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: vitals, error: vError } = await supabase
+      .from('vital_signs')
+      .select(`
+        id,
+        created_at,
+        blood_pressure,
+        heart_rate,
+        temperature,
+        oxygen_saturation,
+        respiratory_rate,
+        chief_complaint,
+        current_medications,
+        notes,
+        height_cm,
+        weight_kg,
+        bmi,
+        queue_ticket_id,
+        queue_tickets (
+          id,
+          ticket_code,
+          status,
+          queue_number,
+          service_label,
+          created_at,
+          queue_date
+        ),
+        citizens (
+          id,
+          firstname,
+          surname,
+          middle_initial,
+          age,
+          sex,
+          contact_number,
+          complete_address,
+          allergies
+        )
+      `)
+      .gte('created_at', twentyFourHoursAgo)
+      .order('created_at', { ascending: false })
+      .limit(60);
+
+    if (vError) throw vError;
+
+    // Fetch consultations from the last 24h to exclude completed citizen consultations
+    const { data: completedConsults } = await supabase
+      .from('consultations')
+      .select('patient_citizen_id, patient_identifier, created_at')
+      .gte('created_at', twentyFourHoursAgo);
+
+    const completedCitizenIds = new Set((completedConsults || []).map(c => c.patient_citizen_id).filter(Boolean));
+
+    const seenCitizenIds = new Set();
+    const seenTicketIds = new Set();
+
+    const normalized = (vitals || []).map(v => {
+      const citizen = v.citizens;
+      const patientName = citizen
+        ? `${citizen.firstname || ''} ${citizen.middle_initial ? citizen.middle_initial + '. ' : ''}${citizen.surname || ''}`.trim()
+        : 'Walk-in Patient';
+
+      const bp = evaluateBp(v.blood_pressure);
+      const hr = evaluateHr(v.heart_rate);
+      const temp = evaluateTemp(v.temperature);
+      const spo2 = evaluateSpo2(v.oxygen_saturation);
+      const isAlert = bp.level === 'alert' || hr.level === 'alert' || temp.level === 'alert' || spo2.level === 'alert';
+
+      const ticket = v.queue_tickets;
+      const queueStatus = ticket?.status || 'waiting';
+      const ticketCode = ticket?.ticket_code || (v.queue_ticket_id ? `Q-${v.queue_ticket_id}` : 'Walk-in');
+
+      return {
+        ...v,
+        _patientName: patientName,
+        _ticketCode: ticketCode,
+        _queueStatus: queueStatus,
+        _isAlert: isAlert
+      };
+    });
+
+    rawTriagedWaiting = normalized.filter(v => {
+      // Exclude completed or cancelled queue tickets
+      if (v._queueStatus === 'completed' || v._queueStatus === 'cancelled') {
+        return false;
+      }
+
+      // Exclude citizens who already had their consultation completed today
+      if (v.citizens?.id && completedCitizenIds.has(v.citizens.id)) {
+        return false;
+      }
+
+      // Deduplicate: Keep only the most recent triage record per patient
+      if (v.citizens?.id) {
+        if (seenCitizenIds.has(v.citizens.id)) return false;
+        seenCitizenIds.add(v.citizens.id);
+      } else if (v.queue_ticket_id) {
+        if (seenTicketIds.has(v.queue_ticket_id)) return false;
+        seenTicketIds.add(v.queue_ticket_id);
+      }
+
+      // Active waiting triage status
+      return v._queueStatus === 'waiting' || v._queueStatus === 'on_call' || v._queueStatus === 'serving';
+    });
+
+    renderTriagedWaitingTable();
+  } catch (err) {
+    console.warn('[Consultation] Error loading triaged waiting patients:', err);
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="10" style="text-align:center; padding:28px 16px; color:#ef4444; font-size:13px;">
+            Unable to load triaged patients queue. Please click "Refresh" to try again.
+          </td>
+        </tr>
+      `;
+    }
+    if (countBadge) countBadge.textContent = '0';
+  }
+}
+
+export function renderTriagedWaitingTable() {
+  const tbody = document.getElementById('triaged-waiting-tbody');
+  const countBadge = document.getElementById('triaged-waiting-count');
+  if (!tbody) return;
+
+  if (countBadge) {
+    countBadge.textContent = rawTriagedWaiting.length;
+  }
+
+  const query = (triagedWaitingSearchQuery || '').toLowerCase().trim();
+  const filtered = rawTriagedWaiting.filter(v => {
+    if (!query) return true;
+    const name = (v._patientName || '').toLowerCase();
+    const complaint = (v.chief_complaint || '').toLowerCase();
+    const code = (v._ticketCode || '').toLowerCase();
+    const citizenId = v.citizens?.id ? `cit-${v.citizens.id}` : '';
+    return name.includes(query) || complaint.includes(query) || code.includes(query) || citizenId.includes(query);
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="10" style="text-align:center; padding:48px 16px; color:#64748b; font-size:13.5px;">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+            <div style="width:48px; height:48px; border-radius:50%; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <polyline points="16 11 18 13 22 9" />
+              </svg>
+            </div>
+            <div style="font-weight:700; color:#1e293b; font-size:15px;">
+              ${query ? 'No matching triaged patients found' : 'No triaged patients awaiting consultation'}
+            </div>
+            <div style="font-size:13px; max-width:440px; color:#64748b; line-height:1.5;">
+              ${query ? `No patients match the filter "${triagedWaitingSearchQuery}". Clear the search box to see all waiting patients.` : 'All triaged patients have been attended to or completed. New patients triaged by the nurse station will appear here immediately.'}
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(v => {
+    const createdDate = new Date(v.created_at);
+    const timeFormatted = createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const diffMins = Math.max(0, Math.floor((Date.now() - createdDate.getTime()) / 60000));
+    const waitTimeText = diffMins < 1 ? 'Just now' : `${diffMins}m wait`;
+
+    const bp = evaluateBp(v.blood_pressure);
+    const hr = evaluateHr(v.heart_rate);
+    const temp = evaluateTemp(v.temperature);
+    const spo2 = evaluateSpo2(v.oxygen_saturation);
+
+    const citizen = v.citizens;
+    const patientName = sanitizeText(v._patientName);
+    const patientTag = citizen?.id ? `CIT-${citizen.id}` : 'Walk-in';
+    const demoParts = [];
+    if (citizen?.age) demoParts.push(`${citizen.age} yo`);
+    if (citizen?.sex) demoParts.push(citizen.sex);
+    if (citizen?.contact_number) demoParts.push(`📞 ${citizen.contact_number}`);
+    const demoText = demoParts.join(' • ') || 'Walk-in Patient';
+
+    const complaintSnippet = v.chief_complaint
+      ? sanitizeText(v.chief_complaint)
+      : 'Routine triage check';
+
+    let severityHtml = '<span class="vitals-severity-badge severity-stable"><span style="width:6px; height:6px; border-radius:50%; background:#16a34a;"></span> Stable</span>';
+    if (v._isAlert) {
+      severityHtml = '<span class="vitals-severity-badge severity-alert"><span style="width:6px; height:6px; border-radius:50%; background:#e11d48;"></span> Attention</span>';
+    }
+
+    let queueStatusHtml = '<span class="vitals-queue-badge status-waiting">Waiting Consult</span>';
+    if (v._queueStatus === 'serving' || v._queueStatus === 'on_call') {
+      queueStatusHtml = '<span class="vitals-queue-badge status-serving">In Consult</span>';
+    }
+
+    const ticketCodeBadge = v._ticketCode
+      ? `<div style="display:inline-block; font-size:10.5px; font-weight:700; color:#4338ca; background:#e0e7ff; padding:2px 7px; border-radius:5px; font-family:monospace; margin-bottom:3px;">${sanitizeText(v._ticketCode)}</div>`
+      : '';
+
+    return `
+      <tr class="account-row triaged-waiting-row" data-vitals-id="${v.id}" title="Click row to inspect clinical telemetry" style="cursor:pointer;">
+        <td style="white-space:nowrap; vertical-align:middle;">
+          ${ticketCodeBadge}
+          <div style="font-weight:700; font-size:12.5px; color:#1e293b;">${timeFormatted}</div>
+          <span style="font-size:11px; color:#64748b; font-weight:600;">${waitTimeText}</span>
+        </td>
+        <td style="vertical-align:middle;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <strong style="font-size:13.5px; color:#0f172a;">${patientName}</strong>
+            <span style="font-size:10px; font-weight:700; background:#f1f5f9; color:#475569; padding:1px 5px; border-radius:4px;">${patientTag}</span>
+          </div>
+          <div style="font-size:11.5px; color:#64748b; margin-top:2px;">
+            ${sanitizeText(demoText)}
+          </div>
+        </td>
+        <td style="vertical-align:middle;">
+          <div style="font-size:12.5px; color:#334155; font-weight:500; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${complaintSnippet}">
+            ${complaintSnippet}
+          </div>
+        </td>
+        <td style="vertical-align:middle;">
+          <span class="vitals-metric-pill pill-${bp.level}">
+            ${bp.text ? `${bp.text} <span style="font-size:9.5px; font-weight:600; opacity:0.75;">mmHg</span>` : '—'}
+          </span>
+        </td>
+        <td style="vertical-align:middle;">
+          <span class="vitals-metric-pill pill-${hr.level}">
+            ${hr.text || '—'}
+          </span>
+        </td>
+        <td style="vertical-align:middle;">
+          <span class="vitals-metric-pill pill-${temp.level}">
+            ${temp.text || '—'}
+          </span>
+        </td>
+        <td style="vertical-align:middle;">
+          <span class="vitals-metric-pill pill-${spo2.level}">
+            ${spo2.text || '—'}
+          </span>
+        </td>
+        <td style="vertical-align:middle;">
+          ${severityHtml}
+        </td>
+        <td style="vertical-align:middle;">
+          ${queueStatusHtml}
+        </td>
+        <td style="vertical-align:middle; text-align:center; white-space:nowrap;">
+          <button type="button" class="chip-btn chip-btn-primary start-triaged-consult-btn" data-vitals-id="${v.id}" style="padding:6px 12px; font-size:11.5px; font-weight:700; border-radius:8px; gap:5px; height:auto; box-shadow:0 2px 4px rgba(2,132,199,0.2);">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
+              <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+              <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
+              <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+            </svg>
+            Start Consult
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  tbody.querySelectorAll('.start-triaged-consult-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const vitalsId = Number(btn.getAttribute('data-vitals-id'));
+      const record = rawTriagedWaiting.find(v => v.id === vitalsId);
+      if (record) {
+        startConsultationForTriagedPatient(record);
+      }
+    });
+  });
+
+  tbody.querySelectorAll('.triaged-waiting-row').forEach(tr => {
+    const vitalsId = Number(tr.getAttribute('data-vitals-id'));
+    const v = rawTriagedWaiting.find(r => r.id === vitalsId);
+    if (!v) return;
+
+    const timeFormatted = new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateFormatted = new Date(v.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+
+    attachDetailRow(tr, () => ({
+      tag: 'Triaged Patient Telemetry',
+      title: v._patientName,
+      subtitle: `Triaged on ${dateFormatted} at ${timeFormatted} • Status: Waiting Consult`,
+      items: [
+        { label: 'Triage Severity', value: v._isAlert ? 'Needs Attention (Elevated / Out of Range)' : 'Stable (Normal Hemodynamic Parameters)' },
+        { label: 'Queue Status', value: v._queueStatus ? v._queueStatus.toUpperCase() : 'WAITING' },
+        { label: 'Queue Ticket', value: v._ticketCode || 'Direct Encounter' },
+        { label: 'Blood Pressure', value: v.blood_pressure ? `${v.blood_pressure} mmHg` : '—' },
+        { label: 'Heart Rate / Pulse', value: v.heart_rate ? `${v.heart_rate} bpm` : '—' },
+        { label: 'Body Temperature', value: v.temperature ? `${v.temperature} °C` : '—' },
+        { label: 'Oxygen Saturation (SpO2)', value: v.oxygen_saturation ? `${v.oxygen_saturation}%` : '—' },
+        { label: 'Respiratory Rate', value: v.respiratory_rate ? `${v.respiratory_rate} breaths/min` : '—' },
+        { label: 'Height', value: v.height_cm ? `${v.height_cm} cm` : '—' },
+        { label: 'Weight', value: v.weight_kg ? `${v.weight_kg} kg` : '—' },
+        { label: 'BMI', value: v.bmi ? `${v.bmi} kg/m²` : '—' },
+        { label: 'Chief Complaint', value: v.chief_complaint || 'No complaint specified' },
+        { label: 'Current Medications', value: v.current_medications || 'None declared' },
+        { label: 'Allergies', value: v.citizens?.allergies || 'None declared' },
+        { label: 'Patient Age', value: v.citizens?.age ? `${v.citizens.age} years old` : '—' },
+        { label: 'Contact Number', value: v.citizens?.contact_number || '—' }
+      ]
+    }));
+  });
+}
+
+export async function startConsultationForTriagedPatient(v) {
+  const user = sessionStore.getUser();
+  if (String(user?.role || '').toLowerCase() !== 'doctor') {
+    showToast('Only doctors can conduct consultations.', 'warning');
+    return;
+  }
+
+  const citizen = v.citizens;
+  const fullName = citizen
+    ? `${citizen.firstname || ''} ${citizen.middle_initial ? citizen.middle_initial + '. ' : ''}${citizen.surname || ''}`.trim()
+    : (v._patientName || 'Walk-in Patient');
+
+  const ticket = v.queue_tickets;
+  const ticketId = ticket?.id || v.queue_ticket_id || null;
+
+  await openConsultationModal({
+    patientId: citizen ? `CIT-${citizen.id}` : (ticket?.ticket_code || 'Walk-in Patient'),
+    patientName: fullName,
+    serviceLabel: ticket?.service_label || 'General Consultation',
+    queueTicketId: ticketId,
+    symptoms: v.chief_complaint || '',
+    notes: v.current_medications ? `Current Meds: ${v.current_medications}` : ''
+  });
+
+  if (citizen?.id) {
+    loadLatestVitalsForCitizen(citizen.id);
   }
 }
 
@@ -1072,7 +1433,41 @@ export function initConsultationSection() {
   initPrescriptionDosagePresets();
   initConsultationPatientSelector();
   loadConsultationData();
+  loadTriagedWaitingPatients();
   initLabSection();
+
+  if (typeof window !== 'undefined') {
+    window.loadTriagedWaitingPatients = loadTriagedWaitingPatients;
+  }
+
+  // Wire search input for triaged waiting patients
+  const searchInput = document.getElementById('triaged-waiting-search-input');
+  if (searchInput && !searchInput.dataset.bound) {
+    searchInput.dataset.bound = 'true';
+    searchInput.addEventListener('input', (e) => {
+      triagedWaitingSearchQuery = e.target.value;
+      renderTriagedWaitingTable();
+    });
+  }
+
+  // Wire refresh button for triaged waiting patients
+  const refreshBtn = document.getElementById('refresh-triaged-waiting-btn');
+  if (refreshBtn && !refreshBtn.dataset.bound) {
+    refreshBtn.dataset.bound = 'true';
+    refreshBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const orig = refreshBtn.innerHTML;
+      refreshBtn.disabled = true;
+      refreshBtn.innerHTML = `
+        <span class="loading-spinner" style="width:12px; height:12px; border:2px solid #cbd5e1; border-top-color:#0284c7; border-radius:50%; display:inline-block; animation:spin 0.8s linear infinite;"></span>
+        <span>Refreshing...</span>
+      `;
+      await loadTriagedWaitingPatients();
+      refreshBtn.disabled = false;
+      refreshBtn.innerHTML = orig;
+      showToast('Triaged patients queue refreshed.', 'info');
+    });
+  }
 
   const openModalBtn = document.getElementById('open-consult-modal-btn');
   const consultModal = document.getElementById('consultation-modal');
@@ -1221,6 +1616,9 @@ export function initConsultationSection() {
         if (qId) {
           await completeQueueTicket(qId);
         }
+
+        // Live update the triaged waiting list on doctor desk
+        await loadTriagedWaitingPatients();
 
         // Seamlessly transition doctor to prescription modal
         await openPrescriptionModalForPatient(patientId, data.id, patientName, qId);

@@ -487,6 +487,9 @@ export async function handleVitalsSubmission() {
     document.getElementById('vitals-form-container')?.classList.add('hidden');
     setVitalsStationStatus('ready', 'Ready for Intake');
     loadRecentVitals();
+    if (typeof window !== 'undefined' && window.loadTriagedWaitingPatients) {
+      window.loadTriagedWaitingPatients();
+    }
   } catch (err) {
     console.error('Vitals submission error:', err);
     showToast('Failed to record vital signs.', 'error');

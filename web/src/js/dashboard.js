@@ -55,6 +55,7 @@ import {
 import {
   initConsultationSection,
   loadConsultationData,
+  loadTriagedWaitingPatients,
   initLabSection,
   openConsultationModal,
   closeConsultationModal,
@@ -195,6 +196,7 @@ if (typeof window !== 'undefined') {
   window.loadQueueTickets = loadQueueTickets;
   window.openConsultationModal = openConsultationModal;
   window.closeConsultationModal = closeConsultationModal;
+  window.loadTriagedWaitingPatients = loadTriagedWaitingPatients;
   window.openVitalAssessmentModal = openVitalAssessmentModal;
   window.closeVitalAssessmentModal = closeVitalAssessmentModal;
   window.updateLabOrderStatus = updateLabOrderStatus;
@@ -275,6 +277,7 @@ async function bootstrapDashboard() {
       'consultation-section': () => {
         loadConsultationData();
         initLabSection();
+        loadTriagedWaitingPatients();
       },
       'users-section': (options = {}) => {
         loadStaffDirectory();
