@@ -596,12 +596,7 @@ async function loadStaffUsers() {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('staff')
-      .select('id, first_name, last_name, username, email, role, status, employee_id, is_online, last_seen, auth_user_id')
-      .order('id', { ascending: false });
-
-    if (error) throw error;
+    const data = await staffService.listStaff();
 
     staffList = data || [];
     doctorList = staffList.filter(s => (s.role || '').toLowerCase() === 'doctor');

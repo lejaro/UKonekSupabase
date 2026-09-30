@@ -26,9 +26,20 @@ async function assertCanModifyAccounts(actionDescription = 'modify user accounts
 }
 
 export async function listStaff() {
+  // 1. Attempt using administrative RPC to retrieve all staff records including disabled accounts
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('list_all_staff_admin');
+    if (!rpcError && Array.isArray(rpcData)) {
+      return rpcData;
+    }
+  } catch (rpcErr) {
+    console.warn('[StaffService] list_all_staff_admin fallback:', rpcErr);
+  }
+
+  // 2. Direct table select fallback
   const { data, error } = await supabase
     .from('staff')
-    .select('id, first_name, last_name, email, role, status, employee_id, doctor_specialization, is_online, last_seen, auth_user_id, availability_status')
+    .select('id, first_name, last_name, username, email, role, status, employee_id, doctor_specialization, is_online, last_seen, auth_user_id, availability_status')
     .order('id', { ascending: false });
 
   if (error) {
