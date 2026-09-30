@@ -675,7 +675,7 @@ function renderStaffTable() {
         <td><span class="badge-role ${role}">${role}</span></td>
         <td><span class="badge-status ${status.toLowerCase()}">${status}</span></td>
         <td style="text-align:right; white-space:nowrap;">
-          <button type="button" class="admin-btn admin-btn-outline admin-btn-sm btn-staff-toggle-status" data-id="${staff.id}" data-status="${status}" ${isSelf ? 'disabled title="Cannot disable your own account"' : ''}>
+          <button type="button" class="admin-btn admin-btn-outline admin-btn-sm btn-staff-toggle-status" data-id="${staff.id}" data-name="${fullName}" data-username="${staff.username || ''}" data-status="${status}" ${isSelf ? 'disabled title="Cannot disable your own account"' : ''}>
             ${status === 'Active' ? 'Disable' : 'Enable'}
           </button>
           <button type="button" class="admin-btn admin-btn-outline admin-btn-sm btn-staff-reset-pwd" data-id="${staff.id}" data-name="${fullName}" style="margin-left:4px;">
@@ -688,31 +688,15 @@ function renderStaffTable() {
 
   // Bind row actions
   tbody.querySelectorAll('.btn-staff-toggle-status').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
+    btn.addEventListener('click', (e) => {
       e.preventDefault();
       const id = btn.getAttribute('data-id');
+      const name = btn.getAttribute('data-name');
+      const username = btn.getAttribute('data-username');
       const currentStatus = btn.getAttribute('data-status');
       const newStatus = currentStatus === 'Active' ? 'Disabled' : 'Active';
 
-      if (!confirm(`Are you sure you want to change this account status to ${newStatus}?`)) {
-        return;
-      }
-
-      try {
-        btn.disabled = true;
-        const { error } = await supabase
-          .from('staff')
-          .update({ status: newStatus })
-          .eq('id', id);
-
-        if (error) throw error;
-
-        showToast(`Staff account status updated to ${newStatus}.`, 'success');
-        await loadStaffUsers();
-      } catch (err) {
-        console.error('[Admin] Error updating staff status:', err);
-        showToast(`Failed to update status: ${err.message || err}`, 'error');
-      }
+      openToggleStatusModal(id, name, username, currentStatus, newStatus);
     });
   });
 
@@ -724,6 +708,93 @@ function renderStaffTable() {
       openResetPasswordModal(id, name);
     });
   });
+}
+
+function openToggleStatusModal(staffId, staffName, username, currentStatus, newStatus) {
+  const modal = document.getElementById('modal-toggle-status');
+  if (!modal) return;
+
+  const idInp = document.getElementById('toggle-status-staff-id');
+  const actionInp = document.getElementById('toggle-status-target-action');
+  const titleEl = document.getElementById('toggle-status-modal-title');
+  const headingEl = document.getElementById('toggle-status-heading');
+  const descEl = document.getElementById('toggle-status-desc');
+  const warningBox = document.getElementById('toggle-status-warning-box');
+  const iconWrap = document.getElementById('toggle-status-icon-wrap');
+  const confirmBtn = document.getElementById('btn-confirm-toggle-status');
+  const btnLabel = document.getElementById('btn-toggle-status-label');
+
+  if (idInp) idInp.value = staffId;
+  if (actionInp) actionInp.value = newStatus;
+
+  const isDisabling = newStatus === 'Disabled';
+  const userTag = username ? ` (@${username})` : '';
+
+  if (isDisabling) {
+    if (titleEl) titleEl.textContent = 'Disable Staff Account';
+    if (headingEl) headingEl.textContent = 'Disable Staff Access?';
+    if (descEl) descEl.innerHTML = `Are you sure you want to disable access for <strong>${staffName}</strong>${userTag}?`;
+
+    if (iconWrap) {
+      iconWrap.style.background = '#fee2e2';
+      iconWrap.style.color = '#dc2626';
+      iconWrap.innerHTML = `
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+        </svg>
+      `;
+    }
+
+    if (warningBox) {
+      warningBox.style.background = '#fef2f2';
+      warningBox.style.border = '1px solid #fecaca';
+      warningBox.style.color = '#991b1b';
+      warningBox.innerHTML = `
+        <div style="font-weight:700; margin-bottom:2px;">Operational Notice:</div>
+        Disabling this account immediately revokes all authentication and access privileges. The user will be signed out and cannot access patient records or clinical modules until re-enabled by an administrator.
+      `;
+    }
+
+    if (confirmBtn) {
+      confirmBtn.className = 'admin-btn admin-btn-danger';
+    }
+    if (btnLabel) btnLabel.textContent = 'Confirm & Disable Account';
+  } else {
+    // Enabling
+    if (titleEl) titleEl.textContent = 'Enable Staff Account';
+    if (headingEl) headingEl.textContent = 'Restore Staff Access?';
+    if (descEl) descEl.innerHTML = `Are you sure you want to restore full login and operational access for <strong>${staffName}</strong>${userTag}?`;
+
+    if (iconWrap) {
+      iconWrap.style.background = '#dcfce7';
+      iconWrap.style.color = '#16a34a';
+      iconWrap.innerHTML = `
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <polyline points="16 11 18 13 22 9"/>
+        </svg>
+      `;
+    }
+
+    if (warningBox) {
+      warningBox.style.background = '#ecfdf5';
+      warningBox.style.border = '1px solid #a7f3d0';
+      warningBox.style.color = '#065f46';
+      warningBox.innerHTML = `
+        <div style="font-weight:700; margin-bottom:2px;">Account Restoration:</div>
+        This staff member will immediately be able to sign in with their existing credentials and perform clinical services according to their designated role.
+      `;
+    }
+
+    if (confirmBtn) {
+      confirmBtn.className = 'admin-btn admin-btn-emerald';
+    }
+    if (btnLabel) btnLabel.textContent = 'Confirm & Enable Account';
+  }
+
+  modal.classList.remove('hidden');
 }
 
 function initUsersManagementEvents() {
@@ -853,6 +924,42 @@ function initUsersManagementEvents() {
         showToast(`Failed to reset password: ${err.message || err}`, 'error');
       } finally {
         if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  }
+
+  // Confirm Status Toggle (Enable/Disable) Modal Handler
+  const confirmToggleBtn = document.getElementById('btn-confirm-toggle-status');
+  const modalToggle = document.getElementById('modal-toggle-status');
+  if (confirmToggleBtn) {
+    confirmToggleBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const staffId = document.getElementById('toggle-status-staff-id')?.value;
+      const targetStatus = document.getElementById('toggle-status-target-action')?.value;
+
+      if (!staffId || !targetStatus) return;
+
+      const origHtml = confirmToggleBtn.innerHTML;
+      try {
+        confirmToggleBtn.disabled = true;
+        confirmToggleBtn.innerHTML = '<span>Updating...</span>';
+
+        const { error } = await supabase
+          .from('staff')
+          .update({ status: targetStatus })
+          .eq('id', staffId);
+
+        if (error) throw error;
+
+        showToast(`Staff account status updated to ${targetStatus}.`, 'success');
+        if (modalToggle) modalToggle.classList.add('hidden');
+        await loadStaffUsers();
+      } catch (err) {
+        console.error('[Admin] Error updating staff status:', err);
+        showToast(`Failed to update status: ${err.message || err}`, 'error');
+      } finally {
+        confirmToggleBtn.disabled = false;
+        confirmToggleBtn.innerHTML = origHtml;
       }
     });
   }

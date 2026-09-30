@@ -710,6 +710,41 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- MODAL: TOGGLE STAFF STATUS (ENABLE / DISABLE)                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div id="modal-toggle-status" class="admin-modal-overlay hidden">
+    <div class="admin-modal-box" style="max-width:440px;">
+      <div class="admin-modal-head">
+        <h3 id="toggle-status-modal-title">Account Access Status</h3>
+        <button type="button" class="admin-modal-close-btn" data-close="modal-toggle-status">&times;</button>
+      </div>
+      <div class="admin-modal-body" style="text-align:center; padding: 24px 22px 18px;">
+        <input type="hidden" id="toggle-status-staff-id" />
+        <input type="hidden" id="toggle-status-target-action" />
+        
+        <div id="toggle-status-icon-wrap" style="width:58px; height:58px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+          <!-- SVG icon dynamically injected -->
+        </div>
+
+        <h4 id="toggle-status-heading" style="font-size:18px; font-weight:800; color:#0f172a; margin:0 0 8px;">Disable Staff Account?</h4>
+        <p id="toggle-status-desc" style="font-size:13.5px; color:#475569; line-height:1.45; margin:0 0 16px;">
+          Are you sure you want to disable access for this account?
+        </p>
+        
+        <div id="toggle-status-warning-box" style="border-radius:10px; padding:12px 14px; font-size:12.5px; text-align:left; line-height:1.45;">
+          <!-- Warning note dynamically injected -->
+        </div>
+      </div>
+      <div class="admin-modal-foot" style="justify-content:space-between;">
+        <button type="button" class="admin-btn admin-btn-outline" data-close="modal-toggle-status">Cancel</button>
+        <button type="button" class="admin-btn" id="btn-confirm-toggle-status">
+          <span id="btn-toggle-status-label">Confirm Action</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
   <!-- MODAL: ADD / EDIT DOCTOR SCHEDULE                                  -->
   <!-- ══════════════════════════════════════════════════════════════════ -->
   <div id="modal-schedule-editor" class="admin-modal-overlay hidden">
