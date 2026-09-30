@@ -156,3 +156,53 @@ export async function resetStaffPassword(staffId, newPassword) {
 
   return data;
 }
+
+export async function toggleStaffStatus(staffId, newStatus) {
+  await assertCanModifyAccounts('modify staff account status');
+
+  const normalizedStatus = String(newStatus || '').trim().toLowerCase();
+  if (normalizedStatus !== 'active' && normalizedStatus !== 'disabled') {
+    throw new Error('Invalid status. Expected "active" or "disabled".');
+  }
+
+  // 1. Attempt using dedicated toggle_staff_status_admin RPC
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('toggle_staff_status_admin', {
+      target_staff_id: Number(staffId),
+      p_status: normalizedStatus
+    });
+
+    if (!rpcError) {
+      if (rpcData && rpcData.success === false) {
+        throw new Error(rpcData.error || 'Failed to update account status');
+      }
+      return rpcData;
+    }
+
+    if (rpcError && /forbidden/i.test(rpcError.message)) {
+      throw new Error(rpcError.message);
+    }
+    console.warn('[StaffService] RPC toggle_staff_status_admin fallback:', rpcError.message);
+  } catch (rpcErr) {
+    if (/forbidden/i.test(rpcErr?.message)) throw rpcErr;
+    console.warn('[StaffService] RPC toggle_staff_status_admin error, falling back:', rpcErr);
+  }
+
+  // 2. Direct table update fallback (always normalized to lowercase to satisfy DB constraint)
+  const { data, error } = await supabase
+    .from('staff')
+    .update({ status: normalizedStatus })
+    .eq('id', Number(staffId))
+    .select();
+
+  if (error) {
+    const msg = error.message || 'Unable to update account status.';
+    if (/violates check constraint/i.test(msg)) {
+      throw new Error('Account status format rejected by database. Status must be lowercase.');
+    }
+    throw new Error(msg);
+  }
+
+  return { success: true, status: normalizedStatus, staff: data?.[0] };
+}
+

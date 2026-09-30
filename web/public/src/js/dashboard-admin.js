@@ -946,14 +946,11 @@ function initUsersManagementEvents() {
         confirmToggleBtn.disabled = true;
         confirmToggleBtn.innerHTML = '<span>Updating...</span>';
 
-        const { error } = await supabase
-          .from('staff')
-          .update({ status: targetStatus })
-          .eq('id', staffId);
+        await staffService.toggleStaffStatus(staffId, targetStatus);
 
-        if (error) throw error;
-
-        showToast(`Staff account status updated to ${targetStatus}.`, 'success');
+        const readableStatus = String(targetStatus).toLowerCase() === 'active' ? 'Active' : 'Disabled';
+        const actionVerb = readableStatus === 'Disabled' ? 'disabled' : 'enabled';
+        showToast(`Staff account has been successfully ${actionVerb}.`, 'success');
         if (modalToggle) modalToggle.classList.add('hidden');
         await loadStaffUsers();
       } catch (err) {
