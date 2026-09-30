@@ -2646,6 +2646,27 @@
           <div class="consult-dual-pane-body">
             <!-- Left Pane: Patient Context, Vitals & Quick Triage -->
             <aside class="consult-side-summary">
+              <!-- Selected Patient Demographics Card -->
+              <div id="consult-patient-side-card" class="consult-patient-side-card" style="display:none;">
+                <div class="patient-card-header">
+                  <div class="patient-avatar-circle" id="consult-side-avatar">PT</div>
+                  <div class="patient-meta-lines">
+                    <h4 id="consult-side-name" class="patient-name-title">Patient Name</h4>
+                    <span id="consult-side-sub" class="patient-meta-sub">CIT-000 • Age • Sex</span>
+                  </div>
+                </div>
+                <div class="patient-demographics-details">
+                  <div class="demo-item">
+                    <span class="demo-label">Contact:</span>
+                    <span id="consult-side-contact" class="demo-value">&mdash;</span>
+                  </div>
+                  <div class="demo-item">
+                    <span class="demo-label">Address:</span>
+                    <span id="consult-side-address" class="demo-value">&mdash;</span>
+                  </div>
+                </div>
+              </div>
+
               <!-- Critical Allergy Warning Banner -->
               <div id="consult-allergy-alert" class="consult-allergy-box hidden">
                 <div class="allergy-header">
@@ -2675,6 +2696,72 @@
 
             <!-- Right Pane: Active SOAP Note & Plan Editor -->
             <main class="consult-main-editor">
+              <!-- Patient Identification & Linking Header -->
+              <div id="consult-patient-selector-card" class="consult-patient-selector-card">
+                <div class="consult-selector-top-row">
+                  <div class="consult-selector-type-toggles" id="consult-type-toggles">
+                    <button type="button" id="consult-mode-citizen-btn" class="patient-type-pill active">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      <span>Registered Citizen</span>
+                    </button>
+                    <button type="button" id="consult-mode-walkin-btn" class="patient-type-pill">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                      <span>Unregistered Walk-in</span>
+                    </button>
+                  </div>
+                  <div style="font-size:11.5px; color:#64748b; font-weight:600;" id="consult-patient-card-hint">
+                    Select a patient to bind this encounter
+                  </div>
+                </div>
+
+                <!-- Citizen Search View -->
+                <div id="consult-citizen-search-view" class="consult-selector-view" style="position:relative;">
+                  <div class="consult-search-input-wrap">
+                    <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="consult-citizen-search-input" class="manual-entry-input" placeholder="Search by Citizen Name, ID (e.g. 102), contact #, or email..." autocomplete="off">
+                  </div>
+                  <div id="consult-citizen-dropdown" class="consult-citizen-dropdown hidden"></div>
+                </div>
+
+                <!-- Walk-in View -->
+                <div id="consult-walkin-view" class="consult-selector-view hidden">
+                  <div class="assessment-field-grid" style="grid-template-columns: 2fr 1fr 1fr; margin-bottom: 0; gap: 10px;">
+                    <div class="field" style="margin-bottom:0;">
+                      <label class="inputLabel required-label">Full Name <span style="color:#ef4444;">*</span></label>
+                      <input type="text" id="consult-walkin-name" class="manual-entry-input" placeholder="e.g. Juanita Dela Cruz">
+                    </div>
+                    <div class="field" style="margin-bottom:0;">
+                      <label class="inputLabel">Age</label>
+                      <input type="number" id="consult-walkin-age" class="manual-entry-input" placeholder="e.g. 42" min="0" max="130">
+                    </div>
+                    <div class="field" style="margin-bottom:0;">
+                      <label class="inputLabel">Sex / Gender</label>
+                      <select id="consult-walkin-sex" class="manual-entry-input">
+                        <option value="">Select...</option>
+                        <option value="Female">Female</option>
+                        <option value="Male">Male</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Confirmed Patient Banner -->
+                <div id="consult-confirmed-patient-banner" class="consult-confirmed-patient-banner hidden">
+                  <div class="confirmed-patient-info">
+                    <div class="confirmed-avatar" id="consult-confirmed-avatar">PT</div>
+                    <div class="confirmed-details">
+                      <div class="confirmed-name-row">
+                        <strong id="consult-confirmed-name">Patient Name</strong>
+                        <span id="consult-confirmed-tag" class="confirmed-id-tag">CIT-000</span>
+                        <span id="consult-confirmed-source" class="confirmed-source-tag">Registered</span>
+                      </div>
+                      <div id="consult-confirmed-meta" class="confirmed-meta-row">Demographic information</div>
+                    </div>
+                  </div>
+                  <button type="button" id="consult-confirmed-change-btn" class="chip-btn chip-btn-outline" style="font-size:11.5px; padding:5px 12px; height:auto; color:#065f46; border-color:#a7f3d0; background:#ffffff;">Change Patient</button>
+                </div>
+              </div>
+
               <div class="modal-tabs">
                 <button type="button" class="modal-tab active" data-tab="tab-history">1. History & Subjective</button>
                 <button type="button" class="modal-tab" data-tab="tab-exam">2. Physical Exam</button>

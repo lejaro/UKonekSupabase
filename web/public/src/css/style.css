@@ -7973,4 +7973,301 @@ body.dashboard-loading {
     .mainview {
         max-width: 1920px;
     }
-}
+}
+
+/* 6. Patient Identification & Linking Card in Consultation Workspace */
+.consult-patient-selector-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius-lg, 16px);
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.consult-selector-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.consult-selector-type-toggles {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #f1f5f9;
+    padding: 3px;
+    border-radius: var(--radius-full, 9999px);
+    border: 1px solid #e2e8f0;
+}
+
+.patient-type-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: var(--radius-full, 9999px);
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition-fast, 0.18s ease);
+}
+
+.patient-type-pill:hover {
+    color: #0f172a;
+}
+
+.patient-type-pill.active {
+    background: #065f46;
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(6, 95, 70, 0.2);
+}
+
+.consult-search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.consult-search-input-wrap .search-icon {
+    position: absolute;
+    left: 12px;
+    pointer-events: none;
+    color: #94a3b8;
+}
+
+.consult-search-input-wrap input {
+    padding-left: 36px !important;
+    font-size: 13.5px !important;
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    width: 100% !important;
+}
+
+.consult-citizen-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.14);
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.citizen-dropdown-item {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.15s ease;
+}
+
+.citizen-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.citizen-dropdown-item:hover,
+.citizen-dropdown-item.is-selected {
+    background: #f0fdf4;
+}
+
+.citizen-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #dcfce7;
+    color: #15803d;
+    font-weight: 700;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.citizen-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+    flex: 1;
+}
+
+.citizen-name-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.citizen-id-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: #0284c7;
+    background: #e0f2fe;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.citizen-sub-line {
+    font-size: 11.5px;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.consult-confirmed-patient-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    border-radius: 12px;
+    padding: 8px 12px;
+    gap: 12px;
+}
+
+.confirmed-patient-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.confirmed-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #059669;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.confirmed-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+}
+
+.confirmed-id-tag {
+    font-size: 11px;
+    font-weight: 700;
+    color: #065f46;
+    background: #d1fae5;
+    padding: 2px 7px;
+    border-radius: 6px;
+}
+
+.confirmed-source-tag {
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #0284c7;
+    background: #e0f2fe;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.confirmed-meta-row {
+    font-size: 11.5px;
+    color: #047857;
+    margin-top: 1px;
+}
+
+/* Left Sidebar Demographics Card */
+.consult-patient-side-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius-md, 12px);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.patient-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.patient-avatar-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e0f2fe;
+    color: #0284c7;
+    font-weight: 700;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.patient-name-title {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.patient-meta-sub {
+    font-size: 11.5px;
+    color: #64748b;
+}
+
+.patient-demographics-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 8px;
+}
+
+.demo-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: 11.5px;
+}
+
+.demo-label {
+    color: #64748b;
+    font-weight: 600;
+}
+
+.demo-value {
+    color: #0f172a;
+    font-weight: 500;
+    text-align: right;
+    max-width: 68%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+

@@ -512,11 +512,470 @@ export async function loadVitalsForConsultation(queueTicketId) {
   }
 }
 
-export function openConsultationModal(prefill = {}) {
+let activeConsultPatient = null;
+let citizenSearchDebounceTimer = null;
+let patientSelectorInitialized = false;
+
+function updateLeftPaneDemographics(info = {}) {
+  const card = document.getElementById('consult-patient-side-card');
+  const avatar = document.getElementById('consult-side-avatar');
+  const nameEl = document.getElementById('consult-side-name');
+  const subEl = document.getElementById('consult-side-sub');
+  const contactEl = document.getElementById('consult-side-contact');
+  const addressEl = document.getElementById('consult-side-address');
+
+  if (!card) return;
+
+  const name = String(info.name || '').trim();
+  if (!name) {
+    card.style.display = 'none';
+    return;
+  }
+
+  const nameParts = name.replace(/^(walk-in:\s*)/i, '').trim().split(/\s+/);
+  const initials = (nameParts.length >= 2
+    ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`
+    : `${nameParts[0]?.[0] || 'P'}${nameParts[0]?.[1] || 'T'}`
+  ).toUpperCase();
+
+  if (avatar) avatar.textContent = initials;
+  if (nameEl) nameEl.textContent = name;
+
+  const subParts = [];
+  if (info.id) subParts.push(info.id);
+  if (info.age) subParts.push(`${info.age} yo`);
+  if (info.sex) subParts.push(info.sex);
+  if (subEl) subEl.textContent = subParts.join(' • ') || '—';
+
+  if (contactEl) contactEl.textContent = info.contact || 'None';
+  if (addressEl) addressEl.textContent = info.address || 'None';
+
+  card.style.display = 'block';
+}
+
+function clearLeftPaneDemographics() {
+  const card = document.getElementById('consult-patient-side-card');
+  if (card) card.style.display = 'none';
+}
+
+export async function loadLatestVitalsForCitizen(citizenId) {
+  if (!citizenId) return;
+  try {
+    const { data, error } = await supabase
+      .from('vital_signs')
+      .select('id, queue_ticket_id, citizen_id, chief_complaint, blood_pressure, heart_rate, temperature, respiratory_rate, oxygen_saturation, current_medications, notes, height_cm, weight_kg, bmi, created_at')
+      .eq('citizen_id', citizenId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return;
+
+    const banner = document.getElementById('consult-vitals-banner');
+    const grid = document.getElementById('consult-vitals-grid');
+    const complaintEl = document.getElementById('consult-vitals-complaint');
+    const notesEl = document.getElementById('consult-vitals-notes');
+    if (!banner || !grid) return;
+
+    const vitals = [
+      { label: 'BP', value: data.blood_pressure ? `${data.blood_pressure} mmHg` : null },
+      { label: 'HR', value: data.heart_rate ? `${data.heart_rate} bpm` : null },
+      { label: 'Temp', value: data.temperature ? `${data.temperature} °C` : null },
+      { label: 'RR', value: data.respiratory_rate ? `${data.respiratory_rate} bpm` : null },
+      { label: 'SpO₂', value: data.oxygen_saturation ? `${data.oxygen_saturation}%` : null },
+      { label: 'Height', value: data.height_cm ? `${data.height_cm} cm` : null },
+      { label: 'Weight', value: data.weight_kg ? `${data.weight_kg} kg` : null },
+      { label: 'BMI', value: data.bmi ? `${data.bmi}` : null },
+    ].filter(v => v.value);
+
+    if (vitals.length === 0 && !data.chief_complaint) return;
+
+    grid.innerHTML = vitals.map(v => `
+      <div class="vitals-mini-card">
+        <div class="v-label">${sanitizeText(v.label)}</div>
+        <div class="v-val">${sanitizeText(v.value)}</div>
+      </div>
+    `).join('');
+
+    if (complaintEl) {
+      complaintEl.innerHTML = data.chief_complaint
+        ? `<strong>Chief Complaint:</strong> ${sanitizeText(data.chief_complaint)}`
+        : '';
+    }
+    if (notesEl) {
+      notesEl.innerHTML = data.notes
+        ? `<strong>Nurse Notes:</strong> ${sanitizeText(data.notes)}`
+        : '';
+      if (data.current_medications) {
+        notesEl.innerHTML += `<br><strong>Current Meds:</strong> ${sanitizeText(data.current_medications)}`;
+      }
+    }
+
+    const hpiInput = document.getElementById('consult-hpi');
+    if (hpiInput && (!hpiInput.value || hpiInput.value === 'None') && data.chief_complaint) {
+      hpiInput.value = data.chief_complaint;
+    }
+
+    banner.style.display = 'block';
+  } catch (err) {
+    console.warn('Could not load vitals for citizen:', err);
+  }
+}
+
+async function executeCitizenSearch(query) {
+  const dropdown = document.getElementById('consult-citizen-dropdown');
+  if (!dropdown) return;
+
+  const trimmed = String(query || '').trim();
+  if (trimmed.length < 1) {
+    dropdown.innerHTML = '';
+    dropdown.classList.add('hidden');
+    return;
+  }
+
+  dropdown.innerHTML = '<div style="padding:12px; text-align:center; color:#64748b; font-size:12px;">Searching registered citizens...</div>';
+  dropdown.classList.remove('hidden');
+
+  try {
+    const cleanNum = trimmed.replace(/[^0-9]/g, '');
+    let filterOrs = [];
+    if (cleanNum && cleanNum.length <= 10) {
+      filterOrs.push(`id.eq.${cleanNum}`);
+    }
+    filterOrs.push(`firstname.ilike.%${trimmed}%`);
+    filterOrs.push(`surname.ilike.%${trimmed}%`);
+    filterOrs.push(`contact_number.ilike.%${trimmed}%`);
+
+    const { data: citizens, error } = await supabase
+      .from('citizens')
+      .select('id, firstname, surname, middle_initial, age, sex, contact_number, complete_address, allergies, date_of_birth')
+      .or(filterOrs.join(','))
+      .order('surname', { ascending: true })
+      .limit(8);
+
+    if (error) throw error;
+
+    if (!citizens || citizens.length === 0) {
+      dropdown.innerHTML = `
+        <div style="padding:14px; text-align:center; color:#64748b; font-size:12.5px;">
+          No registered citizens matching "<strong>${sanitizeText(trimmed)}</strong>".<br>
+          <span style="font-size:11.5px; color:#94a3b8;">Switch to <strong>Unregistered Walk-in</strong> if they are not in the system.</span>
+        </div>
+      `;
+      return;
+    }
+
+    dropdown.innerHTML = citizens.map(c => {
+      const fullName = `${c.firstname || ''} ${c.middle_initial ? c.middle_initial + '. ' : ''}${c.surname || ''}`.trim();
+      const initials = `${(c.firstname || 'P')[0]}${(c.surname || 'T')[0]}`.toUpperCase();
+      const metaParts = [];
+      if (c.age) metaParts.push(`${c.age} yo`);
+      if (c.sex) metaParts.push(c.sex);
+      if (c.contact_number) metaParts.push(`📞 ${c.contact_number}`);
+      const metaLine = metaParts.join(' • ');
+      const hasAllergy = c.allergies && c.allergies !== 'None' && c.allergies.trim().length > 0;
+
+      return `
+        <div class="citizen-dropdown-item" data-citizen-id="${c.id}">
+          <div class="citizen-avatar">${sanitizeText(initials)}</div>
+          <div class="citizen-info">
+            <div class="citizen-name-line">
+              <span>${sanitizeText(fullName)}</span>
+              <span class="citizen-id-badge">CIT-${c.id}</span>
+            </div>
+            <div class="citizen-sub-line">${sanitizeText(metaLine)}</div>
+            ${hasAllergy ? `<div style="font-size:11px; color:#dc2626; font-weight:600; margin-top:2px;">⚠️ Allergies: ${sanitizeText(c.allergies)}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    dropdown.querySelectorAll('.citizen-dropdown-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const id = Number(item.dataset.citizenId);
+        const citizen = citizens.find(c => c.id === id);
+        if (citizen) {
+          bindCitizenToConsultation(citizen);
+        }
+      });
+    });
+  } catch (err) {
+    console.error('Citizen search error:', err);
+    dropdown.innerHTML = '<div style="padding:12px; text-align:center; color:#ef4444; font-size:12px;">Error searching citizens. Please try again.</div>';
+  }
+}
+
+function bindCitizenToConsultation(citizen) {
+  const form = document.getElementById('consultation-form');
+  const patientInput = document.getElementById('consult-patient-id');
+  const displayId = document.getElementById('consult-display-id');
+  const dropdown = document.getElementById('consult-citizen-dropdown');
+  const confirmedBanner = document.getElementById('consult-confirmed-patient-banner');
+  const searchView = document.getElementById('consult-citizen-search-view');
+  const walkinView = document.getElementById('consult-walkin-view');
+  const toggles = document.getElementById('consult-type-toggles');
+  const changeBtn = document.getElementById('consult-confirmed-change-btn');
+
+  if (dropdown) dropdown.classList.add('hidden');
+
+  const fullName = `${citizen.firstname || ''} ${citizen.middle_initial ? citizen.middle_initial + '. ' : ''}${citizen.surname || ''}`.trim();
+  const initials = `${(citizen.firstname || 'P')[0]}${(citizen.surname || 'T')[0]}`.toUpperCase();
+
+  activeConsultPatient = {
+    mode: 'citizen',
+    id: citizen.id,
+    name: fullName,
+    citizen: citizen
+  };
+
+  if (patientInput) patientInput.value = `CIT-${citizen.id}`;
+  if (form) {
+    form.dataset.patientName = fullName;
+    form.dataset.patientCitizenId = String(citizen.id);
+    form.dataset.patientMode = 'citizen';
+  }
+
+  if (displayId) {
+    const servicePart = form?.dataset.serviceLabel ? ` &mdash; <em>${sanitizeText(form.dataset.serviceLabel)}</em>` : '';
+    displayId.innerHTML = `<strong>${sanitizeText(fullName)}</strong> <span style="color:#cbd5e1">(CIT-${citizen.id})</span>${servicePart}`;
+  }
+
+  const confAvatar = document.getElementById('consult-confirmed-avatar');
+  const confName = document.getElementById('consult-confirmed-name');
+  const confTag = document.getElementById('consult-confirmed-tag');
+  const confSource = document.getElementById('consult-confirmed-source');
+  const confMeta = document.getElementById('consult-confirmed-meta');
+
+  if (confAvatar) confAvatar.textContent = initials;
+  if (confName) confName.textContent = fullName;
+  if (confTag) confTag.textContent = `CIT-${citizen.id}`;
+  if (confSource) {
+    confSource.textContent = 'Registered Citizen';
+    confSource.className = 'confirmed-source-tag';
+  }
+  if (confMeta) {
+    const metaParts = [];
+    if (citizen.age) metaParts.push(`${citizen.age} yo`);
+    if (citizen.sex) metaParts.push(citizen.sex);
+    if (citizen.contact_number) metaParts.push(`📞 ${citizen.contact_number}`);
+    if (citizen.complete_address) metaParts.push(citizen.complete_address);
+    confMeta.textContent = metaParts.join(' • ') || 'No extra demographics recorded';
+  }
+
+  if (changeBtn) changeBtn.style.display = form?.dataset.queueTicketId ? 'none' : 'inline-block';
+  if (confirmedBanner) confirmedBanner.classList.remove('hidden');
+  if (searchView) searchView.classList.add('hidden');
+  if (walkinView) walkinView.classList.add('hidden');
+  if (toggles) toggles.style.display = 'none';
+
+  updateLeftPaneDemographics({
+    name: fullName,
+    id: `CIT-${citizen.id}`,
+    age: citizen.age,
+    sex: citizen.sex,
+    contact: citizen.contact_number,
+    address: citizen.complete_address
+  });
+
+  const allergyBox = document.getElementById('consult-allergy-alert');
+  const allergyText = document.getElementById('consult-allergy-text');
+  const allergyInput = document.getElementById('consult-allergies');
+  if (citizen.allergies && citizen.allergies !== 'None' && citizen.allergies.trim()) {
+    if (allergyText) allergyText.textContent = citizen.allergies;
+    if (allergyBox) allergyBox.classList.remove('hidden');
+    if (allergyInput && (!allergyInput.value || allergyInput.value === 'None')) {
+      allergyInput.value = citizen.allergies;
+    }
+  } else {
+    if (allergyBox) allergyBox.classList.add('hidden');
+  }
+
+  if (!form?.dataset.queueTicketId) {
+    loadLatestVitalsForCitizen(citizen.id);
+  }
+}
+
+function syncWalkinPatient() {
+  const form = document.getElementById('consultation-form');
+  const patientInput = document.getElementById('consult-patient-id');
+  const displayId = document.getElementById('consult-display-id');
+  const nameInput = document.getElementById('consult-walkin-name');
+  const ageInput = document.getElementById('consult-walkin-age');
+  const sexInput = document.getElementById('consult-walkin-sex');
+
+  const name = (nameInput?.value || '').trim();
+  const age = (ageInput?.value || '').trim();
+  const sex = (sexInput?.value || '').trim();
+
+  activeConsultPatient = {
+    mode: 'walkin',
+    id: null,
+    name: name,
+    age: age,
+    sex: sex
+  };
+
+  if (patientInput) {
+    patientInput.value = name ? `Walk-in: ${name}` : '';
+  }
+  if (form) {
+    form.dataset.patientName = name || 'Walk-in Patient';
+    form.dataset.patientCitizenId = '';
+    form.dataset.patientMode = 'walkin';
+  }
+
+  if (displayId) {
+    displayId.innerHTML = name
+      ? `<strong>${sanitizeText(name)}</strong> <span style="color:#cbd5e1">(Walk-in)</span>`
+      : '<em>Walk-in Patient</em>';
+  }
+
+  if (name) {
+    updateLeftPaneDemographics({
+      name: name,
+      id: 'Walk-in (Unregistered)',
+      age: age,
+      sex: sex,
+      contact: 'N/A (Walk-in)',
+      address: 'N/A (Walk-in)'
+    });
+  } else {
+    clearLeftPaneDemographics();
+  }
+}
+
+function resetPatientSelection() {
+  activeConsultPatient = null;
+  const form = document.getElementById('consultation-form');
+  const patientInput = document.getElementById('consult-patient-id');
+  const displayId = document.getElementById('consult-display-id');
+  const confirmedBanner = document.getElementById('consult-confirmed-patient-banner');
+  const searchView = document.getElementById('consult-citizen-search-view');
+  const walkinView = document.getElementById('consult-walkin-view');
+  const toggles = document.getElementById('consult-type-toggles');
+  const searchInput = document.getElementById('consult-citizen-search-input');
+  const dropdown = document.getElementById('consult-citizen-dropdown');
+  const walkinName = document.getElementById('consult-walkin-name');
+  const walkinAge = document.getElementById('consult-walkin-age');
+  const walkinSex = document.getElementById('consult-walkin-sex');
+
+  if (patientInput) patientInput.value = '';
+  if (form) {
+    form.dataset.patientName = '';
+    form.dataset.patientCitizenId = '';
+    form.dataset.patientMode = 'citizen';
+  }
+  if (displayId) displayId.innerHTML = '—';
+  if (searchInput) searchInput.value = '';
+  if (dropdown) {
+    dropdown.innerHTML = '';
+    dropdown.classList.add('hidden');
+  }
+  if (walkinName) walkinName.value = '';
+  if (walkinAge) walkinAge.value = '';
+  if (walkinSex) walkinSex.value = '';
+
+  if (confirmedBanner) confirmedBanner.classList.add('hidden');
+  if (toggles) toggles.style.display = 'flex';
+
+  document.getElementById('consult-mode-citizen-btn')?.classList.add('active');
+  document.getElementById('consult-mode-walkin-btn')?.classList.remove('active');
+  if (searchView) searchView.classList.remove('hidden');
+  if (walkinView) walkinView.classList.add('hidden');
+
+  clearLeftPaneDemographics();
+  document.getElementById('consult-allergy-alert')?.classList.add('hidden');
+  const vitalsBanner = document.getElementById('consult-vitals-banner');
+  if (vitalsBanner) vitalsBanner.style.display = 'none';
+
+  setTimeout(() => searchInput?.focus(), 120);
+}
+
+export function initConsultationPatientSelector() {
+  if (patientSelectorInitialized) return;
+  patientSelectorInitialized = true;
+
+  const citizenBtn = document.getElementById('consult-mode-citizen-btn');
+  const walkinBtn = document.getElementById('consult-mode-walkin-btn');
+  const searchView = document.getElementById('consult-citizen-search-view');
+  const walkinView = document.getElementById('consult-walkin-view');
+  const searchInput = document.getElementById('consult-citizen-search-input');
+  const dropdown = document.getElementById('consult-citizen-dropdown');
+  const changeBtn = document.getElementById('consult-confirmed-change-btn');
+  const form = document.getElementById('consultation-form');
+
+  const walkinName = document.getElementById('consult-walkin-name');
+  const walkinAge = document.getElementById('consult-walkin-age');
+  const walkinSex = document.getElementById('consult-walkin-sex');
+
+  if (citizenBtn) {
+    citizenBtn.addEventListener('click', () => {
+      citizenBtn.classList.add('active');
+      walkinBtn?.classList.remove('active');
+      if (searchView) searchView.classList.remove('hidden');
+      if (walkinView) walkinView.classList.add('hidden');
+      if (form) form.dataset.patientMode = 'citizen';
+      searchInput?.focus();
+    });
+  }
+
+  if (walkinBtn) {
+    walkinBtn.addEventListener('click', () => {
+      walkinBtn.classList.add('active');
+      citizenBtn?.classList.remove('active');
+      if (searchView) searchView.classList.add('hidden');
+      if (walkinView) walkinView.classList.remove('hidden');
+      if (dropdown) dropdown.classList.add('hidden');
+      if (form) form.dataset.patientMode = 'walkin';
+      walkinName?.focus();
+      syncWalkinPatient();
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      clearTimeout(citizenSearchDebounceTimer);
+      const val = e.target.value;
+      citizenSearchDebounceTimer = setTimeout(() => {
+        executeCitizenSearch(val);
+      }, 250);
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && dropdown) {
+        dropdown.classList.add('hidden');
+      }
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!dropdown || dropdown.classList.contains('hidden')) return;
+    if (!dropdown.contains(e.target) && e.target !== searchInput) {
+      dropdown.classList.add('hidden');
+    }
+  });
+
+  [walkinName, walkinAge, walkinSex].forEach(el => {
+    if (el) {
+      el.addEventListener('input', syncWalkinPatient);
+      el.addEventListener('change', syncWalkinPatient);
+    }
+  });
+
+  if (changeBtn) {
+    changeBtn.addEventListener('click', () => {
+      resetPatientSelection();
+    });
+  }
+}
+
+export async function openConsultationModal(prefill = {}) {
   const consultationModal = document.getElementById('consultation-modal');
   const consultationForm = document.getElementById('consultation-form');
   if (!consultationModal) return;
   if (consultationForm) consultationForm.reset();
+
+  initConsultationPatientSelector();
 
   // Reset tab to History
   consultationModal.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
@@ -536,18 +995,91 @@ export function openConsultationModal(prefill = {}) {
   const displayId = document.getElementById('consult-display-id');
   if (patientInput && prefill.patientId) patientInput.value = prefill.patientId;
 
-  // Show patient name + service in modal header
-  if (displayId) {
-    const namePart = prefill.patientName ? `<strong>${sanitizeText(prefill.patientName)}</strong>` : '';
-    const idPart = prefill.patientId ? `<span style="color:#cbd5e1">(${sanitizeText(String(prefill.patientId))})</span>` : '—';
-    const servicePart = prefill.serviceLabel ? ` &mdash; <em>${sanitizeText(prefill.serviceLabel)}</em>` : '';
-    displayId.innerHTML = `${namePart} ${idPart}${servicePart}`.trim();
-  }
-
-  // Store queue ticket id on form for later use
+  // Store queue ticket id and service label on form for later use
   if (consultationForm) {
     consultationForm.dataset.queueTicketId = prefill.queueTicketId ? String(prefill.queueTicketId) : '';
     consultationForm.dataset.patientName = prefill.patientName || '';
+    consultationForm.dataset.serviceLabel = prefill.serviceLabel || '';
+  }
+
+  // Handle Patient Binding (Prefilled Ticket vs Fresh Form)
+  if (prefill.queueTicketId || prefill.patientId) {
+    const rawPatientId = prefill.patientId || '';
+    const citizenId = resolveCitizenId(rawPatientId);
+
+    if (citizenId) {
+      try {
+        const { data: citizen } = await supabase
+          .from('citizens')
+          .select('id, firstname, surname, middle_initial, age, sex, contact_number, complete_address, allergies, date_of_birth')
+          .eq('id', citizenId)
+          .maybeSingle();
+
+        if (citizen) {
+          bindCitizenToConsultation(citizen);
+        } else {
+          updateLeftPaneDemographics({
+            name: prefill.patientName || rawPatientId,
+            id: rawPatientId,
+            age: '',
+            sex: ''
+          });
+        }
+      } catch (cErr) {
+        console.warn('Could not fetch citizen details for consultation prefill:', cErr);
+      }
+    } else {
+      const pName = prefill.patientName || rawPatientId || 'Walk-in Patient';
+      if (consultationForm) {
+        consultationForm.dataset.patientName = pName;
+        consultationForm.dataset.patientCitizenId = '';
+        consultationForm.dataset.patientMode = 'walkin';
+      }
+
+      const confirmedBanner = document.getElementById('consult-confirmed-patient-banner');
+      const confAvatar = document.getElementById('consult-confirmed-avatar');
+      const confName = document.getElementById('consult-confirmed-name');
+      const confTag = document.getElementById('consult-confirmed-tag');
+      const confSource = document.getElementById('consult-confirmed-source');
+      const confMeta = document.getElementById('consult-confirmed-meta');
+      const changeBtn = document.getElementById('consult-confirmed-change-btn');
+      const toggles = document.getElementById('consult-type-toggles');
+      const searchView = document.getElementById('consult-citizen-search-view');
+      const walkinView = document.getElementById('consult-walkin-view');
+
+      if (confAvatar) confAvatar.textContent = (pName[0] || 'W').toUpperCase();
+      if (confName) confName.textContent = pName;
+      if (confTag) confTag.textContent = prefill.queueTicketId ? `Ticket #${prefill.queueTicketId}` : 'Walk-in';
+      if (confSource) {
+        confSource.textContent = 'Walk-in Queue';
+        confSource.className = 'confirmed-source-tag';
+      }
+      if (confMeta) confMeta.textContent = prefill.serviceLabel || 'Walk-in Patient';
+      if (changeBtn) changeBtn.style.display = 'none';
+
+      if (confirmedBanner) confirmedBanner.classList.remove('hidden');
+      if (toggles) toggles.style.display = 'none';
+      if (searchView) searchView.classList.add('hidden');
+      if (walkinView) walkinView.classList.add('hidden');
+
+      updateLeftPaneDemographics({
+        name: pName,
+        id: prefill.queueTicketId ? `Ticket #${prefill.queueTicketId}` : 'Walk-in',
+        age: '',
+        sex: '',
+        contact: 'Walk-in Patient',
+        address: 'Walk-in'
+      });
+    }
+
+    if (displayId) {
+      const namePart = prefill.patientName ? `<strong>${sanitizeText(prefill.patientName)}</strong>` : '';
+      const idPart = prefill.patientId ? `<span style="color:#cbd5e1">(${sanitizeText(String(prefill.patientId))})</span>` : '—';
+      const servicePart = prefill.serviceLabel ? ` &mdash; <em>${sanitizeText(prefill.serviceLabel)}</em>` : '';
+      displayId.innerHTML = `${namePart} ${idPart}${servicePart}`.trim();
+    }
+  } else {
+    resetPatientSelection();
   }
 
   // Pre-fill fields answerable by "None" when no answers
@@ -615,6 +1147,8 @@ export function closeConsultationModal() {
   if (!consultationModal) return;
   consultationModal.classList.add('hidden');
   if (consultationForm) consultationForm.reset();
+  const dropdown = document.getElementById('consult-citizen-dropdown');
+  if (dropdown) dropdown.classList.add('hidden');
 }
 
 export async function completeQueueTicket(ticketId) {
@@ -637,6 +1171,7 @@ export function initConsultationSection() {
   initConsultationQuickDiagnosis();
   initConsultationTabs();
   initPrescriptionDosagePresets();
+  initConsultationPatientSelector();
   loadConsultationData();
   initLabSection();
 
@@ -682,9 +1217,34 @@ export function initConsultationSection() {
       }
 
       const submitBtn = document.getElementById('consult-submit-btn');
-      const patientId = document.getElementById('consult-patient-id')?.value || '';
-      const patientName = consultationForm.dataset.patientName || '';
+      let patientId = document.getElementById('consult-patient-id')?.value || '';
+      let patientName = consultationForm.dataset.patientName || '';
+      const patientMode = consultationForm.dataset.patientMode || 'citizen';
       const diagnosis = document.getElementById('consult-diagnosis')?.value || '';
+
+      // Validate patient selection
+      let citizenId = resolveCitizenId(patientId) || resolveCitizenId(consultationForm.dataset.patientCitizenId);
+      let walkinName = '';
+
+      if (patientMode === 'walkin' || (!citizenId && patientId.toLowerCase().startsWith('walk-in:'))) {
+        walkinName = (document.getElementById('consult-walkin-name')?.value || '').trim() || patientName.replace(/^walk-in:\s*/i, '').trim();
+        if (!walkinName) {
+          showToast('Please specify the walk-in patient\'s name.', 'warning');
+          document.getElementById('consult-mode-walkin-btn')?.click();
+          document.getElementById('consult-walkin-name')?.focus();
+          return;
+        }
+        patientId = `Walk-in: ${walkinName}`;
+        patientName = walkinName;
+        citizenId = null;
+      } else {
+        if (!citizenId) {
+          showToast('Please search and select a registered citizen, or select Unregistered Walk-in.', 'warning');
+          document.getElementById('consult-citizen-search-input')?.focus();
+          return;
+        }
+        patientId = `CIT-${citizenId}`;
+      }
 
       if (!diagnosis) {
         showToast('Diagnosis is required.', 'warning');
@@ -699,15 +1259,22 @@ export function initConsultationSection() {
           throw new Error('Unable to resolve doctor staff session.');
         }
 
-        const citizenId = resolveCitizenId(patientId);
+        // Format notes with walk-in demographics if applicable
+        let finalNotes = cleanNone(document.getElementById('consult-notes')?.value);
+        if (patientMode === 'walkin' && walkinName) {
+          const wAge = document.getElementById('consult-walkin-age')?.value?.trim();
+          const wSex = document.getElementById('consult-walkin-sex')?.value?.trim();
+          const tag = `[Walk-in Patient: ${walkinName}${wAge ? ', Age: ' + wAge : ''}${wSex ? ', Sex: ' + wSex : ''}]`;
+          finalNotes = (finalNotes && finalNotes !== 'None') ? `${tag} ${finalNotes}` : tag;
+        }
 
         const payload = {
-          patient_identifier: String(patientId || '').trim(),
+          patient_identifier: String(patientId).trim(),
           patient_citizen_id: citizenId,
           doctor_staff_id: doctorStaffId,
           symptoms: cleanNone(document.getElementById('consult-hpi')?.value),
           diagnosis: String(diagnosis).trim(),
-          notes: cleanNone(document.getElementById('consult-notes')?.value),
+          notes: finalNotes,
           hpi: cleanNone(document.getElementById('consult-hpi')?.value),
           pmh: cleanNone(document.getElementById('consult-pmh')?.value),
           allergies: cleanNone(document.getElementById('consult-allergies')?.value),
