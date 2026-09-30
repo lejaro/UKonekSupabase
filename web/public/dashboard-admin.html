@@ -374,13 +374,20 @@
           <!-- Staff Table -->
           <div class="admin-table-wrap">
             <table class="admin-table" id="staff-table">
+              <colgroup>
+                <col style="width: 32%;">
+                <col style="width: 17%;">
+                <col style="width: 14%;">
+                <col style="width: 17%;">
+                <col style="width: 20%;">
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Staff Member</th>
-                  <th>Employee ID</th>
-                  <th>Role</th>
-                  <th>Account Status</th>
-                  <th style="text-align:right;">Actions</th>
+                  <th class="col-left">Staff Member</th>
+                  <th class="col-left">Employee ID</th>
+                  <th class="col-center">Role</th>
+                  <th class="col-center">Account Status</th>
+                  <th class="col-right" style="padding-right: 22px;">Actions</th>
                 </tr>
               </thead>
               <tbody id="staff-tbody">
@@ -425,14 +432,22 @@
         <div class="admin-panel-body">
           <div class="admin-table-wrap">
             <table class="admin-table" id="schedules-table">
+              <colgroup>
+                <col style="width: 24%;">
+                <col style="width: 18%;">
+                <col style="width: 15%;">
+                <col style="width: 16%;">
+                <col style="width: 15%;">
+                <col style="width: 12%;">
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Physician</th>
-                  <th>Specialization</th>
-                  <th>Date</th>
-                  <th>Shift Time</th>
-                  <th>Duty Notes</th>
-                  <th style="text-align:right;">Actions</th>
+                  <th class="col-left">Physician</th>
+                  <th class="col-left">Specialization</th>
+                  <th class="col-center">Date</th>
+                  <th class="col-center">Shift Time</th>
+                  <th class="col-left">Duty Notes</th>
+                  <th class="col-right" style="padding-right: 20px;">Actions</th>
                 </tr>
               </thead>
               <tbody id="schedules-tbody">
@@ -478,14 +493,22 @@
         <div class="admin-panel-body">
           <div class="admin-table-wrap">
             <table class="admin-table" id="announcements-table">
+              <colgroup>
+                <col style="width: 68px;">
+                <col style="width: 40%;">
+                <col style="width: 14%;">
+                <col style="width: 15%;">
+                <col style="width: 17%;">
+                <col style="width: 14%;">
+              </colgroup>
               <thead>
                 <tr>
-                  <th style="width:60px; text-align:center;">Image</th>
-                  <th>Title & Notice Content</th>
-                  <th>Target Audience</th>
-                  <th>Author</th>
-                  <th>Published Date</th>
-                  <th style="text-align:right;">Actions</th>
+                  <th class="col-center">Image</th>
+                  <th class="col-left">Title & Notice Content</th>
+                  <th class="col-center">Target Audience</th>
+                  <th class="col-left">Author</th>
+                  <th class="col-center">Published Date</th>
+                  <th class="col-right" style="padding-right: 20px;">Actions</th>
                 </tr>
               </thead>
               <tbody id="announcements-tbody">

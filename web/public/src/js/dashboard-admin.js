@@ -659,7 +659,7 @@ function renderStaffTable() {
 
     return `
       <tr data-staff-id="${staff.id}">
-        <td>
+        <td class="col-left">
           <div class="admin-user-cell">
             <div class="user-initials">${initials}</div>
             <div>
@@ -671,16 +671,18 @@ function renderStaffTable() {
             </div>
           </div>
         </td>
-        <td><span style="font-family:monospace; font-weight:600; color:#334155;">${staff.employee_id || '—'}</span></td>
-        <td><span class="badge-role ${role}">${role}</span></td>
-        <td><span class="badge-status ${status.toLowerCase()}">${status}</span></td>
-        <td style="text-align:right; white-space:nowrap;">
-          <button type="button" class="admin-btn admin-btn-outline admin-btn-sm btn-staff-toggle-status" data-id="${staff.id}" data-name="${fullName}" data-username="${staff.username || ''}" data-status="${status}" ${isSelf ? 'disabled title="Cannot disable your own account"' : ''}>
-            ${status === 'Active' ? 'Disable' : 'Enable'}
-          </button>
-          <button type="button" class="admin-btn admin-btn-outline admin-btn-sm btn-staff-reset-pwd" data-id="${staff.id}" data-name="${fullName}" style="margin-left:4px;">
-            Reset Password
-          </button>
+        <td class="col-left"><span class="employee-badge-mono">${staff.employee_id || '—'}</span></td>
+        <td class="col-center"><span class="badge-role ${role}">${role}</span></td>
+        <td class="col-center"><span class="badge-status ${status.toLowerCase()}">${status}</span></td>
+        <td class="col-right" style="padding-right: 22px;">
+          <div class="admin-actions-cell">
+            <button type="button" class="admin-btn admin-btn-outline admin-btn-sm btn-staff-toggle-status" data-id="${staff.id}" data-name="${fullName}" data-username="${staff.username || ''}" data-status="${status}" ${isSelf ? 'disabled title="Cannot disable your own account"' : ''}>
+              ${status === 'Active' ? 'Disable' : 'Enable'}
+            </button>
+            <button type="button" class="admin-btn admin-btn-outline admin-btn-sm btn-staff-reset-pwd" data-id="${staff.id}" data-name="${fullName}">
+              Reset Password
+            </button>
+          </div>
         </td>
       </tr>
     `;
@@ -1050,12 +1052,12 @@ function renderSchedulesTable() {
 
     return `
       <tr>
-        <td><strong>${docName}</strong></td>
-        <td><span style="font-size:12px; color:#475569;">${spec}</span></td>
-        <td>${dateFormatted}</td>
-        <td><span style="font-weight:600; color:#0284c7;">${timeFormatted}</span></td>
-        <td><span style="font-size:12px; color:#64748b;">${sched.notes || '—'}</span></td>
-        <td style="text-align:right;">
+        <td class="col-left"><strong>${docName}</strong></td>
+        <td class="col-left"><span style="font-size:12px; color:#475569;">${spec}</span></td>
+        <td class="col-center"><span style="font-weight:600; color:#334155;">${dateFormatted}</span></td>
+        <td class="col-center"><span style="font-weight:700; color:#0284c7; background:#e0f2fe; padding:3px 8px; border-radius:6px; font-size:12px;">${timeFormatted}</span></td>
+        <td class="col-left"><span style="font-size:12px; color:#64748b;">${sched.notes || '—'}</span></td>
+        <td class="col-right" style="padding-right: 20px;">
           <button type="button" class="admin-btn admin-btn-danger admin-btn-sm btn-delete-schedule" data-id="${sched.id}">
             Remove
           </button>
@@ -1199,15 +1201,15 @@ function renderAnnouncementsTable() {
 
     return `
       <tr>
-        <td style="text-align:center;">${imgHtml}</td>
-        <td>
+        <td class="col-center">${imgHtml}</td>
+        <td class="col-left">
           <div style="font-weight:700; color:#0f172a; font-size:13.5px; margin-bottom:2px;">${ann.title}</div>
           <div style="font-size:12px; color:#64748b; line-height:1.35; max-width:440px;">${ann.content || ''}</div>
         </td>
-        <td><span class="badge-role ${visBadgeClass}">${visLabel}</span></td>
-        <td><span style="font-size:12.5px; font-weight:600; color:#334155;">${author}</span></td>
-        <td><span style="font-size:12px; color:#64748b;">${dateFormatted}</span></td>
-        <td style="text-align:right;">
+        <td class="col-center"><span class="badge-role ${visBadgeClass}">${visLabel}</span></td>
+        <td class="col-left"><span style="font-size:12.5px; font-weight:600; color:#334155;">${author}</span></td>
+        <td class="col-center"><span style="font-size:12px; color:#64748b;">${dateFormatted}</span></td>
+        <td class="col-right" style="padding-right: 20px;">
           <button type="button" class="admin-btn admin-btn-danger admin-btn-sm btn-delete-announcement" data-id="${ann.id}">
             Delete
           </button>
