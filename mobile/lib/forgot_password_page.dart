@@ -19,13 +19,13 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
   bool _isLoading = false;
   bool _emailSent = false;
 
-  // ── Updated Medical Green Design Tokens ──────────────────────
-  static const _primary      = Color(0xFF059669); // Emerald 600
-  static const _primary2     = Color(0xFF064E3B); // Forest Emerald 900
+  // ── Unified Design System Tokens ───────────────────────────────
+  static const _primary      = Color(0xFF2D5A27); // Forest Green
+  static const _primary2     = Color(0xFF1E3D1A); // Forest Green Dark
   static const _bg           = Color(0xFFF8FAFC); // Slate Background
   static const _textDark     = Color(0xFF0F172A); // Slate 900
   static const _textMuted    = Color(0xFF64748B); // Slate 500
-  static const _fieldBdr     = Color(0xFFE2E8F0); // Light Mist Border
+  static const _fieldBdr     = Color(0xFFCBD5E1); // Slate 300
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;

@@ -133,6 +133,11 @@ class _JoinQueuePageState extends State<JoinQueuePage>
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'queue_tickets',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'id',
+              value: ticketId,
+            ),
             callback: (payload) {
               final rec = payload.newRecord;
               if (rec.isEmpty) return;
@@ -168,9 +173,6 @@ class _JoinQueuePageState extends State<JoinQueuePage>
                 } else {
                   _refreshDashboard();
                 }
-              } else if (status == 'serving' || status == 'completed') {
-                // Another patient ahead moved forward, refresh countdown immediately
-                _refreshDashboard();
               }
             },
           )
@@ -192,8 +194,8 @@ class _JoinQueuePageState extends State<JoinQueuePage>
 
   void _startRefreshTimer() {
     _refreshTimer?.cancel();
-    // 30-second fallback polling while realtime pushes live events
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshDashboard());
+    // 120-second fallback polling while realtime pushes live events
+    _refreshTimer = Timer.periodic(const Duration(seconds: 120), (_) => _refreshDashboard());
   }
 
   void _stopRefreshTimer() {

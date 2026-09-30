@@ -11,6 +11,7 @@ import 'medicine_scheduler_page.dart';
 import 'join_queue_page.dart';
 import 'profile_page.dart';
 import 'core/navigation/shell_navigation.dart';
+import 'core/theme/app_colors.dart';
 import 'widgets/prescription_details_sheet.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -107,8 +108,8 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
       if (mounted) _checkNewPrescriptionAlert();
     });
 
-    // Check periodically every 30 seconds while the app is active
-    _prescriptionCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    // Check periodically every 90 seconds while the app is active (instant trigger also runs on app resume & consultation end)
+    _prescriptionCheckTimer = Timer.periodic(const Duration(seconds: 90), (_) {
       if (mounted) _checkNewPrescriptionAlert();
     });
   }
@@ -252,11 +253,19 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
   }
 
   Widget _buildBottomNav() {
-    const Color barColor = Color(0xFF1E4E2B); // Dark green background
     final currentTab = _selectedTab;
 
     return Container(
-      color: barColor,
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowMd,
+            blurRadius: 10,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
       child: SafeArea(
         top: false,
         child: SizedBox(
@@ -301,18 +310,18 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
               ),
               // Prominent Raised Center QR Button
               Positioned(
-                top: -12,
+                top: -16,
                 child: GestureDetector(
                   onTap: _showPatientQrModal,
                   child: Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: const [
+                    width: 60,
+                    height: 60,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
                         BoxShadow(
-                          color: Color(0x33000000),
+                          color: AppColors.shadowMd,
                           blurRadius: 10,
                           offset: Offset(0, 4),
                         ),
@@ -320,8 +329,8 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
                     ),
                     child: const Icon(
                       Icons.qr_code_scanner_rounded,
-                      color: barColor,
-                      size: 34,
+                      color: Colors.white,
+                      size: 32,
                     ),
                   ),
                 ),
@@ -345,25 +354,16 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
       },
       behavior: HitTestBehavior.opaque,
       child: Container(
-        width: 44,
-        height: 44,
+        width: 48,
+        height: 48,
         decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: isSelected
-              ? const [
-                  BoxShadow(
-                    color: Color(0x33000000),
-                    blurRadius: 6,
-                    offset: Offset(0, 2),
-                  )
-                ]
-              : null,
+          color: isSelected ? AppColors.primaryLight : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
           icon,
-          color: const Color(0xFF1E4E2B),
-          size: 24,
+          color: isSelected ? AppColors.primary : AppColors.textMuted,
+          size: 26,
         ),
       ),
     );

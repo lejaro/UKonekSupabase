@@ -12,7 +12,7 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+      font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
@@ -48,17 +48,17 @@
     @media (max-width: 500px) { .ph-stats { grid-template-columns: 1fr; } }
     .ph-card {
       background: #fff;
-      border-radius: 18px;
+      border-radius: var(--card-radius, 14px);
       padding: 20px 22px;
-      border: 1px solid rgba(226, 232, 240, 0.8);
+      border: 1.5px solid var(--border-default, #e2e8f0);
       display: flex;
       align-items: center;
       gap: 16px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+      box-shadow: var(--shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.04));
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .ph-card:hover {
-      box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+      box-shadow: var(--shadow-md, 0 4px 12px -2px rgba(15, 23, 42, 0.08));
     }
     .ph-card-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
     .ph-card-icon.green  { background: var(--ph-green-light); }
@@ -75,9 +75,9 @@
     /* Panel */
     .ph-panel {
       background: #fff;
-      border-radius: 18px;
-      border: 1px solid rgba(226, 232, 240, 0.8);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+      border-radius: var(--card-radius, 14px);
+      border: 1.5px solid var(--border-default, #e2e8f0);
+      box-shadow: var(--shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.04));
       margin-bottom: 24px;
       overflow: hidden;
     }
@@ -133,16 +133,19 @@
 
     /* Action buttons */
     .ph-btn {
-      display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px;
-      border-radius: 9999px; font-size: 13px; font-weight: 600; cursor: pointer;
-      border: none; transition: all 0.18s ease; font-family: inherit;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px;
+      height: var(--btn-h-md, 38px); border-radius: var(--btn-radius, 10px); font-size: 13px; font-weight: 600; cursor: pointer;
+      border: 1.5px solid transparent; transition: all var(--transition-fast, 0.18s cubic-bezier(0.16, 1, 0.3, 1)); font-family: inherit;
+      box-shadow: var(--shadow-xs, 0 1px 2px rgba(15, 23, 42, 0.04));
     }
-    .ph-btn:hover { opacity: 0.92; transform: scale(1.02); }
-    .ph-btn:active { transform: scale(0.97); }
+    .ph-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-sm, 0 2px 6px rgba(15, 23, 42, 0.08)); filter: brightness(1.03); }
+    .ph-btn:active:not(:disabled) { transform: translateY(0); box-shadow: none; filter: brightness(0.97); }
     .ph-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .ph-btn-primary { background: var(--ph-green); color: #fff; }
-    .ph-btn-outline { background: transparent; border: 1px solid var(--ph-green); color: var(--ph-green); }
-    .ph-btn-sm { padding: 5px 12px; font-size: 11.5px; border-radius: 9999px; }
+    .ph-btn-primary { background: var(--ph-green); color: #fff; border-color: transparent; }
+    .ph-btn-primary:hover:not(:disabled) { background: #15803d; color: #fff; }
+    .ph-btn-outline { background: #ffffff; border-color: var(--border-strong, #cbd5e1); color: var(--text-secondary, #334155); }
+    .ph-btn-outline:hover:not(:disabled) { background: #f8fafc; color: var(--text-primary, #0f172a); border-color: #94a3b8; }
+    .ph-btn-sm { height: var(--btn-h-sm, 32px); padding: 0 12px; font-size: 12px; border-radius: var(--radius-sm, 8px); }
     .ph-btn-edit   { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
     .ph-btn-delete { background: var(--ph-red-light); color: #991b1b; border: 1px solid #fecaca; }
 
@@ -151,21 +154,22 @@
     @media (max-width: 900px) { .ph-add-form { grid-template-columns: 1fr 1fr; } }
     .ph-field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #475569; margin-bottom: 4px; }
     .ph-field input, .ph-field textarea, .ph-field select {
-      width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 12px;
-      font-size: 14px; outline: none; box-sizing: border-box; font-family: inherit;
+      width: 100%; height: var(--input-h-md, 40px); padding: 9px 12px; border: var(--input-border, 1.5px solid #cbd5e1); border-radius: var(--input-radius, 10px);
+      font-size: 13.5px; outline: none; box-sizing: border-box; font-family: inherit;
     }
-    .ph-field input:focus, .ph-field textarea:focus { border-color: var(--ph-green); }
+    .ph-field input:focus, .ph-field textarea:focus { border-color: var(--ph-green); box-shadow: var(--input-focus-ring, 0 0 0 3px rgba(22, 163, 74, 0.14)); }
     .ph-field input[type="date"] { color: #475569; }
 
     /* Edit modal */
     .ph-modal-overlay {
-      position: fixed; inset: 0; background: rgba(15,23,42,0.5);
+      position: fixed; inset: 0; background: rgba(15,23,42,0.5); backdrop-filter: blur(8px);
       display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
     }
     .ph-modal-overlay.hidden { display: none; }
     .ph-modal-box {
-      background: #fff; border-radius: 16px; padding: 28px; width: 100%; max-width: 500px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      background: #fff; border-radius: var(--card-radius, 14px); padding: 28px; width: 100%; max-width: 500px;
+      box-shadow: var(--shadow-xl, 0 20px 40px -6px rgba(15, 23, 42, 0.14));
+      border: 1px solid var(--border-default, #e2e8f0);
     }
     .ph-modal-box h3 { margin: 0 0 20px; font-size: 18px; font-weight: 700; color: #1e293b; }
     .ph-modal-fields { display: grid; gap: 14px; }

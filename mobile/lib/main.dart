@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'menu_page.dart';
@@ -164,14 +165,49 @@ class _UKonekAppState extends State<UKonekApp> {
       title: 'uKonek Medical Clinic',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // Updated to Medical Green for the Dental Clinic theme
+        // Unified Design System Theme
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF059669), // Emerald 600
-          primary: const Color(0xFF059669),   // Emerald 600
+          seedColor: const Color(0xFF2D5A27), // Forest Green
+          primary: const Color(0xFF2D5A27),   // Forest Green
           surface: const Color(0xFFF8FAFC),   // Slate Background
         ),
         useMaterial3: true,
-        fontFamily: 'Poppins',
+        textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10.0),
+            ),
+            minimumSize: const Size.fromHeight(44), // btn-h-lg equivalent
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10.0),
+            borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10.0),
+            borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10.0),
+            borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+          ),
+          filled: true,
+          fillColor: Colors.white,
+        ),
+        cardTheme: CardThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14.0),
+          ),
+          elevation: 1, // subtle shadow
+        ),
+        dialogTheme: DialogThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14.0),
+          ),
+        ),
       ),
       home: const RootHandler(),
     );

@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabaseClient.js';
 import { navigateToSection } from './navigationController.js';
 import { toggleStatsSkeleton, toggleChartSkeleton } from '../utils/uiHelpers.js';
 
-export const ADMIN_DASHBOARD_REFRESH_MS = 15000;
+export const ADMIN_DASHBOARD_REFRESH_MS = 60000;
 let adminDashboardRefreshTimer = null;
 let adminDashboardRefreshInFlight = false;
 
@@ -30,30 +30,17 @@ export let clinicalMetricsCache = {
 
 export async function loadClinicalOperationsMetrics() {
   try {
-    const manilaTodayStr = getManilaTodayStr();
-    const manilaStartIso = `${manilaTodayStr}T00:00:00+08:00`;
-    const manilaEndIso = `${manilaTodayStr}T23:59:59.999+08:00`;
-
-    // Query active queue tickets specifically for today's queue date
-    const [metricsRpc, queueWaitingRes, queueServingRes] = await Promise.all([
-      supabase.rpc('get_clinical_operations_metrics'),
-      supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).in('status', ['waiting', 'on_call']).eq('queue_date', manilaTodayStr),
-      supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'serving').eq('queue_date', manilaTodayStr)
-    ]);
-
-    const { data, error } = metricsRpc;
-
-    const waitingToday = (queueWaitingRes && typeof queueWaitingRes.count === 'number')
-      ? queueWaitingRes.count
-      : (data?.waiting || 0);
-
-    const servingToday = (queueServingRes && typeof queueServingRes.count === 'number')
-      ? queueServingRes.count
-      : (data?.serving || 0);
+    const { data, error } = await supabase.rpc('get_clinical_operations_metrics');
 
     if (error) {
       console.warn('RPC get_clinical_operations_metrics failed, falling back to individual queries:', error);
-      const [consultsRes, vitalsRes, rxRes, otcRes] = await Promise.all([
+      const manilaTodayStr = getManilaTodayStr();
+      const manilaStartIso = `${manilaTodayStr}T00:00:00+08:00`;
+      const manilaEndIso = `${manilaTodayStr}T23:59:59.999+08:00`;
+
+      const [queueWaitingRes, queueServingRes, consultsRes, vitalsRes, rxRes, otcRes] = await Promise.all([
+        supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).in('status', ['waiting', 'on_call']).eq('queue_date', manilaTodayStr),
+        supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'serving').eq('queue_date', manilaTodayStr),
         supabase.from('consultations').select('id', { count: 'exact', head: true }).gte('created_at', manilaStartIso).lte('created_at', manilaEndIso),
         supabase.from('vital_signs').select('id', { count: 'exact', head: true }).gte('created_at', manilaStartIso).lte('created_at', manilaEndIso),
         supabase.from('prescription_item_dispenses').select('id', { count: 'exact', head: true }).gte('dispensed_at', manilaStartIso).lte('dispensed_at', manilaEndIso),
@@ -64,16 +51,18 @@ export async function loadClinicalOperationsMetrics() {
       const otcCount = (otcRes && typeof otcRes.count === 'number') ? otcRes.count : 0;
 
       clinicalMetricsCache = {
-        waiting: waitingToday,
-        serving: servingToday,
+        ...clinicalMetricsCache,
+        waiting: (queueWaitingRes && typeof queueWaitingRes.count === 'number') ? queueWaitingRes.count : 0,
+        serving: (queueServingRes && typeof queueServingRes.count === 'number') ? queueServingRes.count : 0,
         consultsToday: (consultsRes && typeof consultsRes.count === 'number') ? consultsRes.count : 0,
         vitalsToday: (vitalsRes && typeof vitalsRes.count === 'number') ? vitalsRes.count : 0,
         dispensesToday: rxCount + otcCount
       };
     } else {
       clinicalMetricsCache = {
-        waiting: waitingToday,
-        serving: servingToday,
+        ...clinicalMetricsCache,
+        waiting: data?.waiting || 0,
+        serving: data?.serving || 0,
         consultsToday: data?.consults_today || 0,
         vitalsToday: data?.vitals_today || 0,
         dispensesToday: data?.dispenses_today || 0

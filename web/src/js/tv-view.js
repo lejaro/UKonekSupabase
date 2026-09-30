@@ -121,6 +121,7 @@ const tvView = (() => {
             client.removeChannel(realtimeChannel);
         }
 
+        let tvDebounceTimer = null;
         realtimeChannel = client
             .channel('tv-queue-updates')
             .on('postgres_changes', {
@@ -130,7 +131,10 @@ const tvView = (() => {
                 filter: 'status=in.(serving,on_call,waiting)'
             }, (payload) => {
                 console.log('[TV View] Realtime change detected:', payload.eventType);
-                loadQueueData();
+                if (tvDebounceTimer) clearTimeout(tvDebounceTimer);
+                tvDebounceTimer = setTimeout(() => {
+                    loadQueueData();
+                }, 800);
             })
             .subscribe((status) => {
                 console.log('[TV View] Realtime status:', status);

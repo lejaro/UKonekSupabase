@@ -65,9 +65,8 @@ class _uKonekDoctorSchedulesPageState extends State<uKonekDoctorSchedulesPage> {
             }).toList();
           });
         }
-
-        ApiService.invalidateDoctorCache();
-        _loadSchedules(isSilent: true, forceRefresh: true);
+        // Removed redundant _loadSchedules() and cache invalidation
+        // to prevent Thundering Herd IOps exhaustion.
       },
     )
         .subscribe((status, [error]) {

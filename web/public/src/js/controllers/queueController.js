@@ -371,6 +371,8 @@ export async function setupRealtime() {
       day: '2-digit'
     }).format(new Date());
 
+    let queueDebounceTimer = null;
+
     queueBoardChannel = supabase
       .channel('queue-board-updates')
       .on('postgres_changes', {
@@ -380,7 +382,10 @@ export async function setupRealtime() {
         filter: `queue_date=eq.${manilaTodayStr}`
       }, (payload) => {
         console.log('[Queue] Realtime update:', payload.eventType);
-        loadQueueTickets();
+        if (queueDebounceTimer) clearTimeout(queueDebounceTimer);
+        queueDebounceTimer = setTimeout(() => {
+          loadQueueTickets();
+        }, 800);
       })
       .subscribe((status) => {
         console.log('[Queue] Realtime status:', status);

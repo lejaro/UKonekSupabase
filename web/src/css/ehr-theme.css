@@ -156,10 +156,10 @@ h2,
 .chip-btn,
 button[type="submit"],
 button[type="button"] {
-    border-radius: 4px;
+    border-radius: var(--btn-radius, 10px);
     padding: 7px 16px;
-    font-size: 13px;
-    font-weight: 500;
+    font-size: var(--text-base, 13px);
+    font-weight: var(--btn-font-weight, 600);
     letter-spacing: 0.01em;
 }
 
@@ -176,9 +176,9 @@ textarea,
 .filter-select,
 .vital-input {
     border: 1px solid #d0d7e2;
-    border-radius: 4px;
-    padding: 6px 10px;
-    font-size: 13px;
+    border-radius: var(--input-radius, 10px);
+    padding: 8px 12px;
+    font-size: var(--text-base, 13.5px);
     background: #ffffff;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -407,7 +407,7 @@ textarea:focus,
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .modal-box {
-    border-radius: 6px;
+    border-radius: var(--card-radius, 14px);
     padding: 24px 28px;
     background: #ffffff;
 }
@@ -581,9 +581,9 @@ textarea:focus,
 }
 
 .vital-btn {
-    border-radius: 4px;
+    border-radius: var(--btn-radius, 10px);
     padding: 9px 20px;
-    font-size: 13px;
+    font-size: var(--text-base, 13.5px);
     font-weight: 600;
 }
 
@@ -600,7 +600,7 @@ textarea:focus,
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    font-weight: 500;
+    font-weight: 600;
     color: #6b7a8d;
     margin-bottom: 6px;
 }
@@ -609,10 +609,11 @@ textarea:focus,
 .field select,
 .field textarea {
     width: 100%;
-    border: 1px solid #d0d7e2;
-    border-radius: 4px;
-    padding: 6px 10px;
-    font-size: 13px;
+    border: 1.5px solid var(--border-strong, #cbd5e1);
+    border-radius: var(--input-radius, 10px);
+    padding: 8px 12px;
+    font-size: var(--text-base, 13.5px);
+    font-family: var(--font-sans);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -621,7 +622,7 @@ textarea:focus,
 
 .notification-item {
     border: 1px solid #d0d7e2;
-    border-radius: 6px;
+    border-radius: var(--card-radius-sm, 10px);
     padding: 14px 16px;
     margin-bottom: 10px;
 }

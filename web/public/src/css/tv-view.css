@@ -1,7 +1,9 @@
+@import './tokens.css';
+
 :root {
-    --primary: #28A745;
-    --primary-dark: #1B5E20;
-    --accent: #F59E0B;
+    --primary: #2D5A27;
+    --primary-dark: #1E3D1A;
+    --accent: #16a34a;
     --bg: #F8FAFB;
     --surface: #FFFFFF;
     --text: #0F172A;
@@ -20,7 +22,7 @@ body.tv-mode {
     height: 100vh;
     background: linear-gradient(135deg, #F8FAFB 0%, #E8F5E9 100%);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+    font-family: var(--font-sans);
     overflow: hidden;
     display: flex;
     flex-direction: column;

@@ -132,6 +132,14 @@ export function toTitleCase(value) {
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
+export function toPossessiveRole(roleName) {
+  const raw = String(roleName || '').trim();
+  if (!raw) return "User's";
+  return raw.endsWith('s') || raw.endsWith('S') ? `${raw}'` : `${raw}'s`;
+}
+
+let currentActiveRole = 'nurse';
+
 export function parseNameParts(fullName) {
   const trimmed = String(fullName || '').trim();
   if (!trimmed) return { firstName: '', lastName: '' };
@@ -211,16 +219,16 @@ export function getRoleLogoConfig(roleValue) {
   const key = String(roleValue || '').trim().toLowerCase();
   switch (key) {
     case 'admin':
-      return { className: 'role-logo-admin', label: 'Admin Dashboard', icon: 'shield' };
+      return { className: 'role-logo-admin', label: "Administrator's Dashboard", icon: 'shield' };
     case 'doctor':
-      return { className: 'role-logo-doctor', label: 'Doctor', icon: 'stethoscope' };
+      return { className: 'role-logo-doctor', label: "Doctor's Dashboard", icon: 'stethoscope' };
     case 'nurse':
     case 'staff':
-      return { className: 'role-logo-nurse', label: 'Nurse', icon: 'heart' };
+      return { className: 'role-logo-nurse', label: "Nurse's Dashboard", icon: 'heart' };
     case 'pharmacist':
-      return { className: 'role-logo-pharmacist', label: 'Pharmacist', icon: 'capsule' };
+      return { className: 'role-logo-pharmacist', label: "Pharmacist's Dashboard", icon: 'capsule' };
     default:
-      return { className: 'role-logo-default', label: 'User', icon: 'user' };
+      return { className: 'role-logo-default', label: "User's Dashboard", icon: 'user' };
   }
 }
 
@@ -260,6 +268,7 @@ export function applyRoleLogos(roleValue) {
 
 export function applyRoleAccess(user) {
   const role = String(user?.role || '').trim().toLowerCase();
+  currentActiveRole = role;
   const isAdmin = role === 'admin';
   const isClinical = role === 'doctor' || role === 'nurse' || role === 'staff';
   const hasFullAccess = isAdmin || isClinical;
@@ -326,8 +335,10 @@ export function applyRoleAccess(user) {
   if (mainDashTitle || mainTopbarTitle) {
     let roleText = toTitleCase(role);
     if (role === 'admin') roleText = 'Administrator';
-    if (mainDashTitle) mainDashTitle.textContent = `${roleText} Dashboard`;
-    if (mainTopbarTitle) mainTopbarTitle.textContent = `${roleText} Systems Overview`;
+    const possessiveRole = toPossessiveRole(roleText);
+    if (mainDashTitle) mainDashTitle.textContent = `${possessiveRole} Dashboard`;
+    if (mainTopbarTitle) mainTopbarTitle.textContent = `${possessiveRole} Systems Overview`;
+    document.title = `U-Konek — ${possessiveRole} Dashboard`;
   }
 
   populateProfile(user);
@@ -574,6 +585,12 @@ export function navigateToSection(sectionId, options = {}) {
   if (topbarTitleNode) {
     if (allowedTarget === 'profile-section' && options?.pane === 'profile-pane-security') {
       topbarTitleNode.textContent = SECTION_BREADCRUMBS['security-section'] || 'Change Password';
+    } else if (allowedTarget === 'dashboard-section') {
+      let roleText = toTitleCase(currentActiveRole || 'staff');
+      if (currentActiveRole === 'admin') roleText = 'Administrator';
+      const possessiveRole = toPossessiveRole(roleText);
+      topbarTitleNode.textContent = `${possessiveRole} Systems Overview`;
+      document.title = `U-Konek — ${possessiveRole} Dashboard`;
     } else if (SECTION_BREADCRUMBS[allowedTarget]) {
       topbarTitleNode.textContent = SECTION_BREADCRUMBS[allowedTarget];
     }

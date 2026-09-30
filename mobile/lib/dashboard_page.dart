@@ -205,6 +205,11 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'queue_tickets',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'id',
+              value: ticketId,
+            ),
             callback: (payload) {
               final rec = payload.newRecord;
               if (rec.isEmpty || !mounted) return;
@@ -236,8 +241,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     payload: '{"action":"consultation_done"}',
                   );
                 }
-                _loadAllData(isInitial: false);
-              } else if (status == 'serving' || status == 'completed') {
                 _loadAllData(isInitial: false);
               }
             },
@@ -296,9 +299,8 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   }).toList();
                 });
               }
-
-              ApiService.invalidateDoctorCache();
-              _refreshDoctorListSilently();
+              // Removed redundant _refreshDoctorListSilently() and cache invalidation
+              // to prevent the Thundering Herd IOps depletion problem.
             },
           )
           .subscribe((status, [error]) {

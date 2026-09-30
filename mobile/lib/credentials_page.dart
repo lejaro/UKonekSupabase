@@ -47,16 +47,16 @@ class _uKonekCredentialsPageState
   bool _agreedToTerms   = false;
   bool _isSubmitting    = false;
 
-  // ── Updated Medical Green Color Palette ────────────────────────
-  static const _primary   = Color(0xFF059669); // Emerald 600
-  static const _primary2  = Color(0xFF064E3B); // Forest Emerald 900
+  // ── Unified Design System Palette ────────────────────────────────
+  static const _primary   = Color(0xFF2D5A27); // Forest Green
+  static const _primary2  = Color(0xFF1E3D1A); // Forest Green Dark
   static const _bg        = Color(0xFFF8FAFC); // Slate Background
   static const _surface   = Colors.white;
   static const _textDark  = Color(0xFF0F172A); // Slate 900
   static const _textMuted = Color(0xFF64748B); // Slate 500
   static const _fieldBg   = Color(0xFFF8FAFC); // Slate Field
-  static const _fieldBdr  = Color(0xFFE2E8F0); // Slate Divider
-  static const _success   = Color(0xFF10B981);
+  static const _fieldBdr  = Color(0xFFCBD5E1); // Slate 300
+  static const _success   = Color(0xFF16A34A); // Action Emerald
 
   // ── Password strength ────────────────────────────────────────
   int get _strengthLevel {
