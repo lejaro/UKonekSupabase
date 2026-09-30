@@ -170,6 +170,7 @@ class ActiveTicketCard extends StatelessWidget {
                     children: [
                       const Text(
                         'YOUR QUEUE TICKET',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 11,
@@ -180,6 +181,7 @@ class ActiveTicketCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         queue.serviceLabel.toUpperCase(),
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -205,6 +207,7 @@ class ActiveTicketCard extends StatelessWidget {
                         ),
                         child: Text(
                           '#${(queue.myQueueNumber ?? 0).toString().padLeft(3, '0')}',
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 56,
                             fontWeight: FontWeight.w900,
@@ -216,6 +219,7 @@ class ActiveTicketCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         'YOUR NUMBER',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
@@ -284,6 +288,7 @@ class ActiveTicketCard extends StatelessWidget {
                       const SizedBox(height: 16),
                       Text(
                         queue.ticketCode,
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 11,
                           color: _C.textMuted,
@@ -349,37 +354,51 @@ class ActiveTicketCard extends StatelessWidget {
   Widget _statChip(IconData icon, String label, String value, Color color) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.07),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: color.withValues(alpha: 0.15)),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: color.withValues(alpha: 0.7),
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: color,
+                Icon(icon, color: color.withValues(alpha: 0.75), size: 14),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: color.withValues(alpha: 0.75),
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 5),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
           ],
         ),
