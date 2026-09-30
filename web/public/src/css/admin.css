@@ -263,6 +263,16 @@ body.admin-body {
   margin: 0;
 }
 
+/* ── Centered Security & Password Wrapper ── */
+.admin-security-wrap {
+  max-width: 580px;
+  margin: 10px auto 40px;
+}
+
+.admin-security-wrap .admin-section-header {
+  margin-bottom: 22px;
+}
+
 .admin-header-controls {
   display: flex;
   align-items: center;
