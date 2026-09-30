@@ -592,7 +592,7 @@ function renderCensusSheet() {
 async function loadStaffUsers() {
   const tbody = document.getElementById('staff-tbody');
   if (tbody) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:24px; color:#64748b;">Loading registered staff accounts...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:24px; color:#64748b;">Loading registered staff accounts...</td></tr>`;
   }
 
   try {
@@ -614,7 +614,7 @@ async function loadStaffUsers() {
   } catch (err) {
     console.error('[Admin] Error loading staff:', err);
     if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:24px; color:#ef4444;">Failed to load staff accounts: ${err.message || err}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:24px; color:#ef4444;">Failed to load staff accounts: ${err.message || err}</td></tr>`;
     }
   }
 }
@@ -642,7 +642,7 @@ function renderStaffTable() {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align:center; padding:36px; color:#64748b;">
+        <td colspan="5" style="text-align:center; padding:36px; color:#64748b;">
           No staff accounts found matching your search criteria.
         </td>
       </tr>
@@ -656,7 +656,6 @@ function renderStaffTable() {
     const role = (staff.role || 'staff').toLowerCase();
     const isSelf = currentUser && (staff.id === currentUser.id || staff.auth_user_id === currentUser.id);
     const status = (staff.status || 'Active').toLowerCase() === 'active' ? 'Active' : 'Disabled';
-    const isOnline = Boolean(staff.is_online);
 
     return `
       <tr data-staff-id="${staff.id}">
@@ -675,12 +674,6 @@ function renderStaffTable() {
         <td><span style="font-family:monospace; font-weight:600; color:#334155;">${staff.employee_id || '—'}</span></td>
         <td><span class="badge-role ${role}">${role}</span></td>
         <td><span class="badge-status ${status.toLowerCase()}">${status}</span></td>
-        <td>
-          <span style="display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:${isOnline ? '#059669' : '#94a3b8'};">
-            <span style="width:7px; height:7px; border-radius:50%; background:${isOnline ? '#10b981' : '#cbd5e1'};"></span>
-            ${isOnline ? 'Online' : 'Offline'}
-          </span>
-        </td>
         <td style="text-align:right; white-space:nowrap;">
           <button type="button" class="admin-btn admin-btn-outline admin-btn-sm btn-staff-toggle-status" data-id="${staff.id}" data-status="${status}" ${isSelf ? 'disabled title="Cannot disable your own account"' : ''}>
             ${status === 'Active' ? 'Disable' : 'Enable'}
