@@ -593,10 +593,6 @@ async function loadStaffUsers() {
     staffList = data || [];
     doctorList = staffList.filter(s => (s.role || '').toLowerCase() === 'doctor');
 
-    // Update nav counter
-    const navUsersCount = document.getElementById('nav-count-users');
-    if (navUsersCount) navUsersCount.textContent = staffList.length;
-
     renderStaffTable();
   } catch (err) {
     console.error('[Admin] Error loading staff:', err);
