@@ -89,9 +89,10 @@ class Consultation {
 
   factory Consultation.fromMap(Map<String, dynamic> map) {
     final doctor = map['doctor'] as Map<String, dynamic>?;
-    final drName = doctor != null
-        ? formatDoctorName('${doctor['first_name'] ?? ''} ${doctor['last_name'] ?? ''}'.trim())
-        : null;
+    final rawName = doctor != null
+        ? '${doctor['first_name'] ?? ''} ${doctor['last_name'] ?? ''}'.trim()
+        : map['doctor_name']?.toString();
+    final drName = rawName != null && rawName.isNotEmpty ? formatDoctorName(rawName) : null;
 
     return Consultation(
       id: (map['id'] as num?)?.toInt() ?? 0,

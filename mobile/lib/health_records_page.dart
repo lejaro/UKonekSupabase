@@ -100,10 +100,13 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
         if (!matchesType) return false;
         if (keyword.isEmpty) return true;
 
-        final s = (r['service'] as String).toLowerCase();
-        final d = (r['diagnosis'] as String).toLowerCase();
-        final p = (r['provider'] as String).toLowerCase();
-        return s.contains(keyword) || d.contains(keyword) || p.contains(keyword);
+        final s = (r['service'] as String? ?? '').toLowerCase();
+        final d = (r['diagnosis'] as String? ?? '').toLowerCase();
+        final p = (r['provider'] as String? ?? '').toLowerCase();
+        final extra = r['raw'] is Consultation
+            ? '${(r['raw'] as Consultation).symptoms ?? ''} ${(r['raw'] as Consultation).notes ?? ''}'.toLowerCase()
+            : (r['raw'] is VitalSigns ? ((r['raw'] as VitalSigns).chiefComplaint).toLowerCase() : '');
+        return s.contains(keyword) || d.contains(keyword) || p.contains(keyword) || extra.contains(keyword);
       }).toList();
     });
   }
@@ -139,11 +142,7 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_C.primary, _C.primaryMid],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: _C.primary,
         borderRadius: BorderRadius.only(
           bottomLeft:  Radius.circular(32),
           bottomRight: Radius.circular(32),
@@ -215,31 +214,66 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
     return Container(
       height: 48,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: TextField(
         controller: _searchController,
-        onChanged: _runFilter,
-        style: const TextStyle(color: Colors.white, fontSize: 14),
-        cursorColor: Colors.white,
+        onChanged: (val) {
+          setState(() {});
+          _runFilter(val);
+        },
+        style: const TextStyle(
+          color: _C.textDark,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+        cursorColor: _C.primary,
         decoration: InputDecoration(
+          isDense: true,
+          filled: true,
+          fillColor: Colors.white,
           hintText: 'Search diagnoses, services, doctors...',
-          hintStyle: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13),
-          prefixIcon: Icon(Icons.search_rounded,
-              color: Colors.white.withOpacity(0.7), size: 20),
+          hintStyle: const TextStyle(
+            color: _C.textMuted,
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: _C.primary,
+            size: 20,
+          ),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear_rounded, color: Colors.white70, size: 18),
+                  icon: const Icon(Icons.clear_rounded, color: _C.textMuted, size: 18),
                   onPressed: () {
                     _searchController.clear();
+                    setState(() {});
                     _applyFilters();
                   },
                 )
               : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _C.primaryMid, width: 1.5),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         ),
       ),
     );
@@ -438,7 +472,7 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
           const SizedBox(width: 8),
           _filterChip('consultation', 'Consultations ($consultCount)'),
           const SizedBox(width: 8),
-          _filterChip('vitals', 'Vitals Signs ($vitalsCount)'),
+          _filterChip('vitals', 'Vital Signs ($vitalsCount)'),
         ],
       ),
     );
