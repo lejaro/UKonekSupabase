@@ -96,14 +96,14 @@ body.admin-body {
 .admin-user-pill {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 9999px;
-  padding: 5px 14px;
-  font-size: 13px;
+  gap: 9px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0 4px;
+  font-size: 13.5px;
   font-weight: 600;
-  color: #e2e8f0;
+  color: #f1f5f9;
 }
 
 .admin-user-pill .avatar {

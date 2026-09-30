@@ -148,14 +148,6 @@ function initNavigation() {
     });
   });
 
-  const headerSecurityBtn = document.getElementById('btn-header-security');
-  if (headerSecurityBtn) {
-    headerSecurityBtn.addEventListener('click', () => {
-      const secTab = document.querySelector('[data-section="section-security"]');
-      if (secTab) secTab.click();
-    });
-  }
-
   const logoutBtn = document.getElementById('admin-logout-btn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
