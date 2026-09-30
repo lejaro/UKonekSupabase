@@ -657,9 +657,11 @@ async function executeCitizenSearch(query) {
 
     if (!citizens || citizens.length === 0) {
       dropdown.innerHTML = `
-        <div style="padding:14px; text-align:center; color:#64748b; font-size:12.5px;">
-          No registered citizens matching "<strong>${sanitizeText(trimmed)}</strong>".<br>
-          <span style="font-size:11.5px; color:#94a3b8;">Switch to <strong>Unregistered Walk-in</strong> if they are not in the system.</span>
+        <div style="padding:16px; text-align:center; color:#64748b; font-size:12.5px; line-height:1.5;">
+          <div style="font-weight:600; color:#334155; margin-bottom:4px;">No patient health record matching "<strong>${sanitizeText(trimmed)}</strong>"</div>
+          <div style="font-size:11.5px; color:#94a3b8;">
+            Unregistered walk-in patients must first complete <strong>Vitals & Triage Intake</strong> at the Nurse Station before consultation.
+          </div>
         </div>
       `;
       return;
@@ -668,6 +670,7 @@ async function executeCitizenSearch(query) {
     dropdown.innerHTML = citizens.map(c => {
       const fullName = `${c.firstname || ''} ${c.middle_initial ? c.middle_initial + '. ' : ''}${c.surname || ''}`.trim();
       const initials = `${(c.firstname || 'P')[0]}${(c.surname || 'T')[0]}`.toUpperCase();
+      const isWalkin = c.email && c.email.includes('walkin_');
       const metaParts = [];
       if (c.age) metaParts.push(`${c.age} yo`);
       if (c.sex) metaParts.push(c.sex);
@@ -681,7 +684,7 @@ async function executeCitizenSearch(query) {
           <div class="citizen-info">
             <div class="citizen-name-line">
               <span>${sanitizeText(fullName)}</span>
-              <span class="citizen-id-badge">CIT-${c.id}</span>
+              <span class="citizen-id-badge">${isWalkin ? 'Walk-in' : 'CIT-' + c.id}</span>
             </div>
             <div class="citizen-sub-line">${sanitizeText(metaLine)}</div>
             ${hasAllergy ? `<div style="font-size:11px; color:#dc2626; font-weight:600; margin-top:2px;">⚠️ Allergies: ${sanitizeText(c.allergies)}</div>` : ''}
@@ -701,7 +704,7 @@ async function executeCitizenSearch(query) {
     });
   } catch (err) {
     console.error('Citizen search error:', err);
-    dropdown.innerHTML = '<div style="padding:12px; text-align:center; color:#ef4444; font-size:12px;">Error searching citizens. Please try again.</div>';
+    dropdown.innerHTML = '<div style="padding:12px; text-align:center; color:#ef4444; font-size:12px;">Error searching patient records. Please try again.</div>';
   }
 }
 
@@ -712,17 +715,16 @@ function bindCitizenToConsultation(citizen) {
   const dropdown = document.getElementById('consult-citizen-dropdown');
   const confirmedBanner = document.getElementById('consult-confirmed-patient-banner');
   const searchView = document.getElementById('consult-citizen-search-view');
-  const walkinView = document.getElementById('consult-walkin-view');
-  const toggles = document.getElementById('consult-type-toggles');
   const changeBtn = document.getElementById('consult-confirmed-change-btn');
 
   if (dropdown) dropdown.classList.add('hidden');
 
   const fullName = `${citizen.firstname || ''} ${citizen.middle_initial ? citizen.middle_initial + '. ' : ''}${citizen.surname || ''}`.trim();
   const initials = `${(citizen.firstname || 'P')[0]}${(citizen.surname || 'T')[0]}`.toUpperCase();
+  const isWalkin = citizen.email && citizen.email.includes('walkin_');
 
   activeConsultPatient = {
-    mode: 'citizen',
+    mode: isWalkin ? 'walkin' : 'citizen',
     id: citizen.id,
     name: fullName,
     citizen: citizen
@@ -732,12 +734,12 @@ function bindCitizenToConsultation(citizen) {
   if (form) {
     form.dataset.patientName = fullName;
     form.dataset.patientCitizenId = String(citizen.id);
-    form.dataset.patientMode = 'citizen';
+    form.dataset.patientMode = isWalkin ? 'walkin' : 'citizen';
   }
 
   if (displayId) {
     const servicePart = form?.dataset.serviceLabel ? ` &mdash; <em>${sanitizeText(form.dataset.serviceLabel)}</em>` : '';
-    displayId.innerHTML = `<strong>${sanitizeText(fullName)}</strong> <span style="color:#cbd5e1">(CIT-${citizen.id})</span>${servicePart}`;
+    displayId.innerHTML = `<strong>${sanitizeText(fullName)}</strong> <span style="color:#cbd5e1">(${isWalkin ? 'Triaged Walk-in' : 'CIT-' + citizen.id})</span>${servicePart}`;
   }
 
   const confAvatar = document.getElementById('consult-confirmed-avatar');
@@ -748,10 +750,10 @@ function bindCitizenToConsultation(citizen) {
 
   if (confAvatar) confAvatar.textContent = initials;
   if (confName) confName.textContent = fullName;
-  if (confTag) confTag.textContent = `CIT-${citizen.id}`;
+  if (confTag) confTag.textContent = isWalkin ? `Walk-in #${citizen.id}` : `CIT-${citizen.id}`;
   if (confSource) {
-    confSource.textContent = 'Registered Citizen';
-    confSource.className = 'confirmed-source-tag';
+    confSource.textContent = isWalkin ? 'Triaged Patient' : 'Registered Citizen';
+    confSource.className = isWalkin ? 'confirmed-source-tag' : 'confirmed-source-tag';
   }
   if (confMeta) {
     const metaParts = [];
@@ -765,12 +767,10 @@ function bindCitizenToConsultation(citizen) {
   if (changeBtn) changeBtn.style.display = form?.dataset.queueTicketId ? 'none' : 'inline-block';
   if (confirmedBanner) confirmedBanner.classList.remove('hidden');
   if (searchView) searchView.classList.add('hidden');
-  if (walkinView) walkinView.classList.add('hidden');
-  if (toggles) toggles.style.display = 'none';
 
   updateLeftPaneDemographics({
     name: fullName,
-    id: `CIT-${citizen.id}`,
+    id: isWalkin ? `Walk-in #${citizen.id}` : `CIT-${citizen.id}`,
     age: citizen.age,
     sex: citizen.sex,
     contact: citizen.contact_number,
@@ -795,55 +795,6 @@ function bindCitizenToConsultation(citizen) {
   }
 }
 
-function syncWalkinPatient() {
-  const form = document.getElementById('consultation-form');
-  const patientInput = document.getElementById('consult-patient-id');
-  const displayId = document.getElementById('consult-display-id');
-  const nameInput = document.getElementById('consult-walkin-name');
-  const ageInput = document.getElementById('consult-walkin-age');
-  const sexInput = document.getElementById('consult-walkin-sex');
-
-  const name = (nameInput?.value || '').trim();
-  const age = (ageInput?.value || '').trim();
-  const sex = (sexInput?.value || '').trim();
-
-  activeConsultPatient = {
-    mode: 'walkin',
-    id: null,
-    name: name,
-    age: age,
-    sex: sex
-  };
-
-  if (patientInput) {
-    patientInput.value = name ? `Walk-in: ${name}` : '';
-  }
-  if (form) {
-    form.dataset.patientName = name || 'Walk-in Patient';
-    form.dataset.patientCitizenId = '';
-    form.dataset.patientMode = 'walkin';
-  }
-
-  if (displayId) {
-    displayId.innerHTML = name
-      ? `<strong>${sanitizeText(name)}</strong> <span style="color:#cbd5e1">(Walk-in)</span>`
-      : '<em>Walk-in Patient</em>';
-  }
-
-  if (name) {
-    updateLeftPaneDemographics({
-      name: name,
-      id: 'Walk-in (Unregistered)',
-      age: age,
-      sex: sex,
-      contact: 'N/A (Walk-in)',
-      address: 'N/A (Walk-in)'
-    });
-  } else {
-    clearLeftPaneDemographics();
-  }
-}
-
 function resetPatientSelection() {
   activeConsultPatient = null;
   const form = document.getElementById('consultation-form');
@@ -851,13 +802,8 @@ function resetPatientSelection() {
   const displayId = document.getElementById('consult-display-id');
   const confirmedBanner = document.getElementById('consult-confirmed-patient-banner');
   const searchView = document.getElementById('consult-citizen-search-view');
-  const walkinView = document.getElementById('consult-walkin-view');
-  const toggles = document.getElementById('consult-type-toggles');
   const searchInput = document.getElementById('consult-citizen-search-input');
   const dropdown = document.getElementById('consult-citizen-dropdown');
-  const walkinName = document.getElementById('consult-walkin-name');
-  const walkinAge = document.getElementById('consult-walkin-age');
-  const walkinSex = document.getElementById('consult-walkin-sex');
 
   if (patientInput) patientInput.value = '';
   if (form) {
@@ -871,17 +817,9 @@ function resetPatientSelection() {
     dropdown.innerHTML = '';
     dropdown.classList.add('hidden');
   }
-  if (walkinName) walkinName.value = '';
-  if (walkinAge) walkinAge.value = '';
-  if (walkinSex) walkinSex.value = '';
 
   if (confirmedBanner) confirmedBanner.classList.add('hidden');
-  if (toggles) toggles.style.display = 'flex';
-
-  document.getElementById('consult-mode-citizen-btn')?.classList.add('active');
-  document.getElementById('consult-mode-walkin-btn')?.classList.remove('active');
   if (searchView) searchView.classList.remove('hidden');
-  if (walkinView) walkinView.classList.add('hidden');
 
   clearLeftPaneDemographics();
   document.getElementById('consult-allergy-alert')?.classList.add('hidden');
@@ -895,42 +833,10 @@ export function initConsultationPatientSelector() {
   if (patientSelectorInitialized) return;
   patientSelectorInitialized = true;
 
-  const citizenBtn = document.getElementById('consult-mode-citizen-btn');
-  const walkinBtn = document.getElementById('consult-mode-walkin-btn');
   const searchView = document.getElementById('consult-citizen-search-view');
-  const walkinView = document.getElementById('consult-walkin-view');
   const searchInput = document.getElementById('consult-citizen-search-input');
   const dropdown = document.getElementById('consult-citizen-dropdown');
   const changeBtn = document.getElementById('consult-confirmed-change-btn');
-  const form = document.getElementById('consultation-form');
-
-  const walkinName = document.getElementById('consult-walkin-name');
-  const walkinAge = document.getElementById('consult-walkin-age');
-  const walkinSex = document.getElementById('consult-walkin-sex');
-
-  if (citizenBtn) {
-    citizenBtn.addEventListener('click', () => {
-      citizenBtn.classList.add('active');
-      walkinBtn?.classList.remove('active');
-      if (searchView) searchView.classList.remove('hidden');
-      if (walkinView) walkinView.classList.add('hidden');
-      if (form) form.dataset.patientMode = 'citizen';
-      searchInput?.focus();
-    });
-  }
-
-  if (walkinBtn) {
-    walkinBtn.addEventListener('click', () => {
-      walkinBtn.classList.add('active');
-      citizenBtn?.classList.remove('active');
-      if (searchView) searchView.classList.add('hidden');
-      if (walkinView) walkinView.classList.remove('hidden');
-      if (dropdown) dropdown.classList.add('hidden');
-      if (form) form.dataset.patientMode = 'walkin';
-      walkinName?.focus();
-      syncWalkinPatient();
-    });
-  }
 
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
@@ -952,13 +858,6 @@ export function initConsultationPatientSelector() {
     if (!dropdown || dropdown.classList.contains('hidden')) return;
     if (!dropdown.contains(e.target) && e.target !== searchInput) {
       dropdown.classList.add('hidden');
-    }
-  });
-
-  [walkinName, walkinAge, walkinSex].forEach(el => {
-    if (el) {
-      el.addEventListener('input', syncWalkinPatient);
-      el.addEventListener('change', syncWalkinPatient);
     }
   });
 
@@ -1219,32 +1118,17 @@ export function initConsultationSection() {
       const submitBtn = document.getElementById('consult-submit-btn');
       let patientId = document.getElementById('consult-patient-id')?.value || '';
       let patientName = consultationForm.dataset.patientName || '';
-      const patientMode = consultationForm.dataset.patientMode || 'citizen';
       const diagnosis = document.getElementById('consult-diagnosis')?.value || '';
 
-      // Validate patient selection
+      // Validate patient selection: consultations are strictly allowed only on triaged patients or existing clinic records
       let citizenId = resolveCitizenId(patientId) || resolveCitizenId(consultationForm.dataset.patientCitizenId);
-      let walkinName = '';
 
-      if (patientMode === 'walkin' || (!citizenId && patientId.toLowerCase().startsWith('walk-in:'))) {
-        walkinName = (document.getElementById('consult-walkin-name')?.value || '').trim() || patientName.replace(/^walk-in:\s*/i, '').trim();
-        if (!walkinName) {
-          showToast('Please specify the walk-in patient\'s name.', 'warning');
-          document.getElementById('consult-mode-walkin-btn')?.click();
-          document.getElementById('consult-walkin-name')?.focus();
-          return;
-        }
-        patientId = `Walk-in: ${walkinName}`;
-        patientName = walkinName;
-        citizenId = null;
-      } else {
-        if (!citizenId) {
-          showToast('Please search and select a registered citizen, or select Unregistered Walk-in.', 'warning');
-          document.getElementById('consult-citizen-search-input')?.focus();
-          return;
-        }
-        patientId = `CIT-${citizenId}`;
+      if (!citizenId) {
+        showToast('Please search and select a triaged patient or existing clinic record. Un-triaged walk-in patients must first complete intake at the Nurse Triage Station.', 'warning');
+        document.getElementById('consult-citizen-search-input')?.focus();
+        return;
       }
+      patientId = `CIT-${citizenId}`;
 
       if (!diagnosis) {
         showToast('Diagnosis is required.', 'warning');
@@ -1259,14 +1143,7 @@ export function initConsultationSection() {
           throw new Error('Unable to resolve doctor staff session.');
         }
 
-        // Format notes with walk-in demographics if applicable
-        let finalNotes = cleanNone(document.getElementById('consult-notes')?.value);
-        if (patientMode === 'walkin' && walkinName) {
-          const wAge = document.getElementById('consult-walkin-age')?.value?.trim();
-          const wSex = document.getElementById('consult-walkin-sex')?.value?.trim();
-          const tag = `[Walk-in Patient: ${walkinName}${wAge ? ', Age: ' + wAge : ''}${wSex ? ', Sex: ' + wSex : ''}]`;
-          finalNotes = (finalNotes && finalNotes !== 'None') ? `${tag} ${finalNotes}` : tag;
-        }
+        const finalNotes = cleanNone(document.getElementById('consult-notes')?.value);
 
         const payload = {
           patient_identifier: String(patientId).trim(),

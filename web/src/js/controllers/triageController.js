@@ -164,14 +164,19 @@ export async function loadRecentVitals() {
 export async function handleVitalsSubmission() {
   const submitBtn = document.getElementById('vitals-submit-btn');
   const citizenId = document.getElementById('vitals-citizen-id')?.value;
-  const name = document.getElementById('vitals-name')?.value;
-  const complaint = document.getElementById('vitals-complaint')?.value;
-  const bp = document.getElementById('vitals-bp')?.value;
-  const rr = document.getElementById('vitals-rr')?.value;
-  const temp = document.getElementById('vitals-temp')?.value;
-  const spo2 = document.getElementById('vitals-spo2')?.value;
-  const meds = document.getElementById('vitals-meds')?.value;
-  const hr = document.getElementById('vitals-hr')?.value;
+  const name = document.getElementById('vitals-name')?.value?.trim();
+  const complaint = document.getElementById('vitals-complaint')?.value?.trim();
+  const bp = document.getElementById('vitals-bp')?.value?.trim();
+  const rr = document.getElementById('vitals-rr')?.value?.trim();
+  const temp = document.getElementById('vitals-temp')?.value?.trim();
+  const spo2 = document.getElementById('vitals-spo2')?.value?.trim();
+  const meds = document.getElementById('vitals-meds')?.value?.trim();
+  const hr = document.getElementById('vitals-hr')?.value?.trim();
+  const sex = document.getElementById('vitals-sex')?.value?.trim();
+  const allergies = document.getElementById('vitals-allergies')?.value?.trim();
+  const contact = document.getElementById('vitals-contact')?.value?.trim();
+  const address = document.getElementById('vitals-address')?.value?.trim();
+  const age = document.getElementById('vitals-age')?.value?.trim();
 
   if (!complaint || (!citizenId && !name)) {
     showToast('Patient name and chief complaint are required.', 'error');
@@ -182,19 +187,52 @@ export async function handleVitalsSubmission() {
 
   try {
     const user = sessionStore.getUser();
-    let finalCitizenId = citizenId;
+    let finalCitizenId = citizenId ? Number(citizenId) : null;
 
+    // Check if citizen exists by contact number or ID
+    if (!finalCitizenId && contact) {
+      try {
+        const { data: matched } = await supabase
+          .from('citizens')
+          .select('id, firstname, surname, allergies')
+          .eq('contact_number', contact)
+          .maybeSingle();
+
+        if (matched?.id) {
+          finalCitizenId = matched.id;
+          // Update allergies or address if newly provided
+          const updates = {};
+          if (allergies && (!matched.allergies || matched.allergies === 'None')) updates.allergies = allergies;
+          if (address) updates.complete_address = address;
+          if (Object.keys(updates).length > 0) {
+            await supabase.from('citizens').update(updates).eq('id', finalCitizenId);
+          }
+        }
+      } catch (cErr) {
+        console.warn('Could not match citizen by contact:', cErr);
+      }
+    }
+
+    // If new walk-in patient, register clinic record
     if (!finalCitizenId && name) {
+      const nameParts = name.split(/\s+/);
+      const firstname = nameParts[0] || 'Unknown';
+      const surname = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Patient';
+
+      const citizenPayload = {
+        firstname,
+        surname,
+        contact_number: contact || null,
+        complete_address: address || null,
+        age: parseInt(age) || null,
+        sex: sex || null,
+        allergies: allergies || null,
+        email: contact ? `walkin_${contact.replace(/\D/g, '')}@ukonek.local` : `walkin_${Date.now()}@ukonek.local`
+      };
+
       const { data: created, error: createError } = await supabase
         .from('citizens')
-        .insert([{
-          firstname: name.split(' ')[0] || 'Unknown',
-          surname: name.split(' ').slice(1).join(' ') || 'Patient',
-          contact_number: document.getElementById('vitals-contact')?.value || null,
-          complete_address: document.getElementById('vitals-address')?.value || null,
-          age: parseInt(document.getElementById('vitals-age')?.value) || null,
-          email: `walkin_${Date.now()}@ukonek.local`
-        }])
+        .insert([citizenPayload])
         .select()
         .single();
 
@@ -218,10 +256,63 @@ export async function handleVitalsSubmission() {
       payload.queue_ticket_id = Number(activeVitalsQueueTicketId);
     }
 
-    const { error } = await supabase.from('vital_signs').insert([payload]);
-    if (error) throw error;
+    const { data: vitalsRow, error: vitalsError } = await supabase
+      .from('vital_signs')
+      .insert([payload])
+      .select('id')
+      .single();
 
-    showToast('Vital signs recorded successfully.', 'success');
+    if (vitalsError) throw vitalsError;
+
+    // If no queue ticket was linked, auto-issue a walk-in queue ticket so patient appears in the doctor queue
+    if (!activeVitalsQueueTicketId && finalCitizenId) {
+      try {
+        const manilaDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+        const { data: nextNumData } = await supabase
+          .from('queue_tickets')
+          .select('queue_number')
+          .eq('queue_date', manilaDateStr)
+          .order('queue_number', { ascending: false })
+          .limit(1);
+
+        const nextNum = (nextNumData?.[0]?.queue_number || 0) + 1;
+        const codeNum = String(nextNum).padStart(3, '0');
+        const ticketCode = `Q-${manilaDateStr.replace(/-/g, '')}-GEN-${codeNum}`;
+
+        const { data: newTicket } = await supabase
+          .from('queue_tickets')
+          .insert([{
+            queue_date: manilaDateStr,
+            service_key: 'general_consultation',
+            service_label: 'General Consultation',
+            queue_number: nextNum,
+            ticket_code: ticketCode,
+            citizen_id: finalCitizenId,
+            citizen_type: 'regular',
+            reason: complaint || 'Walk-in Consultation',
+            symptoms: complaint || '',
+            status: 'waiting',
+            walkin_patient_name: name
+          }])
+          .select('id')
+          .single();
+
+        if (newTicket?.id && vitalsRow?.id) {
+          await supabase
+            .from('vital_signs')
+            .update({ queue_ticket_id: newTicket.id })
+            .eq('id', vitalsRow.id);
+        }
+
+        if (typeof window !== 'undefined' && window.loadQueueTickets) {
+          window.loadQueueTickets();
+        }
+      } catch (qErr) {
+        console.warn('Could not auto-generate queue ticket for triaged walk-in:', qErr);
+      }
+    }
+
+    showToast('Vital signs recorded and patient queued for consultation.', 'success');
     activeVitalsQueueTicketId = null;
 
     document.getElementById('vitals-form')?.reset();

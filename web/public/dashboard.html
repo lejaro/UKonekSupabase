@@ -2699,50 +2699,22 @@
               <!-- Patient Identification & Linking Header -->
               <div id="consult-patient-selector-card" class="consult-patient-selector-card">
                 <div class="consult-selector-top-row">
-                  <div class="consult-selector-type-toggles" id="consult-type-toggles">
-                    <button type="button" id="consult-mode-citizen-btn" class="patient-type-pill active">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                      <span>Registered Citizen</span>
-                    </button>
-                    <button type="button" id="consult-mode-walkin-btn" class="patient-type-pill">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-                      <span>Unregistered Walk-in</span>
-                    </button>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="background:#ecfdf5; color:#065f46; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; text-transform:uppercase; letter-spacing:0.04em; border:1px solid #a7f3d0;">Clinic Records</span>
+                    <span style="font-size:12.5px; font-weight:600; color:#1e293b;">Patient Encounter Lookup</span>
                   </div>
-                  <div style="font-size:11.5px; color:#64748b; font-weight:600;" id="consult-patient-card-hint">
-                    Select a patient to bind this encounter
+                  <div style="font-size:11.5px; color:#64748b; font-weight:500;" id="consult-patient-card-hint">
+                    Select an active triaged patient or search existing clinic health records
                   </div>
                 </div>
 
-                <!-- Citizen Search View -->
+                <!-- Patient Search View -->
                 <div id="consult-citizen-search-view" class="consult-selector-view" style="position:relative;">
                   <div class="consult-search-input-wrap">
                     <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input type="text" id="consult-citizen-search-input" class="manual-entry-input" placeholder="Search by Citizen Name, ID (e.g. 102), contact #, or email..." autocomplete="off">
+                    <input type="text" id="consult-citizen-search-input" class="manual-entry-input" placeholder="Search by Patient Name, Citizen ID (e.g. 102), or contact #..." autocomplete="off">
                   </div>
                   <div id="consult-citizen-dropdown" class="consult-citizen-dropdown hidden"></div>
-                </div>
-
-                <!-- Walk-in View -->
-                <div id="consult-walkin-view" class="consult-selector-view hidden">
-                  <div class="assessment-field-grid" style="grid-template-columns: 2fr 1fr 1fr; margin-bottom: 0; gap: 10px;">
-                    <div class="field" style="margin-bottom:0;">
-                      <label class="inputLabel required-label">Full Name <span style="color:#ef4444;">*</span></label>
-                      <input type="text" id="consult-walkin-name" class="manual-entry-input" placeholder="e.g. Juanita Dela Cruz">
-                    </div>
-                    <div class="field" style="margin-bottom:0;">
-                      <label class="inputLabel">Age</label>
-                      <input type="number" id="consult-walkin-age" class="manual-entry-input" placeholder="e.g. 42" min="0" max="130">
-                    </div>
-                    <div class="field" style="margin-bottom:0;">
-                      <label class="inputLabel">Sex / Gender</label>
-                      <select id="consult-walkin-sex" class="manual-entry-input">
-                        <option value="">Select...</option>
-                        <option value="Female">Female</option>
-                        <option value="Male">Male</option>
-                      </select>
-                    </div>
-                  </div>
                 </div>
 
                 <!-- Confirmed Patient Banner -->
@@ -3558,34 +3530,48 @@
             <div class="vitals-modal-body">
               <input type="hidden" id="vitals-citizen-id" />
 
-              <div class="assessment-field-grid">
+              <div class="assessment-field-grid" style="grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
                 <div class="field">
-                  <label class="inputLabel" for="vitals-name">Patient Name</label>
-                  <input id="vitals-name" class="manual-entry-input" type="text" placeholder="Full Name" required />
+                  <label class="inputLabel" for="vitals-name">Patient Name <span style="color:#ef4444;">*</span></label>
+                  <input id="vitals-name" class="manual-entry-input" type="text" placeholder="Full Name (First and Last)" required />
                 </div>
                 <div class="field">
                   <label class="inputLabel" for="vitals-age">Age</label>
-                  <input id="vitals-age" class="manual-entry-input" type="number" placeholder="Age" required />
+                  <input id="vitals-age" class="manual-entry-input" type="number" placeholder="e.g. 35" min="0" max="130" required />
+                </div>
+                <div class="field">
+                  <label class="inputLabel" for="vitals-sex">Sex</label>
+                  <select id="vitals-sex" class="manual-entry-input">
+                    <option value="">Select...</option>
+                    <option value="Female">Female</option>
+                    <option value="Male">Male</option>
+                  </select>
                 </div>
               </div>
 
-              <div class="assessment-field-grid" style="grid-template-columns: 2fr 1fr;">
+              <div class="assessment-field-grid" style="grid-template-columns: 2fr 1fr; gap: 10px;">
                 <div class="field">
                   <label class="inputLabel" for="vitals-address">Complete Address</label>
                   <input id="vitals-address" class="manual-entry-input" type="text"
-                    placeholder="House No., Street, Brgy, City" required />
+                    placeholder="House No., Street, Brgy, City" />
                 </div>
                 <div class="field">
                   <label class="inputLabel" for="vitals-contact">Contact Number</label>
-                  <input id="vitals-contact" class="manual-entry-input" type="text" placeholder="09XXXXXXXXX"
-                    required />
+                  <input id="vitals-contact" class="manual-entry-input" type="text" placeholder="09XXXXXXXXX (for app sync)" />
                 </div>
               </div>
 
-              <div class="field" style="margin-bottom: 18px;">
-                <label class="inputLabel" for="vitals-complaint">Chief Complaint</label>
-                <textarea id="vitals-complaint" class="manual-entry-input" rows="2"
-                  style="width: 100%; box-sizing: border-box;" placeholder="What is the patient feeling?"></textarea>
+              <div class="assessment-field-grid" style="grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                <div class="field" style="margin-bottom: 0;">
+                  <label class="inputLabel" for="vitals-complaint">Chief Complaint <span style="color:#ef4444;">*</span></label>
+                  <textarea id="vitals-complaint" class="manual-entry-input" rows="2"
+                    style="width: 100%; box-sizing: border-box;" placeholder="Symptoms or reason for visit..."></textarea>
+                </div>
+                <div class="field" style="margin-bottom: 0;">
+                  <label class="inputLabel" for="vitals-allergies">Known Drug Allergies</label>
+                  <textarea id="vitals-allergies" class="manual-entry-input" rows="2"
+                    style="width: 100%; box-sizing: border-box;" placeholder="e.g. Penicillin, Amoxicillin, or None"></textarea>
+                </div>
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px; margin: 18px 0 14px;">
