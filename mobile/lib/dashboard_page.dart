@@ -983,9 +983,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         servingSubtitle = "On Call: Vitals";
       } else if (queue.isNextInLine) {
         servingSubtitle = "You're next in line";
-      } else if (queue.peopleAheadCount > 0) {
-        final ahead = queue.peopleAheadCount;
-        servingSubtitle = "$ahead patient${ahead > 1 ? 's' : ''} ahead";
       } else {
         servingSubtitle = "Station active";
       }
@@ -1007,7 +1004,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
       } else if (queue.isOnCallStatus) {
         waitSubtitle = 'In triage';
       } else {
-        waitSubtitle = '~${queue.formattedWaitTime} wait';
+        waitSubtitle = 'Ticket active';
       }
     } else {
       waitSubtitle = 'Not in queue';
@@ -1958,7 +1955,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               const Text(
                 'U-Konek brings seamless clinic services right to your pocket:\n\n'
                 '• Fast Check-ins: Present your digital Patient ID at triage.\n'
-                '• Live Queue Tracking: Monitor your ticket status and estimated waiting time in real time.\n'
+                '• Live Queue Tracking: Monitor your ticket status and station progress in real time.\n'
                 '• Digital Prescriptions: View issued medications, dosage instructions, and dispensing logs.\n'
                 '• Medicine Scheduler: Automated dosage reminders for prescribed medications.',
                 style: TextStyle(fontSize: 12, color: Color(0xFF475569), height: 1.5),

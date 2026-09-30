@@ -27,7 +27,6 @@ class ActiveTicketCard extends StatelessWidget {
     final isOnCall = !isFinished && !isCancelled && queue.isOnCallStatus;
     final isNext = !isFinished && !isCancelled && !isServing && !isOnCall && queue.isNextInLine;
     final isTurn = isServing || isNext;
-    final int ahead = queue.peopleAheadCount;
 
     final Color statusColor = isFinished
         ? _C.success
@@ -47,7 +46,7 @@ class ActiveTicketCard extends StatelessWidget {
                     ? (queue.hasServingAhead
                         ? 'You\'re next in line! Doctor is currently serving #${queue.currentlyServingQueueNumber!.toString().padLeft(3, '0')}.'
                         : 'You\'re next in line! Station is preparing to call your number.')
-                    : '$ahead ${ahead == 1 ? 'person' : 'people'} ahead of you in line')));
+                    : 'Please wait for your ticket number to be called')));
 
     final IconData statusIcon = isFinished
         ? Icons.task_alt_rounded
@@ -55,7 +54,7 @@ class ActiveTicketCard extends StatelessWidget {
             ? Icons.campaign_rounded
             : (isServing
                 ? Icons.check_circle_rounded
-                : (isNext ? Icons.notifications_active_rounded : Icons.groups_rounded)));
+                : (isNext ? Icons.notifications_active_rounded : Icons.schedule_rounded)));
 
     final String headerStatusTitle = isFinished
         ? 'CONSULTATION COMPLETED'
@@ -298,26 +297,6 @@ class ActiveTicketCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 24),
 
-                      // Stats row
-                      Row(
-                        children: [
-                          _statChip(
-                            Icons.timer_outlined,
-                            'Est. Wait',
-                            queue.formattedWaitTime,
-                            _C.primaryMid,
-                          ),
-                          const SizedBox(width: 12),
-                          _statChip(
-                            Icons.people_outline_rounded,
-                            'People Ahead',
-                            (isFinished || isServing || isOnCall) ? '0' : '$ahead',
-                            _C.primaryMid,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-
                       // Cancel button (Hidden when On Call, Serving, or Finished)
                       if (!isOnCall && !isServing && !isFinished)
                         SizedBox(
@@ -347,61 +326,6 @@ class ActiveTicketCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _statChip(IconData icon, String label, String value, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.07),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.15)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: color.withValues(alpha: 0.75), size: 14),
-                const SizedBox(width: 5),
-                Flexible(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: color.withValues(alpha: 0.75),
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 5),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                value,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: color,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -90,11 +90,10 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
           body = "It's your turn! Please proceed to the doctor's office for consultation.";
         } else if (queue.isOnCallStatus || status == 'on_call') {
           body = 'You are being called! Please proceed to the nurse station for vitals.';
-        } else if (queue.isNextInLine || queue.peopleAheadCount <= 0) {
+        } else if (queue.isNextInLine) {
           body = "You're next in line! Please stay near the consultation area.";
         } else {
-          final count = queue.peopleAheadCount;
-          body = 'There ${count == 1 ? 'is' : 'are'} $count patient${count == 1 ? '' : 's'} ahead of you in line.';
+          body = 'Your ticket is in queue. Please wait for your number to be called.';
         }
         notifications.add({
           'id': 'queue_${queue.queueId}',
