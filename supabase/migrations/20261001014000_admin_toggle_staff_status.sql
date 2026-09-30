@@ -21,7 +21,7 @@ DECLARE
   v_current_email text;
 BEGIN
   -- 1. Ensure caller has active administrator privileges
-  IF NOT public.is_admin() THEN
+  IF NOT (public.is_admin() OR auth.role() = 'service_role' OR current_user = 'postgres') THEN
     RETURN json_build_object('success', false, 'error', 'Forbidden: admin role required');
   END IF;
 
