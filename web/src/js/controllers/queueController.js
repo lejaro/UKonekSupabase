@@ -354,12 +354,29 @@ export function initVitalAssessmentModal() {
 }
 
 export function teardownQueueRealtime() {
+  stopQueueFallbackPolling();
   if (queueBoardChannel) {
     try {
       supabase.removeChannel(queueBoardChannel);
       console.log('[Queue] Realtime channel unsubscribed.');
     } catch (_) {}
     queueBoardChannel = null;
+  }
+}
+
+export function startQueueFallbackPolling() {
+  if (queueRefreshInterval) return;
+  console.log('[Queue] Fallback polling started (60s) due to disconnected Realtime.');
+  queueRefreshInterval = setInterval(() => {
+    if (document.visibilityState === 'visible') loadQueueTickets();
+  }, 60000);
+}
+
+export function stopQueueFallbackPolling() {
+  if (queueRefreshInterval) {
+    clearInterval(queueRefreshInterval);
+    queueRefreshInterval = null;
+    console.log('[Queue] Stopped fallback polling — Realtime is healthy.');
   }
 }
 
@@ -392,14 +409,34 @@ export async function setupRealtime() {
       })
       .subscribe((status) => {
         console.log('[Queue] Realtime status:', status);
+        if (status === 'SUBSCRIBED') {
+          stopQueueFallbackPolling();
+        } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+          startQueueFallbackPolling();
+          console.log('[Queue] Reconnecting realtime in 5s...');
+          setTimeout(setupRealtime, 5000);
+        }
       });
   } catch (err) {
     console.error('[Queue] Failed to setup realtime:', err);
+    startQueueFallbackPolling();
   }
 }
 
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', teardownQueueRealtime);
+}
+
+if (typeof document !== 'undefined' && !document._queueVisibilityBound) {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      const qSection = document.getElementById('queue-section');
+      if (qSection && !qSection.classList.contains('hidden')) {
+        loadQueueTickets();
+      }
+    }
+  });
+  document._queueVisibilityBound = true;
 }
 
 export async function loadQueueTickets() {
@@ -795,11 +832,6 @@ export async function initQueueController() {
   setupUI();
   await setupRealtime();
   await loadQueueTickets();
-
-  if (queueRefreshInterval) clearInterval(queueRefreshInterval);
-  queueRefreshInterval = setInterval(() => {
-    if (document.visibilityState === 'visible') loadQueueTickets();
-  }, 60000);
 }
 
 // Preserve backwards-compatibility endpoints

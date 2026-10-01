@@ -1,0 +1,343 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1150" width="1600" height="1150" style="background:#ffffff; font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <style>
+      .title { font-size: 24px; font-weight: 800; fill: #000000; letter-spacing: -0.5px; }
+      .subtitle { font-size: 13px; fill: #64748b; font-style: italic; }
+      .tbl-header { fill: #f1f5f9; stroke: #334155; stroke-width: 1.5; }
+      .tbl-body { fill: #ffffff; stroke: #334155; stroke-width: 1.5; }
+      .tbl-title { font-size: 13px; font-weight: 700; fill: #0f172a; letter-spacing: 0.5px; }
+      .col-type { font-size: 11px; fill: #64748b; font-family: 'Consolas', monospace; }
+      .col-name { font-size: 11.5px; font-weight: 600; fill: #1e293b; }
+      .badge-pk { font-size: 9.5px; font-weight: 800; fill: #b91c1c; }
+      .badge-fk { font-size: 9.5px; font-weight: 800; fill: #0369a1; }
+      .badge-uk { font-size: 9.5px; font-weight: 800; fill: #047857; }
+      .row-sep { stroke: #e2e8f0; stroke-width: 1; }
+      .rel-line { fill: none; stroke: #475569; stroke-width: 1.5; }
+      .rel-line-hl { fill: none; stroke: #0284c7; stroke-width: 1.5; stroke-dasharray: 4,4; }
+      .crows-foot { fill: none; stroke: #475569; stroke-width: 1.5; stroke-linecap: round; }
+      .rel-label { font-size: 10px; fill: #475569; font-weight: 600; background: #ffffff; }
+    </style>
+    <!-- Marker for 1:N crow foot -->
+    <marker id="crow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 6 L 0 11 M 10 1 L 10 11" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
+    </marker>
+    <!-- Marker for 1:1 bar -->
+    <marker id="one" viewBox="0 0 10 12" refX="2" refY="6" markerWidth="8" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 4 1 L 4 11 M 8 1 L 8 11" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
+    </marker>
+  </defs>
+
+  <!-- Title Section -->
+  <text x="800" y="45" text-anchor="middle" class="title">3.5.6 Entity-Relationship Diagram</text>
+  <text x="800" y="68" text-anchor="middle" class="subtitle">U-Konek Healthcare Clinic Management Platform — System Relational Data Model</text>
+
+  <!-- ================= RELATIONAL CONNECTOR LINES ================= -->
+  <!-- STAFF -> DOCTOR_SCHEDULES -->
+  <path d="M 330 310 L 330 360 L 140 360 L 140 440" class="rel-line" marker-start="url(#one)" marker-end="url(#crow)"/>
+  
+  <!-- STAFF -> ANNOUNCEMENTS -->
+  <path d="M 380 310 L 380 440" class="rel-line" marker-start="url(#one)" marker-end="url(#crow)"/>
+  
+  <!-- STAFF -> MEDICINES -->
+  <path d="M 430 310 L 430 380 L 590 380 L 590 440" class="rel-line" marker-start="url(#one)" marker-end="url(#crow)"/>
+
+  <!-- STAFF -> APPOINTMENTS -->
+  <path d="M 480 310 L 480 410 L 800 410 L 800 440" class="rel-line" marker-start="url(#one)" marker-end="url(#crow)"/>
+
+  <!-- CITIZENS -> APPOINTMENTS -->
+  <path d="M 940 280 L 940 380 L 880 380 L 880 440" class="rel-line" marker-start="url(#one)" marker-end="url(#crow)"/>
+
+  <!-- CITIZENS -> FEEDBACKS -->
+  <path d="M 1030 280 L 1030 360 L 1170 360 L 1170 440" class="rel-line" marker-start="url(#one)" marker-end="url(#crow)"/>
+
+  <!-- CITIZENS -> QUEUE_TICKETS -->
+  <path d="M 1070 280 L 1070 340 L 1430 340 L 1430 440" class="rel-line" marker-start="url(#one)" marker-end="url(#crow)"/>
+
+  <!-- CITIZENS -> CONSULTATIONS -->
+  <path d="M 980 280 L 980 690 L 880 690 L 880 730" class="rel-line" marker-start="url(#one)" marker-end="url(#crow)"/>
+
+  <!-- STAFF -> CONSULTATIONS -->
+  <path d="M 510 260 L 550 260 L 550 710 L 780 710 L 780 730" class="rel-line" marker-start="url(#one)" marker-end="url(#crow)"/>
+
+  <!-- CONSULTATIONS -> PRESCRIPTION_HEADERS -->
+  <path d="M 970 820 L 1070 820" class="rel-line" marker-start="url(#one)" marker-end="url(#crow)"/>
+
+  <!-- STAFF -> PRESCRIPTION_HEADERS -->
+  <path d="M 520 280 L 530 280 L 530 960 L 1160 960 L 1160 920" class="rel-line" marker-start="url(#one)" marker-end="url(#crow)"/>
+
+  <!-- PRESCRIPTION_HEADERS -> PRESCRIPTION_ITEMS -->
+  <path d="M 1200 920 L 1200 980" class="rel-line" marker-start="url(#one)" marker-end="url(#crow)"/>
+
+  <!-- MEDICINES -> PRESCRIPTION_ITEMS -->
+  <path d="M 640 590 L 640 1020 L 1070 1020" class="rel-line-hl" marker-start="url(#one)" marker-end="url(#crow)"/>
+
+
+  <!-- ================= ENTITY BOXES ================= -->
+
+  <!-- 1. STAFF -->
+  <g transform="translate(250, 95)">
+    <rect width="260" height="215" rx="4" class="tbl-body"/>
+    <rect width="260" height="28" rx="4" class="tbl-header"/>
+    <rect width="260" height="4" y="24" fill="#f1f5f9"/>
+    <line x1="0" y1="28" x2="260" y2="28" stroke="#334155" stroke-width="1.5"/>
+    <text x="130" y="19" text-anchor="middle" class="tbl-title">STAFF</text>
+    
+    <text x="12" y="47" class="col-type">bigint</text><text x="75" y="47" class="col-name">id</text><text x="235" y="47" class="badge-pk">PK</text>
+    <line x1="0" y1="53" x2="260" y2="53" class="row-sep"/>
+    <text x="12" y="67" class="col-type">varchar</text><text x="75" y="67" class="col-name">username</text><text x="235" y="67" class="badge-uk">UK</text>
+    <line x1="0" y1="73" x2="260" y2="73" class="row-sep"/>
+    <text x="12" y="87" class="col-type">varchar</text><text x="75" y="87" class="col-name">employee_id</text><text x="235" y="87" class="badge-uk">UK</text>
+    <line x1="0" y1="93" x2="260" y2="93" class="row-sep"/>
+    <text x="12" y="107" class="col-type">varchar</text><text x="75" y="107" class="col-name">email</text><text x="235" y="107" class="badge-uk">UK</text>
+    <line x1="0" y1="113" x2="260" y2="113" class="row-sep"/>
+    <text x="12" y="127" class="col-type">varchar</text><text x="75" y="127" class="col-name">role</text>
+    <line x1="0" y1="133" x2="260" y2="133" class="row-sep"/>
+    <text x="12" y="147" class="col-type">varchar</text><text x="75" y="147" class="col-name">status</text>
+    <line x1="0" y1="153" x2="260" y2="153" class="row-sep"/>
+    <text x="12" y="167" class="col-type">uuid</text><text x="75" y="167" class="col-name">auth_user_id</text><text x="235" y="167" class="badge-uk">UK</text>
+    <line x1="0" y1="173" x2="260" y2="173" class="row-sep"/>
+    <text x="12" y="187" class="col-type">boolean</text><text x="75" y="187" class="col-name">is_online</text>
+    <line x1="0" y1="193" x2="260" y2="193" class="row-sep"/>
+    <text x="12" y="207" class="col-type">text</text><text x="75" y="207" class="col-name">doctor_specialization</text>
+  </g>
+
+  <!-- 2. CITIZENS -->
+  <g transform="translate(860, 110)">
+    <rect width="240" height="170" rx="4" class="tbl-body"/>
+    <rect width="240" height="28" rx="4" class="tbl-header"/>
+    <rect width="240" height="4" y="24" fill="#f1f5f9"/>
+    <line x1="0" y1="28" x2="240" y2="28" stroke="#334155" stroke-width="1.5"/>
+    <text x="120" y="19" text-anchor="middle" class="tbl-title">CITIZENS</text>
+    
+    <text x="12" y="47" class="col-type">bigint</text><text x="70" y="47" class="col-name">id</text><text x="215" y="47" class="badge-pk">PK</text>
+    <line x1="0" y1="53" x2="240" y2="53" class="row-sep"/>
+    <text x="12" y="67" class="col-type">varchar</text><text x="70" y="67" class="col-name">email</text><text x="215" y="67" class="badge-uk">UK</text>
+    <line x1="0" y1="73" x2="240" y2="73" class="row-sep"/>
+    <text x="12" y="87" class="col-type">varchar</text><text x="70" y="87" class="col-name">username</text><text x="215" y="87" class="badge-uk">UK</text>
+    <line x1="0" y1="93" x2="240" y2="93" class="row-sep"/>
+    <text x="12" y="107" class="col-type">varchar</text><text x="70" y="107" class="col-name">firstname</text>
+    <line x1="0" y1="113" x2="240" y2="113" class="row-sep"/>
+    <text x="12" y="127" class="col-type">varchar</text><text x="70" y="127" class="col-name">surname</text>
+    <line x1="0" y1="133" x2="240" y2="133" class="row-sep"/>
+    <text x="12" y="147" class="col-type">varchar</text><text x="70" y="147" class="col-name">role</text>
+    <line x1="0" y1="153" x2="240" y2="153" class="row-sep"/>
+    <text x="12" y="165" class="col-type">uuid</text><text x="70" y="165" class="col-name">auth_user_id</text><text x="215" y="165" class="badge-uk">UK</text>
+  </g>
+
+  <!-- 3. PENDING_CITIZEN_SIGNUPS -->
+  <g transform="translate(1220, 110)">
+    <rect width="260" height="175" rx="4" class="tbl-body"/>
+    <rect width="260" height="28" rx="4" class="tbl-header"/>
+    <rect width="260" height="4" y="24" fill="#f1f5f9"/>
+    <line x1="0" y1="28" x2="260" y2="28" stroke="#334155" stroke-width="1.5"/>
+    <text x="130" y="19" text-anchor="middle" class="tbl-title">PENDING_CITIZEN_SIGNUPS</text>
+    
+    <text x="12" y="47" class="col-type">bigint</text><text x="80" y="47" class="col-name">id</text><text x="235" y="47" class="badge-pk">PK</text>
+    <line x1="0" y1="53" x2="260" y2="53" class="row-sep"/>
+    <text x="12" y="67" class="col-type">text</text><text x="80" y="67" class="col-name">email</text><text x="235" y="67" class="badge-uk">UK</text>
+    <line x1="0" y1="73" x2="260" y2="73" class="row-sep"/>
+    <text x="12" y="87" class="col-type">jsonb</text><text x="80" y="87" class="col-name">profile</text>
+    <line x1="0" y1="93" x2="260" y2="93" class="row-sep"/>
+    <text x="12" y="107" class="col-type">text</text><text x="80" y="107" class="col-name">otp_hash</text>
+    <line x1="0" y1="113" x2="260" y2="113" class="row-sep"/>
+    <text x="12" y="127" class="col-type">timestamptz</text><text x="80" y="127" class="col-name">otp_expires_at</text>
+    <line x1="0" y1="133" x2="260" y2="133" class="row-sep"/>
+    <text x="12" y="147" class="col-type">integer</text><text x="80" y="147" class="col-name">attempts_left</text>
+    <line x1="0" y1="153" x2="260" y2="153" class="row-sep"/>
+    <text x="12" y="167" class="col-type">timestamptz</text><text x="80" y="167" class="col-name">verified_at</text>
+  </g>
+
+  <!-- 4. DOCTOR_SCHEDULES -->
+  <g transform="translate(30, 440)">
+    <rect width="220" height="150" rx="4" class="tbl-body"/>
+    <rect width="220" height="28" rx="4" class="tbl-header"/>
+    <rect width="220" height="4" y="24" fill="#f1f5f9"/>
+    <line x1="0" y1="28" x2="220" y2="28" stroke="#334155" stroke-width="1.5"/>
+    <text x="110" y="19" text-anchor="middle" class="tbl-title">DOCTOR_SCHEDULES</text>
+    
+    <text x="12" y="47" class="col-type">bigint</text><text x="70" y="47" class="col-name">id</text><text x="195" y="47" class="badge-pk">PK</text>
+    <line x1="0" y1="53" x2="220" y2="53" class="row-sep"/>
+    <text x="12" y="67" class="col-type">bigint</text><text x="70" y="67" class="col-name">doctor_staff_id</text><text x="195" y="67" class="badge-fk">FK</text>
+    <line x1="0" y1="73" x2="220" y2="73" class="row-sep"/>
+    <text x="12" y="87" class="col-type">bigint</text><text x="70" y="87" class="col-name">created_by_staff_id</text><text x="195" y="87" class="badge-fk">FK</text>
+    <line x1="0" y1="93" x2="220" y2="93" class="row-sep"/>
+    <text x="12" y="107" class="col-type">date</text><text x="70" y="107" class="col-name">schedule_date</text>
+    <line x1="0" y1="113" x2="220" y2="113" class="row-sep"/>
+    <text x="12" y="127" class="col-type">time</text><text x="70" y="127" class="col-name">start_time</text>
+    <line x1="0" y1="133" x2="220" y2="133" class="row-sep"/>
+    <text x="12" y="145" class="col-type">time</text><text x="70" y="145" class="col-name">end_time</text>
+  </g>
+
+  <!-- 5. ANNOUNCEMENTS -->
+  <g transform="translate(280, 440)">
+    <rect width="200" height="130" rx="4" class="tbl-body"/>
+    <rect width="200" height="28" rx="4" class="tbl-header"/>
+    <rect width="200" height="4" y="24" fill="#f1f5f9"/>
+    <line x1="0" y1="28" x2="200" y2="28" stroke="#334155" stroke-width="1.5"/>
+    <text x="100" y="19" text-anchor="middle" class="tbl-title">ANNOUNCEMENTS</text>
+    
+    <text x="12" y="47" class="col-type">bigint</text><text x="70" y="47" class="col-name">id</text><text x="175" y="47" class="badge-pk">PK</text>
+    <line x1="0" y1="53" x2="200" y2="53" class="row-sep"/>
+    <text x="12" y="67" class="col-type">bigint</text><text x="70" y="67" class="col-name">created_by_staff_id</text><text x="175" y="67" class="badge-fk">FK</text>
+    <line x1="0" y1="73" x2="200" y2="73" class="row-sep"/>
+    <text x="12" y="87" class="col-type">text</text><text x="70" y="87" class="col-name">title</text>
+    <line x1="0" y1="93" x2="200" y2="93" class="row-sep"/>
+    <text x="12" y="107" class="col-type">varchar</text><text x="70" y="107" class="col-name">visibility</text>
+    <line x1="0" y1="113" x2="200" y2="113" class="row-sep"/>
+    <text x="12" y="125" class="col-type">text</text><text x="70" y="125" class="col-name">image_url</text>
+  </g>
+
+  <!-- 6. MEDICINES -->
+  <g transform="translate(510, 440)">
+    <rect width="210" height="150" rx="4" class="tbl-body"/>
+    <rect width="210" height="28" rx="4" class="tbl-header"/>
+    <rect width="210" height="4" y="24" fill="#f1f5f9"/>
+    <line x1="0" y1="28" x2="210" y2="28" stroke="#334155" stroke-width="1.5"/>
+    <text x="105" y="19" text-anchor="middle" class="tbl-title">MEDICINES</text>
+    
+    <text x="12" y="47" class="col-type">bigint</text><text x="70" y="47" class="col-name">id</text><text x="185" y="47" class="badge-pk">PK</text>
+    <line x1="0" y1="53" x2="210" y2="53" class="row-sep"/>
+    <text x="12" y="67" class="col-type">bigint</text><text x="70" y="67" class="col-name">created_by_staff_id</text><text x="185" y="67" class="badge-fk">FK</text>
+    <line x1="0" y1="73" x2="210" y2="73" class="row-sep"/>
+    <text x="12" y="87" class="col-type">text</text><text x="70" y="87" class="col-name">name</text><text x="185" y="87" class="badge-uk">UK</text>
+    <line x1="0" y1="93" x2="210" y2="93" class="row-sep"/>
+    <text x="12" y="107" class="col-type">integer</text><text x="70" y="107" class="col-name">qty</text>
+    <line x1="0" y1="113" x2="210" y2="113" class="row-sep"/>
+    <text x="12" y="127" class="col-type">text</text><text x="70" y="127" class="col-name">drug_classification</text>
+    <line x1="0" y1="133" x2="210" y2="133" class="row-sep"/>
+    <text x="12" y="145" class="col-type">timestamptz</text><text x="70" y="145" class="col-name">archived_at</text>
+  </g>
+
+  <!-- 7. APPOINTMENTS -->
+  <g transform="translate(750, 440)">
+    <rect width="240" height="150" rx="4" class="tbl-body"/>
+    <rect width="240" height="28" rx="4" class="tbl-header"/>
+    <rect width="240" height="4" y="24" fill="#f1f5f9"/>
+    <line x1="0" y1="28" x2="240" y2="28" stroke="#334155" stroke-width="1.5"/>
+    <text x="120" y="19" text-anchor="middle" class="tbl-title">APPOINTMENTS</text>
+    
+    <text x="12" y="47" class="col-type">bigint</text><text x="70" y="47" class="col-name">id</text><text x="215" y="47" class="badge-pk">PK</text>
+    <line x1="0" y1="53" x2="240" y2="53" class="row-sep"/>
+    <text x="12" y="67" class="col-type">bigint</text><text x="70" y="67" class="col-name">citizen_id</text><text x="215" y="67" class="badge-fk">FK</text>
+    <line x1="0" y1="73" x2="240" y2="73" class="row-sep"/>
+    <text x="12" y="87" class="col-type">bigint</text><text x="70" y="87" class="col-name">doctor_staff_id</text><text x="215" y="87" class="badge-fk">FK</text>
+    <line x1="0" y1="93" x2="240" y2="93" class="row-sep"/>
+    <text x="12" y="107" class="col-type">date</text><text x="70" y="107" class="col-name">appointment_date</text>
+    <line x1="0" y1="113" x2="240" y2="113" class="row-sep"/>
+    <text x="12" y="127" class="col-type">time</text><text x="70" y="127" class="col-name">appointment_time</text>
+    <line x1="0" y1="133" x2="240" y2="133" class="row-sep"/>
+    <text x="12" y="145" class="col-type">varchar</text><text x="70" y="145" class="col-name">status</text>
+  </g>
+
+  <!-- 8. FEEDBACKS -->
+  <g transform="translate(1040, 440)">
+    <rect width="210" height="130" rx="4" class="tbl-body"/>
+    <rect width="210" height="28" rx="4" class="tbl-header"/>
+    <rect width="210" height="4" y="24" fill="#f1f5f9"/>
+    <line x1="0" y1="28" x2="210" y2="28" stroke="#334155" stroke-width="1.5"/>
+    <text x="105" y="19" text-anchor="middle" class="tbl-title">FEEDBACKS</text>
+    
+    <text x="12" y="47" class="col-type">bigint</text><text x="70" y="47" class="col-name">id</text><text x="185" y="47" class="badge-pk">PK</text>
+    <line x1="0" y1="53" x2="210" y2="53" class="row-sep"/>
+    <text x="12" y="67" class="col-type">bigint</text><text x="70" y="67" class="col-name">citizen_id</text><text x="185" y="67" class="badge-fk">FK</text>
+    <line x1="0" y1="73" x2="210" y2="73" class="row-sep"/>
+    <text x="12" y="87" class="col-type">text</text><text x="70" y="87" class="col-name">from_email</text>
+    <line x1="0" y1="93" x2="210" y2="93" class="row-sep"/>
+    <text x="12" y="107" class="col-type">text</text><text x="70" y="107" class="col-name">subject</text>
+    <line x1="0" y1="113" x2="210" y2="113" class="row-sep"/>
+    <text x="12" y="125" class="col-type">smallint</text><text x="70" y="125" class="col-name">rating</text>
+  </g>
+
+  <!-- 9. QUEUE_TICKETS -->
+  <g transform="translate(1300, 440)">
+    <rect width="240" height="190" rx="4" class="tbl-body"/>
+    <rect width="240" height="28" rx="4" class="tbl-header"/>
+    <rect width="240" height="4" y="24" fill="#f1f5f9"/>
+    <line x1="0" y1="28" x2="240" y2="28" stroke="#334155" stroke-width="1.5"/>
+    <text x="120" y="19" text-anchor="middle" class="tbl-title">QUEUE_TICKETS</text>
+    
+    <text x="12" y="47" class="col-type">bigint</text><text x="70" y="47" class="col-name">id</text><text x="215" y="47" class="badge-pk">PK</text>
+    <line x1="0" y1="53" x2="240" y2="53" class="row-sep"/>
+    <text x="12" y="67" class="col-type">bigint</text><text x="70" y="67" class="col-name">citizen_id</text><text x="215" y="67" class="badge-fk">FK</text>
+    <line x1="0" y1="73" x2="240" y2="73" class="row-sep"/>
+    <text x="12" y="87" class="col-type">date</text><text x="70" y="87" class="col-name">queue_date</text>
+    <line x1="0" y1="93" x2="240" y2="93" class="row-sep"/>
+    <text x="12" y="107" class="col-type">text</text><text x="70" y="107" class="col-name">service_key</text>
+    <line x1="0" y1="113" x2="240" y2="113" class="row-sep"/>
+    <text x="12" y="127" class="col-type">integer</text><text x="70" y="127" class="col-name">queue_number</text>
+    <line x1="0" y1="133" x2="240" y2="133" class="row-sep"/>
+    <text x="12" y="147" class="col-type">text</text><text x="70" y="147" class="col-name">ticket_code</text><text x="215" y="147" class="badge-uk">UK</text>
+    <line x1="0" y1="153" x2="240" y2="153" class="row-sep"/>
+    <text x="12" y="167" class="col-type">text</text><text x="70" y="167" class="col-name">citizen_type</text>
+    <line x1="0" y1="173" x2="240" y2="173" class="row-sep"/>
+    <text x="12" y="185" class="col-type">text</text><text x="70" y="185" class="col-name">status</text>
+  </g>
+
+  <!-- 10. CONSULTATIONS -->
+  <g transform="translate(730, 730)">
+    <rect width="240" height="170" rx="4" class="tbl-body"/>
+    <rect width="240" height="28" rx="4" class="tbl-header"/>
+    <rect width="240" height="4" y="24" fill="#f1f5f9"/>
+    <line x1="0" y1="28" x2="240" y2="28" stroke="#334155" stroke-width="1.5"/>
+    <text x="120" y="19" text-anchor="middle" class="tbl-title">CONSULTATIONS</text>
+    
+    <text x="12" y="47" class="col-type">bigint</text><text x="70" y="47" class="col-name">id</text><text x="215" y="47" class="badge-pk">PK</text>
+    <line x1="0" y1="53" x2="240" y2="53" class="row-sep"/>
+    <text x="12" y="67" class="col-type">bigint</text><text x="70" y="67" class="col-name">patient_citizen_id</text><text x="215" y="67" class="badge-fk">FK</text>
+    <line x1="0" y1="73" x2="240" y2="73" class="row-sep"/>
+    <text x="12" y="87" class="col-type">bigint</text><text x="70" y="87" class="col-name">doctor_staff_id</text><text x="215" y="87" class="badge-fk">FK</text>
+    <line x1="0" y1="93" x2="240" y2="93" class="row-sep"/>
+    <text x="12" y="107" class="col-type">text</text><text x="70" y="107" class="col-name">diagnosis</text>
+    <line x1="0" y1="113" x2="240" y2="113" class="row-sep"/>
+    <text x="12" y="127" class="col-type">text</text><text x="70" y="127" class="col-name">symptoms</text>
+    <line x1="0" y1="133" x2="240" y2="133" class="row-sep"/>
+    <text x="12" y="147" class="col-type">jsonb</text><text x="70" y="147" class="col-name">physical_exam</text>
+    <line x1="0" y1="153" x2="240" y2="153" class="row-sep"/>
+    <text x="12" y="165" class="col-type">timestamptz</text><text x="70" y="165" class="col-name">consulted_at</text>
+  </g>
+
+  <!-- 11. PRESCRIPTION_HEADERS -->
+  <g transform="translate(1070, 750)">
+    <rect width="260" height="170" rx="4" class="tbl-body"/>
+    <rect width="260" height="28" rx="4" class="tbl-header"/>
+    <rect width="260" height="4" y="24" fill="#f1f5f9"/>
+    <line x1="0" y1="28" x2="260" y2="28" stroke="#334155" stroke-width="1.5"/>
+    <text x="130" y="19" text-anchor="middle" class="tbl-title">PRESCRIPTION_HEADERS</text>
+    
+    <text x="12" y="47" class="col-type">bigint</text><text x="80" y="47" class="col-name">id</text><text x="235" y="47" class="badge-pk">PK</text>
+    <line x1="0" y1="53" x2="260" y2="53" class="row-sep"/>
+    <text x="12" y="67" class="col-type">bigint</text><text x="80" y="67" class="col-name">consultation_id</text><text x="235" y="67" class="badge-fk">FK</text>
+    <line x1="0" y1="73" x2="260" y2="73" class="row-sep"/>
+    <text x="12" y="87" class="col-type">bigint</text><text x="80" y="87" class="col-name">patient_citizen_id</text><text x="235" y="87" class="badge-fk">FK</text>
+    <line x1="0" y1="93" x2="260" y2="93" class="row-sep"/>
+    <text x="12" y="107" class="col-type">bigint</text><text x="80" y="107" class="col-name">doctor_staff_id</text><text x="235" y="107" class="badge-fk">FK</text>
+    <line x1="0" y1="113" x2="260" y2="113" class="row-sep"/>
+    <text x="12" y="127" class="col-type">text</text><text x="80" y="127" class="col-name">prescription_code</text><text x="235" y="127" class="badge-uk">UK</text>
+    <line x1="0" y1="133" x2="260" y2="133" class="row-sep"/>
+    <text x="12" y="147" class="col-type">text</text><text x="80" y="147" class="col-name">dispensing_status</text>
+    <line x1="0" y1="153" x2="260" y2="153" class="row-sep"/>
+    <text x="12" y="165" class="col-type">timestamptz</text><text x="80" y="165" class="col-name">issued_at</text>
+  </g>
+
+  <!-- 12. PRESCRIPTION_ITEMS -->
+  <g transform="translate(1070, 980)">
+    <rect width="260" height="150" rx="4" class="tbl-body"/>
+    <rect width="260" height="28" rx="4" class="tbl-header"/>
+    <rect width="260" height="4" y="24" fill="#f1f5f9"/>
+    <line x1="0" y1="28" x2="260" y2="28" stroke="#334155" stroke-width="1.5"/>
+    <text x="130" y="19" text-anchor="middle" class="tbl-title">PRESCRIPTION_ITEMS</text>
+    
+    <text x="12" y="47" class="col-type">bigint</text><text x="80" y="47" class="col-name">id</text><text x="235" y="47" class="badge-pk">PK</text>
+    <line x1="0" y1="53" x2="260" y2="53" class="row-sep"/>
+    <text x="12" y="67" class="col-type">bigint</text><text x="80" y="67" class="col-name">prescription_id</text><text x="235" y="67" class="badge-fk">FK</text>
+    <line x1="0" y1="73" x2="260" y2="73" class="row-sep"/>
+    <text x="12" y="87" class="col-type">bigint</text><text x="80" y="87" class="col-name">medicine_id</text><text x="235" y="87" class="badge-fk">FK</text>
+    <line x1="0" y1="93" x2="260" y2="93" class="row-sep"/>
+    <text x="12" y="107" class="col-type">text</text><text x="80" y="107" class="col-name">medicine_name</text>
+    <line x1="0" y1="113" x2="260" y2="113" class="row-sep"/>
+    <text x="12" y="127" class="col-type">integer</text><text x="80" y="127" class="col-name">quantity</text>
+    <line x1="0" y1="133" x2="260" y2="133" class="row-sep"/>
+    <text x="12" y="145" class="col-type">integer</text><text x="80" y="145" class="col-name">dispensed_quantity</text>
+  </g>
+
+</svg>

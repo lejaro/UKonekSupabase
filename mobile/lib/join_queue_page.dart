@@ -40,7 +40,7 @@ class JoinQueuePage extends StatefulWidget {
 }
 
 class _JoinQueuePageState extends State<JoinQueuePage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
 
   late Future<QueueDashboardSnapshot> _dashboardFuture;
   late Future<List<QueueServiceOption>> _servicesFuture;
@@ -70,10 +70,21 @@ class _JoinQueuePageState extends State<JoinQueuePage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _animController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _loadInitialData();
     _animController.forward();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_activeQueueId != null && _queueRealtimeChannel == null) {
+        _subscribeQueueRealtime(_activeQueueId);
+      }
+      _refreshDashboard();
+    }
   }
 
   void _loadInitialData() {
@@ -81,7 +92,7 @@ class _JoinQueuePageState extends State<JoinQueuePage>
     _servicesFuture  = ApiService.listAvailableQueueServices();
     _limiterStatusFuture = ApiService.getQueueLimiterStatus();
     
-    // Check if citizen has active queue and start timer accordingly
+    // Check if citizen has active queue and setup Realtime
     _dashboardFuture.then((snapshot) {
       if (!mounted) return;
       if (snapshot.hasActiveQueue) {
@@ -91,7 +102,6 @@ class _JoinQueuePageState extends State<JoinQueuePage>
         _activeTicketCode = snapshot.ticketCode;
         _userManuallyCancelled = false;
         _subscribeQueueRealtime(snapshot.queueId);
-        _startRefreshTimer();
       } else {
         _stopRefreshTimer();
         _unsubscribeQueueRealtime();
@@ -176,7 +186,14 @@ class _JoinQueuePageState extends State<JoinQueuePage>
               }
             },
           )
-          .subscribe();
+          .subscribe((status, [error]) {
+            debugPrint('[Queue Realtime] Status: $status');
+            if (status == RealtimeSubscribeStatus.subscribed) {
+              _stopRefreshTimer(); // Stop polling when Realtime is healthy
+            } else if (status == RealtimeSubscribeStatus.channelError || status == RealtimeSubscribeStatus.closed) {
+              _startRefreshTimer(); // Only fallback to polling if Realtime drops
+            }
+          });
     } catch (e) {
       debugPrint('Error subscribing to queue realtime: $e');
     }
@@ -193,8 +210,8 @@ class _JoinQueuePageState extends State<JoinQueuePage>
   }
 
   void _startRefreshTimer() {
-    _refreshTimer?.cancel();
-    // 120-second fallback polling while realtime pushes live events
+    if (_refreshTimer != null) return;
+    // Slow 120-second fallback polling ONLY when realtime is disconnected
     _refreshTimer = Timer.periodic(const Duration(seconds: 120), (_) => _refreshDashboard());
   }
 
@@ -219,7 +236,6 @@ class _JoinQueuePageState extends State<JoinQueuePage>
         _activeQueueNumber = snapshot.myQueueNumber;
         _activeTicketCode = snapshot.ticketCode;
         _userManuallyCancelled = false;
-        if (_refreshTimer == null) _startRefreshTimer();
         if (_queueRealtimeChannel == null) _subscribeQueueRealtime(snapshot.queueId);
       } else {
         _stopRefreshTimer();
@@ -358,6 +374,7 @@ class _JoinQueuePageState extends State<JoinQueuePage>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _unsubscribeQueueRealtime();
     _refreshTimer?.cancel();
     _animController.dispose();
@@ -481,33 +498,42 @@ class _JoinQueuePageState extends State<JoinQueuePage>
         Expanded(
           child: FadeTransition(
             opacity: _fadeAnim,
-            child: FutureBuilder<QueueDashboardSnapshot>(
-              future: _dashboardFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator(color: _C.primary));
-                }
-                final data = snapshot.data;
-                if (data != null && data.hasActiveQueue) {
-                  return ActiveTicketCard(
-                    queue: data,
-                    isSubmitting: _isSubmitting,
-                    onCancel: _handleCancel,
-                  );
-                }
-                return QueueJoinForm(
-                  servicesFuture: _servicesFuture,
-                  limiterStatusFuture: _limiterStatusFuture,
-                  selectedService: _selectedService,
-                  onServiceSelected: (service) => setState(() => _selectedService = service),
-                  citizenType: _citizenType,
-                  onCitizenTypeChanged: (type) => setState(() => _citizenType = type),
-                  reasonController: _reasonController,
-                  symptomsController: _symptomsController,
-                  isSubmitting: _isSubmitting,
-                  onJoin: _handleJoin,
-                );
+            child: RefreshIndicator(
+              color: _C.primary,
+              onRefresh: () async {
+                _refreshDashboard();
+                try {
+                  await Future.wait([_dashboardFuture, _limiterStatusFuture]);
+                } catch (_) {}
               },
+              child: FutureBuilder<QueueDashboardSnapshot>(
+                future: _dashboardFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator(color: _C.primary));
+                  }
+                  final data = snapshot.data;
+                  if (data != null && data.hasActiveQueue) {
+                    return ActiveTicketCard(
+                      queue: data,
+                      isSubmitting: _isSubmitting,
+                      onCancel: _handleCancel,
+                    );
+                  }
+                  return QueueJoinForm(
+                    servicesFuture: _servicesFuture,
+                    limiterStatusFuture: _limiterStatusFuture,
+                    selectedService: _selectedService,
+                    onServiceSelected: (service) => setState(() => _selectedService = service),
+                    citizenType: _citizenType,
+                    onCitizenTypeChanged: (type) => setState(() => _citizenType = type),
+                    reasonController: _reasonController,
+                    symptomsController: _symptomsController,
+                    isSubmitting: _isSubmitting,
+                    onJoin: _handleJoin,
+                  );
+                },
+              ),
             ),
           ),
         ),

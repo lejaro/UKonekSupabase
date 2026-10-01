@@ -7,9 +7,10 @@ import { supabase } from '../lib/supabaseClient.js';
 import { navigateToSection } from './navigationController.js';
 import { toggleStatsSkeleton, toggleChartSkeleton } from '../utils/uiHelpers.js';
 
-export const ADMIN_DASHBOARD_REFRESH_MS = 60000;
+export const ADMIN_DASHBOARD_REFRESH_MS = 180000; // Relaxed 3-minute heartbeat
 let adminDashboardRefreshTimer = null;
 let adminDashboardRefreshInFlight = false;
+let lastDashboardRefreshTime = 0;
 
 export function getManilaTodayStr() {
   return new Intl.DateTimeFormat('fr-CA', {
@@ -530,11 +531,30 @@ export function startAdminDashboardAutoRefresh() {
     try {
       await loadClinicalOperationsMetrics();
       renderDashboardInsights();
+      lastDashboardRefreshTime = Date.now();
     } catch (_) {}
     finally {
       adminDashboardRefreshInFlight = false;
     }
   }, ADMIN_DASHBOARD_REFRESH_MS);
+
+  if (typeof document !== 'undefined' && !document._adminVisibilityBound) {
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'visible') {
+        const dashSection = document.getElementById('dashboard-section');
+        if (dashSection && !dashSection.classList.contains('hidden')) {
+          if (Date.now() - lastDashboardRefreshTime > 60000) {
+            try {
+              await loadClinicalOperationsMetrics();
+              renderDashboardInsights();
+              lastDashboardRefreshTime = Date.now();
+            } catch (_) {}
+          }
+        }
+      }
+    });
+    document._adminVisibilityBound = true;
+  }
 }
 
 export function stopAdminDashboardAutoRefresh() {

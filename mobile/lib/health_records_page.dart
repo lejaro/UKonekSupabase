@@ -403,21 +403,73 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
               Expanded(child: _vitalChip('SpO2', v.spo2 != null ? '${v.spo2}%' : '—', Icons.air_rounded, const Color(0xFF00897B))),
             ],
           ),
-          if (v.heightCm != null || v.weightKg != null || v.bmi != null) ...[
+          if (v.heightCm != null || v.weightKg != null) ...[
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: _vitalChip('Height', v.heightCm != null ? '${v.heightCm} cm' : '—', Icons.height_rounded, const Color(0xFF6366F1))),
+                Expanded(
+                  child: _vitalChip(
+                    'Height',
+                    v.heightCm != null ? '${_cleanNum(v.heightCm!)} cm' : '—',
+                    Icons.height_rounded,
+                    const Color(0xFF6366F1),
+                  ),
+                ),
                 const SizedBox(width: 10),
-                Expanded(child: _vitalChip('Weight', v.weightKg != null ? '${v.weightKg} kg' : '—', Icons.monitor_weight_rounded, const Color(0xFF8B5CF6))),
-                const SizedBox(width: 10),
-                Expanded(child: _vitalChip('BMI', v.bmi != null ? '${v.bmi}' : '—', Icons.accessibility_new_rounded, const Color(0xFF0EA5E9))),
+                Expanded(
+                  child: _vitalChip(
+                    'Weight',
+                    v.weightKg != null ? '${_cleanNum(v.weightKg!)} kg' : '—',
+                    Icons.monitor_weight_rounded,
+                    const Color(0xFF8B5CF6),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (v.bmi != null || v.rr != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (v.bmi != null)
+                  Expanded(
+                    child: _vitalChip(
+                      'BMI',
+                      _formatBmi(v.bmi!, compact: v.rr != null),
+                      Icons.accessibility_new_rounded,
+                      const Color(0xFF0EA5E9),
+                    ),
+                  ),
+                if (v.bmi != null && v.rr != null)
+                  const SizedBox(width: 10),
+                if (v.rr != null)
+                  Expanded(
+                    child: _vitalChip(
+                      'Resp. Rate',
+                      '${v.rr} bpm',
+                      Icons.air_rounded,
+                      const Color(0xFF14B8A6),
+                    ),
+                  ),
               ],
             ),
           ],
         ],
       ),
     );
+  }
+
+  String _cleanNum(double val) {
+    return val % 1 == 0 ? val.toInt().toString() : val.toStringAsFixed(1);
+  }
+
+  String _formatBmi(double bmi, {bool compact = false}) {
+    final val = bmi % 1 == 0 ? bmi.toInt().toString() : bmi.toStringAsFixed(1);
+    if (compact) return val;
+    if (bmi < 18.5) return '$val • Underweight';
+    if (bmi < 25.0) return '$val • Normal';
+    if (bmi < 30.0) return '$val • Overweight';
+    return '$val • Obese';
   }
 
   Widget _vitalChip(String label, String value, IconData icon, Color color) {
@@ -442,14 +494,27 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   label.toUpperCase(),
-                  style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 2),
                 Text(
                   value,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: _C.textDark),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: _C.textDark,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -698,9 +763,9 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
                     _detailSection('Oxygen Saturation (SpO2)', v.spo2 != null ? '${v.spo2}%' : '—'),
                     if (v.heightCm != null || v.weightKg != null || v.bmi != null)
                       Row(children: [
-                        Expanded(child: _detailSection('Height', v.heightCm != null ? '${v.heightCm} cm' : '—')),
-                        Expanded(child: _detailSection('Weight', v.weightKg != null ? '${v.weightKg} kg' : '—')),
-                        Expanded(child: _detailSection('BMI', v.bmi != null ? '${v.bmi}' : '—')),
+                        Expanded(child: _detailSection('Height', v.heightCm != null ? '${_cleanNum(v.heightCm!)} cm' : '—')),
+                        Expanded(child: _detailSection('Weight', v.weightKg != null ? '${_cleanNum(v.weightKg!)} kg' : '—')),
+                        Expanded(child: _detailSection('BMI', v.bmi != null ? _formatBmi(v.bmi!) : '—')),
                       ]),
                     _detailSection('Current Medications', v.meds?.isNotEmpty == true ? v.meds! : 'None recorded'),
                   ] else if (c != null) ...[

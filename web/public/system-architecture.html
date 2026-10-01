@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>U-Konek — System Architecture & High-Level ERD</title>
+  <meta name="description" content="Interactive high-level system architecture and entity relationship diagram for the U-Konek Healthcare Clinic Management Platform.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg-dark: #0a0f1d;
+      --bg-card: rgba(17, 24, 39, 0.75);
+      --bg-card-hover: rgba(30, 41, 59, 0.85);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(14, 165, 233, 0.4);
+      --primary: #0ea5e9;
+      --primary-glow: rgba(14, 165, 233, 0.25);
+      --teal: #10b981;
+      --teal-glow: rgba(16, 185, 129, 0.25);
+      --purple: #8b5cf6;
+      --purple-glow: rgba(139, 92, 246, 0.25);
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --radius-lg: 16px;
+      --radius-md: 10px;
+      --radius-sm: 6px;
+      --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.1) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(139, 92, 246, 0.08) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 60px;
+    }
+
+    h1, h2, h3, h4, .brand-font {
+      font-family: 'Outfit', sans-serif;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 20px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 28px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      backdrop-filter: blur(16px);
+      margin-bottom: 28px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #0ea5e9, #10b981);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+      box-shadow: 0 0 20px rgba(14, 165, 233, 0.4);
+    }
+
+    .brand-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-title span {
+      background: linear-gradient(90deg, #38bdf8, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .stats-bar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .stat-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      padding: 6px 14px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-pill b {
+      color: #38bdf8;
+    }
+
+    /* Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 6px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      margin-bottom: 24px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      padding: 10px 20px;
+      border-radius: var(--radius-md);
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: var(--transition);
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(16, 185, 129, 0.2));
+      color: #fff;
+      border: 1px solid var(--border-active);
+      box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15);
+    }
+
+    /* Tab Content Panes */
+    .tab-pane {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cards & Layout */
+    .glass-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      backdrop-filter: blur(14px);
+      padding: 24px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    /* Architecture Grid */
+    .arch-tier {
+      margin-bottom: 24px;
+    }
+
+    .tier-header {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tier-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .node-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .node-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--primary);
+      opacity: 0.7;
+    }
+
+    .node-card.green::before { background: var(--teal); }
+    .node-card.purple::before { background: var(--purple); }
+    .node-card.amber::before { background: var(--amber); }
+
+    .node-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-active);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      background: var(--bg-card-hover);
+    }
+
+    .node-title {
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .node-subtitle {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+
+    .node-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 3px 8px;
+      border-radius: 4px;
+      color: var(--text-muted);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* Diagram Viewport */
+    .mermaid-viewport {
+      background: #070b14;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      overflow-x: auto;
+      text-align: center;
+      position: relative;
+    }
+
+    .mermaid {
+      display: inline-block;
+      min-width: 100%;
+    }
+
+    /* Pipeline Step Tracker */
+    .flow-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .step-card {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      position: relative;
+      transition: var(--transition);
+    }
+
+    .step-card:hover {
+      border-color: var(--border-active);
+      transform: translateY(-3px);
+    }
+
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(14, 165, 233, 0.15);
+      color: var(--primary);
+      border: 1px solid var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .step-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--text-main);
+    }
+
+    .step-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Entity Dictionary Table */
+    .dict-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 18px;
+    }
+
+    .dict-card {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 18px;
+    }
+
+    .dict-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 8px;
+    }
+
+    .table-name {
+      font-family: monospace;
+      font-size: 14px;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .domain-badge {
+      font-size: 10px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 100px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--teal);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-weight: 700;
+    }
+
+    .field-list {
+      list-style: none;
+      font-size: 12px;
+    }
+
+    .field-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .field-name {
+      font-family: monospace;
+      color: var(--text-main);
+    }
+
+    .field-type {
+      font-family: monospace;
+      color: var(--text-dim);
+    }
+
+    .key-badge {
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: 700;
+      margin-right: 4px;
+    }
+
+    .key-pk { background: #e02424; color: #fff; }
+    .key-fk { background: #0284c7; color: #fff; }
+
+    /* Infographic Banner */
+    .infographic-banner {
+      width: 100%;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      margin-bottom: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      cursor: pointer;
+      transition: var(--transition);
+      display: block;
+    }
+
+    .infographic-banner:hover {
+      border-color: var(--primary);
+      transform: scale(1.005);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .stats-bar {
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Top Header -->
+    <header>
+      <div class="brand">
+        <div class="logo-badge">+</div>
+        <div>
+          <div class="brand-title">U-Konek <span>System Architecture</span></div>
+          <div class="brand-subtitle">Barangay Health Center / RHU EMR, Queue & Teleconsultation Platform</div>
+        </div>
+      </div>
+      <div class="stats-bar">
+        <div class="stat-pill"><b>22</b> Database Tables</div>
+        <div class="stat-pill"><b>6</b> Functional Domains</div>
+        <div class="stat-pill"><b>2</b> Frontends (Flutter & Web)</div>
+        <div class="stat-pill"><b>Supabase</b> Backend</div>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('arch')">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+        System Architecture
+      </button>
+      <button class="tab-btn" onclick="switchTab('erd')">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+        Simplified High-Level ERD
+      </button>
+      <button class="tab-btn" onclick="switchTab('lifecycle')">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Patient Clinical Journey
+      </button>
+      <button class="tab-btn" onclick="switchTab('dict')">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        Entity Data Dictionary
+      </button>
+    </div>
+
+    <!-- TAB 1: SYSTEM ARCHITECTURE -->
+    <div id="tab-arch" class="tab-pane active">
+
+      <!-- Interactive Architectural Layers -->
+      <div class="glass-card">
+        <div class="card-title">Three-Tier Architecture & Data Flow</div>
+        <div class="card-desc">End-to-end integration between mobile citizens, clinic workstations, and the Supabase backend.</div>
+
+        <!-- Tier 1: Clients -->
+        <div class="arch-tier">
+          <div class="tier-header">
+            <span>📱 Tier 1: Client Frontends</span>
+          </div>
+          <div class="tier-grid">
+            <div class="node-card">
+              <div class="node-title">Citizen Mobile App</div>
+              <div class="node-subtitle">Flutter / Dart (Android & iOS)</div>
+              <div class="node-tags">
+                <span class="tag">Digital Queue Ticket</span>
+                <span class="tag">Realtime Status Tracker</span>
+                <span class="tag">Medicine Intake Alarm</span>
+                <span class="tag">Doctor Schedules</span>
+                <span class="tag">Health Records View</span>
+              </div>
+            </div>
+            <div class="node-card green">
+              <div class="node-title">Clinical & Admin Web Dashboard</div>
+              <div class="node-subtitle">HTML5 / Vanilla JavaScript / Vercel</div>
+              <div class="node-tags">
+                <span class="tag">Doctor Consultation EMR</span>
+                <span class="tag">Nurse Triage & Vitals</span>
+                <span class="tag">Pharmacy Dispensing & Restock</span>
+                <span class="tag">Admin Staff Management</span>
+                <span class="tag">Audit Logs & Reports</span>
+              </div>
+            </div>
+            <div class="node-card amber">
+              <div class="node-title">TV Waiting Room Display</div>
+              <div class="node-subtitle">Public Web Screen View</div>
+              <div class="node-tags">
+                <span class="tag">Live On-Call Board</span>
+                <span class="tag">Now Serving Audio/Visual</span>
+                <span class="tag">Automated Realtime Feed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tier 2: Cloud Services -->
+        <div class="arch-tier">
+          <div class="tier-header">
+            <span>⚡ Tier 2: Supabase Cloud Infrastructure (Asia/Manila UTC+8)</span>
+          </div>
+          <div class="tier-grid">
+            <div class="node-card purple">
+              <div class="node-title">Supabase Auth</div>
+              <div class="node-subtitle">Identity & Access Management</div>
+              <div class="node-tags">
+                <span class="tag">JWT Tokens</span>
+                <span class="tag">Role Claims (Admin/Doctor/Nurse/Pharmacist)</span>
+                <span class="tag">Row-Level Security (RLS)</span>
+              </div>
+            </div>
+            <div class="node-card">
+              <div class="node-title">Realtime Engine</div>
+              <div class="node-subtitle">WebSockets (Postgres Changes)</div>
+              <div class="node-tags">
+                <span class="tag">queue_tickets broadcast</span>
+                <span class="tag">staff online presence</span>
+                <span class="tag">Zero-polling latency</span>
+              </div>
+            </div>
+            <div class="node-card green">
+              <div class="node-title">PostgreSQL Database Engine</div>
+              <div class="node-subtitle">Relational Storage & Stored Procedures</div>
+              <div class="node-tags">
+                <span class="tag">22 Strict Schemas</span>
+                <span class="tag">Daily Queue Limiters</span>
+                <span class="tag">Atomic Dispensing RPCs</span>
+                <span class="tag">Manila Timezone Standard</span>
+              </div>
+            </div>
+            <div class="node-card amber">
+              <div class="node-title">Storage Buckets</div>
+              <div class="node-subtitle">Public Object Storage</div>
+              <div class="node-tags">
+                <span class="tag">promo-banners bucket</span>
+                <span class="tag">Clinic Posters & Bulletins</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tier 3: Core Database Domains -->
+        <div class="arch-tier">
+          <div class="tier-header">
+            <span>🗄️ Tier 3: Core Data Domains</span>
+          </div>
+          <div class="tier-grid">
+            <div class="node-card">
+              <div class="node-title">1. IAM & Profiles</div>
+              <div class="node-tags">
+                <span class="tag">staff</span>
+                <span class="tag">citizens</span>
+                <span class="tag">staff_login_logs</span>
+                <span class="tag">pending_citizen_signups</span>
+              </div>
+            </div>
+            <div class="node-card green">
+              <div class="node-title">2. Queue & Triage</div>
+              <div class="node-tags">
+                <span class="tag">queue_tickets</span>
+                <span class="tag">vital_signs</span>
+                <span class="tag">system_config</span>
+              </div>
+            </div>
+            <div class="node-card purple">
+              <div class="node-title">3. Consultations & Labs</div>
+              <div class="node-tags">
+                <span class="tag">consultations</span>
+                <span class="tag">lab_orders</span>
+                <span class="tag">doctor_schedules</span>
+                <span class="tag">appointments</span>
+              </div>
+            </div>
+            <div class="node-card amber">
+              <div class="node-title">4. Pharmacy & Dispensing</div>
+              <div class="node-tags">
+                <span class="tag">medicines</span>
+                <span class="tag">prescription_headers</span>
+                <span class="tag">prescription_items</span>
+                <span class="tag">prescription_item_dispenses</span>
+                <span class="tag">otc_dispenses</span>
+                <span class="tag">dispense_returns</span>
+                <span class="tag">medicine_intake_logs</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- TAB 2: SIMPLIFIED HIGH-LEVEL ERD -->
+    <div id="tab-erd" class="tab-pane">
+      <div class="glass-card">
+        <div class="card-title">Simplified Conceptual Entity Relationship Diagram</div>
+        <div class="card-desc">Shows the primary healthcare records connecting patients from triage intake to clinical examination and drug dispensing.</div>
+        
+        <div class="mermaid-viewport">
+          <pre class="mermaid">
+erDiagram
+    STAFF ||--o{ APPOINTMENTS : "assigned to"
+    STAFF ||--o{ VITAL_SIGNS : "records triage"
+    STAFF ||--o{ CONSULTATIONS : "examines"
+    STAFF ||--o{ PRESCRIPTIONS : "prescribes"
+    STAFF ||--o{ DISPENSES : "fulfills"
+
+    CITIZEN ||--o{ APPOINTMENTS : "books"
+    CITIZEN ||--o{ QUEUE_TICKETS : "takes daily ticket"
+    CITIZEN ||--o{ VITAL_SIGNS : "vital measurements"
+    CITIZEN ||--o{ CONSULTATIONS : "participates in"
+    CITIZEN ||--o{ PRESCRIPTIONS : "receives"
+    CITIZEN ||--o{ MEDICINE_INTAKE : "logs daily compliance"
+
+    QUEUE_TICKETS ||--o| VITAL_SIGNS : "initiates triage"
+    
+    CONSULTATIONS ||--o{ LAB_ORDERS : "orders diagnostics"
+    CONSULTATIONS ||--o{ PRESCRIPTIONS : "issues Rx"
+
+    PRESCRIPTIONS ||--|{ PRESCRIPTION_ITEMS : "contains drug items"
+    MEDICINES ||--o{ PRESCRIPTION_ITEMS : "stocked from inventory"
+
+    PRESCRIPTION_ITEMS ||--o{ MEDICINE_INTAKE : "generates reminders"
+    PRESCRIPTION_ITEMS ||--o{ DISPENSES : "tracked by"
+    MEDICINES ||--o{ DISPENSES : "deducts stock"
+          </pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: PATIENT CLINICAL JOURNEY -->
+    <div id="tab-lifecycle" class="tab-pane">
+      <div class="glass-card">
+        <div class="card-title">Patient Clinical & Operational Lifecycle</div>
+        <div class="card-desc">How a patient flows through the U-Konek system from daily queueing to at-home medication compliance.</div>
+
+        <div class="flow-steps">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <div class="step-title">Queue & Arrival</div>
+            <div class="step-desc">Patient generates a ticket via Mobile App or registers at the clinic as a walk-in. Ticket is visible on the Waiting Room TV display.</div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <div class="step-title">Nurse Triage</div>
+            <div class="step-desc">Nurse records blood pressure, heart rate, temperature, height, weight, and automated BMI calculation in <span class="tag">vital_signs</span>.</div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <div class="step-title">Doctor Consultation</div>
+            <div class="step-desc">Doctor reviews triage vitals, inputs symptoms, HPI, PMH, differential diagnosis, and orders diagnostics into <span class="tag">consultations</span>.</div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">4</div>
+            <div class="step-title">Electronic Rx (e-Prescription)</div>
+            <div class="step-desc">Doctor prescribes medication items with dosage, frequency, and duration. A unique <span class="tag">RX-XXXXXX</span> code is generated.</div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">5</div>
+            <div class="step-title">Pharmacy Dispensing</div>
+            <div class="step-desc">Pharmacist pulls up the prescription code, verifies stock, and records partial or full dispensing with inventory deduction.</div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">6</div>
+            <div class="step-title">At-Home Intake Alarms</div>
+            <div class="step-desc">Citizen mobile app syncs active prescriptions, sets intake alarm reminders, and logs daily taken doses in <span class="tag">medicine_intake_logs</span>.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: ENTITY DATA DICTIONARY -->
+    <div id="tab-dict" class="tab-pane">
+      <div class="glass-card">
+        <div class="card-title">Database Entity Summary</div>
+        <div class="card-desc">Comprehensive reference of core system tables, keys, and relational cardinality.</div>
+
+        <div class="dict-grid">
+          <!-- Staff -->
+          <div class="dict-card">
+            <div class="dict-card-header">
+              <span class="table-name">public.staff</span>
+              <span class="domain-badge">IAM</span>
+            </div>
+            <ul class="field-list">
+              <li class="field-item"><span class="field-name"><span class="key-badge key-pk">PK</span>id</span><span class="field-type">bigint</span></li>
+              <li class="field-item"><span class="field-name"><span class="key-badge key-fk">FK</span>auth_user_id</span><span class="field-type">uuid (auth.users)</span></li>
+              <li class="field-item"><span class="field-name">username, employee_id</span><span class="field-type">varchar (unique)</span></li>
+              <li class="field-item"><span class="field-name">role</span><span class="field-type">doctor|nurse|pharmacist|admin</span></li>
+              <li class="field-item"><span class="field-name">availability_status</span><span class="field-type">available|on_break|unavailable</span></li>
+            </ul>
+          </div>
+
+          <!-- Citizens -->
+          <div class="dict-card">
+            <div class="dict-card-header">
+              <span class="table-name">public.citizens</span>
+              <span class="domain-badge">IAM</span>
+            </div>
+            <ul class="field-list">
+              <li class="field-item"><span class="field-name"><span class="key-badge key-pk">PK</span>id</span><span class="field-type">bigint</span></li>
+              <li class="field-item"><span class="field-name"><span class="key-badge key-fk">FK</span>auth_user_id</span><span class="field-type">uuid (auth.users)</span></li>
+              <li class="field-item"><span class="field-name">firstname, surname</span><span class="field-type">varchar</span></li>
+              <li class="field-item"><span class="field-name">email, contact_number</span><span class="field-type">varchar</span></li>
+              <li class="field-item"><span class="field-name">date_of_birth, sex</span><span class="field-type">date, varchar</span></li>
+            </ul>
+          </div>
+
+          <!-- Queue Tickets -->
+          <div class="dict-card">
+            <div class="dict-card-header">
+              <span class="table-name">public.queue_tickets</span>
+              <span class="domain-badge">Triage</span>
+            </div>
+            <ul class="field-list">
+              <li class="field-item"><span class="field-name"><span class="key-badge key-pk">PK</span>id</span><span class="field-type">bigint</span></li>
+              <li class="field-item"><span class="field-name"><span class="key-badge key-fk">FK</span>citizen_id</span><span class="field-type">bigint (nullable)</span></li>
+              <li class="field-item"><span class="field-name">ticket_code, queue_number</span><span class="field-type">text, integer</span></li>
+              <li class="field-item"><span class="field-name">status</span><span class="field-type">waiting|on_call|serving|completed</span></li>
+              <li class="field-item"><span class="field-name">queue_date</span><span class="field-type">date (Manila timezone)</span></li>
+            </ul>
+          </div>
+
+          <!-- Vital Signs -->
+          <div class="dict-card">
+            <div class="dict-card-header">
+              <span class="table-name">public.vital_signs</span>
+              <span class="domain-badge">Triage</span>
+            </div>
+            <ul class="field-list">
+              <li class="field-item"><span class="field-name"><span class="key-badge key-pk">PK</span>id</span><span class="field-type">uuid</span></li>
+              <li class="field-item"><span class="field-name"><span class="key-badge key-fk">FK</span>citizen_id, nurse_id</span><span class="field-type">bigint</span></li>
+              <li class="field-item"><span class="field-name"><span class="key-badge key-fk">FK</span>queue_ticket_id</span><span class="field-type">bigint (unique slot)</span></li>
+              <li class="field-item"><span class="field-name">blood_pressure, heart_rate</span><span class="field-type">text, integer</span></li>
+              <li class="field-item"><span class="field-name">height_cm, weight_kg, bmi</span><span class="field-type">numeric</span></li>
+            </ul>
+          </div>
+
+          <!-- Consultations -->
+          <div class="dict-card">
+            <div class="dict-card-header">
+              <span class="table-name">public.consultations</span>
+              <span class="domain-badge">Clinical</span>
+            </div>
+            <ul class="field-list">
+              <li class="field-item"><span class="field-name"><span class="key-badge key-pk">PK</span>id</span><span class="field-type">bigint</span></li>
+              <li class="field-item"><span class="field-name"><span class="key-badge key-fk">FK</span>doctor_staff_id</span><span class="field-type">bigint (staff)</span></li>
+              <li class="field-item"><span class="field-name"><span class="key-badge key-fk">FK</span>patient_citizen_id</span><span class="field-type">bigint (citizens)</span></li>
+              <li class="field-item"><span class="field-name">diagnosis, differential</span><span class="field-type">text</span></li>
+              <li class="field-item"><span class="field-name">physical_exam</span><span class="field-type">jsonb</span></li>
+            </ul>
+          </div>
+
+          <!-- Prescriptions -->
+          <div class="dict-card">
+            <div class="dict-card-header">
+              <span class="table-name">public.prescription_headers</span>
+              <span class="domain-badge">Pharmacy</span>
+            </div>
+            <ul class="field-list">
+              <li class="field-item"><span class="field-name"><span class="key-badge key-pk">PK</span>id</span><span class="field-type">bigint</span></li>
+              <li class="field-item"><span class="field-name"><span class="key-badge key-fk">FK</span>consultation_id</span><span class="field-type">bigint (consultations)</span></li>
+              <li class="field-item"><span class="field-name">prescription_code</span><span class="field-type">text (unique RX-XXXXXX)</span></li>
+              <li class="field-item"><span class="field-name"><span class="key-badge key-fk">FK</span>doctor_staff_id, dispensed_by</span><span class="field-type">bigint</span></li>
+              <li class="field-item"><span class="field-name">dispensing_status</span><span class="field-type">pending|partial|dispensed|cancelled</span></li>
+            </ul>
+          </div>
+
+          <!-- Prescription Items -->
+          <div class="dict-card">
+            <div class="dict-card-header">
+              <span class="table-name">public.prescription_items</span>
+              <span class="domain-badge">Pharmacy</span>
+            </div>
+            <ul class="field-list">
+              <li class="field-item"><span class="field-name"><span class="key-badge key-pk">PK</span>id</span><span class="field-type">bigint</span></li>
+              <li class="field-item"><span class="field-name"><span class="key-badge key-fk">FK</span>prescription_id</span><span class="field-type">bigint (headers)</span></li>
+              <li class="field-item"><span class="field-name"><span class="key-badge key-fk">FK</span>medicine_id</span><span class="field-type">bigint (medicines)</span></li>
+              <li class="field-item"><span class="field-name">quantity, dispensed_quantity</span><span class="field-type">integer</span></li>
+              <li class="field-item"><span class="field-name">dosage, frequency, duration</span><span class="field-type">text</span></li>
+            </ul>
+          </div>
+
+          <!-- Medicines -->
+          <div class="dict-card">
+            <div class="dict-card-header">
+              <span class="table-name">public.medicines</span>
+              <span class="domain-badge">Inventory</span>
+            </div>
+            <ul class="field-list">
+              <li class="field-item"><span class="field-name"><span class="key-badge key-pk">PK</span>id</span><span class="field-type">bigint</span></li>
+              <li class="field-item"><span class="field-name">name</span><span class="field-type">text (unique active)</span></li>
+              <li class="field-item"><span class="field-name">qty, unit</span><span class="field-type">integer, text</span></li>
+              <li class="field-item"><span class="field-name">drug_classification</span><span class="field-type">rx | otc</span></li>
+              <li class="field-item"><span class="field-name">archived_at</span><span class="field-type">timestamptz (soft-delete)</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#070b14',
+        primaryColor: '#0ea5e9',
+        primaryTextColor: '#f8fafc',
+        primaryBorderColor: '#0284c7',
+        lineColor: '#38bdf8',
+        secondaryColor: '#10b981',
+        tertiaryColor: '#1e293b'
+      }
+    });
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
+    }
+  </script>
+</body>
+</html>

@@ -84,23 +84,25 @@
       </div>
       <div class="ph-panel-body">
         <!-- Lookup form -->
-        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px;">
-          <div class="ph-field" style="flex:1;min-width:200px;">
+        <div class="ph-lookup-row">
+          <div class="ph-field ph-lookup-field">
             <label for="rx-code-input">Prescription ID</label>
             <input id="rx-code-input" type="text" value="RX-" placeholder="e.g. RX-000012" style="text-transform:uppercase;" />
           </div>
-          <button class="ph-btn ph-btn-primary" id="rx-lookup-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            Look Up
-          </button>
-          <button class="ph-btn ph-btn-outline" id="rx-scan-btn" style="border-color: #0ea5e9; color: #0ea5e9;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><rect x="7" y="7" width="3" height="3"/><rect x="14" y="7" width="3" height="3"/><rect x="7" y="14" width="3" height="3"/><path d="M14 14h3v3h-3z"/></svg>
-            Scan QR
-          </button>
-          <button class="ph-btn ph-btn-outline" id="rx-clear-btn" style="display:none;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Clear
-          </button>
+          <div class="ph-lookup-actions">
+            <button class="ph-btn ph-btn-primary" id="rx-lookup-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Look Up
+            </button>
+            <button class="ph-btn ph-btn-outline" id="rx-scan-btn" style="border-color: #0ea5e9; color: #0ea5e9;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><rect x="7" y="7" width="3" height="3"/><rect x="14" y="7" width="3" height="3"/><rect x="7" y="14" width="3" height="3"/><path d="M14 14h3v3h-3z"/></svg>
+              Scan QR
+            </button>
+            <button class="ph-btn ph-btn-outline" id="rx-clear-btn" style="display:none;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Clear
+            </button>
+          </div>
         </div>
 
         <!-- Prescription detail card (hidden until lookup) -->
@@ -231,7 +233,7 @@
               </button>
             </div>
           </div>
-          <div class="ph-field" style="margin-top:12px; max-width:600px;">
+          <div class="ph-field" style="margin-top:12px; max-width:820px;">
             <label for="add-desc">Description (optional)</label>
             <input id="add-desc" type="text" placeholder="Brief notes about this medicine" />
           </div>
@@ -252,26 +254,45 @@
         </button>
       </div>
       <div class="ph-panel-body" style="padding-bottom:10px;">
-        <div class="ph-toolbar" style="margin-bottom:16px;">
-          <input class="ph-search" type="search" id="ph-search" placeholder="Search medicine name…" />
-          <select id="ph-sort-select" class="ph-search" style="flex: 0 1 180px; cursor: pointer;">
-            <option value="name-asc">Name (A-Z)</option>
-            <option value="name-desc">Name (Z-A)</option>
-            <option value="stock-desc">Highest Stock</option>
-            <option value="stock-asc">Lowest Stock</option>
-            <option value="expiry-asc">Expiry (Soonest)</option>
-            <option value="expiry-desc">Expiry (Latest)</option>
-          </select>
-          <div class="ph-filter-group">
-            <button class="ph-filter-btn active" data-filter="all">All <span class="filter-count-badge" id="ph-count-all">0</span></button>
-            <button class="ph-filter-btn green" data-filter="otc">OTC Only <span class="filter-count-badge" id="ph-count-otc">0</span></button>
-            <button class="ph-filter-btn amber" data-filter="low">Low Stock <span class="filter-count-badge" id="ph-count-low">0</span></button>
-            <button class="ph-filter-btn red" data-filter="expired">Expired <span class="filter-count-badge" id="ph-count-expired">0</span></button>
-            <button class="ph-filter-btn amber" data-filter="expiring">Expiring Soon <span class="filter-count-badge" id="ph-count-expiring">0</span></button>
+        <div class="ph-toolbar">
+          <div class="ph-toolbar-primary">
+            <div class="ph-search-wrap">
+              <svg class="ph-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input class="ph-search" type="search" id="ph-search" placeholder="Search medicine name, generic formulation…" />
+            </div>
+            <div class="ph-sort-wrap">
+              <select id="ph-sort-select" class="ph-sort-select" aria-label="Sort medicines catalog">
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+                <option value="stock-desc">Highest Stock</option>
+                <option value="stock-asc">Lowest Stock</option>
+                <option value="expiry-asc">Expiry (Soonest)</option>
+                <option value="expiry-desc">Expiry (Latest)</option>
+              </select>
+            </div>
           </div>
-          <button id="ph-csv-import-btn" class="ph-btn ph-btn-outline ph-btn-sm" style="border-color:#16a34a;color:#16a34a;">Import CSV</button>
-          <button id="ph-csv-export-btn" class="ph-btn ph-btn-outline ph-btn-sm">Export CSV</button>
-          <button id="ph-pdf-export-btn" class="ph-btn ph-btn-primary ph-btn-sm">Export PDF</button>
+          <div class="ph-toolbar-secondary">
+            <div class="ph-filter-group" role="tablist" aria-label="Medicine Inventory Filters">
+              <button type="button" class="ph-filter-btn active" data-filter="all">All <span class="filter-count-badge" id="ph-count-all">0</span></button>
+              <button type="button" class="ph-filter-btn green" data-filter="otc">OTC Only <span class="filter-count-badge" id="ph-count-otc">0</span></button>
+              <button type="button" class="ph-filter-btn amber" data-filter="low">Low Stock <span class="filter-count-badge" id="ph-count-low">0</span></button>
+              <button type="button" class="ph-filter-btn red" data-filter="expired">Expired <span class="filter-count-badge" id="ph-count-expired">0</span></button>
+              <button type="button" class="ph-filter-btn amber" data-filter="expiring">Expiring Soon <span class="filter-count-badge" id="ph-count-expiring">0</span></button>
+            </div>
+            <div class="ph-actions-group">
+              <button id="ph-csv-import-btn" class="ph-btn ph-btn-outline ph-btn-sm ph-btn-import" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Import CSV
+              </button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="ph-divider"></div>

@@ -42,11 +42,7 @@ class ActiveTicketCard extends StatelessWidget {
             ? 'Please proceed to the nurse station for vital signs assessment'
             : (isServing
                 ? 'It\'s your turn! Please proceed to the doctor\'s office'
-                : (isNext
-                    ? (queue.hasServingAhead
-                        ? 'You\'re next in line! Doctor is currently serving #${queue.currentlyServingQueueNumber!.toString().padLeft(3, '0')}.'
-                        : 'You\'re next in line! Station is preparing to call your number.')
-                    : 'Please wait for your ticket number to be called')));
+                : 'Please wait for your ticket number to be called'));
 
     final IconData statusIcon = isFinished
         ? Icons.task_alt_rounded
@@ -54,7 +50,7 @@ class ActiveTicketCard extends StatelessWidget {
             ? Icons.campaign_rounded
             : (isServing
                 ? Icons.check_circle_rounded
-                : (isNext ? Icons.notifications_active_rounded : Icons.schedule_rounded)));
+                : Icons.schedule_rounded));
 
     final String headerStatusTitle = isFinished
         ? 'CONSULTATION COMPLETED'
@@ -62,11 +58,9 @@ class ActiveTicketCard extends StatelessWidget {
             ? 'YOU ARE ON CALL'
             : (isServing
                 ? 'YOU ARE NOW SERVING'
-                : (isNext
-                    ? 'YOU ARE NEXT IN LINE'
-                    : (queue.currentlyServingQueueNumber != null && queue.currentlyServingQueueNumber! > 0
-                        ? 'NOW SERVING #${queue.currentlyServingQueueNumber!.toString().padLeft(3, '0')}'
-                        : 'STATION ACTIVE'))));
+                : (queue.currentlyServingQueueNumber != null && queue.currentlyServingQueueNumber! > 0
+                    ? 'NOW SERVING #${queue.currentlyServingQueueNumber!.toString().padLeft(3, '0')}'
+                    : 'STATION ACTIVE')));
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),

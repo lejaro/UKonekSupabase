@@ -58,7 +58,6 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
 
   late int _selectedTab;
   late final List<Widget> _pages;
-  Timer? _prescriptionCheckTimer;
   bool _isShowingPrescriptionModal = false;
   bool _isCheckingPrescriptionAlert = false;
   int? _lastAlertedPrescriptionId;
@@ -107,11 +106,6 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
     Future.delayed(const Duration(milliseconds: 1200), () {
       if (mounted) _checkNewPrescriptionAlert();
     });
-
-    // Check periodically every 90 seconds while the app is active (instant trigger also runs on app resume & consultation end)
-    _prescriptionCheckTimer = Timer.periodic(const Duration(seconds: 90), (_) {
-      if (mounted) _checkNewPrescriptionAlert();
-    });
   }
 
   @override
@@ -119,7 +113,6 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
     WidgetsBinding.instance.removeObserver(this);
     ShellNavigation.currentTab.removeListener(_onNavigationTabChanged);
     ShellNavigation.prescriptionAlertTrigger.removeListener(_onPrescriptionTrigger);
-    _prescriptionCheckTimer?.cancel();
     super.dispose();
   }
 

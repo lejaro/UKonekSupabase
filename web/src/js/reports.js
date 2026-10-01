@@ -103,10 +103,26 @@ function getDateRangeString(startDate, endDate) {
 }
 
 /**
+ * Role-based authorization guard: ensures only Administrators can export clinic datasets.
+ */
+function verifyAdminRole() {
+  const role = (
+    sessionStorage.getItem('ukonek_role') ||
+    sessionStorage.getItem('user_role') ||
+    ''
+  ).trim().toLowerCase();
+
+  if (role !== 'admin') {
+    throw new Error('Unauthorized: Exporting clinic datasets and reports is strictly restricted to Administrator accounts.');
+  }
+}
+
+/**
  * 1. PATIENT REPORT
  * Exports all registered patients with their details
  */
 export async function exportPatientReport(startDate = null, endDate = null) {
+  verifyAdminRole();
   try {
     const { supabase } = await loadSupabaseModule();
     
@@ -179,6 +195,7 @@ export async function exportPatientReport(startDate = null, endDate = null) {
  * Exports all consultations with patient and doctor details
  */
 export async function exportConsultationReport(startDate = null, endDate = null, searchQuery = '') {
+  verifyAdminRole();
   try {
     const { supabase } = await loadSupabaseModule();
     
@@ -294,6 +311,7 @@ export async function exportConsultationReport(startDate = null, endDate = null,
  * Exports doctor activities including consultations, prescriptions, and schedules
  */
 export async function exportDoctorActivityReport(startDate = null, endDate = null) {
+  verifyAdminRole();
   try {
     const { supabase } = await loadSupabaseModule();
     
@@ -420,6 +438,7 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
  * Exports queue ticket data with statistics
  */
 export async function exportQueueReport(startDate = null, endDate = null) {
+  verifyAdminRole();
   try {
     const { supabase } = await loadSupabaseModule();
     
@@ -517,6 +536,7 @@ export async function exportQueueReport(startDate = null, endDate = null) {
  * Exports system usage statistics including logins, activities, and resource usage
  */
 export async function exportSystemUsageReport(startDate = null, endDate = null) {
+  verifyAdminRole();
   try {
     const { supabase } = await loadSupabaseModule();
     
@@ -668,6 +688,7 @@ export async function fetchStaffLoginLogs(startDate = null, endDate = null, sear
 }
 
 export async function exportStaffLoginLogsReport(startDate = null, endDate = null) {
+  verifyAdminRole();
   try {
     const { supabase } = await loadSupabaseModule();
     console.log('[Reports] Generating Staff Login Logs Report...');
@@ -729,6 +750,7 @@ export async function exportStaffLoginLogsReport(startDate = null, endDate = nul
  * Exports complete pharmacy medicines catalog, classification, and stock telemetry
  */
 export async function exportMedicineInventoryReport(filter = 'all', searchQuery = '') {
+  verifyAdminRole();
   try {
     const { supabase } = await loadSupabaseModule();
     console.log('[Reports] Generating Medicine Inventory Report...');

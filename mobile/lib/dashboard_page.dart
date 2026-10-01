@@ -124,7 +124,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   List<Announcement> _announcements = [];
   bool _isInitialLoading = true;
   bool _hasUnseenNotifications = false;
-  Timer? _refreshTimer;
   RealtimeChannel? _dashboardQueueRealtimeChannel;
   RealtimeChannel? _doctorAvailabilityChannel;
   int? _subscribedTicketId;
@@ -170,9 +169,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     WidgetsBinding.instance.addObserver(this);
     _loadAllData(isInitial: true);
     _subscribeDoctorAvailabilityRealtime();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 180), (_) {
-      _loadAllData(isInitial: false);
-    });
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -185,7 +181,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _promoPageController.dispose();
-    _refreshTimer?.cancel();
     _unsubscribeDashboardQueueRealtime();
     _unsubscribeDoctorAvailabilityRealtime();
     super.dispose();
@@ -981,8 +976,10 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         servingSubtitle = "It's your turn!";
       } else if (queue.isOnCallStatus) {
         servingSubtitle = "On Call: Vitals";
-      } else if (queue.isNextInLine) {
-        servingSubtitle = "You're next in line";
+      } else if (servingNum != null && servingNum > 0) {
+        servingSubtitle = "Serving #$servingNum";
+      } else if (queue.waitingCount > 0) {
+        servingSubtitle = "${queue.waitingCount} in line";
       } else {
         servingSubtitle = "Station active";
       }

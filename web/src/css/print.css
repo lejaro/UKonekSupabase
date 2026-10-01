@@ -1,4 +1,4 @@
-﻿            @media print {
+            @media print {
 
               /* Hide everything else */
               body * {
@@ -36,7 +36,6 @@
 
               /* Hide UI controls */
               #chr-close-btn,
-              #chr-export-btn,
               .chr-tab,
               input,
               select,

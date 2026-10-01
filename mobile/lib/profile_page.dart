@@ -522,40 +522,40 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         _divider(),
         _tile(Icons.people_outline_rounded,     'Relationship', _relation.isNotEmpty         ? _relation         : '—'),
         _divider(),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              Container(
-                width: 38, height: 38,
-                decoration: BoxDecoration(color: _C.primary.withOpacity(0.07), borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.phone_callback_rounded, color: _C.primary, size: 18),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Number', style: TextStyle(color: _C.textMuted, fontSize: 11, fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 2),
-                    Text(_emergencyContact.isNotEmpty ? _emergencyContact : '—', style: const TextStyle(fontWeight: FontWeight.bold, color: _C.textDark, fontSize: 14)),
-                  ],
-                ),
-              ),
-              if (hasContactNumber)
-                ElevatedButton.icon(
-                  onPressed: () => _dialPhoneNumber(_emergencyContact),
-                  icon: const Icon(Icons.call_rounded, size: 14, color: Colors.white),
-                  label: const Text('CALL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE53935),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        _tile(
+          Icons.phone_callback_rounded,
+          'Number',
+          _emergencyContact.isNotEmpty ? _emergencyContact : '—',
+          trailing: hasContactNumber
+              ? InkWell(
+                  onTap: () => _dialPhoneNumber(_emergencyContact),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE53935),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.call_rounded, size: 13, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text(
+                          'CALL',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-            ],
-          ),
+                )
+              : null,
+          onTap: hasContactNumber ? () => _dialPhoneNumber(_emergencyContact) : null,
         ),
         const SizedBox(height: 8),
         Container(
@@ -1103,24 +1103,75 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
               ),
             ),
           ),
-        Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 16), child: Column(children: children)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children,
+          ),
+        ),
       ]),
     );
   }
 
-  Widget _tile(IconData icon, String label, String value) {
-    return Padding(
+  Widget _tile(IconData icon, String label, String value, {Widget? trailing, VoidCallback? onTap}) {
+    final content = Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(children: [
-        Container(width: 38, height: 38, decoration: BoxDecoration(color: _C.primary.withOpacity(0.07), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _C.primary, size: 18)),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: const TextStyle(color: _C.textMuted, fontSize: 11, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 2),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: _C.textDark, fontSize: 14)),
-        ])),
-      ]),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: _C.primary.withOpacity(0.07),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: _C.primary, size: 18),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: _C.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: _C.textDark,
+                    fontSize: 14,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: 10),
+            trailing,
+          ],
+        ],
+      ),
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: content,
+      );
+    }
+    return content;
   }
 
   Widget _settingsTile(IconData icon, String title, {VoidCallback? onTap}) {
