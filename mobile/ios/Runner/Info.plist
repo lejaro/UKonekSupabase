@@ -83,5 +83,21 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- Permissions for image picker and media uploads -->
+		<key>NSCameraUsageDescription</key>
+		<string>U-Konek requires camera access to take profile photos and scan documents or prescriptions.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>U-Konek requires access to your photo library to select profile photos and medical records.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>U-Konek requires microphone access for media and audio features.</string>
+		<!-- URL schemes for url_launcher (emergency calling, mail, web links) -->
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>tel</string>
+			<string>mailto</string>
+			<string>sms</string>
+			<string>https</string>
+			<string>http</string>
+		</array>
 	</dict>
 </plist>

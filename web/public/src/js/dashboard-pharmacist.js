@@ -291,41 +291,21 @@ async function ensurePharmacistSession() {
     profile = await authService.getAuthenticatedStaffProfile();
   } catch (err) {
     console.error('Failed to load staff profile:', err);
-    const localRole = (sessionStorage.getItem('ukonek_role') || '').toLowerCase();
-    if (localRole === 'pharmacist') {
-      const fallbackStaff = {
-        username: sessionStorage.getItem('ukonek_staff_name') || 'Pharmacist',
-        role: 'pharmacist',
-        first_name: sessionStorage.getItem('ukonek_staff_name') || 'Pharmacist'
-      };
-      cachedUser = fallbackStaff;
-      return fallbackStaff;
-    }
     showToast('Unable to verify your session. Please sign in again.', 'error');
-    setTimeout(() => { window.location.href = './index.html'; }, 1800);
+    window.location.replace('./index.html');
     throw err;
   }
 
   if (!profile) {
-    const localRole = (sessionStorage.getItem('ukonek_role') || '').toLowerCase();
-    if (localRole === 'pharmacist') {
-      const fallbackStaff = {
-        username: sessionStorage.getItem('ukonek_staff_name') || 'Pharmacist',
-        role: 'pharmacist',
-        first_name: sessionStorage.getItem('ukonek_staff_name') || 'Pharmacist'
-      };
-      cachedUser = fallbackStaff;
-      return fallbackStaff;
-    }
     showToast('Session expired. Please sign in again.', 'warning');
-    setTimeout(() => { window.location.href = './index.html'; }, 1500);
+    window.location.replace('./index.html');
     throw new Error('Not authenticated');
   }
 
   const role = String(profile.role || '').trim().toLowerCase();
   if (role !== 'pharmacist') {
     showToast('Access denied. Pharmacist account required.', 'error');
-    setTimeout(() => { window.location.href = './index.html'; }, 1500);
+    window.location.replace('./index.html');
     throw new Error('Forbidden role: ' + role);
   }
 
@@ -935,6 +915,8 @@ if (logoutConfirmBtn) {
   logoutConfirmBtn.addEventListener('click', async () => {
     setLoading(logoutConfirmBtn, true);
     try {
+      const sessionTimeout = await import('./utils/sessionTimeout.js');
+      sessionTimeout.stopIdleTimer();
       const authService = await loadAuthServiceModule();
       const fn = authService.signOutStaff || authService.signOut || authService.default?.signOutStaff;
       if (fn) await fn();
@@ -946,12 +928,10 @@ if (logoutConfirmBtn) {
 
 // ── Guard: prevent non-pharmacist access ──────────────────────────────────────
 async function guardAccess() {
-  // Check the session-storage role key written by script.js at login time
   const role = (sessionStorage.getItem('ukonek_role') || '').toLowerCase();
-  // Only block if we have a definitive non-pharmacist role (empty means not yet loaded)
-  if (role !== '' && role !== 'pharmacist') {
+  if (role !== 'pharmacist') {
     showToast('Access restricted to pharmacists only.', 'error');
-    setTimeout(() => { window.location.href = './index.html'; }, 1200);
+    window.location.replace('./index.html');
     return false;
   }
   return true;
@@ -1691,6 +1671,13 @@ async function init() {
     const user = await ensurePharmacistSession();
     const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || 'Pharmacist';
     if (userNameEl) userNameEl.textContent = `${name} — Pharmacist`;
+
+    // Reveal page once pharmacist session is verified
+    document.body.classList.remove('auth-cloak');
+
+    // Activate 15-minute idle timeout guard (HIPAA compliance)
+    const sessionTimeout = await import('./utils/sessionTimeout.js');
+    sessionTimeout.startIdleTimer();
   } catch (_) {
     return;
   }

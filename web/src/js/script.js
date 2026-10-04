@@ -440,3 +440,21 @@ loginForm.addEventListener('submit', async (e) => {
 applyLoginLockStateUI();
 setupPasswordVisibilityToggles();
 
+function checkSessionTimeoutNotice() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const reason = params.get('reason');
+        if (reason === 'timeout') {
+            const err = document.getElementById('login-error');
+            if (err) {
+                err.textContent = 'Your session was automatically closed due to 15 minutes of inactivity to protect patient records (HIPAA compliance). Please sign in again.';
+                err.style.display = 'block';
+                err.style.color = '#0369a1';
+                err.style.backgroundColor = '#f0f9ff';
+                err.style.borderColor = '#bae6fd';
+            }
+        }
+    } catch (_) {}
+}
+checkSessionTimeoutNotice();
+

@@ -1,4 +1,7 @@
 /* ── UKonek Administrator Console Stylesheet ── */
+body.auth-cloak {
+  visibility: hidden !important;
+}
 :root {
   --admin-primary: #0f172a;
   --admin-primary-light: #1e293b;

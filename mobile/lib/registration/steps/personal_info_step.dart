@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class PersonalInfoStep extends StatelessWidget {
   final GlobalKey<FormState> formKey;
@@ -64,9 +65,11 @@ class PersonalInfoStep extends StatelessWidget {
             // ── Name Card ────────────────────────────────────
             _card(children: [
               _field('First Name', firstName, Icons.person_outline_rounded,
-                  required: true),
+                  required: true,
+                  formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s\-'.]"))]),
               _field('Middle Name (Optional)', middleName, Icons.badge_outlined,
-                  required: false),
+                  required: false,
+                  formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s\-'.]"))]),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -74,7 +77,8 @@ class PersonalInfoStep extends StatelessWidget {
                     flex: 2,
                     child: _field('Last Name', lastName,
                         Icons.family_restroom_outlined,
-                        required: true),
+                        required: true,
+                        formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s\-'.]"))]),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -162,11 +166,12 @@ class PersonalInfoStep extends StatelessWidget {
   }
 
   Widget _field(String label, TextEditingController ctrl, IconData icon,
-      {bool required = true, String? hint}) {
+      {bool required = true, String? hint, List<TextInputFormatter>? formatters}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: ctrl,
+        inputFormatters: formatters,
         style: const TextStyle(fontSize: 14, color: _textDark),
         decoration: InputDecoration(
           labelText: label,
@@ -194,6 +199,9 @@ class PersonalInfoStep extends StatelessWidget {
         validator: (v) {
           if (required && (v == null || v.trim().isEmpty)) {
             return 'Required';
+          }
+          if (v != null && (v.contains('%') || v.contains('_') || v.contains(';') || v.contains('--'))) {
+            return 'Invalid characters detected';
           }
           return null;
         },

@@ -15,6 +15,7 @@ import {
   exportSystemUsageReport
 } from './reports.js';
 import { showToast } from './utils/uiHelpers.js';
+import { startIdleTimer, stopIdleTimer } from './utils/sessionTimeout.js';
 
 // Polyfill loadSupabaseModule on window so reports.js has direct access
 if (typeof window !== 'undefined') {
@@ -71,11 +72,16 @@ async function ensureAdminSession() {
       if (emailMatch) staffRecord = emailMatch;
     }
 
-    const role = String(staffRecord?.role || sessionStorage.getItem('ukonek_role') || '').trim().toLowerCase();
+    if (!staffRecord || String(staffRecord.status || '').toLowerCase() !== 'active') {
+      console.warn('[Admin] Account is not active staff. Redirecting to login...');
+      window.location.replace('./index.html');
+      return null;
+    }
 
-    // Verify Admin authorization
+    // Verify Admin authorization strictly from verified database record
+    const role = String(staffRecord.role || '').trim().toLowerCase();
     if (role !== 'admin') {
-      console.warn(`[Admin] Unauthorized access attempt by role '${role}'. Redirecting...`);
+      console.warn(`[Admin] Unauthorized access attempt by non-admin role '${role}'. Redirecting...`);
       if (role === 'pharmacist') {
         window.location.replace('./dashboard-pharmacist.html');
       } else if (role === 'doctor' || role === 'nurse') {
@@ -164,6 +170,7 @@ function initNavigation() {
       try {
         btnConfirmSignout.disabled = true;
         btnConfirmSignout.innerHTML = '<span>Signing out...</span>';
+        stopIdleTimer();
         await supabase.auth.signOut();
         sessionStorage.clear();
         localStorage.removeItem('supabase.auth.token');
@@ -1564,6 +1571,12 @@ async function init() {
 
   const user = await ensureAdminSession();
   if (!user) return;
+
+  // Reveal page once admin authorization is verified
+  document.body.classList.remove('auth-cloak');
+
+  // Activate 15-minute idle timeout guard (HIPAA compliance)
+  startIdleTimer();
 
   initNavigation();
   initReportsExports();

@@ -1,0 +1,70 @@
+name: Build iOS App
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_mode:
+        description: 'Build Mode (release or profile)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - profile
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-ios.yml'
+
+jobs:
+  build-ios:
+    name: Build iOS App (macOS Runner)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Verify Flutter installation
+        run: flutter doctor -v
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Install CocoaPods
+        working-directory: mobile/ios
+        run: pod install --repo-update
+
+      - name: Build iOS Application (No Codesign)
+        working-directory: mobile
+        run: flutter build ios --release --no-codesign
+
+      - name: Package Unsigned IPA
+        run: |
+          mkdir -p build_output/Payload
+          cp -r mobile/build/ios/iphoneos/Runner.app build_output/Payload/
+          cd build_output
+          zip -r UKonek-iOS-unsigned.ipa Payload
+          cd ..
+
+      - name: Compress Runner.app (For Simulator / Archive)
+        run: |
+          cd mobile/build/ios/iphoneos
+          zip -r UKonek-Runner-app.zip Runner.app
+          mv UKonek-Runner-app.zip ../../../../build_output/
+
+      - name: Upload iOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: UKonek-iOS-Build
+          path: build_output/*
+          retention-days: 14

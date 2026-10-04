@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient.js';
 import * as sessionAuth from './sessionAuth.js';
+import { sanitizeSearchTerm } from '../utils/querySanitizer.js';
 
 function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
@@ -25,31 +26,36 @@ export async function resolveStaffLoginEmail(identifier) {
     return trimmed.toLowerCase();
   }
 
-  // Attempt lookup by username or employee_id from public.staff
+  // Sanitize identifier to prevent PostgREST filter injection (CWE-943)
+  const safeIdentifier = sanitizeSearchTerm(trimmed).replace(/[^a-zA-Z0-9_\-\.]/g, '');
+  if (!safeIdentifier) {
+    throw new Error('Please enter a valid username, employee ID, or email.');
+  }
+
+  // Attempt lookup by exact username or employee_id from public.staff
   try {
     const { data: staffMember, error } = await supabase
       .from('staff')
       .select('email')
-      .or(`username.ilike.%${trimmed}%,employee_id.ilike.%${trimmed}%`)
+      .or(`username.ilike.${safeIdentifier},employee_id.ilike.${safeIdentifier}`)
       .limit(1)
       .maybeSingle();
 
     if (!error && staffMember?.email) {
-      console.log(`[Auth] Resolved identifier "${trimmed}" to email "${staffMember.email}"`);
+      console.log(`[Auth] Resolved identifier "${safeIdentifier}" to email "${staffMember.email}"`);
       return String(staffMember.email).toLowerCase();
     }
   } catch (lookupErr) {
     console.warn('[Auth] Staff identifier lookup warning:', lookupErr);
   }
 
-  throw new Error(`Account "${trimmed}" not found. Please enter your valid email address.`);
+  throw new Error(`Account "${safeIdentifier}" not found. Please enter your valid email address.`);
 }
 
 export async function signInStaff({ identifier, password }) {
   const email = await resolveStaffLoginEmail(identifier);
-  const isLocalDev = isLocalEnvironment();
 
-  console.log('[Auth] Attempting sign-in for:', email, isLocalDev ? '(Local Dev)' : '(Production)');
+  console.log('[Auth] Attempting sign-in for:', email);
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -58,38 +64,6 @@ export async function signInStaff({ identifier, password }) {
 
   if (error || !data?.user) {
     console.warn('[Auth] Supabase auth.signInWithPassword error:', error);
-
-    // In local development, allow bypass if account exists as an active staff member in the database
-    if (isLocalDev) {
-      try {
-        const { data: staffRecord, error: staffErr } = await supabase
-          .from('staff')
-          .select('id, first_name, last_name, email, username, role, employee_id, status')
-          .ilike('email', email)
-          .maybeSingle();
-
-        if (!staffErr && staffRecord && String(staffRecord.status || '').toLowerCase() === 'active') {
-          console.info('[Auth Local Dev] Active staff record found in database. Authorizing local session:', staffRecord);
-          return {
-            id: staffRecord.auth_user_id || `local-dev-${staffRecord.id}`,
-            email: staffRecord.email,
-            role: String(staffRecord.role || 'doctor').toLowerCase(),
-            username: staffRecord.username || staffRecord.first_name || '',
-            first_name: staffRecord.first_name || '',
-            last_name: staffRecord.last_name || '',
-            user_metadata: {
-              first_name: staffRecord.first_name,
-              last_name: staffRecord.last_name,
-              role: staffRecord.role
-            },
-            isLocalDevBypass: true,
-            staffRecord
-          };
-        }
-      } catch (devLookupErr) {
-        console.warn('[Auth Local Dev] Staff lookup fallback error:', devLookupErr);
-      }
-    }
 
     const rawMsg = String(error?.message || '').trim();
     if (/invalid login credentials/i.test(rawMsg)) {
@@ -106,23 +80,19 @@ export async function signInStaff({ identifier, password }) {
   
   if (roleError) {
     console.error('Staff role lookup error:', roleError);
-    if (!isLocalDev) {
-      await supabase.auth.signOut();
-    }
+    await supabase.auth.signOut();
 
     const roleErrorMessage = String(roleError.message || 'unknown error');
     if (/non-volatile function|update is not allowed/i.test(roleErrorMessage)) {
       throw new Error('Login is blocked by an outdated database migration (staff role function). Apply latest Supabase migrations, then try again.');
     }
 
-    if (!isLocalDev) {
-      throw new Error(`Error checking staff status: ${roleErrorMessage}`);
-    }
+    throw new Error(`Error checking staff status: ${roleErrorMessage}`);
   }
 
-  if (!staffRole && !isLocalDev) {
+  if (!staffRole) {
     await supabase.auth.signOut();
-    throw new Error('Your account does not exist in the system. Please contact your administrator.');
+    throw new Error('Your account does not exist or is inactive in the system. Please contact your administrator.');
   }
 
   try {
@@ -136,27 +106,8 @@ export async function signInStaff({ identifier, password }) {
 }
 
 export async function getAuthenticatedStaffProfile() {
-  const isLocalDev = isLocalEnvironment();
-
   const { data: userResult, error: userError } = await supabase.auth.getUser().catch(() => ({ data: null, error: true }));
   if (userError || !userResult?.user) {
-    if (isLocalDev) {
-      const meta = sessionAuth.getAuthSessionMeta();
-      const role = (sessionStorage.getItem('ukonek_role') || meta?.role || '').trim().toLowerCase();
-      if (role && meta?.email) {
-        const localUsername = (meta.username && !meta.username.includes('@'))
-          ? meta.username
-          : (meta.firstName || meta.first_name || sessionStorage.getItem('ukonek_staff_name') || (role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Staff'));
-        return {
-          id: meta.userId || 14,
-          email: meta.email,
-          role: role,
-          username: localUsername,
-          first_name: meta.firstName || meta.first_name || localUsername,
-          last_name: meta.lastName || meta.last_name || ''
-        };
-      }
-    }
     return null;
   }
 

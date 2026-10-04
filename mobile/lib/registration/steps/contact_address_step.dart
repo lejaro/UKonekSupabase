@@ -244,6 +244,9 @@ class uKonekContactStep extends StatelessWidget {
           if (isEmail && trimmed.isNotEmpty && (!trimmed.contains('@') || !trimmed.contains('.'))) {
             return 'Invalid email';
           }
+          if (trimmed.contains('%') || trimmed.contains(';') || trimmed.contains('--')) {
+            return 'Invalid characters detected';
+          }
           return null;
         },
       ),

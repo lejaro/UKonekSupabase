@@ -8,11 +8,14 @@
  * @returns {string}
  */
 export function formatPhysicalExam(physicalExam) {
-  if (!physicalExam) return '';
+  if (!physicalExam) return 'Normal / Unremarkable';
   
   let examObj = physicalExam;
   if (typeof physicalExam === 'string') {
     const trimmed = physicalExam.trim();
+    if (!trimmed || trimmed === '—' || trimmed === '-' || trimmed.toLowerCase() === 'none' || trimmed.toLowerCase() === 'null') {
+      return 'Normal / Unremarkable';
+    }
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       try {
         examObj = JSON.parse(trimmed);
@@ -39,12 +42,16 @@ export function formatPhysicalExam(physicalExam) {
     const lines = [];
     for (const [key, value] of Object.entries(examObj)) {
       if (value && String(value).trim() !== '') {
-        const label = keyLabels[key.toLowerCase()] || (key.charAt(0).toUpperCase() + key.slice(1));
-        lines.push(`${label}: ${String(value).trim()}`);
+        const v = String(value).trim();
+        const vLower = v.toLowerCase();
+        if (vLower !== 'none' && vLower !== 'normal' && vLower !== 'unremarkable' && vLower !== 'n/a' && vLower !== '-' && vLower !== '—' && vLower !== 'null' && vLower !== 'nil') {
+          const label = keyLabels[key.toLowerCase()] || (key.charAt(0).toUpperCase() + key.slice(1));
+          lines.push(`${label}: ${v}`);
+        }
       }
     }
     
-    return lines.length > 0 ? lines.join('; ') : '';
+    return lines.length > 0 ? lines.join('; ') : 'Normal / Unremarkable';
   }
   
   return String(physicalExam);

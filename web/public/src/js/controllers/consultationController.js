@@ -13,6 +13,7 @@ import { attachDetailRow, sanitizeText } from '../utils/dataDetailModal.js';
 import { showSection } from './navigationController.js';
 import { openPrescriptionModalForPatient, resolveCitizenId } from './prescriptionController.js';
 import { evaluateBp, evaluateHr, evaluateTemp, evaluateSpo2 } from './triageController.js';
+import { sanitizeSearchTerm } from '../utils/querySanitizer.js';
 
 export let consultations = [];
 export let consultationQueueTickets = [];
@@ -955,14 +956,20 @@ async function executeCitizenSearch(query) {
   dropdown.classList.remove('hidden');
 
   try {
+    const safeTerm = sanitizeSearchTerm(trimmed);
+    if (!safeTerm) {
+      dropdown.classList.add('hidden');
+      return;
+    }
+
     const cleanNum = trimmed.replace(/[^0-9]/g, '');
     let filterOrs = [];
     if (cleanNum && cleanNum.length <= 10) {
       filterOrs.push(`id.eq.${cleanNum}`);
     }
-    filterOrs.push(`firstname.ilike.%${trimmed}%`);
-    filterOrs.push(`surname.ilike.%${trimmed}%`);
-    filterOrs.push(`contact_number.ilike.%${trimmed}%`);
+    filterOrs.push(`firstname.ilike.%${safeTerm}%`);
+    filterOrs.push(`surname.ilike.%${safeTerm}%`);
+    filterOrs.push(`contact_number.ilike.%${safeTerm}%`);
 
     const { data: citizens, error } = await supabase
       .from('citizens')

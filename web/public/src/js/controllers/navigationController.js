@@ -10,6 +10,7 @@ import * as sessionAuth from '../services/sessionAuth.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { showToast, dismissPagePreloader, toggleUserSkeleton } from '../utils/uiHelpers.js';
 import { openDialogModal, closeDialogModal } from '../utils/dialogModal.js';
+import { stopIdleTimer } from '../utils/sessionTimeout.js';
 
 export { openDialogModal, closeDialogModal } from '../utils/dialogModal.js';
 
@@ -476,6 +477,7 @@ export function switchProfileSubpane(targetPaneId) {
 
 export async function performLogout() {
   try {
+    stopIdleTimer();
     sessionStore.clear();
     await authService.signOutStaff();
     sessionAuth.clearAuthSessionMeta();

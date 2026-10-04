@@ -1,12 +1,73 @@
 // CSV Export Reports Module
 // Implements all 5 required reports: Patient, Consultation, Doctor Activity, Queue, System Usage
+import { sanitizeCsvCell, sanitizeSearchTerm } from './utils/querySanitizer.js';
 
+/**
+ * Format date & time into unambiguous, spreadsheet-safe string: YYYY-MM-DD hh:mm AM/PM
+ * Eliminates extraneous commas that disrupt CSV parsers.
+ */
+function formatReportDateTime(dateVal) {
+  if (!dateVal) return '—';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return String(dateVal);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const strHours = String(hours).padStart(2, '0');
+  return `${year}-${month}-${day} ${strHours}:${minutes} ${ampm}`;
+}
+
+/**
+ * Standardize patient ID into uniform CIT- prefix or original walk-in code
+ */
+function formatPatientId(consult) {
+  const rawId = consult.patient_identifier || consult.citizen?.id || consult.patient_citizen_id || '';
+  if (!rawId) return '—';
+  const str = String(rawId).trim();
+  if (/^\d+$/.test(str)) {
+    return `CIT-${str}`;
+  }
+  return str;
+}
+
+/**
+ * Normalizes placeholder strings ('None', 'null', 'N/A', empty) into clean fallback
+ */
+function cleanClinicalText(val, fallback = '—') {
+  if (val === null || val === undefined) return fallback;
+  const s = String(val).trim();
+  if (!s || s === '—' || s === '-' || s.toLowerCase() === 'none' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined' || s.toLowerCase() === 'n/a') {
+    return fallback;
+  }
+  return s;
+}
+
+/**
+ * Clean allergies entry: returns 'No Known Allergies (NKA)' when none reported
+ */
+function formatAllergies(allergies) {
+  const clean = cleanClinicalText(allergies, '');
+  return clean ? clean : 'No Known Allergies (NKA)';
+}
+
+/**
+ * Format physical exam: filters out 'None' entries.
+ * Returns 'Normal / Unremarkable' if no abnormal findings, or lists only positive findings.
+ */
 function formatPhysicalExam(physicalExam) {
-  if (!physicalExam) return '';
+  if (!physicalExam) return 'Normal / Unremarkable';
   
   let examObj = physicalExam;
   if (typeof physicalExam === 'string') {
     const trimmed = physicalExam.trim();
+    if (!trimmed || trimmed === '—' || trimmed === '-' || trimmed.toLowerCase() === 'none' || trimmed.toLowerCase() === 'null') {
+      return 'Normal / Unremarkable';
+    }
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       try {
         examObj = JSON.parse(trimmed);
@@ -33,12 +94,16 @@ function formatPhysicalExam(physicalExam) {
     const lines = [];
     for (const [key, value] of Object.entries(examObj)) {
       if (value && String(value).trim() !== '') {
-        const label = keyLabels[key.toLowerCase()] || (key.charAt(0).toUpperCase() + key.slice(1));
-        lines.push(`${label}: ${String(value).trim()}`);
+        const v = String(value).trim();
+        const vLower = v.toLowerCase();
+        if (vLower !== 'none' && vLower !== 'normal' && vLower !== 'unremarkable' && vLower !== 'n/a' && vLower !== '-' && vLower !== '—' && vLower !== 'null' && vLower !== 'nil') {
+          const label = keyLabels[key.toLowerCase()] || (key.charAt(0).toUpperCase() + key.slice(1));
+          lines.push(`${label}: ${v}`);
+        }
       }
     }
     
-    return lines.length > 0 ? lines.join('; ') : '';
+    return lines.length > 0 ? lines.join('; ') : 'Normal / Unremarkable';
   }
   
   return String(physicalExam);
@@ -57,13 +122,14 @@ function convertToCSV(data, headers) {
   // Add headers
   csvRows.push(headers.join(','));
   
-  // Add data rows
+  // Add data rows with formula injection sanitization (CWE-1236)
   for (const row of data) {
     const values = headers.map(header => {
       const rawVal = row[header];
       const value = (rawVal !== undefined && rawVal !== null) ? rawVal : '';
-      // Escape quotes and wrap in quotes if contains comma or newline
-      const escaped = String(value).replace(/"/g, '""');
+      const safeVal = sanitizeCsvCell(value);
+      // Escape quotes and wrap in quotes if contains comma, newline, or quotes
+      const escaped = String(safeVal).replace(/"/g, '""');
       return escaped.includes(',') || escaped.includes('\n') || escaped.includes('"') 
         ? `"${escaped}"` 
         : escaped;
@@ -166,7 +232,7 @@ export async function exportPatientReport(startDate = null, endDate = null) {
       'Emergency Contact Name': patient.emergency_contact_complete_name || '',
       'Emergency Contact Number': patient.emergency_contact_contact_number || '',
       'Relation': patient.relation || '',
-      'Registration Date': patient.created_at ? new Date(patient.created_at).toLocaleString() : ''
+      'Registration Date': patient.created_at ? formatReportDateTime(patient.created_at) : ''
     }));
     
     const headers = [
@@ -206,7 +272,7 @@ export async function exportConsultationReport(startDate = null, endDate = null,
       .from('consultations')
       .select(`
         *,
-        citizen:citizens(id, firstname, surname, email),
+        citizen:citizens(id, firstname, surname, email, contact_number, age, sex),
         doctor:staff(id, first_name, last_name, employee_id)
       `)
       .order('consulted_at', { ascending: false });
@@ -248,47 +314,83 @@ export async function exportConsultationReport(startDate = null, endDate = null,
         const pName = `${c.citizen?.firstname || ''} ${c.citizen?.surname || ''} ${c.patient_identifier || ''}`.toLowerCase();
         const diag = String(c.diagnosis || '').toLowerCase();
         const sym = String(c.symptoms || '').toLowerCase();
-        return pName.includes(q) || diag.includes(q) || sym.includes(q);
+        const comp = String(c.chief_complaint || '').toLowerCase();
+        const docName = `${c.doctor?.first_name || ''} ${c.doctor?.last_name || ''}`.toLowerCase();
+        return pName.includes(q) || diag.includes(q) || sym.includes(q) || comp.includes(q) || docName.includes(q);
       });
     }
 
     console.log(`[Reports] Found ${exportRows.length} consultations for export`);
     
-    // Transform data for CSV
-    const csvData = exportRows.map(consult => ({
-      'Consultation ID': consult.id,
-      'Consultation Date': consult.consulted_at ? new Date(consult.consulted_at).toLocaleString() : '',
-      'Patient ID': consult.citizen?.id || consult.patient_citizen_id || '',
-      'Patient Name': consult.citizen ? `${consult.citizen.firstname} ${consult.citizen.surname}` : '',
-      'Patient Email': consult.citizen?.email || '',
-      'Patient Identifier': consult.patient_identifier || '',
-      'Doctor ID': consult.doctor?.id || consult.doctor_staff_id || '',
-      'Doctor Name': consult.doctor ? `Dr. ${consult.doctor.first_name} ${consult.doctor.last_name}` : '',
-      'Doctor Employee ID': consult.doctor?.employee_id || '',
-      'Symptoms': consult.symptoms || '',
-      'Diagnosis': consult.diagnosis || '',
-      'Notes': consult.notes || '',
-      'HPI': consult.hpi || '',
-      'PMH': consult.pmh || '',
-      'Allergies': consult.allergies || '',
-      'Immunization Status': consult.immunization_status || '',
-      'Social History': consult.social_history || '',
-      'Physical Exam': formatPhysicalExam(consult.physical_exam),
-      'Differential Diagnosis': consult.differential_diagnosis || '',
-      'Lab Orders': consult.lab_orders || '',
-      'Follow Up Date': consult.follow_up_date || '',
-      'Treatment Plan': consult.treatment_plan || '',
-      'Chief Complaint': consult.chief_complaint || '',
-      'Created At': consult.created_at ? new Date(consult.created_at).toLocaleString() : ''
-    }));
+    // Transform data for CSV - streamlined and clinically enriched
+    const csvData = exportRows.map(consult => {
+      const chiefComplaint = (consult.chief_complaint || '').trim();
+      const symptoms = (consult.symptoms || '').trim();
+      
+      let primaryComplaint = chiefComplaint;
+      if (!primaryComplaint) {
+        primaryComplaint = symptoms;
+      } else if (symptoms && symptoms.toLowerCase() !== chiefComplaint.toLowerCase()) {
+        primaryComplaint = `${chiefComplaint} (${symptoms})`;
+      }
+      primaryComplaint = cleanClinicalText(primaryComplaint, '—');
+
+      const hpi = (consult.hpi || '').trim();
+      const cleanHpi = (hpi && hpi.toLowerCase() !== 'none' && hpi.toLowerCase() !== primaryComplaint.toLowerCase() && hpi.toLowerCase() !== symptoms.toLowerCase())
+        ? hpi
+        : '—';
+
+      return {
+        'Consultation ID': consult.id,
+        'Consultation Date': formatReportDateTime(consult.consulted_at || consult.created_at),
+        'Patient ID': formatPatientId(consult),
+        'Patient Name': consult.citizen ? `${consult.citizen.firstname} ${consult.citizen.surname}`.trim() : (consult.patient_identifier || '—'),
+        'Age': consult.citizen?.age ?? '—',
+        'Sex': consult.citizen?.sex || '—',
+        'Contact Number': consult.citizen?.contact_number || '—',
+        'Patient Email': consult.citizen?.email || '—',
+        'Doctor Name': consult.doctor ? `Dr. ${consult.doctor.first_name} ${consult.doctor.last_name}`.trim() : '—',
+        'Doctor Employee ID': consult.doctor?.employee_id || (consult.doctor_staff_id ? `STF-${consult.doctor_staff_id}` : '—'),
+        'Chief Complaint / Symptoms': primaryComplaint,
+        'Diagnosis': cleanClinicalText(consult.diagnosis, 'Pending Diagnosis'),
+        'HPI': cleanHpi,
+        'PMH': cleanClinicalText(consult.pmh, '—'),
+        'Allergies': formatAllergies(consult.allergies),
+        'Immunization Status': cleanClinicalText(consult.immunization_status, '—'),
+        'Social History': cleanClinicalText(consult.social_history, '—'),
+        'Physical Exam': formatPhysicalExam(consult.physical_exam),
+        'Differential Diagnosis': cleanClinicalText(consult.differential_diagnosis, '—'),
+        'Lab Orders': cleanClinicalText(consult.lab_orders, '—'),
+        'Treatment Plan': cleanClinicalText(consult.treatment_plan, '—'),
+        'Follow Up Date': consult.follow_up_date || '—',
+        'Clinical Notes': cleanClinicalText(consult.notes, '—')
+      };
+    });
     
     const headers = [
-      'Consultation ID', 'Consultation Date', 'Patient ID', 'Patient Name', 'Patient Email',
-      'Patient Identifier', 'Doctor ID', 'Doctor Name', 'Doctor Employee ID',
-      'Symptoms', 'Diagnosis', 'Notes', 'HPI', 'PMH', 'Allergies', 
-      'Immunization Status', 'Social History', 'Physical Exam', 
-      'Differential Diagnosis', 'Lab Orders', 'Follow Up Date', 
-      'Treatment Plan', 'Chief Complaint', 'Created At'
+      'Consultation ID',
+      'Consultation Date',
+      'Patient ID',
+      'Patient Name',
+      'Age',
+      'Sex',
+      'Contact Number',
+      'Patient Email',
+      'Doctor Name',
+      'Doctor Employee ID',
+      'Chief Complaint / Symptoms',
+      'Diagnosis',
+      'HPI',
+      'PMH',
+      'Allergies',
+      'Immunization Status',
+      'Social History',
+      'Physical Exam',
+      'Differential Diagnosis',
+      'Lab Orders',
+      'Treatment Plan',
+      'Follow Up Date',
+      'Clinical Notes'
     ];
     
     const csv = convertToCSV(csvData, headers);
@@ -405,10 +507,10 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
         'Total Prescriptions': prescriptions.length,
         'Total Scheduled Slots': schedules.length,
         'Total Scheduled Hours': totalHours.toFixed(2),
-        'Last Consultation': sortedConsults[0]?.consulted_at ? new Date(sortedConsults[0].consulted_at).toLocaleString() : 'None',
-        'Last Prescription': sortedPrescriptions[0]?.issued_at ? new Date(sortedPrescriptions[0].issued_at).toLocaleString() : 'None',
+        'Last Consultation': sortedConsults[0]?.consulted_at ? formatReportDateTime(sortedConsults[0].consulted_at) : 'None',
+        'Last Prescription': sortedPrescriptions[0]?.issued_at ? formatReportDateTime(sortedPrescriptions[0].issued_at) : 'None',
         'Is Online': doctor.is_online ? 'Yes' : 'No',
-        'Last Seen': (doctor.last_seen && !isNaN(new Date(doctor.last_seen).getTime())) ? new Date(doctor.last_seen).toLocaleString() : 'Never'
+        'Last Seen': (doctor.last_seen && !isNaN(new Date(doctor.last_seen).getTime())) ? formatReportDateTime(doctor.last_seen) : 'Never'
       };
     });
     
@@ -501,9 +603,9 @@ export async function exportQueueReport(startDate = null, endDate = null) {
         'Reason': ticket.reason || '',
         'Symptoms': ticket.symptoms || '',
         'Status': ticket.status || '',
-        'Created At': ticket.created_at ? new Date(ticket.created_at).toLocaleString() : '',
-        'Served At': ticket.served_at ? new Date(ticket.served_at).toLocaleString() : '',
-        'Completed At': ticket.completed_at ? new Date(ticket.completed_at).toLocaleString() : '',
+        'Created At': ticket.created_at ? formatReportDateTime(ticket.created_at) : '',
+        'Served At': ticket.served_at ? formatReportDateTime(ticket.served_at) : '',
+        'Completed At': ticket.completed_at ? formatReportDateTime(ticket.completed_at) : '',
         'Wait Time': waitTime,
         'Service Time': serviceTime
       };
@@ -622,7 +724,7 @@ export async function exportSystemUsageReport(startDate = null, endDate = null) 
     const reportMetadata = [
       {
         'Metric': 'Report Generated',
-        'Value': new Date().toLocaleString(),
+        'Value': formatReportDateTime(new Date()),
         'Category': 'Report Info'
       },
       {
@@ -673,8 +775,10 @@ export async function fetchStaffLoginLogs(startDate = null, endDate = null, sear
 
     // Push search filtering to the database instead of client-side .filter()
     if (searchTerm) {
-      const term = searchTerm.trim();
-      query = query.or(`username.ilike.%${term}%,email.ilike.%${term}%,role.ilike.%${term}%,action.ilike.%${term}%`);
+      const term = sanitizeSearchTerm(searchTerm);
+      if (term) {
+        query = query.or(`username.ilike.%${term}%,email.ilike.%${term}%,role.ilike.%${term}%,action.ilike.%${term}%`);
+      }
     }
     
     const { data, error } = await query.limit(1000);

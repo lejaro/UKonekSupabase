@@ -21,6 +21,7 @@ import {
   openDialogModal,
   closeDialogModal
 } from './utils/dialogModal.js';
+import { startIdleTimer, stopIdleTimer } from './utils/sessionTimeout.js';
 import {
   initNavigation,
   showSection,
@@ -103,7 +104,7 @@ export async function ensureAuthenticatedSession(force = false) {
     return cached;
   }
 
-  console.log('[Dashboard] Validating staff session...');
+  console.log('[Dashboard] Validating staff session with Supabase...');
 
   try {
     const profile = await withTimeout(
@@ -113,33 +114,30 @@ export async function ensureAuthenticatedSession(force = false) {
     );
 
     if (!profile) {
-      console.warn('[Dashboard] No authenticated profile from Supabase, checking fallback session...');
-      const meta = sessionAuth.getAuthSessionMeta();
-      const role = (sessionStorage.getItem('ukonek_role') || meta?.role || '').trim().toLowerCase();
-      if (!role) {
-        console.warn('[Dashboard] No fallback role found. Redirecting to index.html');
-        window.location.replace('./index.html');
-        return null;
-      }
+      console.warn('[Dashboard] No valid authenticated profile from Supabase. Redirecting to login...');
+      window.location.replace('./index.html');
+      return null;
+    }
 
-      const fallbackUsername = (meta?.username && !meta.username.includes('@'))
-        ? meta.username
-        : (meta?.firstName || meta?.first_name || sessionStorage.getItem('ukonek_staff_name') || (role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Clinician'));
+    const role = String(profile.role || '').toLowerCase();
+    const validRoles = ['doctor', 'nurse', 'pharmacist', 'admin'];
+    if (!validRoles.includes(role)) {
+      console.warn(`[Dashboard] Unauthorized role '${role}'. Redirecting...`);
+      window.location.replace('./index.html');
+      return null;
+    }
 
-      const fallbackProfile = {
-        id: meta?.userId || null,
-        email: meta?.email || 'clinician@ukonek.local',
-        role: role,
-        username: fallbackUsername,
-        first_name: meta?.firstName || meta?.first_name || fallbackUsername,
-        last_name: meta?.lastName || meta?.last_name || ''
-      };
-      sessionStore.setUser(fallbackProfile);
-      return fallbackProfile;
+    // Role redirection if wrong dashboard
+    if (role === 'admin') {
+      window.location.replace('./dashboard-admin.html');
+      return null;
+    }
+    if (role === 'pharmacist') {
+      window.location.replace('./dashboard-pharmacist.html');
+      return null;
     }
 
     sessionStore.setUser(profile);
-    const role = String(profile.role || 'nurse').toLowerCase();
     const resolvedUsername = (profile.username && !profile.username.includes('@'))
       ? profile.username
       : (profile.first_name || 'Staff');
@@ -155,30 +153,11 @@ export async function ensureAuthenticatedSession(force = false) {
       last_name: profile.last_name || null
     });
     sessionStorage.setItem('ukonek_staff_name', resolvedUsername);
+    sessionStorage.setItem('ukonek_role', role);
     console.log('[Dashboard] Authenticated staff profile loaded:', profile.username || profile.email, `(${role})`);
     return profile;
   } catch (error) {
-    console.warn('[Dashboard] Session validation warning:', error?.message || error);
-    const meta = sessionAuth.getAuthSessionMeta();
-    const role = (sessionStorage.getItem('ukonek_role') || meta?.role || '').trim().toLowerCase();
-    if (role) {
-      console.log('[Dashboard] Recovered session from stored metadata:', role);
-      const fallbackUsername = (meta?.username && !meta.username.includes('@'))
-        ? meta.username
-        : (meta?.firstName || meta?.first_name || sessionStorage.getItem('ukonek_staff_name') || (role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Clinician'));
-
-      const fallbackProfile = {
-        id: meta?.userId || null,
-        email: meta?.email || 'clinician@ukonek.local',
-        role: role,
-        username: fallbackUsername,
-        first_name: meta?.firstName || meta?.first_name || fallbackUsername,
-        last_name: meta?.lastName || meta?.last_name || ''
-      };
-      sessionStore.setUser(fallbackProfile);
-      return fallbackProfile;
-    }
-
+    console.error('[Dashboard] Session validation failure:', error?.message || error);
     window.location.replace('./index.html');
     return null;
   }
@@ -223,46 +202,15 @@ if (typeof window !== 'undefined') {
 async function bootstrapDashboard() {
   console.log('[Dashboard] Bootstrap starting...');
   try {
-    // Immediate fast-path: if session metadata already exists in sessionStorage,
-    // apply role access and dismiss header skeletons in 0ms without waiting for network.
-    const fastMeta = sessionAuth.getAuthSessionMeta();
-    const fastRole = (sessionStorage.getItem('ukonek_role') || fastMeta?.role || '').trim().toLowerCase();
-    if (fastRole === 'admin') {
-      window.location.replace('./dashboard-admin.html');
-      return;
-    }
-    if (fastRole === 'pharmacist') {
-      window.location.replace('./dashboard-pharmacist.html');
-      return;
-    }
-    if (fastRole) {
-      const fastUsername = (fastMeta?.username && !fastMeta.username.includes('@'))
-        ? fastMeta.username
-        : (fastMeta?.firstName || fastMeta?.first_name || sessionStorage.getItem('ukonek_staff_name') || (fastRole ? fastRole.charAt(0).toUpperCase() + fastRole.slice(1) : 'Clinician'));
-
-      applyRoleAccess({
-        id: fastMeta?.userId || null,
-        email: fastMeta?.email || null,
-        role: fastRole,
-        username: fastUsername,
-        first_name: fastMeta?.firstName || fastMeta?.first_name || fastUsername,
-        last_name: fastMeta?.lastName || fastMeta?.last_name || ''
-      });
-    }
-
-    // 1. Authenticate user session (with defensive timeout)
+    // 1. Authenticate user session strictly against Supabase
     const user = await ensureAuthenticatedSession();
     if (!user) return;
 
-    const userRole = String(user.role || '').trim().toLowerCase();
-    if (userRole === 'admin') {
-      window.location.replace('./dashboard-admin.html');
-      return;
-    }
-    if (userRole === 'pharmacist') {
-      window.location.replace('./dashboard-pharmacist.html');
-      return;
-    }
+    // Reveal page once session is verified
+    document.body.classList.remove('auth-cloak');
+
+    // Activate 15-minute idle timeout guard (HIPAA compliance)
+    startIdleTimer();
 
     applyRoleAccess(user);
 

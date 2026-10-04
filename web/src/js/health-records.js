@@ -2,12 +2,12 @@
 // Dynamically fetches and displays patient data from Consultations, Vitals, and Prescriptions
 
 function formatPhysicalExam(physicalExam) {
-  if (!physicalExam) return 'None';
+  if (!physicalExam) return 'Normal / Unremarkable';
   
   let examObj = physicalExam;
   if (typeof physicalExam === 'string') {
     const trimmed = physicalExam.trim();
-    if (!trimmed || trimmed === '—' || trimmed === '-' || trimmed === 'null' || trimmed === 'None') return 'None';
+    if (!trimmed || trimmed === '—' || trimmed === '-' || trimmed.toLowerCase() === 'null' || trimmed.toLowerCase() === 'none') return 'Normal / Unremarkable';
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       try {
         examObj = JSON.parse(trimmed);
@@ -34,13 +34,14 @@ function formatPhysicalExam(physicalExam) {
     const lines = [];
     for (const [key, value] of Object.entries(examObj)) {
       const vStr = String(value || '').trim();
-      if (vStr !== '' && vStr !== '—' && vStr !== 'null') {
+      const vLower = vStr.toLowerCase();
+      if (vStr !== '' && vStr !== '—' && vLower !== 'null' && vLower !== 'none' && vLower !== 'normal' && vLower !== 'unremarkable' && vLower !== 'n/a' && vLower !== 'nil') {
         const label = keyLabels[key.toLowerCase()] || (key.charAt(0).toUpperCase() + key.slice(1));
         lines.push(`${label}: ${vStr}`);
       }
     }
     
-    return lines.length > 0 ? lines.join('\n') : 'None';
+    return lines.length > 0 ? lines.join('\n') : 'Normal / Unremarkable';
   }
   
   return String(physicalExam);
