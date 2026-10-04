@@ -419,106 +419,200 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
     
     console.log('[Reports] Generating Doctor Activity Report...');
     
-    // Fetch all doctors
+    // Fetch all doctors with targeted columns (avoiding select('*') credential exposure)
     const { data: doctors, error: doctorsError } = await supabase
       .from('staff')
-      .select('*')
-      .eq('role', 'doctor')
-      .order('first_name');
+      .select('id, employee_id, first_name, last_name, email, doctor_specialization, status, last_seen')
+      .ilike('role', 'doctor')
+      .order('first_name', { ascending: true });
     
     if (doctorsError) {
       throw new Error(`Failed to fetch doctors: ${doctorsError.message}`);
     }
     
-    console.log(`[Reports] Found ${doctors.length} doctors`);
+    console.log(`[Reports] Found ${doctors?.length || 0} doctors`);
     
+    const headers = [
+      'Doctor Employee ID',
+      'Doctor Name',
+      'Specialization',
+      'Status',
+      'Email',
+      'Total Consultations',
+      'Unique Patients Seen',
+      'Total Prescriptions',
+      'Avg Prescriptions / Consult',
+      'Appointments Booked',
+      'Appointments Completed',
+      'Scheduled Duty Days',
+      'Scheduled Duty Slots',
+      'Total Scheduled Hours',
+      'Avg Consultations / Shift',
+      'Avg Consultations / Hour',
+      'Last Consultation',
+      'Last Prescription',
+      'Last Active Date'
+    ];
+
+    if (!doctors || doctors.length === 0) {
+      console.log('[Reports] No doctor accounts found for activity export');
+      const csv = convertToCSV([], headers);
+      const dateRange = getDateRangeString(startDate, endDate);
+      const filename = `Doctor_Activity_Report_${dateRange}_${Date.now()}.csv`;
+      downloadCSV(csv, filename);
+      return { success: true, count: 0, filename };
+    }
+
     const doctorIds = doctors.map(d => d.id);
     
     const startIso = startDate ? (startDate.includes('T') ? startDate : `${startDate}T00:00:00`) : null;
     const endIso = endDate ? (endDate.includes('T') ? endDate : `${endDate}T23:59:59`) : null;
 
-    // Batch fetch all activities across doctors in 3 queries instead of N*3 sequential queries
-    let consultQuery = supabase.from('consultations').select('id, doctor_staff_id, consulted_at').in('doctor_staff_id', doctorIds);
+    // Batch fetch all activities across doctors in parallel with targeted projection
+    let consultQuery = supabase
+      .from('consultations')
+      .select('id, doctor_staff_id, patient_citizen_id, patient_identifier, consulted_at')
+      .in('doctor_staff_id', doctorIds);
     if (startIso) consultQuery = consultQuery.gte('consulted_at', startIso);
     if (endIso) consultQuery = consultQuery.lte('consulted_at', endIso);
     
-    let rxQuery = supabase.from('prescription_headers').select('id, doctor_staff_id, issued_at').in('doctor_staff_id', doctorIds);
+    let rxQuery = supabase
+      .from('prescription_headers')
+      .select('id, doctor_staff_id, issued_at')
+      .in('doctor_staff_id', doctorIds);
     if (startIso) rxQuery = rxQuery.gte('issued_at', startIso);
     if (endIso) rxQuery = rxQuery.lte('issued_at', endIso);
     
-    let schedQuery = supabase.from('doctor_schedules').select('id, doctor_staff_id, schedule_date, start_time, end_time').in('doctor_staff_id', doctorIds);
+    let schedQuery = supabase
+      .from('doctor_schedules')
+      .select('id, doctor_staff_id, schedule_date, start_time, end_time')
+      .in('doctor_staff_id', doctorIds);
     if (startDate) schedQuery = schedQuery.gte('schedule_date', startDate);
     if (endDate) schedQuery = schedQuery.lte('schedule_date', endDate);
 
+    let apptQuery = supabase
+      .from('appointments')
+      .select('id, doctor_staff_id, status, appointment_date')
+      .in('doctor_staff_id', doctorIds);
+    if (startDate) apptQuery = apptQuery.gte('appointment_date', startDate);
+    if (endDate) apptQuery = apptQuery.lte('appointment_date', endDate);
+
     const [
-      { data: allConsultations },
-      { data: allPrescriptions },
-      { data: allSchedules }
-    ] = await Promise.all([consultQuery.limit(5000), rxQuery.limit(5000), schedQuery.limit(5000)]);
+      consultRes,
+      rxRes,
+      schedRes,
+      apptRes
+    ] = await Promise.all([
+      consultQuery.limit(5000),
+      rxQuery.limit(5000),
+      schedQuery.limit(5000),
+      apptQuery.limit(5000).catch(err => {
+        console.warn('[Reports] Optional appointments query notice:', err.message);
+        return { data: [] };
+      })
+    ]);
+
+    const allConsultations = consultRes.data || [];
+    const allPrescriptions = rxRes.data || [];
+    const allSchedules = schedRes.data || [];
+    const allAppointments = apptRes?.data || [];
 
     // Group by doctor ID in memory
     const consultsByDoctor = {};
-    (allConsultations || []).forEach(c => {
+    allConsultations.forEach(c => {
       if (!consultsByDoctor[c.doctor_staff_id]) consultsByDoctor[c.doctor_staff_id] = [];
       consultsByDoctor[c.doctor_staff_id].push(c);
     });
 
     const rxByDoctor = {};
-    (allPrescriptions || []).forEach(r => {
+    allPrescriptions.forEach(r => {
       if (!rxByDoctor[r.doctor_staff_id]) rxByDoctor[r.doctor_staff_id] = [];
       rxByDoctor[r.doctor_staff_id].push(r);
     });
 
     const schedByDoctor = {};
-    (allSchedules || []).forEach(s => {
+    allSchedules.forEach(s => {
       if (!schedByDoctor[s.doctor_staff_id]) schedByDoctor[s.doctor_staff_id] = [];
       schedByDoctor[s.doctor_staff_id].push(s);
+    });
+
+    const apptsByDoctor = {};
+    allAppointments.forEach(a => {
+      if (!apptsByDoctor[a.doctor_staff_id]) apptsByDoctor[a.doctor_staff_id] = [];
+      apptsByDoctor[a.doctor_staff_id].push(a);
     });
 
     const activityData = doctors.map(doctor => {
       const consultations = consultsByDoctor[doctor.id] || [];
       const prescriptions = rxByDoctor[doctor.id] || [];
       const schedules = schedByDoctor[doctor.id] || [];
+      const appointments = apptsByDoctor[doctor.id] || [];
+
+      // Calculate unique patients managed by this doctor
+      const uniquePatients = new Set(
+        consultations
+          .map(c => c.patient_citizen_id || c.patient_identifier)
+          .filter(Boolean)
+      ).size;
+
+      // Calculate distinct duty days scheduled
+      const uniqueDutyDays = new Set(
+        schedules.map(s => s.schedule_date).filter(Boolean)
+      ).size;
 
       // Calculate total hours scheduled
       const totalHours = schedules.reduce((sum, sched) => {
         if (sched.start_time && sched.end_time) {
           const [startH, startM] = sched.start_time.split(':').map(Number);
           const [endH, endM] = sched.end_time.split(':').map(Number);
-          const startMin = startH * 60 + (startM || 0);
-          const endMin = endH * 60 + (endM || 0);
+          const startMin = (startH || 0) * 60 + (startM || 0);
+          const endMin = (endH || 0) * 60 + (endM || 0);
           const hours = (endMin - startMin) / 60;
           return sum + (Number.isFinite(hours) && hours > 0 ? hours : 0);
         }
         return sum;
       }, 0);
 
+      // Clinical workload & throughput metrics
+      const consultsPerShift = schedules.length > 0 
+        ? (consultations.length / schedules.length).toFixed(1) 
+        : (consultations.length > 0 ? String(consultations.length) : '0');
+
+      const consultsPerHour = totalHours > 0 
+        ? (consultations.length / totalHours).toFixed(1) 
+        : '—';
+
+      const rxPerConsult = consultations.length > 0
+        ? (prescriptions.length / consultations.length).toFixed(2)
+        : '0.00';
+
+      const completedAppts = appointments.filter(a => String(a.status || '').toLowerCase() === 'completed').length;
+
       const sortedConsults = consultations.slice().sort((a, b) => new Date(b.consulted_at) - new Date(a.consulted_at));
       const sortedPrescriptions = prescriptions.slice().sort((a, b) => new Date(b.issued_at) - new Date(a.issued_at));
 
       return {
-        'Doctor ID': doctor.id,
-        'Employee ID': doctor.employee_id || '',
-        'Doctor Name': `Dr. ${doctor.first_name} ${doctor.last_name}`,
-        'Email': doctor.email || '',
-        'Specialization': doctor.doctor_specialization || '',
-        'Status': doctor.status || '',
+        'Doctor Employee ID': doctor.employee_id || (doctor.id ? `STF-${doctor.id}` : '—'),
+        'Doctor Name': `Dr. ${doctor.first_name || ''} ${doctor.last_name || ''}`.trim(),
+        'Specialization': cleanClinicalText(doctor.doctor_specialization, 'General Medicine'),
+        'Status': doctor.status || 'Active',
+        'Email': doctor.email || '—',
         'Total Consultations': consultations.length,
+        'Unique Patients Seen': uniquePatients,
         'Total Prescriptions': prescriptions.length,
-        'Total Scheduled Slots': schedules.length,
+        'Avg Prescriptions / Consult': rxPerConsult,
+        'Appointments Booked': appointments.length,
+        'Appointments Completed': completedAppts,
+        'Scheduled Duty Days': uniqueDutyDays,
+        'Scheduled Duty Slots': schedules.length,
         'Total Scheduled Hours': totalHours.toFixed(2),
+        'Avg Consultations / Shift': consultsPerShift,
+        'Avg Consultations / Hour': consultsPerHour,
         'Last Consultation': sortedConsults[0]?.consulted_at ? formatReportDateTime(sortedConsults[0].consulted_at) : 'None',
         'Last Prescription': sortedPrescriptions[0]?.issued_at ? formatReportDateTime(sortedPrescriptions[0].issued_at) : 'None',
-        'Is Online': doctor.is_online ? 'Yes' : 'No',
-        'Last Seen': (doctor.last_seen && !isNaN(new Date(doctor.last_seen).getTime())) ? formatReportDateTime(doctor.last_seen) : 'Never'
+        'Last Active Date': (doctor.last_seen && !isNaN(new Date(doctor.last_seen).getTime())) ? formatReportDateTime(doctor.last_seen) : 'Never'
       };
     });
-    
-    const headers = [
-      'Doctor ID', 'Employee ID', 'Doctor Name', 'Email', 'Specialization', 'Status',
-      'Total Consultations', 'Total Prescriptions', 'Total Scheduled Slots', 'Total Scheduled Hours',
-      'Last Consultation', 'Last Prescription', 'Is Online', 'Last Seen'
-    ];
     
     const csv = convertToCSV(activityData, headers);
     const dateRange = getDateRangeString(startDate, endDate);
