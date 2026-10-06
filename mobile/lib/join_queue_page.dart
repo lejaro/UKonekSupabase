@@ -9,6 +9,7 @@ import 'dashboard_page.dart';
 import 'medicine_scheduler_page.dart';
 import 'profile_page.dart';
 import 'utils/app_transitions.dart';
+import 'utils/anti_spam.dart';
 import 'core/navigation/shell_navigation.dart';
 
 import 'core/theme/app_colors.dart';
@@ -385,6 +386,7 @@ class _JoinQueuePageState extends State<JoinQueuePage>
 
 
   Future<void> _handleJoin() async {
+    if (_isSubmitting || !AntiSpam.allowTap()) return;
     if (_selectedService == null) return _showSnack('Please select a service.', isError: true);
     if (_reasonController.text.trim().isEmpty) return _showSnack('Reason for visit is required.', isError: true);
     setState(() => _isSubmitting = true);
@@ -408,6 +410,7 @@ class _JoinQueuePageState extends State<JoinQueuePage>
   }
 
   Future<void> _handleCancel() async {
+    if (_isSubmitting || !AntiSpam.allowTap()) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -449,7 +452,8 @@ class _JoinQueuePageState extends State<JoinQueuePage>
         ]),
       ),
     );
-    if (confirm != true) return;
+    if (confirm != true || !mounted) return;
+    setState(() => _isSubmitting = true);
     try {
       _userManuallyCancelled = true;
       final success = await ApiService.cancelMyQueue();

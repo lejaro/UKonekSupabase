@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'login_page.dart';
 import 'services/api_service.dart';
 import 'utils/app_transitions.dart';
+import 'utils/anti_spam.dart';
 
 class uKonekCredentialsPage extends StatefulWidget {
   final String firstName, middleName, surname, nameExtension;
@@ -167,6 +168,7 @@ class _uKonekCredentialsPageState
   }
 
   Future<void> _submitRegistration() async {
+    if (_isSubmitting || !AntiSpam.allowTap()) return;
     if (!_formKey.currentState!.validate()) return;
 
     if (passwordController.text != confirmPasswordController.text) {

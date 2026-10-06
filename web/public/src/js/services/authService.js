@@ -32,7 +32,20 @@ export async function resolveStaffLoginEmail(identifier) {
     throw new Error('Please enter a valid username, employee ID, or email.');
   }
 
-  // Attempt lookup by exact username or employee_id from public.staff
+  // 1. Attempt lookup via secure RPC (preferred, avoids exposing public.staff to anonymous callers)
+  try {
+    const { data: resolvedEmail, error: rpcError } = await supabase
+      .rpc('resolve_staff_login_email', { p_identifier: safeIdentifier });
+
+    if (!rpcError && resolvedEmail) {
+      console.log(`[Auth] Resolved identifier "${safeIdentifier}" to email "${resolvedEmail}"`);
+      return String(resolvedEmail).toLowerCase();
+    }
+  } catch (rpcErr) {
+    console.warn('[Auth] RPC resolve_staff_login_email lookup warning:', rpcErr);
+  }
+
+  // 2. Direct lookup fallback for authenticated environments or backward compatibility
   try {
     const { data: staffMember, error } = await supabase
       .from('staff')

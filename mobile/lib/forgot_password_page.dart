@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'services/api_service.dart';
 import 'login_page.dart';
 import 'utils/app_transitions.dart';
+import 'utils/anti_spam.dart';
 
 class uKonekForgotPasswordPage extends StatefulWidget {
   const uKonekForgotPasswordPage({super.key});
@@ -48,6 +49,7 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
   }
 
   Future<void> _sendResetEmail() async {
+    if (_isLoading || !AntiSpam.allowTap()) return;
     if (!_emailFormKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {

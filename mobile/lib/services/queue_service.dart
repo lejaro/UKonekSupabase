@@ -32,12 +32,21 @@ class QueueService {
     return result;
   }
 
+  static bool _isJoiningQueue = false;
+
   static Future<QueueTicket> joinQueue(QueueJoinRequest request) async {
+    if (_isJoiningQueue) {
+      throw Exception('Queue request already in progress. Please wait.');
+    }
+    _isJoiningQueue = true;
+
     final citizenType = request.citizenType.trim().toLowerCase();
     if (request.serviceKey.trim().isEmpty || request.serviceLabel.trim().isEmpty) {
+      _isJoiningQueue = false;
       throw Exception('Please select a healthcare service.');
     }
     if (!const {'regular', 'pwd', 'pregnant'}.contains(citizenType)) {
+      _isJoiningQueue = false;
       throw Exception('Please select a valid citizen type.');
     }
 
@@ -59,6 +68,8 @@ class QueueService {
         throw Exception('Your account is missing a citizen profile. Please contact the health center admin for account setup.');
       }
       rethrow;
+    } finally {
+      _isJoiningQueue = false;
     }
 
     final rows = (response as List<dynamic>?) ?? const [];

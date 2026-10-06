@@ -8,6 +8,7 @@ import 'medicine_scheduler_page.dart';
 import 'join_queue_page.dart';
 import 'dashboard_page.dart';
 import 'utils/app_transitions.dart';
+import 'utils/anti_spam.dart';
 
 import 'core/theme/app_colors.dart';
 
@@ -660,8 +661,10 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setLocal) => DraggableScrollableSheet(
+      builder: (_) {
+        bool isSaving = false;
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => DraggableScrollableSheet(
           initialChildSize: 0.75,
           maxChildSize: 0.95,
           minChildSize: 0.5,
@@ -725,12 +728,13 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
                   height: 52,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _C.primary,
+                      backgroundColor: isSaving ? Colors.grey : _C.primary,
                       foregroundColor: Colors.white,
-                      elevation: 4,
+                      elevation: isSaving ? 0 : 4,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    onPressed: () async {
+                    onPressed: isSaving ? null : () async {
+                      if (isSaving || !AntiSpam.allowTap()) return;
                       // Sync dropdown values back into controllers
                       for (final f in fields) {
                         if (f.type == FieldType.dropdown) {
@@ -738,6 +742,7 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
                         }
                       }
                       if (formKey.currentState!.validate()) {
+                        setLocal(() => isSaving = true);
                         final updatedData = <String, dynamic>{};
                         for (final f in fields) {
                           final dbKey = _mapLabelToDbKey(f.label);
@@ -750,33 +755,46 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
                         }
                         try {
                           await ApiService.updateMyCitizenProfile(updatedData);
-                          setState(() {
-                            for (final f in fields) {
-                              f.setter(controllers[f.label]!.text.trim());
-                            }
-                          });
-                          Navigator.pop(context);
+                          if (mounted) {
+                            setState(() {
+                              for (final f in fields) {
+                                f.setter(controllers[f.label]!.text.trim());
+                              }
+                            });
+                          }
+                          if (ctx.mounted) Navigator.pop(ctx);
                           _snack('✅ $title updated successfully!', _C.success);
                         } catch (e) {
                           _snack('Error updating profile: $e', Colors.redAccent);
+                        } finally {
+                          if (ctx.mounted) {
+                            setLocal(() => isSaving = false);
+                          }
                         }
                       }
                     },
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('SAVE CHANGES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8, fontSize: 15)),
-                        SizedBox(width: 8),
-                        Icon(Icons.check_rounded, size: 18),
-                      ],
-                    ),
+                    child: isSaving
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text('SAVE CHANGES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8, fontSize: 15)),
+                              SizedBox(width: 8),
+                              Icon(Icons.check_rounded, size: 18),
+                            ],
+                          ),
                   ),
                 ),
               ),
             ]),
           ),
         ),
-      ),
+      );
+    },
     );
   }
 
@@ -821,6 +839,7 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: _C.primary, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
                     onPressed: () {
+                      if (!AntiSpam.allowTap()) return;
                       if (newCtrl.text.length < 6) { _snack('Password must be at least 6 characters.', Colors.redAccent); return; }
                       if (newCtrl.text != confCtrl.text) { _snack('Passwords do not match.', Colors.redAccent); return; }
                       Navigator.pop(context);

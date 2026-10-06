@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'services/api_service.dart';
 import 'login_page.dart';
 import 'utils/app_transitions.dart';
+import 'utils/anti_spam.dart';
 
 class uKonekChangePasswordPage extends StatefulWidget {
   const uKonekChangePasswordPage({super.key});
@@ -69,6 +70,7 @@ class _uKonekChangePasswordPageState
       ["", "Weak", "Fair", "Good", "Strong"][_strengthLevel];
 
   Future<void> _changePassword() async {
+    if (_isLoading || !AntiSpam.allowTap()) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {

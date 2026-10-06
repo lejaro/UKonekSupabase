@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'otp_page.dart';
 import 'utils/app_transitions.dart';
+import 'utils/anti_spam.dart';
 
 class uKonekPreviewPage extends StatelessWidget {
   final String firstName, middleName, surname, nameExtension;
@@ -285,9 +286,11 @@ class uKonekPreviewPage extends StatelessWidget {
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16)),
         ),
-        onPressed: () => Navigator.push(
-          context,
-          AppPageRoute.slideRight(
+        onPressed: () {
+          if (!AntiSpam.allowTap()) return;
+          Navigator.push(
+            context,
+            AppPageRoute.slideRight(
             uKonekOtpPage(
               firstName:        firstName,
               middleName:       middleName,

@@ -15,6 +15,7 @@ import 'prescription_page.dart';
 import 'services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'utils/app_transitions.dart';
+import 'utils/anti_spam.dart';
 import 'core/navigation/shell_navigation.dart';
 import 'core/theme/app_colors.dart';
 
@@ -901,6 +902,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   Widget _buildNotificationBell() {
     return GestureDetector(
       onTap: () async {
+        if (!AntiSpam.allowTap()) return;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('last_viewed_notifications', DateTime.now().toIso8601String());
         if (mounted) setState(() => _hasUnseenNotifications = false);
@@ -1265,6 +1267,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   void _navigateToQueue() {
+    if (!AntiSpam.allowTap()) return;
     HapticFeedback.lightImpact();
     if (widget.isEmbeddedInShell) {
       ShellNavigation.switchTab(ShellNavigation.tabQueue);
