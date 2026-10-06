@@ -23,6 +23,22 @@ function formatReportDateTime(dateVal) {
 }
 
 /**
+ * Format time only into unambiguous string: hh:mm AM/PM
+ */
+function formatReportTime(dateVal) {
+  if (!dateVal) return '—';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return String(dateVal);
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const strHours = String(hours).padStart(2, '0');
+  return `${strHours}:${minutes} ${ampm}`;
+}
+
+/**
  * Standardize patient ID into uniform CIT- prefix or original walk-in code
  */
 function formatPatientId(consult) {
@@ -410,7 +426,7 @@ export async function exportConsultationReport(startDate = null, endDate = null,
 
 /**
  * 3. DOCTOR ACTIVITY REPORT
- * Exports doctor activities including consultations, prescriptions, and schedules
+ * Exports doctor activities including consultations, prescriptions, and clinical timelines
  */
 export async function exportDoctorActivityReport(startDate = null, endDate = null) {
   verifyAdminRole();
@@ -442,13 +458,6 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
       'Unique Patients Seen',
       'Total Prescriptions',
       'Avg Prescriptions / Consult',
-      'Appointments Booked',
-      'Appointments Completed',
-      'Scheduled Duty Days',
-      'Scheduled Duty Slots',
-      'Total Scheduled Hours',
-      'Avg Consultations / Shift',
-      'Avg Consultations / Hour',
       'Last Consultation',
       'Last Prescription',
       'Last Active Date'
@@ -482,40 +491,17 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
       .in('doctor_staff_id', doctorIds);
     if (startIso) rxQuery = rxQuery.gte('issued_at', startIso);
     if (endIso) rxQuery = rxQuery.lte('issued_at', endIso);
-    
-    let schedQuery = supabase
-      .from('doctor_schedules')
-      .select('id, doctor_staff_id, schedule_date, start_time, end_time')
-      .in('doctor_staff_id', doctorIds);
-    if (startDate) schedQuery = schedQuery.gte('schedule_date', startDate);
-    if (endDate) schedQuery = schedQuery.lte('schedule_date', endDate);
-
-    let apptQuery = supabase
-      .from('appointments')
-      .select('id, doctor_staff_id, status, appointment_date')
-      .in('doctor_staff_id', doctorIds);
-    if (startDate) apptQuery = apptQuery.gte('appointment_date', startDate);
-    if (endDate) apptQuery = apptQuery.lte('appointment_date', endDate);
 
     const [
       consultRes,
-      rxRes,
-      schedRes,
-      apptRes
+      rxRes
     ] = await Promise.all([
       consultQuery.limit(5000),
-      rxQuery.limit(5000),
-      schedQuery.limit(5000),
-      apptQuery.limit(5000).catch(err => {
-        console.warn('[Reports] Optional appointments query notice:', err.message);
-        return { data: [] };
-      })
+      rxQuery.limit(5000)
     ]);
 
     const allConsultations = consultRes.data || [];
     const allPrescriptions = rxRes.data || [];
-    const allSchedules = schedRes.data || [];
-    const allAppointments = apptRes?.data || [];
 
     // Group by doctor ID in memory
     const consultsByDoctor = {};
@@ -530,23 +516,9 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
       rxByDoctor[r.doctor_staff_id].push(r);
     });
 
-    const schedByDoctor = {};
-    allSchedules.forEach(s => {
-      if (!schedByDoctor[s.doctor_staff_id]) schedByDoctor[s.doctor_staff_id] = [];
-      schedByDoctor[s.doctor_staff_id].push(s);
-    });
-
-    const apptsByDoctor = {};
-    allAppointments.forEach(a => {
-      if (!apptsByDoctor[a.doctor_staff_id]) apptsByDoctor[a.doctor_staff_id] = [];
-      apptsByDoctor[a.doctor_staff_id].push(a);
-    });
-
     const activityData = doctors.map(doctor => {
       const consultations = consultsByDoctor[doctor.id] || [];
       const prescriptions = rxByDoctor[doctor.id] || [];
-      const schedules = schedByDoctor[doctor.id] || [];
-      const appointments = apptsByDoctor[doctor.id] || [];
 
       // Calculate unique patients managed by this doctor
       const uniquePatients = new Set(
@@ -555,38 +527,9 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
           .filter(Boolean)
       ).size;
 
-      // Calculate distinct duty days scheduled
-      const uniqueDutyDays = new Set(
-        schedules.map(s => s.schedule_date).filter(Boolean)
-      ).size;
-
-      // Calculate total hours scheduled
-      const totalHours = schedules.reduce((sum, sched) => {
-        if (sched.start_time && sched.end_time) {
-          const [startH, startM] = sched.start_time.split(':').map(Number);
-          const [endH, endM] = sched.end_time.split(':').map(Number);
-          const startMin = (startH || 0) * 60 + (startM || 0);
-          const endMin = (endH || 0) * 60 + (endM || 0);
-          const hours = (endMin - startMin) / 60;
-          return sum + (Number.isFinite(hours) && hours > 0 ? hours : 0);
-        }
-        return sum;
-      }, 0);
-
-      // Clinical workload & throughput metrics
-      const consultsPerShift = schedules.length > 0 
-        ? (consultations.length / schedules.length).toFixed(1) 
-        : (consultations.length > 0 ? String(consultations.length) : '0');
-
-      const consultsPerHour = totalHours > 0 
-        ? (consultations.length / totalHours).toFixed(1) 
-        : '—';
-
       const rxPerConsult = consultations.length > 0
         ? (prescriptions.length / consultations.length).toFixed(2)
         : '0.00';
-
-      const completedAppts = appointments.filter(a => String(a.status || '').toLowerCase() === 'completed').length;
 
       const sortedConsults = consultations.slice().sort((a, b) => new Date(b.consulted_at) - new Date(a.consulted_at));
       const sortedPrescriptions = prescriptions.slice().sort((a, b) => new Date(b.issued_at) - new Date(a.issued_at));
@@ -601,13 +544,6 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
         'Unique Patients Seen': uniquePatients,
         'Total Prescriptions': prescriptions.length,
         'Avg Prescriptions / Consult': rxPerConsult,
-        'Appointments Booked': appointments.length,
-        'Appointments Completed': completedAppts,
-        'Scheduled Duty Days': uniqueDutyDays,
-        'Scheduled Duty Slots': schedules.length,
-        'Total Scheduled Hours': totalHours.toFixed(2),
-        'Avg Consultations / Shift': consultsPerShift,
-        'Avg Consultations / Hour': consultsPerHour,
         'Last Consultation': sortedConsults[0]?.consulted_at ? formatReportDateTime(sortedConsults[0].consulted_at) : 'None',
         'Last Prescription': sortedPrescriptions[0]?.issued_at ? formatReportDateTime(sortedPrescriptions[0].issued_at) : 'None',
         'Last Active Date': (doctor.last_seen && !isNaN(new Date(doctor.last_seen).getTime())) ? formatReportDateTime(doctor.last_seen) : 'Never'
@@ -630,8 +566,95 @@ export async function exportDoctorActivityReport(startDate = null, endDate = nul
 }
 
 /**
+ * Format Philippine phone number cleanly to local standard 09XX-XXX-XXXX
+ * and avoid leading '+' or quote characters in CSV
+ */
+function formatPhilippineContact(contact) {
+  if (!contact) return '—';
+  let str = String(contact).trim();
+  if (str.startsWith("'")) str = str.slice(1).trim();
+  if (str.startsWith('+63')) {
+    str = '0' + str.slice(3);
+  } else if (str.startsWith('63') && str.length >= 11) {
+    str = '0' + str.slice(2);
+  }
+  return cleanClinicalText(str, '—');
+}
+
+/**
+ * Format citizen priority category into standard display
+ */
+function formatPriorityCategory(type) {
+  if (!type) return 'Regular';
+  const lower = String(type).trim().toLowerCase();
+  if (lower === 'pwd') return 'PWD';
+  if (lower === 'senior' || lower === 'senior_citizen' || lower === 'senior citizen') return 'Senior Citizen';
+  if (lower === 'pregnant') return 'Pregnant';
+  if (lower === 'regular') return 'Regular';
+  return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+}
+
+/**
+ * Format and consolidate ticket reason & symptoms into a single clinical complaint
+ */
+function formatQueueComplaint(reason, symptoms) {
+  const cleanReason = (reason || '').trim();
+  const cleanSymptoms = (symptoms || '').trim();
+  
+  const isGeneric = /^(consult|consultation|checkup|check-up|general|routine|doctor|inquiry|test)$/i.test(cleanReason);
+  
+  if (cleanReason && cleanSymptoms) {
+    if (cleanReason.toLowerCase() === cleanSymptoms.toLowerCase()) {
+      return cleanReason;
+    }
+    if (isGeneric) {
+      return `${cleanSymptoms} (${cleanReason.charAt(0).toUpperCase() + cleanReason.slice(1).toLowerCase()})`;
+    }
+    return `${cleanReason} — ${cleanSymptoms}`;
+  }
+  if (cleanSymptoms) return cleanSymptoms;
+  if (cleanReason) return cleanReason;
+  return 'General Consultation / Inquiry';
+}
+
+/**
+ * Clean and title-case service label
+ */
+function formatServiceLabel(label, key) {
+  const raw = label || key || 'General Consultation';
+  return String(raw).trim().replace(/\b([a-z])/g, (_, c) => c.toUpperCase());
+}
+
+/**
+ * Standardize queue ticket status
+ */
+function formatQueueStatus(status) {
+  if (!status) return 'Waiting';
+  const lower = String(status).trim().toLowerCase();
+  switch (lower) {
+    case 'completed': return 'Completed';
+    case 'cancelled': return 'Cancelled';
+    case 'serving': return 'Serving';
+    case 'on_call': return 'On Call';
+    case 'waiting': return 'Waiting';
+    default: return status.charAt(0).toUpperCase() + status.slice(1);
+  }
+}
+
+/**
+ * Format elapsed milliseconds into readable minutes string
+ */
+function formatMinutesDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  const minutes = Math.round(ms / 60000);
+  if (minutes < 1) return '< 1 min';
+  if (minutes === 1) return '1 min';
+  return `${minutes} mins`;
+}
+
+/**
  * 4. QUEUE REPORT
- * Exports queue ticket data with statistics
+ * Exports queue ticket data with accurate turnaround and service duration metrics
  */
 export async function exportQueueReport(startDate = null, endDate = null) {
   verifyAdminRole();
@@ -640,12 +663,27 @@ export async function exportQueueReport(startDate = null, endDate = null) {
     
     console.log('[Reports] Generating Queue Report...');
     
-    // Build query
+    // Build query with specific projections (including demographics & walk-in support)
     let query = supabase
       .from('queue_tickets')
       .select(`
-        *,
-        citizen:citizens(id, firstname, surname, email, contact_number)
+        id,
+        queue_date,
+        ticket_code,
+        queue_number,
+        service_key,
+        service_label,
+        citizen_id,
+        walkin_patient_name,
+        citizen_type,
+        reason,
+        symptoms,
+        status,
+        created_at,
+        updated_at,
+        served_at,
+        completed_at,
+        citizen:citizens(id, firstname, surname, age, sex, contact_number)
       `)
       .order('created_at', { ascending: false });
     
@@ -657,60 +695,112 @@ export async function exportQueueReport(startDate = null, endDate = null) {
       query = query.lte('queue_date', endDate);
     }
     
-    const { data, error } = await query.limit(1000);
+    const { data, error } = await query.limit(5000);
     
     if (error) {
       throw new Error(`Failed to fetch queue data: ${error.message}`);
     }
     
-    console.log(`[Reports] Found ${data.length} queue tickets`);
+    console.log(`[Reports] Found ${data?.length || 0} queue tickets`);
+
+    const headers = [
+      'Ticket Code',
+      'Queue Number',
+      'Service',
+      'Patient Name',
+      'Priority / Category',
+      'Age',
+      'Sex',
+      'Contact Number',
+      'Chief Complaint / Purpose',
+      'Status',
+      'Date Queued',
+      'Time Queued',
+      'Time Completed',
+      'Wait Time'
+    ];
+
+    if (!data || data.length === 0) {
+      console.log('[Reports] No queue tickets found for date range');
+      const csv = convertToCSV([], headers);
+      const dateRange = getDateRangeString(startDate, endDate);
+      const filename = `Queue_Report_${dateRange}_${Date.now()}.csv`;
+      downloadCSV(csv, filename);
+      return { success: true, count: 0, filename };
+    }
     
-    // Transform data for CSV
+    // Transform data for CSV - focused strictly on relevant patient, service & timing metrics
     const csvData = data.map(ticket => {
-      // Calculate wait time
-      let waitTime = '';
-      if (ticket.created_at && ticket.served_at) {
-        const wait = new Date(ticket.served_at) - new Date(ticket.created_at);
-        const minutes = Math.floor(wait / 60000);
-        waitTime = `${minutes} minutes`;
-      }
+      const statusLower = String(ticket.status || '').trim().toLowerCase();
       
-      // Calculate service time
-      let serviceTime = '';
-      if (ticket.served_at && ticket.completed_at) {
-        const service = new Date(ticket.completed_at) - new Date(ticket.served_at);
-        const minutes = Math.floor(service / 60000);
-        serviceTime = `${minutes} minutes`;
+      const createdDate = ticket.created_at ? new Date(ticket.created_at) : null;
+      const servedDate = ticket.served_at ? new Date(ticket.served_at) : null;
+      const updatedDate = ticket.updated_at ? new Date(ticket.updated_at) : null;
+
+      let waitTime = '—';
+
+      if (statusLower === 'completed') {
+        if (createdDate && servedDate && !isNaN(createdDate) && !isNaN(servedDate)) {
+          waitTime = formatMinutesDuration(servedDate - createdDate);
+        } else {
+          waitTime = '— (Direct service)';
+        }
+      } else if (statusLower === 'cancelled') {
+        const cancelTime = updatedDate || (ticket.completed_at ? new Date(ticket.completed_at) : null) || createdDate;
+        if (createdDate && cancelTime && !isNaN(createdDate) && !isNaN(cancelTime)) {
+          waitTime = `Cancelled after ${formatMinutesDuration(cancelTime - createdDate)}`;
+        } else {
+          waitTime = 'Cancelled';
+        }
+      } else if (statusLower === 'serving') {
+        if (createdDate && servedDate && !isNaN(createdDate) && !isNaN(servedDate)) {
+          waitTime = formatMinutesDuration(servedDate - createdDate);
+        } else if (createdDate && !isNaN(createdDate)) {
+          waitTime = formatMinutesDuration(Date.now() - createdDate.getTime());
+        }
+      } else if (statusLower === 'on_call') {
+        if (createdDate && !isNaN(createdDate)) {
+          waitTime = `On Call (${formatMinutesDuration(Date.now() - createdDate.getTime())})`;
+        } else {
+          waitTime = 'On Call';
+        }
+      } else {
+        // waiting or default
+        if (createdDate && !isNaN(createdDate)) {
+          waitTime = `Waiting (${formatMinutesDuration(Date.now() - createdDate.getTime())})`;
+        } else {
+          waitTime = 'Waiting';
+        }
       }
-      
+
+      const citizen = ticket.citizen || {};
+      const patientName = (citizen.firstname || citizen.surname)
+        ? `${citizen.firstname || ''} ${citizen.surname || ''}`.trim()
+        : (ticket.walkin_patient_name || 'Walk-in Patient');
+
+      const queueDate = ticket.queue_date || (ticket.created_at ? ticket.created_at.split('T')[0] : '—');
+      const timeQueued = ticket.created_at ? formatReportTime(ticket.created_at) : '—';
+      const timeCompleted = ticket.completed_at 
+        ? formatReportTime(ticket.completed_at) 
+        : (statusLower === 'cancelled' && ticket.updated_at ? formatReportTime(ticket.updated_at) : '—');
+
       return {
-        'Ticket ID': ticket.id,
-        'Ticket Code': ticket.ticket_code || '',
-        'Queue Date': ticket.queue_date || '',
-        'Queue Number': ticket.queue_number || '',
-        'Service': ticket.service_label || ticket.service_key || '',
-        'Citizen ID': ticket.citizen?.id || ticket.citizen_id || '',
-        'Citizen Name': ticket.citizen ? `${ticket.citizen.firstname} ${ticket.citizen.surname}` : '',
-        'Citizen Email': ticket.citizen?.email || '',
-        'Citizen Contact': ticket.citizen?.contact_number || '',
-        'Citizen Type': ticket.citizen_type || '',
-        'Reason': ticket.reason || '',
-        'Symptoms': ticket.symptoms || '',
-        'Status': ticket.status || '',
-        'Created At': ticket.created_at ? formatReportDateTime(ticket.created_at) : '',
-        'Served At': ticket.served_at ? formatReportDateTime(ticket.served_at) : '',
-        'Completed At': ticket.completed_at ? formatReportDateTime(ticket.completed_at) : '',
-        'Wait Time': waitTime,
-        'Service Time': serviceTime
+        'Ticket Code': ticket.ticket_code || (ticket.id ? `Q-${ticket.id}` : '—'),
+        'Queue Number': ticket.queue_number ?? '—',
+        'Service': formatServiceLabel(ticket.service_label, ticket.service_key),
+        'Patient Name': patientName,
+        'Priority / Category': formatPriorityCategory(ticket.citizen_type),
+        'Age': citizen.age ?? '—',
+        'Sex': cleanClinicalText(citizen.sex, '—'),
+        'Contact Number': formatPhilippineContact(citizen.contact_number),
+        'Chief Complaint / Purpose': formatQueueComplaint(ticket.reason, ticket.symptoms),
+        'Status': formatQueueStatus(ticket.status),
+        'Date Queued': queueDate,
+        'Time Queued': timeQueued,
+        'Time Completed': timeCompleted,
+        'Wait Time': waitTime
       };
     });
-    
-    const headers = [
-      'Ticket ID', 'Ticket Code', 'Queue Date', 'Queue Number', 'Service',
-      'Citizen ID', 'Citizen Name', 'Citizen Email', 'Citizen Contact', 'Citizen Type',
-      'Reason', 'Symptoms', 'Status', 'Created At', 'Served At', 'Completed At',
-      'Wait Time', 'Service Time'
-    ];
     
     const csv = convertToCSV(csvData, headers);
     const dateRange = getDateRangeString(startDate, endDate);
@@ -719,7 +809,7 @@ export async function exportQueueReport(startDate = null, endDate = null) {
     downloadCSV(csv, filename);
     
     console.log(`[Reports] Queue Report exported: ${filename}`);
-    return { success: true, count: data.length, filename };
+    return { success: true, count: csvData.length, filename };
     
   } catch (error) {
     console.error('[Reports] Queue Report error:', error);
@@ -729,7 +819,8 @@ export async function exportQueueReport(startDate = null, endDate = null) {
 
 /**
  * 5. SYSTEM USAGE REPORT
- * Exports system usage statistics including logins, activities, and resource usage
+ * Exports clinic system usage statistics, operational volume, service utilization,
+ * staff directory census, and platform engagement metrics.
  */
 export async function exportSystemUsageReport(startDate = null, endDate = null) {
   verifyAdminRole();
@@ -738,104 +829,193 @@ export async function exportSystemUsageReport(startDate = null, endDate = null) 
     
     console.log('[Reports] Generating System Usage Report...');
     
-    // Build all count queries
-    let consultQuery = supabase.from('consultations').select('*', { count: 'exact', head: true });
-    if (startDate) consultQuery = consultQuery.gte('consulted_at', startDate);
-    if (endDate) consultQuery = consultQuery.lte('consulted_at', endDate);
+    const startIso = startDate ? (startDate.includes('T') ? startDate : `${startDate}T00:00:00`) : null;
+    const endIso = endDate ? (endDate.includes('T') ? endDate : `${endDate}T23:59:59`) : null;
 
-    let rxQuery = supabase.from('prescription_headers').select('*', { count: 'exact', head: true });
-    if (startDate) rxQuery = rxQuery.gte('issued_at', startDate);
-    if (endDate) rxQuery = rxQuery.lte('issued_at', endDate);
+    // 1. Clinical Queries (Consultations, Nursing Triage / Vitals)
+    let consultQuery = supabase.from('consultations').select('id', { count: 'exact', head: true });
+    if (startIso) consultQuery = consultQuery.gte('consulted_at', startIso);
+    if (endIso) consultQuery = consultQuery.lte('consulted_at', endIso);
 
-    let queueQuery = supabase.from('queue_tickets').select('*', { count: 'exact', head: true });
+    let vitalsQuery = supabase.from('vital_signs').select('id', { count: 'exact', head: true });
+    if (startIso) vitalsQuery = vitalsQuery.gte('created_at', startIso);
+    if (endIso) vitalsQuery = vitalsQuery.lte('created_at', endIso);
+
+    // 2. Queue Queries (Tickets, Completed, Cancelled)
+    let queueQuery = supabase.from('queue_tickets').select('id', { count: 'exact', head: true });
     if (startDate) queueQuery = queueQuery.gte('queue_date', startDate);
     if (endDate) queueQuery = queueQuery.lte('queue_date', endDate);
 
-    let completedQuery = supabase.from('queue_tickets').select('*', { count: 'exact', head: true }).eq('status', 'completed');
-    if (startDate) completedQuery = completedQuery.gte('queue_date', startDate);
-    if (endDate) completedQuery = completedQuery.lte('queue_date', endDate);
+    let completedQueueQuery = supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'completed');
+    if (startDate) completedQueueQuery = completedQueueQuery.gte('queue_date', startDate);
+    if (endDate) completedQueueQuery = completedQueueQuery.lte('queue_date', endDate);
 
-    let labQuery = supabase.from('lab_orders').select('*', { count: 'exact', head: true });
-    if (startDate) labQuery = labQuery.gte('created_at', startDate);
-    if (endDate) labQuery = labQuery.lte('created_at', endDate);
+    let cancelledQueueQuery = supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'cancelled');
+    if (startDate) cancelledQueueQuery = cancelledQueueQuery.gte('queue_date', startDate);
+    if (endDate) cancelledQueueQuery = cancelledQueueQuery.lte('queue_date', endDate);
 
-    let feedbackQuery = supabase.from('feedbacks').select('*', { count: 'exact', head: true });
-    if (startDate) feedbackQuery = feedbackQuery.gte('created_at', startDate);
-    if (endDate) feedbackQuery = feedbackQuery.lte('created_at', endDate);
+    // 3. Pharmacy Queries (Prescriptions Issued, Dispensed)
+    let rxQuery = supabase.from('prescription_headers').select('id', { count: 'exact', head: true });
+    if (startIso) rxQuery = rxQuery.gte('issued_at', startIso);
+    if (endIso) rxQuery = rxQuery.lte('issued_at', endIso);
 
-    let schedQuery = supabase.from('doctor_schedules').select('*', { count: 'exact', head: true });
-    if (startDate) schedQuery = schedQuery.gte('schedule_date', startDate);
-    if (endDate) schedQuery = schedQuery.lte('schedule_date', endDate);
+    let rxDispensedQuery = supabase.from('prescription_headers').select('id', { count: 'exact', head: true }).eq('dispensing_status', 'dispensed');
+    if (startIso) rxDispensedQuery = rxDispensedQuery.gte('issued_at', startIso);
+    if (endIso) rxDispensedQuery = rxDispensedQuery.lte('issued_at', endIso);
 
-    // Execute ALL count queries in parallel instead of 11 sequential roundtrips
+    // 4. Laboratory Queries (Orders, Completed)
+    let labQuery = supabase.from('lab_orders').select('id', { count: 'exact', head: true });
+    if (startIso) labQuery = labQuery.gte('created_at', startIso);
+    if (endIso) labQuery = labQuery.lte('created_at', endIso);
+
+    let completedLabQuery = supabase.from('lab_orders').select('id', { count: 'exact', head: true }).eq('status', 'completed');
+    if (startIso) completedLabQuery = completedLabQuery.gte('created_at', startIso);
+    if (endIso) completedLabQuery = completedLabQuery.lte('created_at', endIso);
+
+    // 5. Citizens Queries (Total, New in Period)
+    let totalCitizensQuery = supabase.from('citizens').select('id', { count: 'exact', head: true });
+    let newCitizensQuery = supabase.from('citizens').select('id', { count: 'exact', head: true });
+    if (startIso) newCitizensQuery = newCitizensQuery.gte('created_at', startIso);
+    if (endIso) newCitizensQuery = newCitizensQuery.lte('created_at', endIso);
+
+    // 6. Inventory Queries (Active Formulary, Low Stock Items)
+    let medicinesQuery = supabase.from('medicines').select('id', { count: 'exact', head: true }).is('archived_at', null);
+    let lowStockQuery = supabase.from('medicines').select('id', { count: 'exact', head: true }).is('archived_at', null).lte('qty', 10);
+
+    // 7. System Activity & Engagement (Staff Logins, Feedback, Announcements)
+    let loginQuery = supabase.from('staff_login_logs').select('id', { count: 'exact', head: true }).eq('action', 'login');
+    if (startIso) loginQuery = loginQuery.gte('logged_at', startIso);
+    if (endIso) loginQuery = loginQuery.lte('logged_at', endIso);
+
+    let feedbackQuery = supabase.from('feedbacks').select('id', { count: 'exact', head: true });
+    if (startIso) feedbackQuery = feedbackQuery.gte('created_at', startIso);
+    if (endIso) feedbackQuery = feedbackQuery.lte('created_at', endIso);
+
+    let announcementsQuery = supabase.from('announcements').select('id', { count: 'exact', head: true });
+    if (startIso) announcementsQuery = announcementsQuery.gte('created_at', startIso);
+    if (endIso) announcementsQuery = announcementsQuery.lte('created_at', endIso);
+
+    // 8. Staff Accounts Directory
+    let staffQuery = supabase.from('staff').select('id, role, status');
+
+    // Helper functions to safely resolve Supabase Postgrest thenables without throwing
+    const safeCount = async (q) => {
+      try {
+        const res = await q;
+        return res?.count || 0;
+      } catch (err) {
+        console.warn('[Reports] Query count notice:', err?.message || err);
+        return 0;
+      }
+    };
+
+    const safeStaff = async (q) => {
+      try {
+        const res = await q;
+        return res?.data || [];
+      } catch (err) {
+        console.warn('[Reports] Staff query notice:', err?.message || err);
+        return [];
+      }
+    };
+
+    // Execute parallel telemetry fetch with resilient error handlers
     const [
-      { count: totalStaff },
-      { count: totalCitizens },
-      { count: activeStaff },
-      { count: onlineStaff },
-      { count: consultations },
-      { count: prescriptions },
-      { count: queueTickets },
-      { count: completedTickets },
-      { count: labOrders },
-      { count: announcements },
-      { count: feedbacks },
-      { count: medicines },
-      { count: schedules }
+      consultations,
+      vitals,
+      queueTickets,
+      completedTickets,
+      cancelledTickets,
+      prescriptions,
+      dispensedRx,
+      labOrders,
+      completedLabs,
+      totalCitizens,
+      newCitizens,
+      activeMeds,
+      lowStockMeds,
+      staffLogins,
+      feedbacks,
+      announcements,
+      staffList
     ] = await Promise.all([
-      supabase.from('staff').select('*', { count: 'exact', head: true }),
-      supabase.from('citizens').select('*', { count: 'exact', head: true }),
-      supabase.from('staff').select('*', { count: 'exact', head: true }).eq('status', 'Active'),
-      supabase.from('staff').select('*', { count: 'exact', head: true }).eq('is_online', true),
-      consultQuery,
-      rxQuery,
-      queueQuery,
-      completedQuery,
-      labQuery,
-      supabase.from('announcements').select('*', { count: 'exact', head: true }),
-      feedbackQuery,
-      supabase.from('medicines').select('*', { count: 'exact', head: true }).is('archived_at', null),
-      schedQuery
+      safeCount(consultQuery),
+      safeCount(vitalsQuery),
+      safeCount(queueQuery),
+      safeCount(completedQueueQuery),
+      safeCount(cancelledQueueQuery),
+      safeCount(rxQuery),
+      safeCount(rxDispensedQuery),
+      safeCount(labQuery),
+      safeCount(completedLabQuery),
+      safeCount(totalCitizensQuery),
+      safeCount(newCitizensQuery),
+      safeCount(medicinesQuery),
+      safeCount(lowStockQuery),
+      safeCount(loginQuery),
+      safeCount(feedbackQuery),
+      safeCount(announcementsQuery),
+      safeStaff(staffQuery)
     ]);
+    const queueCompletionRate = queueTickets > 0 ? `${((completedTickets / queueTickets) * 100).toFixed(1)}%` : (completedTickets > 0 ? '100.0%' : '—');
+    const rxFulfillmentRate = prescriptions > 0 ? `${((dispensedRx / prescriptions) * 100).toFixed(1)}%` : (dispensedRx > 0 ? '100.0%' : '—');
+    const labCompletionRate = labOrders > 0 ? `${((completedLabs / labOrders) * 100).toFixed(1)}%` : (completedLabs > 0 ? '100.0%' : '—');
+
+    const totalStaff = staffList.length;
+    const activeStaff = staffList.filter(s => String(s.status || '').toLowerCase() === 'active').length;
+    const activeDoctors = staffList.filter(s => String(s.status || '').toLowerCase() === 'active' && String(s.role || '').toLowerCase() === 'doctor').length;
+    const activeNurses = staffList.filter(s => String(s.status || '').toLowerCase() === 'active' && String(s.role || '').toLowerCase() === 'nurse').length;
+    const activePharmacists = staffList.filter(s => String(s.status || '').toLowerCase() === 'active' && String(s.role || '').toLowerCase() === 'pharmacist').length;
+    const activeAdmins = staffList.filter(s => String(s.status || '').toLowerCase() === 'active' && String(s.role || '').toLowerCase() === 'admin').length;
+
+    const reportMetadata = [
+      { 'Category': 'Report Info', 'Metric': 'Report Title', 'Value': 'UKonek Clinical Management & System Usage Census' },
+      { 'Category': 'Report Info', 'Metric': 'Report Generated', 'Value': formatReportDateTime(new Date()) },
+      { 'Category': 'Report Info', 'Metric': 'Date Range Start', 'Value': startDate || 'All Time' },
+      { 'Category': 'Report Info', 'Metric': 'Date Range End', 'Value': endDate || 'Present' }
+    ];
 
     const metrics = [
-      { 'Metric': 'Total Staff Accounts', 'Value': totalStaff || 0, 'Category': 'Users' },
-      { 'Metric': 'Total Citizen Accounts', 'Value': totalCitizens || 0, 'Category': 'Users' },
-      { 'Metric': 'Active Staff Accounts', 'Value': activeStaff || 0, 'Category': 'Users' },
-      { 'Metric': 'Currently Online Staff', 'Value': onlineStaff || 0, 'Category': 'Activity' },
-      { 'Metric': 'Total Consultations', 'Value': consultations || 0, 'Category': 'Clinical Activity' },
-      { 'Metric': 'Total Prescriptions', 'Value': prescriptions || 0, 'Category': 'Clinical Activity' },
-      { 'Metric': 'Total Queue Tickets', 'Value': queueTickets || 0, 'Category': 'Queue Activity' },
-      { 'Metric': 'Completed Queue Tickets', 'Value': completedTickets || 0, 'Category': 'Queue Activity' },
-      { 'Metric': 'Total Lab Orders', 'Value': labOrders || 0, 'Category': 'Clinical Activity' },
-      { 'Metric': 'Total Announcements', 'Value': announcements || 0, 'Category': 'Communication' },
-      { 'Metric': 'Total Feedbacks', 'Value': feedbacks || 0, 'Category': 'Communication' },
-      { 'Metric': 'Active Medicines in Inventory', 'Value': medicines || 0, 'Category': 'Inventory' },
-      { 'Metric': 'Doctor Schedule Slots', 'Value': schedules || 0, 'Category': 'Scheduling' }
+      // 1. Clinical Operations
+      { 'Category': 'Clinical Operations', 'Metric': 'Physician Consultations Completed', 'Value': consultations },
+      { 'Category': 'Clinical Operations', 'Metric': 'Nursing Triage & Vital Signs Intakes', 'Value': vitals },
+      { 'Category': 'Clinical Operations', 'Metric': 'Total Patient Queue Tickets', 'Value': queueTickets },
+      { 'Category': 'Clinical Operations', 'Metric': 'Completed Queue Tickets', 'Value': completedTickets },
+      { 'Category': 'Clinical Operations', 'Metric': 'Cancelled Queue Tickets', 'Value': cancelledTickets },
+      { 'Category': 'Clinical Operations', 'Metric': 'Queue Ticket Completion Rate', 'Value': queueCompletionRate },
+
+      // 2. Pharmacy & Dispensing
+      { 'Category': 'Pharmacy & Prescriptions', 'Metric': 'Prescription Medication Orders Issued', 'Value': prescriptions },
+      { 'Category': 'Pharmacy & Prescriptions', 'Metric': 'Prescriptions Dispensed (Pharmacy)', 'Value': dispensedRx },
+      { 'Category': 'Pharmacy & Prescriptions', 'Metric': 'Prescription Dispensing Rate', 'Value': rxFulfillmentRate },
+      { 'Category': 'Pharmacy & Prescriptions', 'Metric': 'Active Medicines in Inventory', 'Value': activeMeds },
+      { 'Category': 'Pharmacy & Prescriptions', 'Metric': 'Low Stock Medicines (<= 10 units)', 'Value': lowStockMeds },
+
+      // 3. Diagnostic Laboratory
+      { 'Category': 'Laboratory Services', 'Metric': 'Diagnostic Lab Orders Placed', 'Value': labOrders },
+      { 'Category': 'Laboratory Services', 'Metric': 'Diagnostic Lab Tests Completed', 'Value': completedLabs },
+      { 'Category': 'Laboratory Services', 'Metric': 'Laboratory Completion Rate', 'Value': labCompletionRate },
+
+      // 4. Patients & Citizens
+      { 'Category': 'Patients & Citizens', 'Metric': 'Total Registered Citizen Accounts', 'Value': totalCitizens },
+      { 'Category': 'Patients & Citizens', 'Metric': 'New Citizen Registrations in Period', 'Value': newCitizens },
+
+      // 5. Staff Personnel Directory
+      { 'Category': 'Staff Personnel', 'Metric': 'Total Staff Accounts', 'Value': totalStaff },
+      { 'Category': 'Staff Personnel', 'Metric': 'Active Staff Accounts', 'Value': activeStaff },
+      { 'Category': 'Staff Personnel', 'Metric': 'Active Doctors', 'Value': activeDoctors },
+      { 'Category': 'Staff Personnel', 'Metric': 'Active Nurses / Triage Staff', 'Value': activeNurses },
+      { 'Category': 'Staff Personnel', 'Metric': 'Active Pharmacists', 'Value': activePharmacists },
+      { 'Category': 'Staff Personnel', 'Metric': 'Active Administrators', 'Value': activeAdmins },
+
+      // 6. System Activity & Engagement
+      { 'Category': 'System Activity', 'Metric': 'Staff Login Sessions in Period', 'Value': staffLogins },
+      { 'Category': 'System Activity', 'Metric': 'Citizen Feedbacks Submitted', 'Value': feedbacks },
+      { 'Category': 'System Activity', 'Metric': 'Public Announcements Published', 'Value': announcements }
     ];
-    
-    // Add report metadata
-    const reportMetadata = [
-      {
-        'Metric': 'Report Generated',
-        'Value': formatReportDateTime(new Date()),
-        'Category': 'Report Info'
-      },
-      {
-        'Metric': 'Date Range Start',
-        'Value': startDate || 'All Time',
-        'Category': 'Report Info'
-      },
-      {
-        'Metric': 'Date Range End',
-        'Value': endDate || 'Present',
-        'Category': 'Report Info'
-      }
-    ];
-    
+
     const allMetrics = [...reportMetadata, ...metrics];
-    
-    const headers = ['Metric', 'Value', 'Category'];
+    const headers = ['Category', 'Metric', 'Value'];
     const csv = convertToCSV(allMetrics, headers);
     const dateRange = getDateRangeString(startDate, endDate);
     const filename = `System_Usage_Report_${dateRange}_${Date.now()}.csv`;

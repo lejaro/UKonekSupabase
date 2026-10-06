@@ -26,7 +26,6 @@ DECLARE
     'vital_signs',
     'consultations',
     'queue_tickets',
-    'appointments',
     'feedbacks',
     'staff_login_logs',
     'citizen_otps',

@@ -44,8 +44,8 @@ class _OnboardingPageState extends State<OnboardingPage>
     },
     {
       'title':       'Stay on Top of Your Health',
-      'subtitle':    'Reminders & appointments made simple.',
-      'description': 'Book visits, track check-ups, and receive reminders for your medicines.',
+      'subtitle':    'Reminders & check-ups made simple.',
+      'description': 'Join the live queue, track check-ups, and receive reminders for your medicines.',
       'icon':        Icons.notifications_active_rounded,
       'color':       const Color(0xFF7B1FA2),
       'bgColor':     const Color(0xFFF5F3FF),

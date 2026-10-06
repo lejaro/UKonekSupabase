@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/consultation.dart';
 
-/// Follow-up checkup appointment banner card displayed on the scheduler timeline.
+/// Follow-up checkup banner card displayed on the scheduler timeline.
 class FollowupCheckupCard extends StatelessWidget {
   final Consultation consultation;
 

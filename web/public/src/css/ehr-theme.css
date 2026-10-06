@@ -1178,36 +1178,6 @@ textarea:focus-visible {
     }
 }
 
-/* Status indicators for appointments */
-.appointment-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.appointment-status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-}
-
-.appointment-status-scheduled .appointment-status-dot {
-    background: #3b82f6;
-}
-
-.appointment-status-confirmed .appointment-status-dot {
-    background: #10b981;
-}
-
-.appointment-status-cancelled .appointment-status-dot {
-    background: #ef4444;
-}
-
-.appointment-status-completed .appointment-status-dot {
-    background: #6b7280;
-}
 
 /* Collapsible sections */
 .ehr-collapsible-header {

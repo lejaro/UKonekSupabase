@@ -834,9 +834,8 @@ export async function initQueueController() {
   await loadQueueTickets();
 }
 
-// Preserve backwards-compatibility endpoints
+// Preserve global helper endpoints
 if (typeof window !== 'undefined') {
-  window.appointments = { init: initQueueController, loadQueueTickets };
   window.loadQueueTickets = loadQueueTickets;
   window.openVitalAssessmentModal = openVitalAssessmentModal;
 }
