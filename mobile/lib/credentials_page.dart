@@ -50,7 +50,6 @@ class _uKonekCredentialsPageState
 
   // ── Unified Design System Palette ────────────────────────────────
   static const _primary   = Color(0xFF2D5A27); // Forest Green
-  static const _primary2  = Color(0xFF1E3D1A); // Forest Green Dark
   static const _bg        = Color(0xFFF8FAFC); // Slate Background
   static const _surface   = Colors.white;
   static const _textDark  = Color(0xFF0F172A); // Slate 900
@@ -171,8 +170,37 @@ class _uKonekCredentialsPageState
     if (_isSubmitting || !AntiSpam.allowTap()) return;
     if (!_formKey.currentState!.validate()) return;
 
-    if (passwordController.text != confirmPasswordController.text) {
+    if (!_agreedToTerms) {
+      _snackBar('You must agree to the Terms & Privacy Policy to register.', Colors.redAccent);
+      return;
+    }
+
+    final username = usernameController.text.trim();
+    final password = passwordController.text;
+    final confirmPassword = confirmPasswordController.text;
+
+    if (username.length < 4 || username.length > 30) {
+      _snackBar('Username must be between 4 and 30 characters.', Colors.redAccent);
+      return;
+    }
+
+    if (password.length < 8 || password.length > 64) {
+      _snackBar('Password must be between 8 and 64 characters.', Colors.redAccent);
+      return;
+    }
+
+    if (password.contains(' ')) {
+      _snackBar('Password cannot contain spaces.', Colors.redAccent);
+      return;
+    }
+
+    if (password != confirmPassword) {
       _snackBar('Passwords do not match. Please verify your password.', Colors.redAccent);
+      return;
+    }
+
+    if (_strengthLevel < 3) {
+      _snackBar('Password is too weak. Please include uppercase, number, and symbol.', Colors.redAccent);
       return;
     }
 
@@ -425,33 +453,33 @@ class _uKonekCredentialsPageState
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_primary, _primary2],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft:  Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-      ),
+      width: double.infinity,
+      color: _bg,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Row(children: [
             GestureDetector(
               onTap: () => Navigator.pop(context),
               child: Container(
-                width: 38, height: 38,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _fieldBdr),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                     Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white, size: 18),
+                    color: _textDark, size: 18),
               ),
             ),
             const SizedBox(width: 14),
@@ -460,7 +488,7 @@ class _uKonekCredentialsPageState
               children: [
                 Text('Set Credentials',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: _textDark,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       letterSpacing: -0.4,
@@ -468,7 +496,7 @@ class _uKonekCredentialsPageState
                 SizedBox(height: 2),
                 Text('Almost there! Create your login info.',
                     style: TextStyle(
-                        color: Colors.white70, fontSize: 12)),
+                        color: _textMuted, fontSize: 12)),
               ],
             ),
           ]),
@@ -482,19 +510,32 @@ class _uKonekCredentialsPageState
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: ctrl,
+        maxLength: 30,
+        maxLengthEnforcement: MaxLengthEnforcement.enforced,
         style: const TextStyle(fontSize: 14, color: _textDark),
         inputFormatters: [
           FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9_.]')),
           LengthLimitingTextInputFormatter(30),
         ],
         decoration: _decoration('Username', Icons.alternate_email_rounded).copyWith(
-          helperText: 'Used for clinic profile. Sign in will use your verified email.',
+          counterText: "",
+          helperText: '4–30 characters (letters, numbers, underscores, and dots).',
           helperStyle: const TextStyle(fontSize: 11, color: _textMuted),
         ),
         validator: (v) {
           final trimmed = v?.trim() ?? '';
           if (trimmed.isEmpty) return 'Username is required';
           if (trimmed.length < 4) return 'Min. 4 characters';
+          if (trimmed.length > 30) return 'Max. 30 characters';
+          if (!RegExp(r'^[a-zA-Z0-9]').hasMatch(trimmed)) {
+            return 'Must start with a letter or number';
+          }
+          if (RegExp(r'[_.]+$').hasMatch(trimmed)) {
+            return 'Cannot end with a period or underscore';
+          }
+          if (trimmed.contains('..') || trimmed.contains('__') || trimmed.contains('._') || trimmed.contains('_.')) {
+            return 'Cannot contain consecutive symbols';
+          }
           if (!RegExp(r'^[a-zA-Z0-9_.]+$').hasMatch(trimmed)) {
             return 'Only letters, numbers, underscores, and dots';
           }
@@ -504,20 +545,28 @@ class _uKonekCredentialsPageState
     );
   }
 
-
   Widget _passwordField(String label,
       TextEditingController ctrl, bool obscure,
       VoidCallback toggle, {bool isConfirm = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
-        controller:  ctrl,
+        controller: ctrl,
         obscureText: obscure,
-        onChanged:   (_) => setState(() {}),
+        maxLength: 64,
+        maxLengthEnforcement: MaxLengthEnforcement.enforced,
+        inputFormatters: [
+          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+          LengthLimitingTextInputFormatter(64),
+        ],
+        onChanged: (_) => setState(() {}),
         style: const TextStyle(
             fontSize: 14, color: _textDark),
         decoration: _decoration(label,
             Icons.lock_outline_rounded).copyWith(
+          counterText: "",
+          helperText: isConfirm ? null : '8–64 characters with uppercase, number, & symbol.',
+          helperStyle: const TextStyle(fontSize: 11, color: _textMuted),
           suffixIcon: IconButton(
             icon: Icon(
               obscure
@@ -532,6 +581,12 @@ class _uKonekCredentialsPageState
         validator: (v) {
           if (v == null || v.isEmpty) {
             return isConfirm ? 'Please confirm your password' : 'Password is required';
+          }
+          if (v.length > 64) {
+            return 'Maximum 64 characters';
+          }
+          if (v.contains(' ')) {
+            return 'Password cannot contain spaces';
           }
           if (isConfirm) {
             if (v != passwordController.text) {

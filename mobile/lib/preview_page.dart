@@ -34,7 +34,6 @@ class uKonekPreviewPage extends StatelessWidget {
   static const _textDark  = Color(0xFF0F172A); // Slate 900
   static const _textMuted = Color(0xFF64748B); // Slate 500
   static const _divider   = Color(0xFFE2E8F0); // Slate Divider
-  static const _success   = Color(0xFF10B981);
 
   @override
   Widget build(BuildContext context) {
@@ -86,36 +85,36 @@ class uKonekPreviewPage extends StatelessWidget {
     );
   }
 
-  // ── Header (Green Gradient) ───────────────────────────────────
+  // ── Header ───────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_primary, _primary2], // Updated to Green Gradient[cite: 1]
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft:  Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-      ),
+      width: double.infinity,
+      color: _bg,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Row(children: [
             GestureDetector(
               onTap: () => Navigator.pop(context),
               child: Container(
-                width: 38, height: 38,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _divider),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                     Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white, size: 18),
+                    color: _textDark, size: 18),
               ),
             ),
             const SizedBox(width: 14),
@@ -124,7 +123,7 @@ class uKonekPreviewPage extends StatelessWidget {
               children: [
                 Text('Review Details',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: _textDark,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       letterSpacing: -0.4,
@@ -132,7 +131,7 @@ class uKonekPreviewPage extends StatelessWidget {
                 SizedBox(height: 2),
                 Text('Confirm your info before submitting',
                     style: TextStyle(
-                        color: Colors.white70, fontSize: 12)),
+                        color: _textMuted, fontSize: 12)),
               ],
             ),
           ]),
@@ -291,23 +290,24 @@ class uKonekPreviewPage extends StatelessWidget {
           Navigator.push(
             context,
             AppPageRoute.slideRight(
-            uKonekOtpPage(
-              firstName:        firstName,
-              middleName:       middleName,
-              surname:          surname,
-              nameExtension:    nameExtension,
-              dob:              dob,
-              age:              age,
-              contact:          contact,
-              sex:              sex,
-              email:            email,
-              address:          address,
-              emergencyName:    emergencyName,
-              emergencyContact: emergencyContact,
-              relation:         relation,
+              uKonekOtpPage(
+                firstName:        firstName,
+                middleName:       middleName,
+                surname:          surname,
+                nameExtension:    nameExtension,
+                dob:              dob,
+                age:              age,
+                contact:          contact,
+                sex:              sex,
+                email:            email,
+                address:          address,
+                emergencyName:    emergencyName,
+                emergencyContact: emergencyContact,
+                relation:         relation,
+              ),
             ),
-          ),
-        ),
+          );
+        },
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

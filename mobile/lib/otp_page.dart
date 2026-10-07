@@ -44,7 +44,6 @@ class uKonekOtpPage extends StatefulWidget {
 class _uKonekOtpPageState extends State<uKonekOtpPage> {
   // ── Unified Design System Tokens ───────────────────────────────
   static const _primary   = Color(0xFF2D5A27); // Forest Green
-  static const _primary2  = Color(0xFF1E3D1A); // Forest Green Dark
   static const _bg        = Color(0xFFF8FAFC); // Slate Background
   static const _fieldBg   = Color(0xFFF8FAFC);
   static const _surface   = Colors.white;
@@ -298,34 +297,40 @@ class _uKonekOtpPageState extends State<uKonekOtpPage> {
 
   Widget _buildHeader() {
     return Container(
-      height: 160,
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_primary, _primary2],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(40),
-          bottomRight: Radius.circular(40),
-        ),
-      ),
-      child: const SafeArea(
-        child: Center(
+      color: _bg,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.mark_email_read_outlined,
-                  color: Colors.white, size: 36),
-              SizedBox(height: 12),
-              Text(
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _divider),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.mark_email_read_outlined,
+                    color: _primary, size: 28),
+              ),
+              const SizedBox(height: 12),
+              const Text(
                 "EMAIL VERIFICATION",
                 style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
+                  color: _textDark,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+                  letterSpacing: 1.1,
                 ),
               ),
             ],

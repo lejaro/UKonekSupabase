@@ -84,6 +84,9 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
       uKonekMedicineSchedulerPage(
         username: widget.username,
         citizenId: widget.citizenId,
+        nickname: widget.fullname.trim().split(RegExp(r'\s+')).first.isNotEmpty
+            ? widget.fullname.trim().split(RegExp(r'\s+')).first
+            : null,
         isEmbeddedInShell: true,
       ),
       uKonekJoinQueuePage(

@@ -141,17 +141,11 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: _C.primary,
-        borderRadius: BorderRadius.only(
-          bottomLeft:  Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-      ),
+      color: _C.bg,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
           child: Column(children: [
             Row(children: [
               GestureDetector(
@@ -160,14 +154,23 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
                   Navigator.pop(context);
                 },
                 child: Container(
-                  width: 38, height: 38,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _C.fieldBdr),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: const Icon(
                       Icons.arrow_back_ios_new_rounded,
-                      color: Colors.white, size: 18),
+                      color: _C.textDark, size: 18),
                 ),
               ),
               const SizedBox(width: 14),
@@ -176,7 +179,7 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
                 children: [
                   Text('Clinical Records',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: _C.textDark,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         letterSpacing: -0.4,
@@ -184,7 +187,7 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
                   SizedBox(height: 2),
                   Text('Your medical history & vitals',
                       style: TextStyle(
-                          color: Colors.white70, fontSize: 12)),
+                          color: _C.textMuted, fontSize: 12)),
                 ],
               )),
               GestureDetector(
@@ -193,12 +196,21 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
                   _loadRecords();
                 },
                 child: Container(
-                  width: 38, height: 38,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _C.fieldBdr),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                  child: const Icon(Icons.refresh_rounded, color: _C.primary, size: 20),
                 ),
               ),
             ]),
@@ -216,10 +228,11 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _C.fieldBdr),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],

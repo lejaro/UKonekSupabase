@@ -41,7 +41,6 @@ class _uKonekRegisterWrapperState
   String    selectedSex  = '';
 
   static const _primary   = Color(0xFF059669); // Emerald 600
-  static const _primary2  = Color(0xFF064E3B); // Forest Emerald 900
   static const _bg        = Color(0xFFF8FAFC); // Slate Background
   static const _surface   = Colors.white;
   static const _textDark  = Color(0xFF0F172A); // Slate 900
@@ -236,20 +235,14 @@ class _uKonekRegisterWrapperState
     );
   }
 
-  // ── Header (Green Gradient) ──────────────────────────────────
+  // ── Header ──────────────────────────────────────────────────
   Widget _buildHeader() {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_primary, _primary2], // Updated to Green[cite: 1]
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
+      color: _bg,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
           child: Row(children: [
             GestureDetector(
               onTap: () {
@@ -263,14 +256,23 @@ class _uKonekRegisterWrapperState
                 }
               },
               child: Container(
-                width: 38, height: 38,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _divider),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                     Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white, size: 18),
+                    color: _textDark, size: 18),
               ),
             ),
             const SizedBox(width: 14),
@@ -279,7 +281,7 @@ class _uKonekRegisterWrapperState
               children: [
                 Text('Create Account',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: _textDark,
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                       letterSpacing: -0.3,
@@ -287,7 +289,7 @@ class _uKonekRegisterWrapperState
                 SizedBox(height: 2),
                 Text('Fill in your information below',
                     style: TextStyle(
-                        color: Colors.white70, fontSize: 12)),
+                        color: _textMuted, fontSize: 12)),
               ],
             )),
           ]),

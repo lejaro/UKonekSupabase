@@ -173,7 +173,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
+        statusBarIconBrightness: Brightness.dark,
       ),
     );
   }
@@ -642,7 +642,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEAF7EA),
+      backgroundColor: _C.bg,
       body: Column(
         children: [
           _buildHeader(),
@@ -692,7 +692,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 
     return Container(
       width: double.infinity,
-      color: const Color(0xFFEAF7EA),
+      color: _C.bg,
       child: SafeArea(
         bottom: false,
         child: Padding(
@@ -1557,7 +1557,13 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
             Navigator.push(
               context,
               AppPageRoute.slideRight(
-                uKonekMedicineSchedulerPage(username: widget.username, citizenId: widget.citizenId),
+                uKonekMedicineSchedulerPage(
+                  username: widget.username,
+                  citizenId: widget.citizenId,
+                  nickname: widget.fullname.trim().split(RegExp(r'\s+')).first.isNotEmpty
+                      ? widget.fullname.trim().split(RegExp(r'\s+')).first
+                      : null,
+                ),
               ),
             );
           }
@@ -1570,9 +1576,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
       },
     ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
+    return _FadingHorizontalScrollView(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: actions.map((item) {
@@ -1623,7 +1627,6 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
       ),
     );
   }
-
   // ── Promo Banner (Swipable PageView & Supports Photos / Announcements) ──
   Widget _buildPromoBanner({String? imageUrl, List<Announcement>? announcements}) {
     final activeList = announcements ?? _announcements;
@@ -2351,6 +2354,9 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                           uKonekMedicineSchedulerPage(
                             username: widget.username,
                             citizenId: widget.citizenId,
+                            nickname: widget.fullname.trim().split(RegExp(r'\s+')).first.isNotEmpty
+                                ? widget.fullname.trim().split(RegExp(r'\s+')).first
+                                : null,
                           ),
                         ));
                       },
@@ -2468,4 +2474,80 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   }
 
   String _queueNumberText(int? n) => (n == null || n <= 0) ? '--' : '#${n.toString().padLeft(3, '0')}';
+}
+
+/// Horizontal scroll view that dynamically applies a fade gradient mask to edges
+/// when scrollable content extends to the left and/or right.
+class _FadingHorizontalScrollView extends StatefulWidget {
+  final Widget child;
+  const _FadingHorizontalScrollView({required this.child});
+
+  @override
+  State<_FadingHorizontalScrollView> createState() => _FadingHorizontalScrollViewState();
+}
+
+class _FadingHorizontalScrollViewState extends State<_FadingHorizontalScrollView> {
+  final ScrollController _controller = ScrollController();
+  bool _canScrollLeft = false;
+  bool _canScrollRight = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_updateScrollIndicators);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+  }
+
+  void _updateScrollIndicators() {
+    if (!mounted || !_controller.hasClients) return;
+    final maxScroll = _controller.position.maxScrollExtent;
+    final current = _controller.offset;
+    final canLeft = current > 4;
+    final canRight = current < (maxScroll - 4);
+    if (canLeft != _canScrollLeft || canRight != _canScrollRight) {
+      setState(() {
+        _canScrollLeft = canLeft;
+        _canScrollRight = canRight;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_updateScrollIndicators);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      shaderCallback: (Rect bounds) {
+        return LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            _canScrollLeft ? Colors.transparent : Colors.white,
+            Colors.white,
+            Colors.white,
+            _canScrollRight ? Colors.transparent : Colors.white,
+          ],
+          stops: [
+            0.0,
+            _canScrollLeft ? 0.08 : 0.0,
+            _canScrollRight ? 0.92 : 1.0,
+            1.0,
+          ],
+        ).createShader(bounds);
+      },
+      blendMode: BlendMode.dstIn,
+      child: SingleChildScrollView(
+        controller: _controller,
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: widget.child,
+      ),
+    );
+  }
 }

@@ -113,32 +113,31 @@ class _uKonekFeedbackPageState extends State<uKonekFeedbackPage> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_C.primary, _C.primaryMid],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-      ),
+      color: _C.bg,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Row(
             children: [
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Container(
-                  width: 38, height: 38,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _C.fieldBdr),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded, color: _C.textDark, size: 18),
                 ),
               ),
               const SizedBox(width: 14),
@@ -147,9 +146,9 @@ class _uKonekFeedbackPageState extends State<uKonekFeedbackPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Patient Feedback',
-                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: -0.4)),
+                        style: TextStyle(color: _C.textDark, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: -0.4)),
                     SizedBox(height: 2),
-                    Text('Share your clinic experience', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    Text('Share your clinic experience', style: TextStyle(color: _C.textMuted, fontSize: 12)),
                   ],
                 ),
               ),

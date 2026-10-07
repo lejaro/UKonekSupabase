@@ -42,6 +42,25 @@ class PatientSession {
     );
   }
 
+  /// Returns the patient's preferred nickname, first name, or display moniker.
+  String get nickname {
+    final rawNick = (rawProfile['nickname'] as String?)?.trim();
+    if (rawNick != null && rawNick.isNotEmpty) return rawNick;
+
+    final first = (rawProfile['firstname'] as String?)?.trim() ??
+        (rawProfile['first_name'] as String?)?.trim() ??
+        '';
+    if (first.isNotEmpty) return first.split(' ').first;
+
+    final nameParts = fullname.trim().split(RegExp(r'\s+'));
+    if (nameParts.isNotEmpty && nameParts.first.isNotEmpty) {
+      return nameParts.first;
+    }
+
+    if (username.isNotEmpty) return username.split(' ').first;
+    return 'Patient';
+  }
+
   PatientSession copyWith({
     String? id,
     String? username,
@@ -74,6 +93,7 @@ class PatientSessionState {
   static String get username => session?.username ?? '';
   static String get citizenId => session?.id ?? '';
   static String get fullname => session?.fullname ?? '';
+  static String get nickname => session?.nickname ?? '';
   static String get email => session?.email ?? '';
   static String get phone => session?.phone ?? '';
   static String get address => session?.address ?? '';

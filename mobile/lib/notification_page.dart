@@ -294,32 +294,31 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_C.primary, _C.primaryMid],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-      ),
+      color: _C.bg,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Row(
             children: [
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Container(
-                  width: 38, height: 38,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _C.fieldBdr),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded, color: _C.textDark, size: 18),
                 ),
               ),
               const SizedBox(width: 14),
@@ -328,10 +327,10 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text('Notifications',
-                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: -0.4)),
+                        style: TextStyle(color: _C.textDark, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: -0.4)),
                     const SizedBox(height: 2),
                     Text('${_notifications.length} announcement${_notifications.length != 1 ? 's' : ''}', 
-                        style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        style: const TextStyle(color: _C.textMuted, fontSize: 12)),
                   ],
                 ),
               ),
@@ -341,12 +340,20 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _C.fieldBdr),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: const Text(
                       'Clear All',
-                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: _C.primary, fontSize: 12, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),

@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'utils/app_transitions.dart';
 
 import 'core/theme/app_colors.dart';
+import 'core/session/patient_session.dart';
 import 'widgets/scheduler/scheduler_date_strip.dart';
 import 'widgets/scheduler/late_intake_sheet.dart';
 import 'widgets/scheduler/adherence_progress_card.dart';
@@ -23,6 +24,7 @@ typedef uKonekMedicineSchedulerPage = MedicineSchedulerPage;
 class MedicineSchedulerPage extends StatefulWidget {
   final String username;
   final String citizenId;
+  final String? nickname;
 
   final bool isEmbeddedInShell;
 
@@ -30,6 +32,7 @@ class MedicineSchedulerPage extends StatefulWidget {
     super.key,
     required this.username,
     required this.citizenId,
+    this.nickname,
     this.isEmbeddedInShell = false,
   });
 
@@ -60,13 +63,60 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
   DateTime _selectedDate = DateTime.now();
   final Map<int, String> _persistedStartTimes = {};
   final ScrollController _dateScrollController = ScrollController();
+  late String _patientNickname;
+
+  String _computeNickname() {
+    final sessionNick = PatientSessionState.nickname.trim();
+    if (sessionNick.isNotEmpty && sessionNick != 'Patient') {
+      return sessionNick;
+    }
+    final session = PatientSessionState.session;
+    if (session != null) {
+      if (session.fullname.trim().isNotEmpty) {
+        final first = session.fullname.trim().split(RegExp(r'\s+')).first;
+        if (first.isNotEmpty) return first;
+      }
+      if (session.username.trim().isNotEmpty) {
+        final first = session.username.trim().split(RegExp(r'\s+')).first;
+        if (first.isNotEmpty) return first;
+      }
+    }
+    if (widget.nickname != null && widget.nickname!.trim().isNotEmpty) {
+      final first = widget.nickname!.trim().split(RegExp(r'\s+')).first;
+      if (first.isNotEmpty) return first;
+    }
+    if (widget.username.trim().isNotEmpty) {
+      final first = widget.username.trim().split(RegExp(r'\s+')).first;
+      if (first.isNotEmpty) return first;
+    }
+    return 'Patient';
+  }
+
+  void _onSessionStateChanged() {
+    if (mounted) {
+      final fresh = _computeNickname();
+      if (fresh != _patientNickname) {
+        setState(() => _patientNickname = fresh);
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _patientNickname = _computeNickname();
+    PatientSessionState.current.addListener(_onSessionStateChanged);
     WidgetsBinding.instance.addObserver(this);
     _load();
     _checkPermissions();
+  }
+
+  @override
+  void didUpdateWidget(covariant MedicineSchedulerPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.username != widget.username || oldWidget.nickname != widget.nickname) {
+      _patientNickname = _computeNickname();
+    }
   }
 
   @override
@@ -169,6 +219,20 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
     try {
       MedicineCacheService.syncPendingIntakeLogs();
       final citizenIntId = int.tryParse(widget.citizenId);
+
+      // Resilient isolated fetch for latest citizen profile to guarantee fresh nickname
+      ApiService.fetchMyCitizenProfile(force: forceRefresh).then((profile) {
+        final session = PatientSession.fromProfile(profile);
+        PatientSessionState.setSession(session);
+        if (mounted) {
+          final freshNick = _computeNickname();
+          if (freshNick != _patientNickname) {
+            setState(() => _patientNickname = freshNick);
+          }
+        }
+      }).catchError((e) {
+        debugPrint('MedicineScheduler: Non-critical citizen profile fetch error: $e');
+      });
 
       // Resilient isolated fetches: a failure in one call does NOT break the schedule
       final remoteMeds = await ApiService.getMedicineSchedule(citizenId: citizenIntId).catchError((e) {
@@ -949,6 +1013,7 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
 
   @override
   void dispose() {
+    PatientSessionState.current.removeListener(_onSessionStateChanged);
     WidgetsBinding.instance.removeObserver(this);
     _dateScrollController.dispose();
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -1195,7 +1260,7 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(isToday 
-                  ? "${_getGreeting()}, ${widget.username.split(' ')[0]} 👋"
+                  ? "${_getGreeting()}, $_patientNickname 👋"
                   : DateFormat('EEEE, MMM d, yyyy').format(_selectedDate),
                   style: TextStyle(fontSize: isToday ? 24 : 20, fontWeight: FontWeight.w900, color: _textDark)),
               const SizedBox(height: 4),
@@ -1622,7 +1687,12 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
               const SizedBox(height: 12),
               const Text('PATIENT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _primary, letterSpacing: 1.2)),
               const SizedBox(height: 6),
-              Text(widget.username, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _textDark)),
+              Text(
+                (PatientSessionState.session?.fullname.isNotEmpty == true)
+                    ? PatientSessionState.session!.fullname
+                    : widget.username,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _textDark),
+              ),
               Text('ID: ${widget.citizenId}', style: const TextStyle(fontSize: 12, color: _textMuted)),
               const SizedBox(height: 4),
               Text('Prescribed by: ${med.displayDoctorName}',
@@ -1751,9 +1821,12 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
                       uKonekProfilePage(
                         username:  widget.username,
                         citizenId: widget.citizenId,
-                        fullName:  widget.username,
+                        fullName:  (PatientSessionState.session?.fullname.isNotEmpty == true)
+                            ? PatientSessionState.session!.fullname
+                            : widget.username,
                       ),
                     )).then((_) {
+                      _load(forceRefresh: true);
                       if (mounted) setState(() => _selectedTab = 1);
                     });
                   }

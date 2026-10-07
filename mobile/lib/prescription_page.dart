@@ -267,17 +267,12 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
   // ── Header ─────────────────────────────────────────────────────
   Widget _buildHeader() {
     return Container(
-      decoration: const BoxDecoration(
-        color: _C.primary,
-        borderRadius: BorderRadius.only(
-          bottomLeft:  Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-      ),
+      width: double.infinity,
+      color: _C.bg,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
           child: Column(
             children: [
               Row(children: [
@@ -286,20 +281,28 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                   child: Container(
                     width: 38, height: 38,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _C.fieldBdr),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                    child: const Icon(Icons.arrow_back_ios_new_rounded, color: _C.textDark, size: 18),
                   ),
                 ),
                 const SizedBox(width: 14),
                 const Expanded(child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Pharmacy Records', style: TextStyle(color: Colors.white, fontSize: 20,
+                    Text('Pharmacy Records', style: TextStyle(color: _C.textDark, fontSize: 20,
                         fontWeight: FontWeight.bold, letterSpacing: -0.4)),
                     SizedBox(height: 2),
-                    Text('Prescriptions & Purchase Dispense Logs', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    Text('Prescriptions & Purchase Dispense Logs', style: TextStyle(color: _C.textMuted, fontSize: 12)),
                   ],
                 )),
                 Semantics(
@@ -310,8 +313,16 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                     child: Container(
                       width: 38, height: 38,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _C.fieldBdr),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: _refreshing
                           ? const SizedBox(
@@ -319,10 +330,10 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                               height: 19,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: _C.primary,
                               ),
                             )
-                          : const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
+                          : const Icon(Icons.refresh_rounded, color: _C.primary, size: 22),
                     ),
                   ),
                 ),
@@ -334,7 +345,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                 height: 44,
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.15),
+                  color: const Color(0xFFE2E8F0),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
@@ -348,7 +359,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                             color: _mainTab == 0 ? Colors.white : Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
                             boxShadow: _mainTab == 0
-                                ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))]
+                                ? [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4, offset: const Offset(0, 2))]
                                 : [],
                           ),
                           alignment: Alignment.center,
@@ -357,14 +368,14 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                             children: [
                               Icon(Icons.receipt_long_rounded,
                                   size: 16,
-                                  color: _mainTab == 0 ? _C.primary : Colors.white70),
+                                  color: _mainTab == 0 ? _C.primary : _C.textMuted),
                               const SizedBox(width: 6),
                               Text(
                                 'Prescriptions (${_groups.length})',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: _mainTab == 0 ? FontWeight.w700 : FontWeight.w500,
-                                  color: _mainTab == 0 ? _C.primary : Colors.white,
+                                  color: _mainTab == 0 ? _C.primary : _C.textMuted,
                                 ),
                               ),
                             ],
@@ -381,7 +392,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                             color: _mainTab == 1 ? Colors.white : Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
                             boxShadow: _mainTab == 1
-                                ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))]
+                                ? [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4, offset: const Offset(0, 2))]
                                 : [],
                           ),
                           alignment: Alignment.center,
@@ -390,14 +401,14 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                             children: [
                               Icon(Icons.history_edu_rounded,
                                   size: 16,
-                                  color: _mainTab == 1 ? _C.primary : Colors.white70),
+                                  color: _mainTab == 1 ? _C.primary : _C.textMuted),
                               const SizedBox(width: 6),
                               Text(
                                 'Purchase Logs (${_dispenseLogs.length})',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: _mainTab == 1 ? FontWeight.w700 : FontWeight.w500,
-                                  color: _mainTab == 1 ? _C.primary : Colors.white,
+                                  color: _mainTab == 1 ? _C.primary : _C.textMuted,
                                 ),
                               ),
                             ],

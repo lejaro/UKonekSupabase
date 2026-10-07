@@ -550,28 +550,36 @@ class _JoinQueuePageState extends State<JoinQueuePage>
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: [_C.primary, _C.primaryMid], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(32), bottomRight: Radius.circular(32)),
-      ),
+      color: _C.bg,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 20, 28),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
           child: Row(children: [
             const Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Queue Tracker', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: -0.3)),
-                SizedBox(height: 2),
-                Text('AFM Roquero Medical Clinic', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                Text('Queue Tracker', style: TextStyle(color: _C.textDark, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.4)),
+                SizedBox(height: 3),
+                Text('AFM Roquero Medical Clinic', style: TextStyle(color: _C.textMuted, fontSize: 13)),
               ]),
             ),
             GestureDetector(
               onTap: _refreshDashboard,
               child: Container(
                 width: 40, height: 40,
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(13), border: Border.all(color: Colors.white.withOpacity(0.25))),
-                child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(color: _C.fieldBdr),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.refresh_rounded, color: _C.primary, size: 20),
               ),
             ),
           ]),

@@ -22,7 +22,6 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
 
   // ── Unified Design System Tokens ───────────────────────────────
   static const _primary      = Color(0xFF2D5A27); // Forest Green
-  static const _primary2     = Color(0xFF1E3D1A); // Forest Green Dark
   static const _bg           = Color(0xFFF8FAFC); // Slate Background
   static const _textDark     = Color(0xFF0F172A); // Slate 900
   static const _textMuted    = Color(0xFF64748B); // Slate 500
@@ -91,31 +90,34 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
       backgroundColor: _bg, // Updated mint background
       body: Column(
         children: [
-          // ── Header (Green Gradient) ─────────────────────────
+          // ── Header ──────────────────────────────────────────
           Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                  colors: [_primary, _primary2], // Updated Green Gradient
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight),
-              borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(32),
-                  bottomRight: Radius.circular(32)),
-            ),
+            width: double.infinity,
+            color: _bg,
             child: SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
                 child: Row(children: [
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
-                      width: 38, height: 38,
+                      width: 38,
+                      height: 38,
                       decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.18),
-                          borderRadius: BorderRadius.circular(12)),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _fieldBdr),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
                       child: const Icon(Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white, size: 18),
+                          color: _textDark, size: 18),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -123,9 +125,10 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
                     Text(
                       _emailSent ? "Check Your Email" : "Forgot Password",
                       style: const TextStyle(
-                          color: Colors.white,
+                          color: _textDark,
                           fontSize: 20,
-                          fontWeight: FontWeight.bold),
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.4),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -133,7 +136,7 @@ class _uKonekForgotPasswordPageState extends State<uKonekForgotPasswordPage>
                           ? "We've sent a password reset link"
                           : "We'll send a reset link to your email",
                       style: const TextStyle(
-                          color: Colors.white70, fontSize: 12),
+                          color: _textMuted, fontSize: 12),
                     ),
                   ]),
                 ]),

@@ -11,6 +11,7 @@ import 'utils/app_transitions.dart';
 import 'utils/anti_spam.dart';
 
 import 'core/theme/app_colors.dart';
+import 'core/session/patient_session.dart';
 
 typedef _C = AppColors;
 
@@ -97,6 +98,9 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
     setState(() => _loading = true);
     try {
       final p = await ApiService.fetchMyCitizenProfile();
+      try {
+        PatientSessionState.setSession(PatientSession.fromProfile(p));
+      } catch (_) {}
       setState(() {
         _firstName        = p['firstname'] ?? '';
         _surname          = p['surname'] ?? '';
@@ -357,22 +361,20 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
   // ── Header ───────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: [_C.primary, _C.primaryMid], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(32), bottomRight: Radius.circular(32)),
-      ),
+      width: double.infinity,
+      color: _C.bg,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
           child: Row(children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Citizen Profile', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 2),
-                  Text(widget.username, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  const Text('Citizen Profile', style: TextStyle(color: _C.textDark, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.4)),
+                  const SizedBox(height: 3),
+                  Text(widget.username, style: const TextStyle(color: _C.textMuted, fontSize: 13)),
                 ],
               ),
             ),
@@ -755,6 +757,10 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
                         }
                         try {
                           await ApiService.updateMyCitizenProfile(updatedData);
+                          try {
+                            final fresh = await ApiService.fetchMyCitizenProfile(force: true);
+                            PatientSessionState.setSession(PatientSession.fromProfile(fresh));
+                          } catch (_) {}
                           if (mounted) {
                             setState(() {
                               for (final f in fields) {
@@ -1040,8 +1046,15 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
     return TextFormField(
       controller: ctrl,
       obscureText: !show,
+      maxLength: 64,
+      maxLengthEnforcement: MaxLengthEnforcement.enforced,
+      inputFormatters: [
+        FilteringTextInputFormatter.deny(RegExp(r'\s')),
+        LengthLimitingTextInputFormatter(64),
+      ],
       style: const TextStyle(fontSize: 14, color: _C.textDark),
       decoration: InputDecoration(
+        counterText: "",
         labelText: label,
         labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
         filled: true, fillColor: _C.fieldBg,

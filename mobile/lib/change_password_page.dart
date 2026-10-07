@@ -107,29 +107,32 @@ class _uKonekChangePasswordPageState
       backgroundColor: _bg,
       body: Column(
         children: [
-          // ── Header (Green Gradient) ─────────────────────────
+          // ── Header ──────────────────────────────────────────
           Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                  colors: [_primary, _primary2],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight),
-              borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(32),
-                  bottomRight: Radius.circular(32)),
-            ),
+            width: double.infinity,
+            color: _bg,
             child: SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
                 child: Row(children: [
                   Container(
-                    width: 38, height: 38,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(12)),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _fieldBdr),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
                     child: const Icon(Icons.lock_reset_rounded,
-                        color: Colors.white, size: 20),
+                        color: _primary, size: 20),
                   ),
                   const SizedBox(width: 14),
                   const Column(
@@ -137,13 +140,14 @@ class _uKonekChangePasswordPageState
                       children: [
                         Text("Reset Password",
                             style: TextStyle(
-                                color: Colors.white,
+                                color: _textDark,
                                 fontSize: 20,
-                                fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 2),
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.4)),
+                        SizedBox(height: 2),
                         Text("Create a strong new password",
                             style: TextStyle(
-                                color: Colors.white70, fontSize: 12)),
+                                color: _textMuted, fontSize: 12)),
                       ]),
                 ]),
               ),

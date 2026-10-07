@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'services/api_service.dart';
 import 'main_shell_page.dart';
@@ -222,66 +223,69 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
     return Scaffold(
       backgroundColor: _bg,
-      body: Stack(
-        children: [
-          Container(
-            height: size.height * 0.42,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(colors: [_primary, _primary2], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: SlideTransition(
+            position: _slideAnim,
+            child: SingleChildScrollView(
+              child: Column(children: [
+                _buildHeaderSection(),
+                _buildLoginCard(),
+                const SizedBox(height: 40),
+              ]),
             ),
           ),
-          SafeArea(
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: SlideTransition(
-                position: _slideAnim,
-                child: SingleChildScrollView(
-                  child: Column(children: [
-                    _buildHeaderSection(),
-                    _buildLoginCard(),
-                    const SizedBox(height: 40),
-                  ]),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildHeaderSection() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 28, 28, 0),
+      padding: const EdgeInsets.fromLTRB(28, 20, 28, 0),
       child: Column(children: [
         Row(children: [
           GestureDetector(
             onTap: () => Navigator.pushAndRemoveUntil(context, AppPageRoute.fadeThrough(const uKonekMenuPage()), (route) => false),
             child: Container(
-              width: 38, height: 38,
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(12)),
-              child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _fieldBdr),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.arrow_back_ios_new_rounded, color: _textDark, size: 18),
             ),
           ),
         ]),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         Container(
-          width: 70, height: 70,
+          width: 70,
+          height: 70,
           decoration: BoxDecoration(
             color: Colors.white,
             shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 8))],
+            border: Border.all(color: _fieldBdr),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 6))],
           ),
           child: const Icon(Icons.health_and_safety_rounded, color: _primary, size: 34),
         ),
         const SizedBox(height: 14),
-        const Text('Welcome Back', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+        const Text('Welcome Back', style: TextStyle(color: _textDark, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: -0.4)),
         const SizedBox(height: 4),
-        const Text('Sign in to your U-Konek+ account', style: TextStyle(color: Colors.white70, fontSize: 13)),
-        const SizedBox(height: 36),
+        const Text('Sign in to your U-Konek+ account', style: TextStyle(color: _textMuted, fontSize: 13)),
+        const SizedBox(height: 28),
       ]),
     );
   }
@@ -466,14 +470,22 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
     Widget? suffixIcon,
     required String? Function(String?) validator,
   }) {
+    final limit = obscure ? 64 : 100;
     return TextFormField(
-      controller:  controller,
+      controller: controller,
       obscureText: obscure,
-      enabled:     enabled,
-      validator:   validator,
+      enabled: enabled,
+      maxLength: limit,
+      maxLengthEnforcement: MaxLengthEnforcement.enforced,
+      inputFormatters: [
+        if (obscure) FilteringTextInputFormatter.deny(RegExp(r'\s')),
+        LengthLimitingTextInputFormatter(limit),
+      ],
+      validator: validator,
       style: const TextStyle(fontSize: 14, color: _textDark),
       decoration: InputDecoration(
-        labelText:  label,
+        counterText: "",
+        labelText: label,
         labelStyle: const TextStyle(fontSize: 13, color: _textMuted),
         prefixIcon: Icon(icon, color: _primary.withOpacity(0.6), size: 20),
         suffixIcon: suffixIcon,

@@ -66,7 +66,7 @@ class uKonekContactStep extends StatelessWidget {
               children: [
                 _phoneField(contact, 'Mobile Number'),
                 _inputField(email, 'Email Address', Icons.email_outlined,
-                    isEmail: true),
+                    isEmail: true, maxLength: 100),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 4),
                   child: Divider(color: _fieldBdr),
@@ -75,9 +75,13 @@ class uKonekContactStep extends StatelessWidget {
                 const SizedBox(height: 12),
                 _inputField(
                     houseNumber, 'House / Bldg No. (Optional)', Icons.home_outlined,
-                    isRequired: false),
+                    isRequired: false,
+                    maxLength: 30,
+                    formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z0-9\s\-#/.,]"))]),
                 _inputField(
-                    street, 'Street Name / Purok', Icons.signpost_outlined),
+                    street, 'Street Name / Purok', Icons.signpost_outlined,
+                    maxLength: 100,
+                    formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z0-9\s\-#/.,']"))]),
                 _barangayDropdown(), // Integrated Valenzuela Barangay Dropdown[cite: 1]
               ],
             ),
@@ -88,7 +92,9 @@ class uKonekContactStep extends StatelessWidget {
               icon: Icons.emergency_share_outlined,
               title: 'Emergency Contact',
               children: [
-                _inputField(eName, 'Full Name', Icons.person_add_alt_1_outlined),
+                _inputField(eName, 'Full Name', Icons.person_add_alt_1_outlined,
+                    maxLength: 80,
+                    formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s\-'.]"))]),
                 _phoneField(
                   eContact, 
                   'Emergency Number',
@@ -177,6 +183,7 @@ class uKonekContactStep extends StatelessWidget {
         keyboardType: TextInputType.phone,
         inputFormatters: [
           _PhilippinePhoneFormatter(),
+          LengthLimitingTextInputFormatter(10),
         ],
         style: const TextStyle(
           fontSize: 14,
@@ -229,20 +236,40 @@ class uKonekContactStep extends StatelessWidget {
   }
 
   Widget _inputField(TextEditingController ctrl, String label, IconData icon,
-      {bool isEmail = false, bool enabled = true, bool isRequired = true}) {
+      {bool isEmail = false, bool enabled = true, bool isRequired = true, int maxLength = 100, List<TextInputFormatter>? formatters}) {
+    final effectiveFormatters = <TextInputFormatter>[
+      if (formatters != null) ...formatters,
+      if (isEmail) FilteringTextInputFormatter.deny(RegExp(r'\s')),
+      LengthLimitingTextInputFormatter(maxLength),
+    ];
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: ctrl,
         enabled: enabled,
+        maxLength: maxLength,
+        maxLengthEnforcement: MaxLengthEnforcement.enforced,
+        inputFormatters: effectiveFormatters,
+        keyboardType: isEmail ? TextInputType.emailAddress : TextInputType.text,
         style: TextStyle(
             fontSize: 14, color: enabled ? _textDark : _textMuted),
-        decoration: _decoration(label, icon),
+        decoration: _decoration(label, icon).copyWith(
+          counterText: "",
+        ),
         validator: (v) {
           final trimmed = v?.trim() ?? '';
-          if (isRequired && trimmed.isEmpty) return 'Required';
-          if (isEmail && trimmed.isNotEmpty && (!trimmed.contains('@') || !trimmed.contains('.'))) {
-            return 'Invalid email';
+          if (isRequired && trimmed.isEmpty) return '$label is required';
+          if (trimmed.length > maxLength) {
+            return 'Max. $maxLength characters';
+          }
+          if (isEmail && trimmed.isNotEmpty) {
+            if (trimmed.length > 100) return 'Max. 100 characters';
+            if (!RegExp(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$').hasMatch(trimmed)) {
+              return 'Enter a valid email address';
+            }
+          }
+          if (!isEmail && isRequired && trimmed.length < 2) {
+            return 'Min. 2 characters';
           }
           if (trimmed.contains('%') || trimmed.contains(';') || trimmed.contains('--')) {
             return 'Invalid characters detected';

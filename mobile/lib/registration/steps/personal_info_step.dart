@@ -166,14 +166,21 @@ class PersonalInfoStep extends StatelessWidget {
   }
 
   Widget _field(String label, TextEditingController ctrl, IconData icon,
-      {bool required = true, String? hint, List<TextInputFormatter>? formatters}) {
+      {bool required = true, String? hint, List<TextInputFormatter>? formatters, int maxLength = 50}) {
+    final effectiveFormatters = <TextInputFormatter>[
+      if (formatters != null) ...formatters,
+      LengthLimitingTextInputFormatter(maxLength),
+    ];
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: ctrl,
-        inputFormatters: formatters,
+        maxLength: maxLength,
+        maxLengthEnforcement: MaxLengthEnforcement.enforced,
+        inputFormatters: effectiveFormatters,
         style: const TextStyle(fontSize: 14, color: _textDark),
         decoration: InputDecoration(
+          counterText: "",
           labelText: label,
           hintText: hint,
           labelStyle: const TextStyle(fontSize: 13, color: _textMuted),
@@ -197,10 +204,17 @@ class PersonalInfoStep extends StatelessWidget {
               borderSide: const BorderSide(color: Colors.redAccent)),
         ),
         validator: (v) {
-          if (required && (v == null || v.trim().isEmpty)) {
-            return 'Required';
+          final trimmed = v?.trim() ?? '';
+          if (required && trimmed.isEmpty) {
+            return '$label is required';
           }
-          if (v != null && (v.contains('%') || v.contains('_') || v.contains(';') || v.contains('--'))) {
+          if (required && trimmed.length < 2) {
+            return 'Min. 2 characters';
+          }
+          if (trimmed.length > maxLength) {
+            return 'Max. $maxLength characters';
+          }
+          if (trimmed.contains('%') || trimmed.contains('_') || trimmed.contains(';') || trimmed.contains('--')) {
             return 'Invalid characters detected';
           }
           return null;
