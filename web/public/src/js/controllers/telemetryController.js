@@ -281,13 +281,12 @@ function renderVolumeLineChart() {
   canvas.replaceWith(newCanvas);
   canvas = newCanvas;
 
-  const { labels, queueCounts, consultCounts } = analyticsDataCache.lineTrend;
-  const hasData = (queueCounts && queueCounts.some(c => c > 0)) || (consultCounts && consultCounts.some(c => c > 0));
+  const { labels, consultCounts } = analyticsDataCache.lineTrend;
+  const hasData = consultCounts && consultCounts.some(c => c > 0);
   const emptyNote = document.getElementById('chart-volume-empty');
   if (emptyNote) emptyNote.classList.toggle('hidden', hasData);
 
   const displayLabels = labels.length ? labels : ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'];
-  const displayQueue = queueCounts.length ? queueCounts : [0, 0, 0, 0, 0, 0, 0];
   const displayConsults = consultCounts.length ? consultCounts : [0, 0, 0, 0, 0, 0, 0];
 
   const ctx = canvas.getContext('2d');
@@ -296,18 +295,6 @@ function renderVolumeLineChart() {
     data: {
       labels: displayLabels,
       datasets: [
-        {
-          label: 'Queue Intake',
-          data: displayQueue,
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59, 130, 246, 0.08)',
-          borderWidth: 2.5,
-          tension: 0.35,
-          fill: true,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          pointBackgroundColor: '#3b82f6'
-        },
         {
           label: 'Consultations',
           data: displayConsults,

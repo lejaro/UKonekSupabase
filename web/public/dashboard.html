@@ -399,27 +399,26 @@
 
           <!-- Multi-Chart Analytics Grid -->
           <div class="analytics-charts-grid">
-            <!-- 1. Full-Width Line Graph: 7-Day Patient Volume & Consultation Flow -->
+            <!-- 1. Full-Width Line Graph: 7-Day Consultation Flow -->
             <div class="chart-card chart-card-wide">
               <div class="chart-card-head">
                 <div>
                   <h4 class="chart-card-title">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M3 3v18h18" />
                       <path d="m19 9-5 5-4-4-3 3" />
                     </svg>
-                    7-Day Patient Volume & Consultation Flow
+                    7-Day Consultation Flow
                   </h4>
-                  <p class="chart-card-subtitle">Daily intake vs completed doctor consultations over the past week</p>
+                  <p class="chart-card-subtitle">Daily completed doctor consultations over the past week</p>
                 </div>
                 <div class="chart-card-legend-pills" id="line-chart-legend">
-                  <span class="legend-pill" style="--pill-color: #3b82f6;"><span class="legend-dot"></span> Queue Intake</span>
                   <span class="legend-pill" style="--pill-color: #10b981;"><span class="legend-dot"></span> Consultations</span>
                 </div>
               </div>
               <div class="chart-canvas-wrapper" style="height: 200px; position: relative;">
-                <canvas id="chart-volume-trend" role="img" aria-label="7-Day Patient Volume and Consultation Flow Line Chart"></canvas>
-                <p id="chart-volume-empty" class="chart-empty-note hidden">No patient activity recorded in the past 7 days.</p>
+                <canvas id="chart-volume-trend" role="img" aria-label="7-Day Consultation Flow Line Chart"></canvas>
+                <p id="chart-volume-empty" class="chart-empty-note hidden">No consultation activity recorded in the past 7 days.</p>
               </div>
             </div>
 

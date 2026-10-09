@@ -1577,6 +1577,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     ];
 
     return _FadingHorizontalScrollView(
+      fadeFraction: 0.14,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: actions.map((item) {
@@ -1588,19 +1589,19 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
             },
             behavior: HitTestBehavior.opaque,
             child: Container(
-              width: 70,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: 84,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
               child: Column(
                 children: [
                   SizedBox(
-                    width: 52,
-                    height: 52,
+                    width: 66,
+                    height: 66,
                     child: iconAsset != null
                         ? Center(
                             child: Image.asset(
                               iconAsset,
-                              width: 50,
-                              height: 50,
+                              width: 64,
+                              height: 64,
                               fit: BoxFit.contain,
                               errorBuilder: (ctx, err, stack) => const SizedBox(),
                             ),
@@ -1611,8 +1612,10 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                   Text(
                     item['label'] as String,
                     textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 9,
+                      fontSize: 9.5,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF1E4E2B),
                       letterSpacing: -0.2,
@@ -2480,7 +2483,11 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
 /// when scrollable content extends to the left and/or right.
 class _FadingHorizontalScrollView extends StatefulWidget {
   final Widget child;
-  const _FadingHorizontalScrollView({required this.child});
+  final double fadeFraction;
+  const _FadingHorizontalScrollView({
+    required this.child,
+    this.fadeFraction = 0.14,
+  });
 
   @override
   State<_FadingHorizontalScrollView> createState() => _FadingHorizontalScrollViewState();
@@ -2534,8 +2541,8 @@ class _FadingHorizontalScrollViewState extends State<_FadingHorizontalScrollView
           ],
           stops: [
             0.0,
-            _canScrollLeft ? 0.08 : 0.0,
-            _canScrollRight ? 0.92 : 1.0,
+            _canScrollLeft ? widget.fadeFraction : 0.0,
+            _canScrollRight ? (1.0 - widget.fadeFraction) : 1.0,
             1.0,
           ],
         ).createShader(bounds);

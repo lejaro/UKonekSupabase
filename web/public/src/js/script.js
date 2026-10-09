@@ -447,7 +447,7 @@ function checkSessionTimeoutNotice() {
         if (reason === 'timeout') {
             const err = document.getElementById('login-error');
             if (err) {
-                err.textContent = 'Your session was automatically closed due to 15 minutes of inactivity to protect patient records (HIPAA compliance). Please sign in again.';
+                err.textContent = 'You have been logged out due to 15 minutes of inactivity. Please sign in again.';
                 err.style.display = 'block';
                 err.style.color = '#0369a1';
                 err.style.backgroundColor = '#f0f9ff';
