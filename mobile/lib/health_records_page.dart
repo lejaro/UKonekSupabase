@@ -25,6 +25,11 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
   Consultation? _latestConsultation;
   String _selectedFilter = 'all'; // 'all', 'consultation', 'vitals'
 
+  int _currentVitalsOffset = 0;
+  int _currentConsultsOffset = 0;
+  bool _hasMore = false;
+  bool _isLoadingMore = false;
+
   @override
   void initState() {
     super.initState();
@@ -33,10 +38,18 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
 
   Future<void> _loadRecords() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _currentVitalsOffset = 0;
+      _currentConsultsOffset = 0;
+    });
     try {
-      final vitals = await ApiService.fetchVitalSigns();
-      final consults = await ApiService.fetchConsultations();
+      final vitals = await ApiService.fetchVitalSigns(limit: 10, offset: 0);
+      final consults = await ApiService.fetchConsultations(limit: 10, offset: 0);
+
+      _currentVitalsOffset = vitals.length;
+      _currentConsultsOffset = consults.length;
+      _hasMore = vitals.length == 10 || consults.length == 10;
 
       if (vitals.isNotEmpty) {
         _latestVitals = vitals.first;
@@ -89,6 +102,59 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadMoreRecords() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() => _isLoadingMore = true);
+
+    try {
+      final nextVitals = await ApiService.fetchVitalSigns(limit: 10, offset: _currentVitalsOffset);
+      final nextConsults = await ApiService.fetchConsultations(limit: 10, offset: _currentConsultsOffset);
+
+      _currentVitalsOffset += nextVitals.length;
+      _currentConsultsOffset += nextConsults.length;
+      _hasMore = nextVitals.length == 10 || nextConsults.length == 10;
+
+      final List<Map<String, dynamic>> newVitalsMapped = nextVitals.map((v) => {
+        'id': v.id,
+        'date': DateFormat('MMMM dd, yyyy').format(v.createdAt),
+        'timestamp': v.createdAt,
+        'service': 'Vitals Assessment',
+        'provider': 'Clinic Nurse',
+        'diagnosis': v.chiefComplaint.isNotEmpty ? v.chiefComplaint : 'Routine Vital Signs Check',
+        'color': _C.primaryMid,
+        'icon': Icons.monitor_heart_outlined,
+        'type': 'vitals',
+        'raw': v,
+      }).toList();
+
+      final List<Map<String, dynamic>> newConsultsMapped = nextConsults.map((c) => {
+        'id': c.id.toString(),
+        'date': DateFormat('MMMM dd, yyyy').format(c.consultedAt),
+        'timestamp': c.consultedAt,
+        'service': 'Doctor Consultation',
+        'provider': c.doctorName ?? 'Health Center Doctor',
+        'diagnosis': c.diagnosis.isNotEmpty ? c.diagnosis : 'Clinical Consultation',
+        'color': const Color(0xFF007AFF), // Medical Blue
+        'icon': Icons.medical_information_outlined,
+        'type': 'consultation',
+        'raw': c,
+      }).toList();
+
+      final List<Map<String, dynamic>> newCombined = [...newVitalsMapped, ...newConsultsMapped];
+      _allRecords.addAll(newCombined);
+      _allRecords.sort((a, b) => (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime));
+
+      if (mounted) {
+        setState(() {
+          _applyFilters();
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -342,6 +408,36 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
               _buildEmptySearchResults()
             else
               ..._foundRecords.map((r) => _buildHistoryCard(r)),
+
+            if (_hasMore) ...[
+              const SizedBox(height: 16),
+              Center(
+                child: OutlinedButton.icon(
+                  onPressed: _isLoadingMore ? null : _loadMoreRecords,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    side: const BorderSide(color: _C.primaryMid),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    backgroundColor: Colors.white,
+                  ),
+                  icon: _isLoadingMore
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: _C.primaryMid),
+                        )
+                      : const Icon(Icons.keyboard_arrow_down_rounded, color: _C.primaryMid),
+                  label: Text(
+                    _isLoadingMore ? 'Loading records...' : 'Load More Records (10)',
+                    style: const TextStyle(
+                      color: _C.primaryMid,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 20),
             const Center(

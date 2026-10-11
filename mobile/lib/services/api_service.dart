@@ -142,11 +142,11 @@ class ApiService {
       CitizenProfileService.updateMyCitizenProfile(data);
 
   // ── Clinical Records ─────────────────────────────────────────────
-  static Future<List<VitalSigns>> fetchVitalSigns({int limit = 50}) =>
-      ClinicalRecordsService.fetchVitalSigns(limit: limit);
+  static Future<List<VitalSigns>> fetchVitalSigns({int limit = 10, int offset = 0}) =>
+      ClinicalRecordsService.fetchVitalSigns(limit: limit, offset: offset);
 
-  static Future<List<Consultation>> fetchConsultations({int limit = 50}) =>
-      ClinicalRecordsService.fetchConsultations(limit: limit);
+  static Future<List<Consultation>> fetchConsultations({int limit = 10, int offset = 0}) =>
+      ClinicalRecordsService.fetchConsultations(limit: limit, offset: offset);
 
   // ── Prescriptions & Medicine Intake ──────────────────────────────
   static Future<List<PrescribedMedicine>> getMyPrescribedMedicines() =>
@@ -155,7 +155,7 @@ class ApiService {
   static Future<List<ScheduledMedicine>> getMedicineSchedule({int? citizenId}) =>
       PrescriptionService.getMedicineSchedule(citizenId: citizenId);
 
-  static Future<List<PrescriptionRecord>> fetchPrescriptions({int limit = 50, int? citizenId}) =>
+  static Future<List<PrescriptionRecord>> fetchPrescriptions({int limit = 10, int? citizenId}) =>
       PrescriptionService.fetchPrescriptions(limit: limit, citizenId: citizenId);
 
   static List<PrescriptionDispenseLog> synthesizeDispenseLogsFromPrescriptions(

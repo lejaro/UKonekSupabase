@@ -76,9 +76,9 @@ export async function loadSystemReportData() {
       vitalsQuery.limit(500),
       rxQuery.limit(500),
       labQuery.limit(500),
-      supabase.from('citizens').select('id, created_at', { count: 'exact' }),
+      supabase.from('citizens').select('id', { count: 'exact', head: true }),
       supabase.from('staff').select('id, username, role, status, is_online'),
-      supabase.from('medicines').select('id, qty', { count: 'exact' }).is('archived_at', null),
+      supabase.from('medicines').select('id', { count: 'exact', head: true }).is('archived_at', null),
       (async () => {
         try {
           return await supabase.rpc('get_clinical_operations_metrics');

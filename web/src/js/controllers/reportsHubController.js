@@ -82,6 +82,87 @@ export function refreshActiveReportsHubPane() {
 // 2. CITIZEN FEEDBACK
 // ─────────────────────────────────────────────────────────────────────────────
 
+const FEEDBACK_PAGE_SIZE = 10;
+let _feedbackOffset = 0;
+let _hasMoreFeedback = false;
+let _isLoadingMoreFeedback = false;
+
+function updateFeedbackPaginationUI() {
+  const tbody = document.getElementById('feedback-tbody');
+  const tableWrap = tbody?.closest('.table-wrap') || tbody?.closest('.table-responsive') || tbody?.parentElement;
+  if (!tableWrap) return;
+
+  let container = document.getElementById('feedback-load-more-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'feedback-load-more-container';
+    container.className = 'load-more-container';
+    tableWrap.parentNode.insertBefore(container, tableWrap.nextSibling);
+  }
+
+  container.innerHTML = `
+    <span class="load-more-counter">Showing ${_feedbacks.length} feedback(s)</span>
+    ${_hasMoreFeedback ? `
+      <button type="button" class="btn-load-more" id="feedback-load-more-btn">
+        <span>Load More (10)</span>
+      </button>
+    ` : `<span style="font-size:11px;color:#94a3b8;">All feedback records loaded</span>`}
+  `;
+
+  const btn = document.getElementById('feedback-load-more-btn');
+  btn?.addEventListener('click', async () => {
+    if (_isLoadingMoreFeedback) return;
+    _isLoadingMoreFeedback = true;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading...</span>';
+
+    try {
+      const from = _feedbackOffset;
+      const to = from + FEEDBACK_PAGE_SIZE - 1;
+      const { data, error } = await supabase
+        .from('feedbacks')
+        .select(`
+          id,
+          citizen_id,
+          from_email,
+          subject,
+          message,
+          rating,
+          created_at,
+          citizen:citizens(id, first_name, last_name, email)
+        `)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      let newRows = [];
+      if (error) {
+        const flatRes = await supabase
+          .from('feedbacks')
+          .select('id, citizen_id, from_email, subject, message, rating, created_at')
+          .order('created_at', { ascending: false })
+          .range(from, to);
+        if (!flatRes.error) newRows = flatRes.data || [];
+      } else {
+        newRows = data || [];
+      }
+
+      if (newRows.length > 0) {
+        _feedbacks.push(...newRows);
+        _feedbackOffset += newRows.length;
+        _hasMoreFeedback = newRows.length === FEEDBACK_PAGE_SIZE;
+        renderFeedbackTable();
+      } else {
+        _hasMoreFeedback = false;
+      }
+    } catch (err) {
+      console.warn('Error loading more feedbacks:', err);
+    } finally {
+      _isLoadingMoreFeedback = false;
+      updateFeedbackPaginationUI();
+    }
+  });
+}
+
 /**
  * Fetch feedbacks from Supabase public.feedbacks table.
  */
@@ -103,7 +184,7 @@ export async function loadFeedback() {
         citizen:citizens(id, first_name, last_name, email)
       `)
       .order('created_at', { ascending: false })
-      .limit(100);
+      .range(0, FEEDBACK_PAGE_SIZE - 1);
 
     if (error) {
       // Fallback if citizens relation join fails
@@ -112,13 +193,16 @@ export async function loadFeedback() {
         .from('feedbacks')
         .select('id, citizen_id, from_email, subject, message, rating, created_at')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .range(0, FEEDBACK_PAGE_SIZE - 1);
 
       if (flatRes.error) throw flatRes.error;
       _feedbacks = flatRes.data || [];
     } else {
       _feedbacks = data || [];
     }
+
+    _feedbackOffset = _feedbacks.length;
+    _hasMoreFeedback = _feedbacks.length === FEEDBACK_PAGE_SIZE;
 
     // Update hub count badge
     const badge = document.getElementById('hub-count-feedback');
@@ -127,6 +211,7 @@ export async function loadFeedback() {
     }
 
     renderFeedbackTable();
+    updateFeedbackPaginationUI();
   } catch (err) {
     console.error('[Feedback] Load error:', err);
     showToast('Failed to load citizen feedback records.', 'error');

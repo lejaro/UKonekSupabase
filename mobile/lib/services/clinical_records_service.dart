@@ -8,7 +8,7 @@ class ClinicalRecordsService {
 
   static SupabaseClient get _client => Supabase.instance.client;
 
-  static Future<List<VitalSigns>> fetchVitalSigns({int limit = 50}) async {
+  static Future<List<VitalSigns>> fetchVitalSigns({int limit = 10, int offset = 0}) async {
     final user = _client.auth.currentUser;
     if (user == null) return [];
 
@@ -21,7 +21,7 @@ class ClinicalRecordsService {
           .select()
           .eq('citizen_id', citizenId)
           .order('created_at', ascending: false)
-          .limit(limit);
+          .range(offset, offset + limit - 1);
       final rows = (response as List<dynamic>?) ?? const [];
       return rows.whereType<Map<String, dynamic>>().map(VitalSigns.fromMap).toList();
     } catch (e) {
@@ -30,7 +30,7 @@ class ClinicalRecordsService {
     }
   }
 
-  static Future<List<Consultation>> fetchConsultations({int limit = 50}) async {
+  static Future<List<Consultation>> fetchConsultations({int limit = 10, int offset = 0}) async {
     final user = _client.auth.currentUser;
     if (user == null) return [];
 
@@ -38,21 +38,23 @@ class ClinicalRecordsService {
       final profile = await CitizenProfileService.fetchMyCitizenProfile();
       final citizenId = profile['id'];
 
-      // Strategy 1: Dedicated secure RPC function get_my_consultations
-      try {
-        final rpcRes = await _client.rpc(
-          'get_my_consultations',
-          params: {
-            'p_limit': limit,
-            'p_citizen_id': citizenId,
-          },
-        );
-        if (rpcRes is List && rpcRes.isNotEmpty) {
-          final rows = rpcRes.whereType<Map<String, dynamic>>().map(Consultation.fromMap).toList();
-          if (rows.isNotEmpty) return rows;
+      // Strategy 1: Dedicated secure RPC function get_my_consultations (initial page)
+      if (offset == 0) {
+        try {
+          final rpcRes = await _client.rpc(
+            'get_my_consultations',
+            params: {
+              'p_limit': limit,
+              'p_citizen_id': citizenId,
+            },
+          );
+          if (rpcRes is List && rpcRes.isNotEmpty) {
+            final rows = rpcRes.whereType<Map<String, dynamic>>().map(Consultation.fromMap).toList();
+            if (rows.isNotEmpty) return rows;
+          }
+        } catch (rpcErr) {
+          debugPrint('[ClinicalRecordsService] get_my_consultations RPC fallback: $rpcErr');
         }
-      } catch (rpcErr) {
-        debugPrint('[ClinicalRecordsService] get_my_consultations RPC fallback: $rpcErr');
       }
 
       // Strategy 2: Query public.consultations with joined doctor details
@@ -67,7 +69,7 @@ class ClinicalRecordsService {
 
         final response = await query
             .order('consulted_at', ascending: false)
-            .limit(limit);
+            .range(offset, offset + limit - 1);
 
         final rows = (response as List<dynamic>?) ?? const [];
         if (rows.isNotEmpty) {
@@ -86,7 +88,7 @@ class ClinicalRecordsService {
 
         final flatResponse = await flatQuery
             .order('consulted_at', ascending: false)
-            .limit(limit);
+            .range(offset, offset + limit - 1);
 
         final flatRows = (flatResponse as List<dynamic>?) ?? const [];
         return flatRows.whereType<Map<String, dynamic>>().map(Consultation.fromMap).toList();

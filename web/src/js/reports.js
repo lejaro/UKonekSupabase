@@ -832,131 +832,162 @@ export async function exportSystemUsageReport(startDate = null, endDate = null) 
     const startIso = startDate ? (startDate.includes('T') ? startDate : `${startDate}T00:00:00`) : null;
     const endIso = endDate ? (endDate.includes('T') ? endDate : `${endDate}T23:59:59`) : null;
 
-    // 1. Clinical Queries (Consultations, Nursing Triage / Vitals)
-    let consultQuery = supabase.from('consultations').select('id', { count: 'exact', head: true });
-    if (startIso) consultQuery = consultQuery.gte('consulted_at', startIso);
-    if (endIso) consultQuery = consultQuery.lte('consulted_at', endIso);
+    let consultations = 0, vitals = 0, queueTickets = 0, completedTickets = 0, cancelledTickets = 0;
+    let prescriptions = 0, dispensedRx = 0, labOrders = 0, completedLabs = 0, totalCitizens = 0;
+    let newCitizens = 0, activeMeds = 0, lowStockMeds = 0, staffLogins = 0, feedbacks = 0, announcements = 0;
+    let staffList = [];
 
-    let vitalsQuery = supabase.from('vital_signs').select('id', { count: 'exact', head: true });
-    if (startIso) vitalsQuery = vitalsQuery.gte('created_at', startIso);
-    if (endIso) vitalsQuery = vitalsQuery.lte('created_at', endIso);
+    // Attempt high-performance consolidated RPC first (1 single round-trip instead of 17)
+    let summaryResolved = false;
+    try {
+      const { data: summaryData, error: summaryError } = await supabase.rpc('get_system_reports_summary', {
+        p_start_date: startIso,
+        p_end_date: endIso
+      });
 
-    // 2. Queue Queries (Tickets, Completed, Cancelled)
-    let queueQuery = supabase.from('queue_tickets').select('id', { count: 'exact', head: true });
-    if (startDate) queueQuery = queueQuery.gte('queue_date', startDate);
-    if (endDate) queueQuery = queueQuery.lte('queue_date', endDate);
+      if (!summaryError && summaryData) {
+        const s = typeof summaryData === 'string' ? JSON.parse(summaryData) : summaryData;
+        consultations = s.consultations_count || 0;
+        vitals = s.vitals_count || 0;
+        queueTickets = s.queue_tickets_count || 0;
+        completedTickets = s.completed_tickets_count || 0;
+        cancelledTickets = s.cancelled_tickets_count || 0;
+        prescriptions = s.prescriptions_count || 0;
+        dispensedRx = s.dispensed_prescriptions_count || 0;
+        labOrders = s.lab_orders_count || 0;
+        completedLabs = s.completed_labs_count || 0;
+        totalCitizens = s.total_citizens_count || 0;
+        newCitizens = s.new_citizens_count || 0;
+        activeMeds = s.active_medicines_count || 0;
+        lowStockMeds = s.low_stock_medicines_count || 0;
+        staffLogins = s.staff_logins_count || 0;
+        feedbacks = s.feedbacks_count || 0;
+        announcements = s.announcements_count || 0;
 
-    let completedQueueQuery = supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'completed');
-    if (startDate) completedQueueQuery = completedQueueQuery.gte('queue_date', startDate);
-    if (endDate) completedQueueQuery = completedQueueQuery.lte('queue_date', endDate);
-
-    let cancelledQueueQuery = supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'cancelled');
-    if (startDate) cancelledQueueQuery = cancelledQueueQuery.gte('queue_date', startDate);
-    if (endDate) cancelledQueueQuery = cancelledQueueQuery.lte('queue_date', endDate);
-
-    // 3. Pharmacy Queries (Prescriptions Issued, Dispensed)
-    let rxQuery = supabase.from('prescription_headers').select('id', { count: 'exact', head: true });
-    if (startIso) rxQuery = rxQuery.gte('issued_at', startIso);
-    if (endIso) rxQuery = rxQuery.lte('issued_at', endIso);
-
-    let rxDispensedQuery = supabase.from('prescription_headers').select('id', { count: 'exact', head: true }).eq('dispensing_status', 'dispensed');
-    if (startIso) rxDispensedQuery = rxDispensedQuery.gte('issued_at', startIso);
-    if (endIso) rxDispensedQuery = rxDispensedQuery.lte('issued_at', endIso);
-
-    // 4. Laboratory Queries (Orders, Completed)
-    let labQuery = supabase.from('lab_orders').select('id', { count: 'exact', head: true });
-    if (startIso) labQuery = labQuery.gte('created_at', startIso);
-    if (endIso) labQuery = labQuery.lte('created_at', endIso);
-
-    let completedLabQuery = supabase.from('lab_orders').select('id', { count: 'exact', head: true }).eq('status', 'completed');
-    if (startIso) completedLabQuery = completedLabQuery.gte('created_at', startIso);
-    if (endIso) completedLabQuery = completedLabQuery.lte('created_at', endIso);
-
-    // 5. Citizens Queries (Total, New in Period)
-    let totalCitizensQuery = supabase.from('citizens').select('id', { count: 'exact', head: true });
-    let newCitizensQuery = supabase.from('citizens').select('id', { count: 'exact', head: true });
-    if (startIso) newCitizensQuery = newCitizensQuery.gte('created_at', startIso);
-    if (endIso) newCitizensQuery = newCitizensQuery.lte('created_at', endIso);
-
-    // 6. Inventory Queries (Active Formulary, Low Stock Items)
-    let medicinesQuery = supabase.from('medicines').select('id', { count: 'exact', head: true }).is('archived_at', null);
-    let lowStockQuery = supabase.from('medicines').select('id', { count: 'exact', head: true }).is('archived_at', null).lte('qty', 10);
-
-    // 7. System Activity & Engagement (Staff Logins, Feedback, Announcements)
-    let loginQuery = supabase.from('staff_login_logs').select('id', { count: 'exact', head: true }).eq('action', 'login');
-    if (startIso) loginQuery = loginQuery.gte('logged_at', startIso);
-    if (endIso) loginQuery = loginQuery.lte('logged_at', endIso);
-
-    let feedbackQuery = supabase.from('feedbacks').select('id', { count: 'exact', head: true });
-    if (startIso) feedbackQuery = feedbackQuery.gte('created_at', startIso);
-    if (endIso) feedbackQuery = feedbackQuery.lte('created_at', endIso);
-
-    let announcementsQuery = supabase.from('announcements').select('id', { count: 'exact', head: true });
-    if (startIso) announcementsQuery = announcementsQuery.gte('created_at', startIso);
-    if (endIso) announcementsQuery = announcementsQuery.lte('created_at', endIso);
-
-    // 8. Staff Accounts Directory
-    let staffQuery = supabase.from('staff').select('id, role, status');
-
-    // Helper functions to safely resolve Supabase Postgrest thenables without throwing
-    const safeCount = async (q) => {
-      try {
-        const res = await q;
-        return res?.count || 0;
-      } catch (err) {
-        console.warn('[Reports] Query count notice:', err?.message || err);
-        return 0;
+        const staffRes = await supabase.from('staff').select('id, role, status');
+        staffList = staffRes?.data || [];
+        summaryResolved = true;
       }
-    };
+    } catch (rpcErr) {
+      console.warn('[Reports] Consolidated summary RPC notice, executing resilient fallback:', rpcErr);
+    }
 
-    const safeStaff = async (q) => {
-      try {
-        const res = await q;
-        return res?.data || [];
-      } catch (err) {
-        console.warn('[Reports] Staff query notice:', err?.message || err);
-        return [];
-      }
-    };
+    if (!summaryResolved) {
+      // Resilient fallback to individual counts if RPC is unavailable
+      let consultQuery = supabase.from('consultations').select('id', { count: 'exact', head: true });
+      if (startIso) consultQuery = consultQuery.gte('consulted_at', startIso);
+      if (endIso) consultQuery = consultQuery.lte('consulted_at', endIso);
 
-    // Execute parallel telemetry fetch with resilient error handlers
-    const [
-      consultations,
-      vitals,
-      queueTickets,
-      completedTickets,
-      cancelledTickets,
-      prescriptions,
-      dispensedRx,
-      labOrders,
-      completedLabs,
-      totalCitizens,
-      newCitizens,
-      activeMeds,
-      lowStockMeds,
-      staffLogins,
-      feedbacks,
-      announcements,
-      staffList
-    ] = await Promise.all([
-      safeCount(consultQuery),
-      safeCount(vitalsQuery),
-      safeCount(queueQuery),
-      safeCount(completedQueueQuery),
-      safeCount(cancelledQueueQuery),
-      safeCount(rxQuery),
-      safeCount(rxDispensedQuery),
-      safeCount(labQuery),
-      safeCount(completedLabQuery),
-      safeCount(totalCitizensQuery),
-      safeCount(newCitizensQuery),
-      safeCount(medicinesQuery),
-      safeCount(lowStockQuery),
-      safeCount(loginQuery),
-      safeCount(feedbackQuery),
-      safeCount(announcementsQuery),
-      safeStaff(staffQuery)
-    ]);
+      let vitalsQuery = supabase.from('vital_signs').select('id', { count: 'exact', head: true });
+      if (startIso) vitalsQuery = vitalsQuery.gte('created_at', startIso);
+      if (endIso) vitalsQuery = vitalsQuery.lte('created_at', endIso);
+
+      let queueQuery = supabase.from('queue_tickets').select('id', { count: 'exact', head: true });
+      if (startDate) queueQuery = queueQuery.gte('queue_date', startDate);
+      if (endDate) queueQuery = queueQuery.lte('queue_date', endDate);
+
+      let completedQueueQuery = supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'completed');
+      if (startDate) completedQueueQuery = completedQueueQuery.gte('queue_date', startDate);
+      if (endDate) completedQueueQuery = completedQueueQuery.lte('queue_date', endDate);
+
+      let cancelledQueueQuery = supabase.from('queue_tickets').select('id', { count: 'exact', head: true }).eq('status', 'cancelled');
+      if (startDate) cancelledQueueQuery = cancelledQueueQuery.gte('queue_date', startDate);
+      if (endDate) cancelledQueueQuery = cancelledQueueQuery.lte('queue_date', endDate);
+
+      let rxQuery = supabase.from('prescription_headers').select('id', { count: 'exact', head: true });
+      if (startIso) rxQuery = rxQuery.gte('issued_at', startIso);
+      if (endIso) rxQuery = rxQuery.lte('issued_at', endIso);
+
+      let rxDispensedQuery = supabase.from('prescription_headers').select('id', { count: 'exact', head: true }).eq('dispensing_status', 'dispensed');
+      if (startIso) rxDispensedQuery = rxDispensedQuery.gte('issued_at', startIso);
+      if (endIso) rxDispensedQuery = rxDispensedQuery.lte('issued_at', endIso);
+
+      let labQuery = supabase.from('lab_orders').select('id', { count: 'exact', head: true });
+      if (startIso) labQuery = labQuery.gte('created_at', startIso);
+      if (endIso) labQuery = labQuery.lte('created_at', endIso);
+
+      let completedLabQuery = supabase.from('lab_orders').select('id', { count: 'exact', head: true }).eq('status', 'completed');
+      if (startIso) completedLabQuery = completedLabQuery.gte('created_at', startIso);
+      if (endIso) completedLabQuery = completedLabQuery.lte('created_at', endIso);
+
+      let totalCitizensQuery = supabase.from('citizens').select('id', { count: 'exact', head: true });
+      let newCitizensQuery = supabase.from('citizens').select('id', { count: 'exact', head: true });
+      if (startIso) newCitizensQuery = newCitizensQuery.gte('created_at', startIso);
+      if (endIso) newCitizensQuery = newCitizensQuery.lte('created_at', endIso);
+
+      let medicinesQuery = supabase.from('medicines').select('id', { count: 'exact', head: true }).is('archived_at', null);
+      let lowStockQuery = supabase.from('medicines').select('id', { count: 'exact', head: true }).is('archived_at', null).lte('qty', 10);
+
+      let loginQuery = supabase.from('staff_login_logs').select('id', { count: 'exact', head: true }).eq('action', 'login');
+      if (startIso) loginQuery = loginQuery.gte('logged_at', startIso);
+      if (endIso) loginQuery = loginQuery.lte('logged_at', endIso);
+
+      let feedbackQuery = supabase.from('feedbacks').select('id', { count: 'exact', head: true });
+      if (startIso) feedbackQuery = feedbackQuery.gte('created_at', startIso);
+      if (endIso) feedbackQuery = feedbackQuery.lte('created_at', endIso);
+
+      let announcementsQuery = supabase.from('announcements').select('id', { count: 'exact', head: true });
+      if (startIso) announcementsQuery = announcementsQuery.gte('created_at', startIso);
+      if (endIso) announcementsQuery = announcementsQuery.lte('created_at', endIso);
+
+      let staffQuery = supabase.from('staff').select('id, role, status');
+
+      const safeCount = async (q) => {
+        try {
+          const res = await q;
+          return res?.count || 0;
+        } catch (_) {
+          return 0;
+        }
+      };
+
+      const safeStaff = async (q) => {
+        try {
+          const res = await q;
+          return res?.data || [];
+        } catch (_) {
+          return [];
+        }
+      };
+
+      [
+        consultations,
+        vitals,
+        queueTickets,
+        completedTickets,
+        cancelledTickets,
+        prescriptions,
+        dispensedRx,
+        labOrders,
+        completedLabs,
+        totalCitizens,
+        newCitizens,
+        activeMeds,
+        lowStockMeds,
+        staffLogins,
+        feedbacks,
+        announcements,
+        staffList
+      ] = await Promise.all([
+        safeCount(consultQuery),
+        safeCount(vitalsQuery),
+        safeCount(queueQuery),
+        safeCount(completedQueueQuery),
+        safeCount(cancelledQueueQuery),
+        safeCount(rxQuery),
+        safeCount(rxDispensedQuery),
+        safeCount(labQuery),
+        safeCount(completedLabQuery),
+        safeCount(totalCitizensQuery),
+        safeCount(newCitizensQuery),
+        safeCount(medicinesQuery),
+        safeCount(lowStockQuery),
+        safeCount(loginQuery),
+        safeCount(feedbackQuery),
+        safeCount(announcementsQuery),
+        safeStaff(staffQuery)
+      ]);
+    }
     const queueCompletionRate = queueTickets > 0 ? `${((completedTickets / queueTickets) * 100).toFixed(1)}%` : (completedTickets > 0 ? '100.0%' : '—');
     const rxFulfillmentRate = prescriptions > 0 ? `${((dispensedRx / prescriptions) * 100).toFixed(1)}%` : (dispensedRx > 0 ? '100.0%' : '—');
     const labCompletionRate = labOrders > 0 ? `${((completedLabs / labOrders) * 100).toFixed(1)}%` : (completedLabs > 0 ? '100.0%' : '—');

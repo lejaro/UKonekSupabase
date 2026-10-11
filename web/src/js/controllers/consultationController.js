@@ -946,7 +946,7 @@ async function executeCitizenSearch(query) {
   if (!dropdown) return;
 
   const trimmed = String(query || '').trim();
-  if (trimmed.length < 1) {
+  if (trimmed.length < 2) {
     dropdown.innerHTML = '';
     dropdown.classList.add('hidden');
     return;

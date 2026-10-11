@@ -53,6 +53,10 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
   List<_PrescriptionGroup> _groups = [];
   bool _hasAutoOpened = false;
 
+  int _prescriptionLimit = 10;
+  bool _hasMorePrescriptions = false;
+  bool _isLoadingMorePrescriptions = false;
+
   // Purchase logs state
   List<PrescriptionDispenseLog> _dispenseLogs = [];
   final TextEditingController _searchController = TextEditingController();
@@ -74,10 +78,11 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     setState(() {
       _loading = true;
       _error = null;
+      _prescriptionLimit = 10;
     });
     try {
       final results = await Future.wait([
-        ApiService.fetchPrescriptions(),
+        ApiService.fetchPrescriptions(limit: _prescriptionLimit),
         ApiService.fetchPrescriptionDispenseLogs(),
       ]);
 
@@ -103,6 +108,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
       setState(() {
         _groups = _buildGroups(records);
         _dispenseLogs = logs;
+        _hasMorePrescriptions = records.length >= _prescriptionLimit;
         _loading = false;
       });
 
@@ -126,12 +132,32 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
     }
   }
 
+  Future<void> _loadMorePrescriptions() async {
+    if (_isLoadingMorePrescriptions || !_hasMorePrescriptions) return;
+    setState(() => _isLoadingMorePrescriptions = true);
+
+    try {
+      final newLimit = _prescriptionLimit + 10;
+      final records = await ApiService.fetchPrescriptions(limit: newLimit);
+
+      if (!mounted) return;
+      setState(() {
+        _prescriptionLimit = newLimit;
+        _groups = _buildGroups(records);
+        _hasMorePrescriptions = records.length >= newLimit;
+        _isLoadingMorePrescriptions = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMorePrescriptions = false);
+    }
+  }
+
   Future<void> _refreshPrescriptionStatus() async {
     if (_refreshing || _loading) return;
     setState(() => _refreshing = true);
     try {
       final results = await Future.wait([
-        ApiService.fetchPrescriptions(),
+        ApiService.fetchPrescriptions(limit: _prescriptionLimit),
         ApiService.fetchPrescriptionDispenseLogs(),
       ]);
 
@@ -478,8 +504,38 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                   style: TextStyle(color: _C.textMuted, fontSize: 15, fontWeight: FontWeight.w500)),
             ]),
           )
-        else
+        else ...[
           ..._filteredPrescriptions.map((g) => _prescriptionGroupCard(g)),
+          if (_hasMorePrescriptions) ...[
+            const SizedBox(height: 16),
+            Center(
+              child: OutlinedButton.icon(
+                onPressed: _isLoadingMorePrescriptions ? null : _loadMorePrescriptions,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  side: const BorderSide(color: _C.primaryMid),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: Colors.white,
+                ),
+                icon: _isLoadingMorePrescriptions
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: _C.primaryMid),
+                      )
+                    : const Icon(Icons.keyboard_arrow_down_rounded, color: _C.primaryMid),
+                label: Text(
+                  _isLoadingMorePrescriptions ? 'Loading prescriptions...' : 'Load More Prescriptions (10)',
+                  style: const TextStyle(
+                    color: _C.primaryMid,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ],
     );
   }

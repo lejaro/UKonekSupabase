@@ -39,7 +39,7 @@ class PrescriptionService {
     }
   }
 
-  static Future<List<PrescriptionRecord>> fetchPrescriptions({int limit = 50, int? citizenId}) async {
+  static Future<List<PrescriptionRecord>> fetchPrescriptions({int limit = 10, int? citizenId}) async {
     final user = _client.auth.currentUser;
     if (user == null) return [];
 

@@ -258,6 +258,115 @@ export function renderVitalsTable() {
   });
 }
 
+const TRIAGE_PAGE_SIZE = 10;
+let triageOffset = 0;
+let hasMoreTriage = false;
+let isLoadingMoreTriage = false;
+
+function updateTriagePaginationUI() {
+  const tbody = document.getElementById('vitals-recent-tbody') || document.getElementById('recent-vitals-tbody');
+  const tableWrap = tbody?.closest('.table-wrap') || tbody?.closest('.table-responsive') || tbody?.parentElement;
+  if (!tableWrap) return;
+
+  let container = document.getElementById('triage-load-more-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'triage-load-more-container';
+    container.className = 'load-more-container';
+    tableWrap.parentNode.insertBefore(container, tableWrap.nextSibling);
+  }
+
+  container.innerHTML = `
+    <span class="load-more-counter">Showing ${rawVitalsData.length} triage record(s)</span>
+    ${hasMoreTriage ? `
+      <button type="button" class="btn-load-more" id="triage-load-more-btn">
+        <span>Load More (10)</span>
+      </button>
+    ` : `<span style="font-size:11px;color:#94a3b8;">All triage records loaded</span>`}
+  `;
+
+  const btn = document.getElementById('triage-load-more-btn');
+  btn?.addEventListener('click', async () => {
+    if (isLoadingMoreTriage) return;
+    isLoadingMoreTriage = true;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading...</span>';
+
+    try {
+      const { data: moreVitals, error } = await supabase
+        .from('vital_signs')
+        .select(`
+          id,
+          created_at,
+          blood_pressure,
+          heart_rate,
+          temperature,
+          oxygen_saturation,
+          respiratory_rate,
+          chief_complaint,
+          current_medications,
+          height_cm,
+          weight_kg,
+          bmi,
+          queue_ticket_id,
+          queue_tickets (
+            id,
+            ticket_code,
+            status,
+            queue_number
+          ),
+          citizens (
+            id,
+            firstname,
+            surname,
+            age,
+            contact_number,
+            complete_address,
+            allergies
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .range(triageOffset, triageOffset + TRIAGE_PAGE_SIZE - 1);
+
+      if (!error && Array.isArray(moreVitals) && moreVitals.length > 0) {
+        const normalized = moreVitals.map(v => {
+          const citizen = v.citizens;
+          const patientName = citizen ? `${citizen.firstname || ''} ${citizen.surname || ''}`.trim() : 'Walk-in Patient';
+          const bp = evaluateBp(v.blood_pressure);
+          const hr = evaluateHr(v.heart_rate);
+          const temp = evaluateTemp(v.temperature);
+          const spo2 = evaluateSpo2(v.oxygen_saturation);
+          const isAlert = bp.level === 'alert' || hr.level === 'alert' || temp.level === 'alert' || spo2.level === 'alert';
+
+          const ticket = v.queue_tickets;
+          const queueStatus = ticket?.status || 'waiting';
+          const ticketCode = ticket?.ticket_code || (v.queue_ticket_id ? `Q-${v.queue_ticket_id}` : '');
+
+          return {
+            ...v,
+            _patientName: patientName,
+            _ticketCode: ticketCode,
+            _queueStatus: queueStatus,
+            _isAlert: isAlert
+          };
+        });
+
+        rawVitalsData.push(...normalized);
+        triageOffset += moreVitals.length;
+        hasMoreTriage = moreVitals.length === TRIAGE_PAGE_SIZE;
+        renderVitalsTable();
+      } else {
+        hasMoreTriage = false;
+      }
+    } catch (err) {
+      console.warn('Error loading more triage vitals:', err);
+    } finally {
+      isLoadingMoreTriage = false;
+      updateTriagePaginationUI();
+    }
+  });
+}
+
 export async function loadRecentVitals() {
   const tbody = document.getElementById('vitals-recent-tbody') || document.getElementById('recent-vitals-tbody');
   if (!tbody) return;
@@ -296,9 +405,12 @@ export async function loadRecentVitals() {
         )
       `)
       .order('created_at', { ascending: false })
-      .limit(30);
+      .range(0, TRIAGE_PAGE_SIZE - 1);
 
     if (error) throw error;
+
+    triageOffset = (vitals || []).length;
+    hasMoreTriage = (vitals || []).length === TRIAGE_PAGE_SIZE;
 
     // Normalize records and pre-evaluate alert statuses
     rawVitalsData = (vitals || []).map(v => {
@@ -324,6 +436,7 @@ export async function loadRecentVitals() {
     });
 
     renderVitalsTable();
+    updateTriagePaginationUI();
   } catch (err) {
     console.warn('Error loading recent vitals:', err);
   }

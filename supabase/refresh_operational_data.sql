@@ -15,23 +15,34 @@ DO $$
 DECLARE
   tbl text;
   tables_to_truncate text[] := ARRAY[
+    -- Pharmacy & Dispensing
     'dispense_returns',
     'prescription_item_dispenses',
     'otc_dispense_items',
     'otc_dispenses',
+
+    -- Prescriptions & Patient Intake
     'prescription_items',
     'prescription_headers',
     'medicine_intake_logs',
-    'lab_orders',
-    'vital_signs',
+
+    -- Clinical Encounters
+    'consultation_attachments',
     'consultations',
+    'vital_signs',
+    'lab_orders',
+
+    -- Queueing & Appointments
     'queue_tickets',
+
+    -- Auditing & Feedback & Transactions
     'feedbacks',
+    'audit_log',
+    'clinic_transactions',
     'staff_login_logs',
-    'citizen_otps',
-    'pending_citizen_signups',
-    'staff_email_verifications',
-    'pending_staff'
+
+    -- Temporary Auth & Registration State
+    'pending_citizen_signups'
   ];
 BEGIN
   -- 1. Safely truncate each operational table only if it exists
@@ -50,5 +61,13 @@ BEGIN
       qty = GREATEST(qty, 0)
     WHERE archived_at IS NOT NULL OR qty < 0;
     RAISE NOTICE 'Medicines inventory preserved and verified.';
+  END IF;
+
+  -- 3. Reset staff availability status so all active staff start in fresh 'available' state
+  IF to_regclass('public.staff') IS NOT NULL THEN
+    UPDATE public.staff
+    SET availability_status = 'available'
+    WHERE status = 'active';
+    RAISE NOTICE 'Staff availability status reset to available.';
   END IF;
 END $$;

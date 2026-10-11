@@ -208,29 +208,43 @@ async function openCitizenHealthModal(citizen) {
 
   citizenHealthModal.classList.remove('hidden');
 
-  // Fetch all health data
+  // State for progressive loading per citizen modal session
+  const CHR_PAGE_SIZE = 10;
+  const chrPaginationState = {
+    citizenId: null,
+    citizenUsername: '',
+    staffLookup: null,
+    consultations: { offset: 0, hasMore: false, items: [], loading: false },
+    vitals: { offset: 0, hasMore: false, items: [], loading: false },
+    prescriptions: { offset: 0, hasMore: false, items: [], loading: false },
+    labOrders: { offset: 0, hasMore: false, items: [], loading: false }
+  };
+
+  // Fetch all health data (Initial 10 records per section)
   try {
     const { supabase } = await loadSupabaseModule();
     const citizenId = Number(citizen.id);
+    chrPaginationState.citizenId = citizenId;
+    chrPaginationState.citizenUsername = citizen.username || '';
 
-    console.log('[Health Records] Loading data for citizen ID:', citizenId);
+    console.log('[Health Records] Loading initial records for citizen ID:', citizenId);
 
     const [consultRes, vitalsRes, rxRes, labRes, staffRes] = await Promise.all([
-      // Consultations
+      // Consultations (First 10)
       supabase.from('consultations')
         .select('*, doctor:staff!doctor_staff_id(first_name,last_name,role)')
         .eq('patient_citizen_id', citizenId)
         .order('consulted_at', { ascending: false })
-        .limit(100),
+        .range(0, CHR_PAGE_SIZE - 1),
       
-      // Vital Signs
+      // Vital Signs (First 10)
       supabase.from('vital_signs')
         .select('*, nurse:staff!nurse_id(first_name,last_name), queue_ticket:queue_tickets!queue_ticket_id(queue_number,ticket_code)')
         .eq('citizen_id', citizenId)
         .order('created_at', { ascending: false })
-        .limit(100),
+        .range(0, CHR_PAGE_SIZE - 1),
       
-      // Prescriptions
+      // Prescriptions (First 10)
       supabase.from('prescription_headers')
         .select(`
           id,
@@ -252,24 +266,32 @@ async function openCitizenHealthModal(citizen) {
         `)
         .or(`patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId},patient_identifier.eq.${citizen.username || ''}`)
         .order('issued_at', { ascending: false })
-        .limit(100),
+        .range(0, CHR_PAGE_SIZE - 1),
       
-      // Lab Orders
+      // Lab Orders (First 10)
       supabase.from('lab_orders')
         .select('*, doctor:staff!doctor_staff_id(first_name,last_name)')
         .eq('patient_citizen_id', citizenId)
         .order('created_at', { ascending: false })
-        .limit(100),
+        .range(0, CHR_PAGE_SIZE - 1),
 
       supabase.rpc('list_staff_accounts')
     ]);
 
-    console.log('[Health Records] Consultations:', consultRes.data?.length || 0, consultRes.error);
-    console.log('[Health Records] Vitals:', vitalsRes.data?.length || 0, vitalsRes.error);
-    console.log('[Health Records] Prescriptions:', rxRes.data?.length || 0, rxRes.error);
-    console.log('[Health Records] Lab Orders:', labRes.data?.length || 0, labRes.error);
-
     const staffLookup = buildStaffLookup(staffRes?.data || []);
+    chrPaginationState.staffLookup = staffLookup;
+
+    const initSection = (sectionKey, resData) => {
+      const items = resData || [];
+      chrPaginationState[sectionKey].items = [...items];
+      chrPaginationState[sectionKey].offset = items.length;
+      chrPaginationState[sectionKey].hasMore = items.length === CHR_PAGE_SIZE;
+    };
+
+    initSection('consultations', consultRes.data);
+    initSection('vitals', vitalsRes.data);
+    initSection('prescriptions', rxRes.data);
+    initSection('labOrders', labRes.data);
 
     // Render each section
     renderConsultationsTab(consultRes.data || [], consultRes.error, staffLookup);
@@ -297,7 +319,7 @@ function renderConsultationsTab(rows, error, staffLookup) {
     return;
   }
 
-  if (!rows.length) {
+  if (!rows.length && !chrPaginationState.consultations.items.length) {
     consultEl.innerHTML = chrEmptyState('No consultation records found for this patient.');
     return;
   }
@@ -324,8 +346,37 @@ function renderConsultationsTab(rows, error, staffLookup) {
         </tr></thead>
         <tbody id="chr-consults-list"></tbody>
       </table>
+    </div>
+    <div id="chr-consults-pagination" class="load-more-container">
+      <span class="load-more-counter" id="chr-consults-counter"></span>
+      <button type="button" class="btn-load-more" id="chr-consults-load-more">
+        <span>Load More (10)</span>
+      </button>
+      <span id="chr-consults-end" style="font-size:11px;color:#94a3b8;display:none;">All records loaded</span>
     </div>`;
-  
+
+  const searchInput = document.getElementById('chr-consult-search');
+  const sortSelect = document.getElementById('chr-consult-sort');
+  const loadMoreBtn = document.getElementById('chr-consults-load-more');
+  const endNotice = document.getElementById('chr-consults-end');
+  const counterEl = document.getElementById('chr-consults-counter');
+
+  const updatePaginationUI = () => {
+    const totalLoaded = chrPaginationState.consultations.items.length;
+    if (counterEl) counterEl.textContent = `Showing ${totalLoaded} record(s)`;
+    if (loadMoreBtn && endNotice) {
+      if (chrPaginationState.consultations.hasMore) {
+        loadMoreBtn.style.display = 'inline-flex';
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.innerHTML = '<span>Load More (10)</span>';
+        endNotice.style.display = 'none';
+      } else {
+        loadMoreBtn.style.display = 'none';
+        endNotice.style.display = 'inline';
+      }
+    }
+  };
+
   const renderList = (data) => {
     const tbody = document.getElementById('chr-consults-list');
     const countEl = document.getElementById('chr-consult-count');
@@ -388,20 +439,15 @@ function renderConsultationsTab(rows, error, staffLookup) {
       
       tbody.appendChild(tr);
     });
+    updatePaginationUI();
   };
-  
-  // Initial render
-  renderList(rows);
-  
-  // Search and sort
-  const searchInput = document.getElementById('chr-consult-search');
-  const sortSelect = document.getElementById('chr-consult-sort');
   
   const filterAndSort = () => {
     const searchTerm = (searchInput?.value || '').toLowerCase();
     const sortBy = sortSelect?.value || 'date-desc';
+    const allItems = chrPaginationState.consultations.items;
     
-    let filtered = rows.filter(r => {
+    let filtered = allItems.filter(r => {
       if (!searchTerm) return true;
       const searchableText = [
         r.diagnosis,
@@ -430,8 +476,41 @@ function renderConsultationsTab(rows, error, staffLookup) {
     renderList(filtered);
   };
   
+  loadMoreBtn?.addEventListener('click', async () => {
+    if (chrPaginationState.consultations.loading) return;
+    chrPaginationState.consultations.loading = true;
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading...</span>';
+
+    try {
+      const { supabase } = await loadSupabaseModule();
+      const from = chrPaginationState.consultations.offset;
+      const to = from + CHR_PAGE_SIZE - 1;
+      const { data, error: moreErr } = await supabase.from('consultations')
+        .select('*, doctor:staff!doctor_staff_id(first_name,last_name,role)')
+        .eq('patient_citizen_id', chrPaginationState.citizenId)
+        .order('consulted_at', { ascending: false })
+        .range(from, to);
+
+      if (!moreErr && data && data.length > 0) {
+        chrPaginationState.consultations.items.push(...data);
+        chrPaginationState.consultations.offset += data.length;
+        chrPaginationState.consultations.hasMore = data.length === CHR_PAGE_SIZE;
+      } else {
+        chrPaginationState.consultations.hasMore = false;
+      }
+    } catch (e) {
+      console.error('[Health Records] Error loading more consultations:', e);
+    } finally {
+      chrPaginationState.consultations.loading = false;
+      filterAndSort();
+    }
+  });
+
   searchInput?.addEventListener('input', filterAndSort);
   sortSelect?.addEventListener('change', filterAndSort);
+
+  filterAndSort();
 }
 
 function renderVitalsTab(rows, error, staffLookup) {
@@ -444,7 +523,7 @@ function renderVitalsTab(rows, error, staffLookup) {
     return;
   }
 
-  if (!rows.length) {
+  if (!rows.length && !chrPaginationState.vitals.items.length) {
     vitalsEl.innerHTML = chrEmptyState('No vital assessment records found for this patient.');
     return;
   }
@@ -472,8 +551,37 @@ function renderVitalsTab(rows, error, staffLookup) {
         </tr></thead>
         <tbody id="chr-vitals-list"></tbody>
       </table>
+    </div>
+    <div id="chr-vitals-pagination" class="load-more-container">
+      <span class="load-more-counter" id="chr-vitals-counter"></span>
+      <button type="button" class="btn-load-more" id="chr-vitals-load-more">
+        <span>Load More (10)</span>
+      </button>
+      <span id="chr-vitals-end" style="font-size:11px;color:#94a3b8;display:none;">All records loaded</span>
     </div>`;
-  
+
+  const searchInput = document.getElementById('chr-vitals-search');
+  const sortSelect = document.getElementById('chr-vitals-sort');
+  const loadMoreBtn = document.getElementById('chr-vitals-load-more');
+  const endNotice = document.getElementById('chr-vitals-end');
+  const counterEl = document.getElementById('chr-vitals-counter');
+
+  const updatePaginationUI = () => {
+    const totalLoaded = chrPaginationState.vitals.items.length;
+    if (counterEl) counterEl.textContent = `Showing ${totalLoaded} record(s)`;
+    if (loadMoreBtn && endNotice) {
+      if (chrPaginationState.vitals.hasMore) {
+        loadMoreBtn.style.display = 'inline-flex';
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.innerHTML = '<span>Load More (10)</span>';
+        endNotice.style.display = 'none';
+      } else {
+        loadMoreBtn.style.display = 'none';
+        endNotice.style.display = 'inline';
+      }
+    }
+  };
+
   const renderList = (data) => {
     const tbody = document.getElementById('chr-vitals-list');
     const countEl = document.getElementById('chr-vitals-count');
@@ -533,20 +641,15 @@ function renderVitalsTab(rows, error, staffLookup) {
       
       tbody.appendChild(tr);
     });
+    updatePaginationUI();
   };
-  
-  // Initial render
-  renderList(rows);
-  
-  // Search and sort
-  const searchInput = document.getElementById('chr-vitals-search');
-  const sortSelect = document.getElementById('chr-vitals-sort');
   
   const filterAndSort = () => {
     const searchTerm = (searchInput?.value || '').toLowerCase();
     const sortBy = sortSelect?.value || 'date-desc';
+    const allItems = chrPaginationState.vitals.items;
     
-    let filtered = rows.filter(r => {
+    let filtered = allItems.filter(r => {
       if (!searchTerm) return true;
       const searchableText = [
         r.chief_complaint,
@@ -570,8 +673,41 @@ function renderVitalsTab(rows, error, staffLookup) {
     renderList(filtered);
   };
   
+  loadMoreBtn?.addEventListener('click', async () => {
+    if (chrPaginationState.vitals.loading) return;
+    chrPaginationState.vitals.loading = true;
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading...</span>';
+
+    try {
+      const { supabase } = await loadSupabaseModule();
+      const from = chrPaginationState.vitals.offset;
+      const to = from + CHR_PAGE_SIZE - 1;
+      const { data, error: moreErr } = await supabase.from('vital_signs')
+        .select('*, nurse:staff!nurse_id(first_name,last_name), queue_ticket:queue_tickets!queue_ticket_id(queue_number,ticket_code)')
+        .eq('citizen_id', chrPaginationState.citizenId)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (!moreErr && data && data.length > 0) {
+        chrPaginationState.vitals.items.push(...data);
+        chrPaginationState.vitals.offset += data.length;
+        chrPaginationState.vitals.hasMore = data.length === CHR_PAGE_SIZE;
+      } else {
+        chrPaginationState.vitals.hasMore = false;
+      }
+    } catch (e) {
+      console.error('[Health Records] Error loading more vitals:', e);
+    } finally {
+      chrPaginationState.vitals.loading = false;
+      filterAndSort();
+    }
+  });
+
   searchInput?.addEventListener('input', filterAndSort);
   sortSelect?.addEventListener('change', filterAndSort);
+
+  filterAndSort();
 }
 
 function renderPrescriptionsTab(rows, error, staffLookup) {
@@ -584,7 +720,7 @@ function renderPrescriptionsTab(rows, error, staffLookup) {
     return;
   }
 
-  if (!rows.length) {
+  if (!rows.length && !chrPaginationState.prescriptions.items.length) {
     rxEl.innerHTML = chrEmptyState('No prescription records found for this patient.');
     return;
   }
@@ -600,8 +736,37 @@ function renderPrescriptionsTab(rows, error, staffLookup) {
       </select>
       <span id="chr-rx-count" style="font-size:12px;color:#64748b;padding:8px 12px;"></span>
     </div>
-    <div id="chr-rx-list"></div>`;
-  
+    <div id="chr-rx-list"></div>
+    <div id="chr-rx-pagination" class="load-more-container">
+      <span class="load-more-counter" id="chr-rx-counter"></span>
+      <button type="button" class="btn-load-more" id="chr-rx-load-more">
+        <span>Load More (10)</span>
+      </button>
+      <span id="chr-rx-end" style="font-size:11px;color:#94a3b8;display:none;">All records loaded</span>
+    </div>`;
+
+  const searchInput = document.getElementById('chr-rx-search');
+  const sortSelect = document.getElementById('chr-rx-sort');
+  const loadMoreBtn = document.getElementById('chr-rx-load-more');
+  const endNotice = document.getElementById('chr-rx-end');
+  const counterEl = document.getElementById('chr-rx-counter');
+
+  const updatePaginationUI = () => {
+    const totalLoaded = chrPaginationState.prescriptions.items.length;
+    if (counterEl) counterEl.textContent = `Showing ${totalLoaded} prescription(s)`;
+    if (loadMoreBtn && endNotice) {
+      if (chrPaginationState.prescriptions.hasMore) {
+        loadMoreBtn.style.display = 'inline-flex';
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.innerHTML = '<span>Load More (10)</span>';
+        endNotice.style.display = 'none';
+      } else {
+        loadMoreBtn.style.display = 'none';
+        endNotice.style.display = 'inline';
+      }
+    }
+  };
+
   const renderList = (data) => {
     const container = document.getElementById('chr-rx-list');
     const countEl = document.getElementById('chr-rx-count');
@@ -651,20 +816,15 @@ function renderPrescriptionsTab(rows, error, staffLookup) {
           <div>${itemsHtml}</div>
         </div>`;
     }).join('');
+    updatePaginationUI();
   };
-  
-  // Initial render
-  renderList(rows);
-  
-  // Search and sort
-  const searchInput = document.getElementById('chr-rx-search');
-  const sortSelect = document.getElementById('chr-rx-sort');
   
   const filterAndSort = () => {
     const searchTerm = (searchInput?.value || '').toLowerCase();
     const sortBy = sortSelect?.value || 'date-desc';
+    const allItems = chrPaginationState.prescriptions.items;
     
-    let filtered = rows.filter(rx => {
+    let filtered = allItems.filter(rx => {
       if (!searchTerm) return true;
       const searchableText = [
         rx.doctor?.first_name,
@@ -690,8 +850,58 @@ function renderPrescriptionsTab(rows, error, staffLookup) {
     renderList(filtered);
   };
   
+  loadMoreBtn?.addEventListener('click', async () => {
+    if (chrPaginationState.prescriptions.loading) return;
+    chrPaginationState.prescriptions.loading = true;
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading...</span>';
+
+    try {
+      const { supabase } = await loadSupabaseModule();
+      const from = chrPaginationState.prescriptions.offset;
+      const to = from + CHR_PAGE_SIZE - 1;
+      const { data, error: moreErr } = await supabase.from('prescription_headers')
+        .select(`
+          id,
+          issued_at,
+          patient_identifier,
+          consultation_id,
+          doctor_staff_id,
+          doctor:staff!doctor_staff_id(first_name,last_name,role),
+          items:prescription_items(
+            id,
+            medicine_name,
+            quantity,
+            unit,
+            dosage,
+            frequency,
+            duration,
+            instructions
+          )
+        `)
+        .or(`patient_identifier.eq.CIT-${chrPaginationState.citizenId},patient_identifier.eq.${chrPaginationState.citizenId},patient_identifier.eq.${chrPaginationState.citizenUsername || ''}`)
+        .order('issued_at', { ascending: false })
+        .range(from, to);
+
+      if (!moreErr && data && data.length > 0) {
+        chrPaginationState.prescriptions.items.push(...data);
+        chrPaginationState.prescriptions.offset += data.length;
+        chrPaginationState.prescriptions.hasMore = data.length === CHR_PAGE_SIZE;
+      } else {
+        chrPaginationState.prescriptions.hasMore = false;
+      }
+    } catch (e) {
+      console.error('[Health Records] Error loading more prescriptions:', e);
+    } finally {
+      chrPaginationState.prescriptions.loading = false;
+      filterAndSort();
+    }
+  });
+
   searchInput?.addEventListener('input', filterAndSort);
   sortSelect?.addEventListener('change', filterAndSort);
+
+  filterAndSort();
 }
 
 function renderLabOrdersTab(rows, error, staffLookup) {
@@ -704,7 +914,7 @@ function renderLabOrdersTab(rows, error, staffLookup) {
     return;
   }
 
-  if (!rows.length) {
+  if (!rows.length && !chrPaginationState.labOrders.items.length) {
     labEl.innerHTML = chrEmptyState('No lab order records found for this patient.');
     return;
   }
@@ -718,25 +928,91 @@ function renderLabOrdersTab(rows, error, staffLookup) {
           <th class="table-header-cell">Status</th>
           <th class="table-header-cell">Doctor</th>
         </tr></thead>
-        <tbody>${rows.map(r => {
-          const date = r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
-          const statusClass = r.status === 'Completed' ? 'badge badge-success' : 'badge badge-warning';
-          const doctor = resolveStaffName({
-            staff: r.doctor,
-            staffId: r.doctor_staff_id,
-            lookup: staffLookup,
-            fallback: '—'
-          });
-          return `<tr class="account-row">
-            <td class="table-cell" style="white-space:nowrap;">${date}</td>
-            <td class="table-cell"><strong>${r.test_name || '—'}</strong></td>
-            <td class="table-cell"><span class="${statusClass}" style="font-size:10px;">${r.status || 'PENDING'}</span></td>
-            <td class="table-cell" style="white-space:nowrap;">${doctor}</td>
-          </tr>`;
-        }).join('')}
-        </tbody>
+        <tbody id="chr-laborders-list"></tbody>
       </table>
+    </div>
+    <div id="chr-laborders-pagination" class="load-more-container">
+      <span class="load-more-counter" id="chr-laborders-counter"></span>
+      <button type="button" class="btn-load-more" id="chr-laborders-load-more">
+        <span>Load More (10)</span>
+      </button>
+      <span id="chr-laborders-end" style="font-size:11px;color:#94a3b8;display:none;">All records loaded</span>
     </div>`;
+
+  const tbody = document.getElementById('chr-laborders-list');
+  const loadMoreBtn = document.getElementById('chr-laborders-load-more');
+  const endNotice = document.getElementById('chr-laborders-end');
+  const counterEl = document.getElementById('chr-laborders-counter');
+
+  const updatePaginationUI = () => {
+    const totalLoaded = chrPaginationState.labOrders.items.length;
+    if (counterEl) counterEl.textContent = `Showing ${totalLoaded} record(s)`;
+    if (loadMoreBtn && endNotice) {
+      if (chrPaginationState.labOrders.hasMore) {
+        loadMoreBtn.style.display = 'inline-flex';
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.innerHTML = '<span>Load More (10)</span>';
+        endNotice.style.display = 'none';
+      } else {
+        loadMoreBtn.style.display = 'none';
+        endNotice.style.display = 'inline';
+      }
+    }
+  };
+
+  const renderTableRows = () => {
+    if (!tbody) return;
+    tbody.innerHTML = chrPaginationState.labOrders.items.map(r => {
+      const date = r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+      const statusClass = r.status === 'Completed' ? 'badge badge-success' : 'badge badge-warning';
+      const doctor = resolveStaffName({
+        staff: r.doctor,
+        staffId: r.doctor_staff_id,
+        lookup: staffLookup,
+        fallback: '—'
+      });
+      return `<tr class="account-row">
+        <td class="table-cell" style="white-space:nowrap;">${date}</td>
+        <td class="table-cell"><strong>${r.test_name || '—'}</strong></td>
+        <td class="table-cell"><span class="${statusClass}" style="font-size:10px;">${r.status || 'PENDING'}</span></td>
+        <td class="table-cell" style="white-space:nowrap;">${doctor}</td>
+      </tr>`;
+    }).join('');
+    updatePaginationUI();
+  };
+
+  loadMoreBtn?.addEventListener('click', async () => {
+    if (chrPaginationState.labOrders.loading) return;
+    chrPaginationState.labOrders.loading = true;
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading...</span>';
+
+    try {
+      const { supabase } = await loadSupabaseModule();
+      const from = chrPaginationState.labOrders.offset;
+      const to = from + CHR_PAGE_SIZE - 1;
+      const { data, error: moreErr } = await supabase.from('lab_orders')
+        .select('*, doctor:staff!doctor_staff_id(first_name,last_name)')
+        .eq('patient_citizen_id', chrPaginationState.citizenId)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (!moreErr && data && data.length > 0) {
+        chrPaginationState.labOrders.items.push(...data);
+        chrPaginationState.labOrders.offset += data.length;
+        chrPaginationState.labOrders.hasMore = data.length === CHR_PAGE_SIZE;
+      } else {
+        chrPaginationState.labOrders.hasMore = false;
+      }
+    } catch (e) {
+      console.error('[Health Records] Error loading more lab orders:', e);
+    } finally {
+      chrPaginationState.labOrders.loading = false;
+      renderTableRows();
+    }
+  });
+
+  renderTableRows();
 }
 
 // Module loaded

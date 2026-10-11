@@ -308,18 +308,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     }
   }
 
-  Future<void> _refreshDoctorListSilently() async {
-    try {
-      final doctors = await ApiService.listDoctorStatus(forceRefresh: true);
-      if (mounted) {
-        setState(() {
-          _doctors = doctors;
-        });
-      }
-    } catch (e) {
-      debugPrint('Silent doctor list refresh error: $e');
-    }
-  }
+
 
   void _unsubscribeDoctorAvailabilityRealtime() {
     if (_doctorAvailabilityChannel != null) {
@@ -341,12 +330,12 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     }
   }
 
-  Future<void> _loadAllData({bool isInitial = false}) async {
+  Future<void> _loadAllData({bool isInitial = false, bool forceRefresh = false}) async {
     if (!mounted) return;
     if (isInitial) setState(() => _isInitialLoading = true);
     try {
       final results = await Future.wait<dynamic>([
-        ApiService.listDoctorStatus(forceRefresh: !isInitial),
+        ApiService.listDoctorStatus(forceRefresh: forceRefresh),
         ApiService.getMyQueueDashboard(),
         ApiService.fetchPrescriptions(limit: 10),
         ApiService.fetchAnnouncements(),
@@ -653,7 +642,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               displacement: 24,
               onRefresh: () async {
                 HapticFeedback.lightImpact();
-                await _loadAllData(isInitial: false);
+                await _loadAllData(isInitial: false, forceRefresh: true);
               },
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),

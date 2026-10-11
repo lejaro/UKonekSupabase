@@ -234,21 +234,25 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
         debugPrint('MedicineScheduler: Non-critical citizen profile fetch error: $e');
       });
 
-      // Resilient isolated fetches: a failure in one call does NOT break the schedule
-      final remoteMeds = await ApiService.getMedicineSchedule(citizenId: citizenIntId).catchError((e) {
-        debugPrint('Error fetching remote medicine schedule: $e');
-        return <ScheduledMedicine>[];
-      });
+      // Resilient parallel fetches: run calls concurrently to eliminate sequential network latency
+      final fetchResults = await Future.wait<dynamic>([
+        ApiService.getMedicineSchedule(citizenId: citizenIntId).catchError((e) {
+          debugPrint('Error fetching remote medicine schedule: $e');
+          return <ScheduledMedicine>[];
+        }),
+        ApiService.fetchPrescriptions(citizenId: citizenIntId).catchError((e) {
+          debugPrint('Error fetching prescriptions: $e');
+          return <PrescriptionRecord>[];
+        }),
+        ApiService.fetchConsultations().catchError((e) {
+          debugPrint('Error fetching consultations: $e');
+          return <Consultation>[];
+        }),
+      ]);
 
-      final cons = await ApiService.fetchConsultations().catchError((e) {
-        debugPrint('Error fetching consultations: $e');
-        return <Consultation>[];
-      });
-
-      final prescriptions = await ApiService.fetchPrescriptions(citizenId: citizenIntId).catchError((e) {
-        debugPrint('Error fetching prescriptions: $e');
-        return <PrescriptionRecord>[];
-      });
+      final remoteMeds = fetchResults[0] as List<ScheduledMedicine>;
+      final prescriptions = fetchResults[1] as List<PrescriptionRecord>;
+      final cons = fetchResults[2] as List<Consultation>;
 
       // Synthesize fallback items from prescriptions
       final synthesized = ApiService.synthesizeScheduledMedicinesFromPrescriptions(prescriptions);

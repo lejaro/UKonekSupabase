@@ -141,10 +141,144 @@ export async function loadStaffData() {
   }
 }
 
+const CITIZENS_PAGE_SIZE = 15;
+let citizensOffset = 0;
+let hasMoreCitizens = false;
+let isLoadingMoreCitizens = false;
+
+function updateCitizensLoadMoreUI() {
+  const tableWrap = document.getElementById('citizens-tbody')?.closest('.table-wrap');
+  if (!tableWrap) return;
+
+  let container = document.getElementById('citizens-load-more-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'citizens-load-more-container';
+    container.className = 'load-more-container';
+    tableWrap.parentNode.insertBefore(container, tableWrap.nextSibling);
+  }
+
+  container.innerHTML = `
+    <span class="load-more-counter">Showing ${latestPatientsList.length} citizen(s)</span>
+    ${hasMoreCitizens ? `
+      <button type="button" class="btn-load-more" id="citizens-load-more-btn">
+        <span>Load More Citizens (15)</span>
+      </button>
+    ` : `<span style="font-size:11px;color:#94a3b8;">All citizens loaded</span>`}
+  `;
+
+  const btn = document.getElementById('citizens-load-more-btn');
+  btn?.addEventListener('click', async () => {
+    if (isLoadingMoreCitizens) return;
+    isLoadingMoreCitizens = true;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading...</span>';
+
+    try {
+      const { data, error } = await supabase
+        .from('citizens')
+        .select('id, firstname, surname, username, email, contact_number, complete_address, age, date_of_birth, sex, emergency_contact_complete_name, emergency_contact_contact_number, relation, created_at')
+        .order('created_at', { ascending: false })
+        .range(citizensOffset, citizensOffset + CITIZENS_PAGE_SIZE - 1);
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        latestPatientsList.push(...data);
+        citizensOffset += data.length;
+        hasMoreCitizens = data.length === CITIZENS_PAGE_SIZE;
+        renderCitizensTableRows();
+      } else {
+        hasMoreCitizens = false;
+        updateCitizensLoadMoreUI();
+      }
+    } catch (err) {
+      console.warn('Error loading more citizens:', err);
+      updateCitizensLoadMoreUI();
+    } finally {
+      isLoadingMoreCitizens = false;
+    }
+  });
+}
+
+function renderCitizensTableRows() {
+  const citizensTbody = document.getElementById('citizens-tbody');
+  if (!citizensTbody) return;
+
+  swapContainer(citizensTbody, (fragment) => {
+    if (latestPatientsList.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td class="table-cell" colspan="5" style="text-align:center; padding:32px 16px; color:#94a3b8;">No registered citizens found.</td>';
+      fragment.appendChild(tr);
+      return;
+    }
+
+    latestPatientsList.forEach((citizen) => {
+      const fullName = `${citizen.firstname || ''} ${citizen.surname || ''}`.trim() || citizen.username || 'Citizen';
+      const contact = citizen.contact_number || '—';
+      const email = citizen.email || '—';
+      const regDate = citizen.created_at ? new Date(citizen.created_at).toLocaleDateString() : '—';
+      const address = citizen.complete_address || '—';
+      const age = citizen.age ? `${citizen.age} yrs` : '—';
+
+      const tr = document.createElement('tr');
+      tr.className = 'citizen-row';
+      tr.dataset.createdAt = citizen.created_at || '';
+      tr.innerHTML = `
+        <td class="table-cell">
+          <strong style="font-size:13px; color:#0f172a;">${sanitizeText(fullName)}</strong>
+          <div style="font-size:11px; color:#64748b;">ID: #${citizen.id}</div>
+        </td>
+        <td class="table-cell" style="color:#475569;">${sanitizeText(email)}</td>
+        <td class="table-cell" style="color:#475569;">${sanitizeText(contact)}</td>
+        <td class="table-cell" style="color:#64748b;">${sanitizeText(regDate)}</td>
+        <td class="table-cell" style="text-align:right;">
+          <button type="button" class="btn small outline" data-action="view-ehr" style="padding:3px 10px; font-size:11px; border-radius:9999px;">View EHR</button>
+        </td>
+      `;
+
+      fragment.appendChild(tr);
+
+      attachDetailRow(tr, () => ({
+        tag: 'Citizen Record',
+        title: fullName,
+        subtitle: `Citizen ID #${citizen.id}`,
+        items: [
+          { label: 'Full Name', value: fullName },
+          { label: 'Age', value: age },
+          { label: 'Contact Number', value: contact },
+          { label: 'Email', value: email },
+          { label: 'Complete Address', value: address },
+          { label: 'Registration Date', value: citizen.created_at ? new Date(citizen.created_at) : '—' }
+        ]
+      }));
+
+      tr.querySelector('[data-action="view-ehr"]')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openCitizenHealthModal(citizen);
+      });
+    });
+  });
+
+  applyCitizensFinder();
+  updateUsersSectionTelemetry();
+  updateCitizensLoadMoreUI();
+}
+
 export async function loadPatientData() {
   const citizensTbody = document.getElementById('citizens-tbody');
   if (citizensTbody) {
     renderTableSkeleton(citizensTbody, 5, 5);
+  }
+
+  // Exact head count for dashboard metric without loading entire dataset
+  try {
+    const { count: totalCount } = await supabase
+      .from('citizens')
+      .select('*', { count: 'exact', head: true });
+    if (typeof totalCount === 'number') {
+      updateRegisteredCitizensMetric(totalCount);
+    }
+  } catch (countErr) {
+    console.warn('Could not fetch exact citizen count:', countErr);
   }
 
   let patients = [];
@@ -153,7 +287,7 @@ export async function loadPatientData() {
       .from('citizens')
       .select('id, firstname, surname, username, email, contact_number, complete_address, age, date_of_birth, sex, emergency_contact_complete_name, emergency_contact_contact_number, relation, created_at')
       .order('created_at', { ascending: false })
-      .limit(200);
+      .range(0, CITIZENS_PAGE_SIZE - 1);
 
     if (!error && Array.isArray(data)) {
       patients = data;
@@ -162,68 +296,11 @@ export async function loadPatientData() {
     console.warn('Error fetching citizens:', err);
   }
 
+  citizensOffset = patients.length;
+  hasMoreCitizens = patients.length === CITIZENS_PAGE_SIZE;
   latestPatientsList = Array.isArray(patients) ? [...patients] : [];
-  updateRegisteredCitizensMetric(latestPatientsList.length);
 
-  if (citizensTbody) {
-    swapContainer(citizensTbody, (fragment) => {
-      if (latestPatientsList.length === 0) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = '<td class="table-cell" colspan="5" style="text-align:center; padding:32px 16px; color:#94a3b8;">No registered citizens found.</td>';
-        fragment.appendChild(tr);
-        return;
-      }
-
-      latestPatientsList.forEach((citizen) => {
-        const fullName = `${citizen.firstname || ''} ${citizen.surname || ''}`.trim() || citizen.username || 'Citizen';
-        const contact = citizen.contact_number || '—';
-        const email = citizen.email || '—';
-        const regDate = citizen.created_at ? new Date(citizen.created_at).toLocaleDateString() : '—';
-        const address = citizen.complete_address || '—';
-        const age = citizen.age ? `${citizen.age} yrs` : '—';
-
-        const tr = document.createElement('tr');
-        tr.className = 'citizen-row';
-        tr.dataset.createdAt = citizen.created_at || '';
-        tr.innerHTML = `
-          <td class="table-cell">
-            <strong style="font-size:13px; color:#0f172a;">${sanitizeText(fullName)}</strong>
-            <div style="font-size:11px; color:#64748b;">ID: #${citizen.id}</div>
-          </td>
-          <td class="table-cell" style="color:#475569;">${sanitizeText(email)}</td>
-          <td class="table-cell" style="color:#475569;">${sanitizeText(contact)}</td>
-          <td class="table-cell" style="color:#64748b;">${sanitizeText(regDate)}</td>
-          <td class="table-cell" style="text-align:right;">
-            <button type="button" class="btn small outline" data-action="view-ehr" style="padding:3px 10px; font-size:11px; border-radius:9999px;">View EHR</button>
-          </td>
-        `;
-
-        fragment.appendChild(tr);
-
-        attachDetailRow(tr, () => ({
-          tag: 'Citizen Record',
-          title: fullName,
-          subtitle: `Citizen ID #${citizen.id}`,
-          items: [
-            { label: 'Full Name', value: fullName },
-            { label: 'Age', value: age },
-            { label: 'Contact Number', value: contact },
-            { label: 'Email', value: email },
-            { label: 'Complete Address', value: address },
-            { label: 'Registration Date', value: citizen.created_at ? new Date(citizen.created_at) : '—' }
-          ]
-        }));
-
-        tr.querySelector('[data-action="view-ehr"]')?.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openCitizenHealthModal(citizen);
-        });
-      });
-    });
-
-    applyCitizensFinder();
-    updateUsersSectionTelemetry();
-  }
+  renderCitizensTableRows();
 }
 
 export function applyStaffFinder() {
@@ -380,6 +457,10 @@ export function switchUsersPane(paneId = 'registered-pane') {
 }
 
 export async function openCitizenHealthModal(citizen) {
+  if (typeof window !== 'undefined' && typeof window.openCitizenHealthModal === 'function') {
+    return window.openCitizenHealthModal(citizen);
+  }
+
   const modal = document.getElementById('citizen-health-modal');
   if (!modal || !citizen) return;
 
@@ -435,22 +516,22 @@ export async function openCitizenHealthModal(citizen) {
         .select('*, doctor:staff!doctor_staff_id(first_name,last_name)')
         .or(`patient_citizen_id.eq.${citizenId},patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId}`)
         .order('consulted_at', { ascending: false })
-        .limit(50),
+        .limit(10),
       supabase.from('vital_signs')
         .select('*, nurse:staff!nurse_id(first_name,last_name)')
         .eq('citizen_id', citizenId)
         .order('created_at', { ascending: false })
-        .limit(50),
+        .limit(10),
       supabase.from('prescription_headers')
         .select('id,issued_at,patient_identifier,doctor_staff_id,doctor:staff!doctor_staff_id(first_name,last_name),items:prescription_items(*)')
         .or(`patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId}`)
         .order('issued_at', { ascending: false })
-        .limit(50),
+        .limit(10),
       supabase.from('lab_orders')
         .select('*, doctor:staff!doctor_staff_id(first_name,last_name)')
         .or(`patient_citizen_id.eq.${citizenId},patient_identifier.eq.CIT-${citizenId},patient_identifier.eq.${citizenId}`)
         .order('created_at', { ascending: false })
-        .limit(50)
+        .limit(10)
     ]);
 
     // Render Consultations
