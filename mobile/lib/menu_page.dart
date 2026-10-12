@@ -218,16 +218,16 @@ class _uKonekMenuPageState extends State<uKonekMenuPage>
 
   Widget _buildStatsRow() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withOpacity(0.06),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withOpacity(0.09)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _statItem("10K+", "Valenzuelanos"),
+          _statItem("Fast Track", "Check-in"),
           _verticalDivider(),
           _statItem("Live", "Queue Status"),
           _verticalDivider(),
@@ -238,21 +238,61 @@ class _uKonekMenuPageState extends State<uKonekMenuPage>
   }
 
   Widget _statItem(String value, String label) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              height: 22,
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 3),
+            SizedBox(
+              height: 15,
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.48),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-        Text(
-          label,
-          style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _verticalDivider() => Container(height: 36, width: 1, color: Colors.white.withOpacity(0.12));
+  Widget _verticalDivider() => Container(
+        height: 30,
+        width: 1,
+        color: Colors.white.withOpacity(0.12),
+      );
 
   Widget _buildPrimaryButton({required String label, required String subtitle, required IconData icon, required VoidCallback onTap}) {
     return GestureDetector(

@@ -13,7 +13,8 @@ import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'utils/app_transitions.dart';
 import 'core/session/patient_session.dart';
-import 'core/session/session_timeout_manager.dart';
+import 'core/security/pin_security_service.dart';
+import 'widgets/security/pin_security_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -210,9 +211,7 @@ class _UKonekAppState extends State<UKonekApp> {
           ),
         ),
       ),
-      builder: (context, child) {
-        return SessionTimeoutWrapper(child: child);
-      },
+      builder: (context, child) => PinSecurityWrapper(child: child),
       home: const RootHandler(),
     );
   }
@@ -274,51 +273,13 @@ class _RootHandlerState extends State<RootHandler> {
     final prefs = await SharedPreferences.getInstance();
     final sessionToken = prefs.getString('session_token');
 
+    // Clean up any legacy inactivity timeout keys from older builds
+    await prefs.remove('session_last_active_ms');
+    await prefs.remove('session_timed_out_notice');
+
     debugPrint('RootHandler: Checking session... ${session != null ? "Supabase OK" : "No Supabase"} | Token: ${sessionToken != null ? "Present" : "Missing"}');
 
     Widget resolvedPage;
-
-    final isColdStartTimedOut = await SessionTimeoutManager.checkPersistedTimeout();
-    if (isColdStartTimedOut) {
-      debugPrint('RootHandler: Session expired while app was closed. Clearing session.');
-      PatientSessionState.clearSession();
-      try {
-        await ApiService.signOut();
-      } catch (_) {}
-
-      if (!mounted) return;
-      _performNavigation(const uKonekMenuPage());
-
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (await SessionTimeoutManager.consumeColdStartTimeoutNotice()) {
-          final navContext = NotificationService.navigatorKey.currentContext;
-          if (navContext != null) {
-            final messenger = ScaffoldMessenger.maybeOf(navContext);
-            messenger?.showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.timer_off_outlined, color: Colors.white, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Session expired after ${SessionTimeoutManager.timeoutDuration.inMinutes} minutes of inactivity for your security.',
-                        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-                backgroundColor: const Color(0xFF0F172A),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                duration: const Duration(seconds: 5),
-              ),
-            );
-          }
-        }
-      });
-      return;
-    }
 
     if (session == null || sessionToken == null) {
       PatientSessionState.clearSession();
@@ -335,7 +296,13 @@ class _RootHandlerState extends State<RootHandler> {
 
         final patientSession = PatientSession.fromProfile(profile);
         PatientSessionState.setSession(patientSession);
-        SessionTimeoutManager.recordActivity();
+
+        final isPinEnabled = await PinSecurityService.instance.isPinEnabled(patientSession.id);
+        if (isPinEnabled) {
+          PinSecurityService.instance.lock();
+        } else {
+          PinSecurityService.instance.unlock();
+        }
 
         final displayName = profile['username'] ?? session.user.email ?? 'User';
 

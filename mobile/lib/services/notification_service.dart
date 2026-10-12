@@ -105,9 +105,11 @@ class NotificationService {
           return;
         }
 
-        // Default navigation fallback: switch to the medicine scheduler tab
+        // Default navigation fallback: switch to appropriate tab
         if (data['action'] == 'medicine') {
           ShellNavigation.switchTab(ShellNavigation.tabMedicineScheduler);
+        } else if (data['action'] == 'followup' || data['action'] == 'queue') {
+          ShellNavigation.switchTab(ShellNavigation.tabQueue);
         }
       }
     } catch (e) {
@@ -206,6 +208,67 @@ class NotificationService {
   /// ID offset for medicine reminders. Medicine IDs use range 1000-1099.
   static const int medicineIdOffset = 1000;
   static const int maxMedicineNotifications = 100;
+
+  /// ID offset for follow-up consultation reminders. IDs use range 2000-2199.
+  static const int followupIdOffset = 2000;
+  static const int maxFollowupNotifications = 200;
+
+  /// Schedule a follow-up consultation reminder for a specific date and time.
+  static Future<void> scheduleFollowupReminder({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime date,
+    required int hour,
+    required int minute,
+    String? payload,
+  }) async {
+    if (kIsWeb) return;
+    if (Platform.isLinux) return;
+
+    final now = tz.TZDateTime.now(tz.local);
+    final scheduledDate = tz.TZDateTime(
+      tz.local,
+      date.year,
+      date.month,
+      date.day,
+      hour,
+      minute,
+    );
+
+    if (scheduledDate.isBefore(now)) return;
+
+    await _notificationsPlugin.zonedSchedule(
+      id: id,
+      title: title,
+      body: body,
+      scheduledDate: scheduledDate,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'followup_reminders',
+          'Follow-up Reminders',
+          channelDescription: 'Notifications for scheduled clinical follow-up checkups',
+          importance: Importance.max,
+          priority: Priority.high,
+          ticker: 'ticker',
+          styleInformation: BigTextStyleInformation(''),
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      payload: payload,
+    );
+  }
+
+  /// Cancel only follow-up reminder notifications (IDs 2000-2199).
+  static Future<void> cancelFollowupReminders() async {
+    if (kIsWeb) return;
+    final futures = <Future<void>>[];
+    for (int i = 0; i < maxFollowupNotifications; i++) {
+      futures.add(_notificationsPlugin.cancel(id: followupIdOffset + i));
+    }
+    await Future.wait(futures);
+  }
 
   /// Cancel only medicine reminder notifications (IDs 1000-1099)
   /// without affecting clinic alerts or other notification channels.

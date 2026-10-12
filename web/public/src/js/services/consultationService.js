@@ -30,6 +30,7 @@ export async function listConsultations({
       symptoms,
       diagnosis,
       notes,
+      follow_up_date,
       consulted_at,
       created_at,
       doctor:staff!doctor_staff_id (
@@ -101,6 +102,7 @@ export async function getConsultationById(consultationId) {
       symptoms,
       diagnosis,
       notes,
+      follow_up_date,
       consulted_at,
       created_at,
       doctor:staff!doctor_staff_id (first_name, last_name),
@@ -125,6 +127,7 @@ export async function getConsultationById(consultationId) {
  * @param {string} [payload.symptoms]
  * @param {string} payload.diagnosis
  * @param {string} [payload.notes]
+ * @param {string} [payload.follow_up_date]
  * @param {string} [payload.consulted_at]
  * @returns {Promise<Object>}
  */
@@ -143,6 +146,7 @@ export async function createConsultation(payload) {
     symptoms: (payload.symptoms || '').trim() || null,
     diagnosis: payload.diagnosis.trim(),
     notes: (payload.notes || '').trim() || null,
+    follow_up_date: payload.follow_up_date || null,
     consulted_at: payload.consulted_at || new Date().toISOString(),
   };
 

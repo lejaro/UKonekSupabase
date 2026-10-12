@@ -36,8 +36,8 @@ export function startConsultationFromTicket(ticket) {
     patientName: fullName,
     serviceLabel: ticket.service_label || 'General Consultation',
     queueTicketId: ticket.id,
-    symptoms: ticket.symptoms || '',
-    notes: ticket.reason || ''
+    symptoms: ticket.reason || ticket.symptoms || '',
+    notes: ''
   });
 }
 

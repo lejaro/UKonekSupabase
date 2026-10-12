@@ -23,7 +23,7 @@ class Announcement {
       content: (map['content'] as String?)?.trim() ?? '',
       visibility: (map['visibility'] as String?)?.trim() ?? 'all',
       imageUrl: (rawImg != null && rawImg.trim().isNotEmpty) ? rawImg.trim() : null,
-      createdAt: DateTime.tryParse(map['created_at'] ?? '') ?? DateTime.now(),
+      createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '')?.toUtc() ?? DateTime.now().toUtc(),
     );
   }
 }

@@ -52,6 +52,33 @@ function cleanNone(val) {
   return (!s || s === '—' || s === '-' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') ? 'None' : s;
 }
 
+function chrEmptyState(msg) {
+  return `<div style="text-align:center;padding:32px 16px;color:#94a3b8;font-size:13px;">
+    <svg style="width:36px;height:36px;margin:0 auto 8px;display:block;opacity:0.4;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+    <p style="margin:0;color:#64748b;font-weight:500;">${msg}</p>
+  </div>`;
+}
+
+function chrLoadingState() {
+  return `
+    <div style="padding: 16px 0; display: flex; flex-direction: column; gap: 12px;">
+      <div class="skeleton-shimmer skeleton-title" style="width: 45%; height: 16px; border-radius: 4px;"></div>
+      <div class="skeleton-shimmer skeleton-text long" style="height: 12px; border-radius: 4px; width: 100%;"></div>
+      <div class="skeleton-shimmer skeleton-text medium" style="height: 12px; border-radius: 4px; width: 85%;"></div>
+      <div class="skeleton-shimmer skeleton-text short" style="height: 12px; border-radius: 4px; width: 60%;"></div>
+      <div style="margin-top: 12px; display: flex; gap: 12px;">
+        <div class="skeleton-shimmer skeleton-rect" style="width: 100px; height: 32px; border-radius: 6px;"></div>
+        <div class="skeleton-shimmer skeleton-rect" style="width: 120px; height: 32px; border-radius: 6px;"></div>
+      </div>
+    </div>
+  `;
+}
+
+if (typeof window !== 'undefined') {
+  window.chrEmptyState = chrEmptyState;
+  window.chrLoadingState = chrLoadingState;
+}
+
 // Helper function to show detailed record information
 function showDataDetail(title, details) {
   const items = Object.entries(details || {}).map(([key, value]) => ({
@@ -146,6 +173,28 @@ function resolveStaffName({ staff, staffId, lookup, fallback = 'Unknown' }) {
   return formatDoctorName(name);
 }
 
+// State for progressive loading per citizen modal session
+const CHR_PAGE_SIZE = 10;
+const chrPaginationState = {
+  citizenId: null,
+  citizenUsername: '',
+  staffLookup: null,
+  consultations: { offset: 0, hasMore: false, items: [], loading: false },
+  vitals: { offset: 0, hasMore: false, items: [], loading: false },
+  prescriptions: { offset: 0, hasMore: false, items: [], loading: false },
+  labOrders: { offset: 0, hasMore: false, items: [], loading: false }
+};
+
+function resetChrPaginationState(citizenId = null, citizenUsername = '') {
+  chrPaginationState.citizenId = citizenId;
+  chrPaginationState.citizenUsername = citizenUsername || '';
+  chrPaginationState.staffLookup = null;
+  chrPaginationState.consultations = { offset: 0, hasMore: false, items: [], loading: false };
+  chrPaginationState.vitals = { offset: 0, hasMore: false, items: [], loading: false };
+  chrPaginationState.prescriptions = { offset: 0, hasMore: false, items: [], loading: false };
+  chrPaginationState.labOrders = { offset: 0, hasMore: false, items: [], loading: false };
+}
+
 async function openCitizenHealthModal(citizen) {
   if (!citizen || !citizen.id) {
     console.error('[Health Records] Invalid citizen data');
@@ -208,17 +257,8 @@ async function openCitizenHealthModal(citizen) {
 
   citizenHealthModal.classList.remove('hidden');
 
-  // State for progressive loading per citizen modal session
-  const CHR_PAGE_SIZE = 10;
-  const chrPaginationState = {
-    citizenId: null,
-    citizenUsername: '',
-    staffLookup: null,
-    consultations: { offset: 0, hasMore: false, items: [], loading: false },
-    vitals: { offset: 0, hasMore: false, items: [], loading: false },
-    prescriptions: { offset: 0, hasMore: false, items: [], loading: false },
-    labOrders: { offset: 0, hasMore: false, items: [], loading: false }
-  };
+  // Reset progressive loading state per citizen modal session
+  resetChrPaginationState(Number(citizen.id), citizen.username || '');
 
   // Fetch all health data (Initial 10 records per section)
   try {
@@ -1020,19 +1060,3 @@ if (typeof window !== 'undefined') {
   console.log('[Health Records] Enhanced module loaded - openCitizenHealthModal is ready');
 }
 
-if (typeof window.chrLoadingState !== 'function') {
-  window.chrLoadingState = function() {
-    return `
-      <div style="padding: 16px 0; display: flex; flex-direction: column; gap: 12px;">
-        <div class="skeleton-shimmer skeleton-title" style="width: 45%; height: 16px; border-radius: 4px;"></div>
-        <div class="skeleton-shimmer skeleton-text long" style="height: 12px; border-radius: 4px; width: 100%;"></div>
-        <div class="skeleton-shimmer skeleton-text medium" style="height: 12px; border-radius: 4px; width: 85%;"></div>
-        <div class="skeleton-shimmer skeleton-text short" style="height: 12px; border-radius: 4px; width: 60%;"></div>
-        <div style="margin-top: 12px; display: flex; gap: 12px;">
-          <div class="skeleton-shimmer skeleton-rect" style="width: 100px; height: 32px; border-radius: 6px;"></div>
-          <div class="skeleton-shimmer skeleton-rect" style="width: 120px; height: 32px; border-radius: 6px;"></div>
-        </div>
-      </div>
-    `;
-  };
-}

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
+import 'services/followup_notification_service.dart';
 import 'services/medicine_cache_service.dart';
 import 'utils/app_transitions.dart';
 import 'prescription_page.dart';
@@ -114,6 +115,11 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
     Future.delayed(const Duration(milliseconds: 1200), () {
       if (mounted) _checkNewPrescriptionAlert();
     });
+
+    // Synchronize upcoming clinical follow-up reminders
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) FollowupNotificationService.syncAndScheduleFollowupReminders();
+    });
   }
 
   @override
@@ -184,6 +190,7 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkNewPrescriptionAlert();
+      FollowupNotificationService.syncAndScheduleFollowupReminders();
     }
   }
 

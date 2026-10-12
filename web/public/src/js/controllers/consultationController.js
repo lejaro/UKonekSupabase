@@ -114,6 +114,7 @@ export function renderConsultations() {
         { label: 'Diagnosis', value: c.diagnosis || '—' },
         { label: 'Chief Complaint / Symptoms', value: c.symptoms || '—' },
         { label: 'Attending Doctor', value: c.doctor ? `Dr. ${c.doctor.first_name || ''} ${c.doctor.last_name || ''}`.trim() : 'Attending Physician' },
+        { label: 'Follow-Up Schedule', value: c.follow_up_date ? new Date(c.follow_up_date).toLocaleDateString() : 'None Scheduled' },
         { label: 'Clinical Notes', value: c.notes || '—' }
       ]
     }));
@@ -307,7 +308,7 @@ export async function loadTriagedWaitingPatients() {
   if (!rawTriagedWaiting || rawTriagedWaiting.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" style="text-align:center; padding:32px; color:#64748b;">
+        <td colspan="5" style="text-align:center; padding:32px; color:#64748b;">
           <span class="loading-spinner" style="width:16px; height:16px; border:2px solid #cbd5e1; border-top-color:#0284c7; border-radius:50%; display:inline-block; animation:spin 0.8s linear infinite; vertical-align:middle; margin-right:8px;"></span>
           <span style="font-size:13px; font-weight:500;">Loading triaged patients awaiting consultation...</span>
         </td>
@@ -428,7 +429,7 @@ export async function loadTriagedWaitingPatients() {
     if (tbody) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="10" style="text-align:center; padding:28px 16px; color:#ef4444; font-size:13px;">
+          <td colspan="5" style="text-align:center; padding:28px 16px; color:#ef4444; font-size:13px;">
             Unable to load triaged patients queue. Please click "Refresh" to try again.
           </td>
         </tr>
@@ -460,7 +461,7 @@ export function renderTriagedWaitingTable() {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" style="text-align:center; padding:48px 16px; color:#64748b; font-size:13.5px;">
+        <td colspan="5" style="text-align:center; padding:48px 16px; color:#64748b; font-size:13.5px;">
           <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
             <div style="width:48px; height:48px; border-radius:50%; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8;">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -488,11 +489,6 @@ export function renderTriagedWaitingTable() {
     const diffMins = Math.max(0, Math.floor((Date.now() - createdDate.getTime()) / 60000));
     const waitTimeText = diffMins < 1 ? 'Just now' : `${diffMins}m wait`;
 
-    const bp = evaluateBp(v.blood_pressure);
-    const hr = evaluateHr(v.heart_rate);
-    const temp = evaluateTemp(v.temperature);
-    const spo2 = evaluateSpo2(v.oxygen_saturation);
-
     const citizen = v.citizens;
     const patientName = sanitizeText(v._patientName);
     const patientTag = citizen?.id ? `CIT-${citizen.id}` : 'Walk-in';
@@ -509,11 +505,6 @@ export function renderTriagedWaitingTable() {
     let severityHtml = '<span class="vitals-severity-badge severity-stable"><span style="width:6px; height:6px; border-radius:50%; background:#16a34a;"></span> Stable</span>';
     if (v._isAlert) {
       severityHtml = '<span class="vitals-severity-badge severity-alert"><span style="width:6px; height:6px; border-radius:50%; background:#e11d48;"></span> Attention</span>';
-    }
-
-    let queueStatusHtml = '<span class="vitals-queue-badge status-waiting">Waiting Consult</span>';
-    if (v._queueStatus === 'serving' || v._queueStatus === 'on_call') {
-      queueStatusHtml = '<span class="vitals-queue-badge status-serving">In Consult</span>';
     }
 
     const ticketCodeBadge = v._ticketCode
@@ -537,35 +528,12 @@ export function renderTriagedWaitingTable() {
           </div>
         </td>
         <td style="vertical-align:middle;">
-          <div style="font-size:12.5px; color:#334155; font-weight:500; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${complaintSnippet}">
+          <div style="font-size:12.5px; color:#334155; font-weight:500; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${complaintSnippet}">
             ${complaintSnippet}
           </div>
         </td>
         <td style="vertical-align:middle;">
-          <span class="vitals-metric-pill pill-${bp.level}">
-            ${bp.text ? `${bp.text} <span style="font-size:9.5px; font-weight:600; opacity:0.75;">mmHg</span>` : '—'}
-          </span>
-        </td>
-        <td style="vertical-align:middle;">
-          <span class="vitals-metric-pill pill-${hr.level}">
-            ${hr.text || '—'}
-          </span>
-        </td>
-        <td style="vertical-align:middle;">
-          <span class="vitals-metric-pill pill-${temp.level}">
-            ${temp.text || '—'}
-          </span>
-        </td>
-        <td style="vertical-align:middle;">
-          <span class="vitals-metric-pill pill-${spo2.level}">
-            ${spo2.text || '—'}
-          </span>
-        </td>
-        <td style="vertical-align:middle;">
           ${severityHtml}
-        </td>
-        <td style="vertical-align:middle;">
-          ${queueStatusHtml}
         </td>
         <td style="vertical-align:middle; text-align:center; white-space:nowrap;">
           <button type="button" class="chip-btn chip-btn-primary start-triaged-consult-btn" data-vitals-id="${v.id}" style="padding:6px 12px; font-size:11.5px; font-weight:700; border-radius:8px; gap:5px; height:auto; box-shadow:0 2px 4px rgba(2,132,199,0.2);">
@@ -648,7 +616,8 @@ export async function startConsultationForTriagedPatient(v) {
     serviceLabel: ticket?.service_label || 'General Consultation',
     queueTicketId: ticketId,
     symptoms: v.chief_complaint || '',
-    notes: v.current_medications ? `Current Meds: ${v.current_medications}` : ''
+    pmh: v.current_medications ? `Current Meds: ${v.current_medications}` : '',
+    notes: ''
   });
 
   if (citizen?.id) {
@@ -1086,6 +1055,7 @@ function bindCitizenToConsultation(citizen) {
     if (citizen.sex) metaParts.push(citizen.sex);
     if (citizen.contact_number) metaParts.push(`📞 ${citizen.contact_number}`);
     if (citizen.complete_address) metaParts.push(citizen.complete_address);
+    if (form?.dataset.reasonForVisit) metaParts.push(`Reason: ${form.dataset.reasonForVisit}`);
     confMeta.textContent = metaParts.join(' • ') || 'No extra demographics recorded';
   }
 
@@ -1224,6 +1194,7 @@ export async function openConsultationModal(prefill = {}) {
     consultationForm.dataset.queueTicketId = prefill.queueTicketId ? String(prefill.queueTicketId) : '';
     consultationForm.dataset.patientName = prefill.patientName || '';
     consultationForm.dataset.serviceLabel = prefill.serviceLabel || '';
+    consultationForm.dataset.reasonForVisit = prefill.symptoms || '';
   }
 
   // Handle Patient Binding (Prefilled Ticket vs Fresh Form)
@@ -1278,7 +1249,13 @@ export async function openConsultationModal(prefill = {}) {
         confSource.textContent = 'Walk-in Queue';
         confSource.className = 'confirmed-source-tag';
       }
-      if (confMeta) confMeta.textContent = prefill.serviceLabel || 'Walk-in Patient';
+      if (confMeta) {
+        let metaText = prefill.serviceLabel || 'Walk-in Patient';
+        if (prefill.symptoms) {
+          metaText += ` • Reason: ${prefill.symptoms}`;
+        }
+        confMeta.textContent = metaText;
+      }
       if (changeBtn) changeBtn.style.display = 'none';
 
       if (confirmedBanner) confirmedBanner.classList.remove('hidden');
@@ -1357,6 +1334,13 @@ export async function openConsultationModal(prefill = {}) {
   if (vitalsBanner) vitalsBanner.style.display = 'none';
   if (prefill.queueTicketId) {
     loadVitalsForConsultation(Number(prefill.queueTicketId));
+  }
+
+  // Initialize follow-up date input min constraint to today
+  const followUpInput = document.getElementById('consult-followup');
+  if (followUpInput) {
+    followUpInput.min = new Date().toISOString().split('T')[0];
+    followUpInput.value = prefill.follow_up_date || '';
   }
 
   initConsultationTabs();

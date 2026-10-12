@@ -7,6 +7,7 @@ import 'join_queue_page.dart';
 import 'profile_page.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
+import 'services/followup_notification_service.dart';
 import 'services/medicine_cache_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'utils/app_transitions.dart';
@@ -303,6 +304,7 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
         // Background load remote logs for today
         _loadDateLogs(_selectedDate, silent: true);
         _scheduleNotifications();
+        FollowupNotificationService.syncAndScheduleFollowupReminders(cons);
       }
     } catch (e) {
       if (mounted && _medicines.isEmpty) {

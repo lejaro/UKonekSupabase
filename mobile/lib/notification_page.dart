@@ -3,6 +3,7 @@ import 'services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'core/theme/app_colors.dart';
+import 'core/navigation/shell_navigation.dart';
 
 typedef _C = AppColors;
 
@@ -34,13 +35,20 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
 
   Future<void> _updateLastViewed() async {
     final prefs = await SharedPreferences.getInstance();
-    final now = DateTime.now().toIso8601String();
+    final now = DateTime.now().toUtc().toIso8601String();
     await prefs.setString('last_viewed_notifications', now);
+    if (widget.username.isNotEmpty) {
+      await prefs.setString('last_viewed_notifications_${widget.username}', now);
+    }
   }
 
   Future<void> _clearAllNotifications() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('notifications_cleared_at', DateTime.now().toIso8601String());
+    final now = DateTime.now().toUtc().toIso8601String();
+    await prefs.setString('notifications_cleared_at', now);
+    if (widget.username.isNotEmpty) {
+      await prefs.setString('notifications_cleared_at_${widget.username}', now);
+    }
     await _updateLastViewed();
     setState(() {
       _notifications.clear();
@@ -70,14 +78,20 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
       final List<Map<String, dynamic>> notifications = [];
       
       // 1. Announcements
+      final userKey = widget.username.isNotEmpty ? 'last_viewed_notifications_${widget.username}' : 'last_viewed_notifications';
+      final lastViewedStr = prefs.getString(userKey) ?? prefs.getString('last_viewed_notifications');
+      final lastViewed = lastViewedStr != null ? DateTime.tryParse(lastViewedStr)?.toUtc() : null;
+
       for (var a in announcements) {
+        final aUtc = a.createdAt.toUtc();
+        final isRead = lastViewed != null && !aUtc.isAfter(lastViewed);
         notifications.add({
           'id': 'ann_${a.id}',
           'title': a.title,
           'body': a.content,
           'time': _formatTime(a.createdAt.toIso8601String()),
           'type': 'announcement',
-          'isRead': false,
+          'isRead': isRead,
           'rawDate': a.createdAt,
         });
       }
@@ -136,58 +150,77 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
         }
       }
 
-      // 4. Follow-up Checkup Date Notifications
+      // 4. Follow-up Checkup Date Notifications (Strictly 2 triggers: 1 Day Before & Day Of at 7:00 AM)
       final todayDate = DateTime(now.year, now.month, now.day);
-      final tomorrowDate = todayDate.add(const Duration(days: 1));
 
       for (var con in consultations) {
         if (con.followupDate != null) {
           final followDate = DateTime(con.followupDate!.year, con.followupDate!.month, con.followupDate!.day);
+          final dayBeforeDate = followDate.subtract(const Duration(days: 1));
+          final docName = (con.doctorName != null && con.doctorName!.trim().isNotEmpty)
+              ? con.doctorName!.trim()
+              : 'your doctor';
+          final formattedDate = DateFormat('MMMM d, yyyy').format(followDate);
 
-          // A. Standard Notification (scheduled date information)
-          notifications.add({
-            'id': 'followup_sched_${con.id}',
-            'title': 'Follow-up Checkup Scheduled',
-            'body': 'You have a follow-up checkup scheduled with ${con.doctorName ?? 'your doctor'} on ${DateFormat('MMMM d, yyyy').format(con.followupDate!)}.',
-            'time': 'Consulted on ${DateFormat('MM/dd/yyyy').format(con.consultedAt)}',
-            'type': 'followup',
-            'isRead': false,
-            'rawDate': con.consultedAt,
-          });
-
-          // B. Tomorrow's Reminder (1 day before)
-          if (followDate.isAtSameMomentAs(tomorrowDate)) {
+          // 1. Day Before Reminder (triggers at 7:00 AM the day before)
+          if (todayDate.isAtSameMomentAs(dayBeforeDate) && now.hour >= 7) {
             notifications.add({
               'id': 'followup_tomorrow_${con.id}',
               'title': 'Follow-up Consultation Tomorrow',
-              'body': 'Friendly reminder: Your follow-up consultation with ${con.doctorName ?? 'your doctor'} is scheduled for tomorrow, ${DateFormat('MMMM d, yyyy').format(con.followupDate!)}.',
-              'time': 'Reminder',
+              'body': 'Friendly reminder: Your follow-up consultation with $docName is scheduled for tomorrow, $formattedDate.',
+              'time': '7:00 AM',
               'type': 'followup',
               'isRead': false,
-              'rawDate': now.subtract(const Duration(seconds: 1)),
+              'rawDate': DateTime(dayBeforeDate.year, dayBeforeDate.month, dayBeforeDate.day, 7, 0),
             });
           }
 
-          // C. Today's Reminder (Same day)
-          if (followDate.isAtSameMomentAs(todayDate)) {
-            notifications.add({
-              'id': 'followup_today_${con.id}',
-              'title': 'Follow-up Consultation Today',
-              'body': 'Your follow-up consultation with ${con.doctorName ?? 'your doctor'} is scheduled for today! You can join the queue today.',
-              'time': 'Active Now',
-              'type': 'followup',
-              'isRead': false,
-              'rawDate': now,
-            });
+          // 2. Day Of Reminder (triggers at 7:00 AM the day of the consultation)
+          if (todayDate.isAtSameMomentAs(followDate)) {
+            if (now.hour >= 7) {
+              notifications.add({
+                'id': 'followup_today_${con.id}',
+                'title': 'Follow-up Consultation Today',
+                'body': 'Your follow-up consultation with $docName is scheduled for today! You can join the clinic queue now.',
+                'time': '7:00 AM',
+                'type': 'followup',
+                'isRead': false,
+                'rawDate': DateTime(followDate.year, followDate.month, followDate.day, 7, 0),
+              });
+            } else {
+              // Before 7:00 AM on the consultation day, retain the day-before reminder
+              notifications.add({
+                'id': 'followup_tomorrow_${con.id}',
+                'title': 'Follow-up Consultation Today',
+                'body': 'Friendly reminder: Your follow-up consultation with $docName is today, $formattedDate.',
+                'time': 'Yesterday 7:00 AM',
+                'type': 'followup',
+                'isRead': false,
+                'rawDate': DateTime(dayBeforeDate.year, dayBeforeDate.month, dayBeforeDate.day, 7, 0),
+              });
+            }
           }
         }
       }
 
+      // Filter out dismissed notifications
+      final dismissedKey = widget.username.isNotEmpty ? 'dismissed_notifications_${widget.username}' : 'dismissed_notifications';
+      final dismissed = prefs.getStringList(dismissedKey) ?? [];
+      if (dismissed.isNotEmpty) {
+        notifications.removeWhere((n) => dismissed.contains(n['id']?.toString()));
+      }
+
       // Filter out notifications cleared before this timestamp
-      final clearedAtStr = prefs.getString('notifications_cleared_at');
+      final userClearedKey = widget.username.isNotEmpty ? 'notifications_cleared_at_${widget.username}' : 'notifications_cleared_at';
+      final clearedAtStr = prefs.getString(userClearedKey) ?? prefs.getString('notifications_cleared_at');
       if (clearedAtStr != null) {
-        final clearedAt = DateTime.parse(clearedAtStr);
-        notifications.removeWhere((n) => (n['rawDate'] as DateTime).isBefore(clearedAt));
+        final clearedAt = DateTime.tryParse(clearedAtStr)?.toUtc();
+        if (clearedAt != null) {
+          notifications.removeWhere((n) {
+            final raw = (n['rawDate'] as DateTime).toUtc();
+            return raw.isBefore(clearedAt) || raw.isAtSameMomentAs(clearedAt);
+          });
+        }
       }
 
       // Sort by date (newest first)
@@ -243,10 +276,22 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
     }
   }
 
-  void _dismissNotification(int index) {
+  void _dismissNotification(int index) async {
+    if (index < 0 || index >= _notifications.length) return;
+    final item = _notifications[index];
+    final id = item['id']?.toString() ?? '';
     setState(() {
       _notifications.removeAt(index);
     });
+    if (id.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final key = widget.username.isNotEmpty ? 'dismissed_notifications_${widget.username}' : 'dismissed_notifications';
+      final dismissed = prefs.getStringList(key) ?? [];
+      if (!dismissed.contains(id)) {
+        dismissed.add(id);
+        await prefs.setStringList(key, dismissed);
+      }
+    }
   }
 
   void _dismissAll() {
@@ -329,7 +374,7 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
                     const Text('Notifications',
                         style: TextStyle(color: _C.textDark, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: -0.4)),
                     const SizedBox(height: 2),
-                    Text('${_notifications.length} announcement${_notifications.length != 1 ? 's' : ''}', 
+                    Text('${_notifications.length} notification${_notifications.length != 1 ? 's' : ''}', 
                         style: const TextStyle(color: _C.textMuted, fontSize: 12)),
                   ],
                 ),
@@ -401,59 +446,75 @@ class _uKonekNotificationPageState extends State<uKonekNotificationPage> {
           ),
         );
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isRead ? _C.surface.withOpacity(0.7) : _C.surface,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 10, offset: Offset(0, 4))],
-          border: isRead ? Border.all(color: _C.divider) : Border.all(color: _C.primaryMid.withOpacity(0.3), width: 1.5),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 48, height: 48,
-              decoration: BoxDecoration(
-                color: _getIconBgColor(item['type']),
-                borderRadius: BorderRadius.circular(14),
+      child: GestureDetector(
+        onTap: () {
+          final type = item['type']?.toString();
+          if (type == 'followup' || type == 'queue') {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            }
+            ShellNavigation.switchTab(ShellNavigation.tabQueue);
+          } else if (type == 'reminder') {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            }
+            ShellNavigation.switchTab(ShellNavigation.tabMedicineScheduler);
+          }
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isRead ? _C.surface.withOpacity(0.7) : _C.surface,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [BoxShadow(color: _C.shadow, blurRadius: 10, offset: Offset(0, 4))],
+            border: isRead ? Border.all(color: _C.divider) : Border.all(color: _C.primaryMid.withOpacity(0.3), width: 1.5),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 48, height: 48,
+                decoration: BoxDecoration(
+                  color: _getIconBgColor(item['type']),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(_getIcon(item['type']), color: _getIconColor(item['type']), size: 22),
               ),
-              child: Icon(_getIcon(item['type']), color: _getIconColor(item['type']), size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(item['title'], 
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _C.textDark)),
-                      ),
-                      GestureDetector(
-                        onTap: () => _dismissNotification(index),
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          child: const Icon(Icons.close, size: 18, color: _C.textMuted),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(item['title'], 
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _C.textDark)),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(item['body'], 
-                      style: const TextStyle(color: _C.textMuted, fontSize: 12, height: 1.4),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 8),
-                  Text(item['time'], 
-                      style: TextStyle(color: _C.textMuted.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.bold)),
-                ],
+                        GestureDetector(
+                          onTap: () => _dismissNotification(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            child: const Icon(Icons.close, size: 18, color: _C.textMuted),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(item['body'], 
+                        style: const TextStyle(color: _C.textMuted, fontSize: 12, height: 1.4),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 8),
+                    Text(item['time'], 
+                        style: TextStyle(color: _C.textMuted.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

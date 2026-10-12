@@ -416,22 +416,34 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         final prefs = results[4] as SharedPreferences;
 
         // Check for unseen notifications
-        final lastViewedStr = prefs.getString('last_viewed_notifications');
-        final clearedAtStr = prefs.getString('notifications_cleared_at');
-        DateTime lastViewed = lastViewedStr != null ? DateTime.parse(lastViewedStr) : DateTime.fromMillisecondsSinceEpoch(0);
+        final userKeySuffix = widget.citizenId.isNotEmpty ? widget.citizenId : widget.username;
+        final lastViewedStr = prefs.getString('last_viewed_notifications_$userKeySuffix') ?? prefs.getString('last_viewed_notifications');
+        final clearedAtStr = prefs.getString('notifications_cleared_at_$userKeySuffix') ?? prefs.getString('notifications_cleared_at');
+        final dismissedKey = 'dismissed_notifications_${widget.username}';
+        final dismissedList = prefs.getStringList(dismissedKey) ?? [];
+
+        DateTime? lastViewed;
+        if (lastViewedStr != null) {
+          lastViewed = DateTime.tryParse(lastViewedStr)?.toUtc();
+        }
         if (clearedAtStr != null) {
-          final clearedAt = DateTime.parse(clearedAtStr);
-          if (clearedAt.isAfter(lastViewed)) lastViewed = clearedAt;
+          final clearedAt = DateTime.tryParse(clearedAtStr)?.toUtc();
+          if (clearedAt != null) {
+            if (lastViewed == null || clearedAt.isAfter(lastViewed)) {
+              lastViewed = clearedAt;
+            }
+          }
         }
 
-        bool unseen = announcements.any((a) => a.createdAt.isAfter(lastViewed));
-        
-        // Also check if queue status is "new" to the user
-        if (newQueueSnapshot.hasActiveQueue && lastViewedStr == null) {
-          unseen = true;
-        }
-        
-        // You could also check for medicine reminders here if needed
+        // If the user has never opened notifications, only announcements within the last 24h are considered new.
+        // Otherwise, only announcements created after lastViewed timestamp are unseen.
+        final effectiveCutoff = lastViewed ?? DateTime.now().toUtc().subtract(const Duration(hours: 24));
+
+        bool unseen = announcements.any((a) {
+          final isDismissed = dismissedList.contains('ann_${a.id}');
+          if (isDismissed) return false;
+          return a.createdAt.toUtc().isAfter(effectiveCutoff);
+        });
 
 
         final newStatus = newQueueSnapshot.status.toLowerCase();
@@ -971,11 +983,15 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
       onTap: () async {
         if (!AntiSpam.allowTap()) return;
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('last_viewed_notifications', DateTime.now().toIso8601String());
+        final nowIso = DateTime.now().toUtc().toIso8601String();
+        final userKeySuffix = widget.citizenId.isNotEmpty ? widget.citizenId : widget.username;
+
+        await prefs.setString('last_viewed_notifications_$userKeySuffix', nowIso);
+        await prefs.setString('last_viewed_notifications', nowIso);
         if (mounted) setState(() => _hasUnseenNotifications = false);
         
         if (!mounted) return;
-        Navigator.push(
+        await Navigator.push(
           context,
           AppPageRoute.slideRight(
             uKonekNotificationPage(
@@ -984,6 +1000,9 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
             ),
           ),
         );
+        if (mounted) {
+          await _loadAllData(isInitial: false);
+        }
       },
       child: Stack(
         clipBehavior: Clip.none,

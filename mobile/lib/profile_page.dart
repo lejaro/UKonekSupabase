@@ -12,6 +12,8 @@ import 'utils/anti_spam.dart';
 
 import 'core/theme/app_colors.dart';
 import 'core/session/patient_session.dart';
+import 'core/security/pin_security_service.dart';
+import 'widgets/security/pin_setup_sheet.dart';
 
 typedef _C = AppColors;
 
@@ -91,6 +93,21 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
     _emergencyContact = widget.emergencyContact;
     _relation         = widget.relation;
     _refreshProfile();
+    _checkPinStatus();
+  }
+
+  bool _isPinConfigured = false;
+  bool _isPinEnabled = false;
+
+  Future<void> _checkPinStatus() async {
+    final configured = await PinSecurityService.instance.isPinConfigured(widget.citizenId);
+    final enabled = await PinSecurityService.instance.isPinEnabled(widget.citizenId);
+    if (mounted) {
+      setState(() {
+        _isPinConfigured = configured;
+        _isPinEnabled = enabled;
+      });
+    }
   }
 
   bool _loading = false;
@@ -598,6 +615,32 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
 
   Widget _buildSettingsCard() {
     return _card(children: [
+      _settingsTile(
+        Icons.pin_outlined,
+        'Security PIN',
+        subtitle: _isPinConfigured
+            ? (_isPinEnabled ? '4-Digit PIN Active' : 'Configured (Disabled)')
+            : 'Set a 4-digit PIN to secure your app',
+        onTap: () => PinSetupSheet.show(context, onPinChanged: _checkPinStatus),
+      ),
+      if (_isPinConfigured) ...[
+        _divider(),
+        _settingsTile(
+          Icons.shield_outlined,
+          'Require PIN on App Open',
+          subtitle: _isPinEnabled ? 'Prompt for PIN on launch' : 'PIN prompt disabled',
+          trailing: Switch.adaptive(
+            value: _isPinEnabled,
+            activeTrackColor: _C.primary,
+            activeColor: Colors.white,
+            onChanged: (val) async {
+              await PinSecurityService.instance.setPinEnabled(enabled: val, citizenId: widget.citizenId);
+              _checkPinStatus();
+            },
+          ),
+        ),
+      ],
+      _divider(),
       _settingsTile(Icons.lock_outline_rounded, 'Change Password', onTap: _showChangePasswordSheet),
       _divider(),
       _settingsTile(Icons.info_outline_rounded, 'About U-Konek+',  onTap: _showAboutDialog),
@@ -1206,16 +1249,43 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
     return content;
   }
 
-  Widget _settingsTile(IconData icon, String title, {VoidCallback? onTap}) {
+  Widget _settingsTile(
+    IconData icon,
+    String title, {
+    String? subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(children: [
-          Container(width: 38, height: 38, decoration: BoxDecoration(color: _C.primary.withOpacity(0.07), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _C.primary, size: 18)),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: _C.primary.withOpacity(0.07),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: _C.primary, size: 18),
+          ),
           const SizedBox(width: 14),
-          Expanded(child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _C.textDark))),
-          const Icon(Icons.chevron_right_rounded, size: 20, color: _C.textMuted),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _C.textDark)),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: const TextStyle(fontSize: 12, color: _C.textMuted)),
+                ],
+              ],
+            ),
+          ),
+          trailing ?? const Icon(Icons.chevron_right_rounded, size: 20, color: _C.textMuted),
         ]),
       ),
     );
