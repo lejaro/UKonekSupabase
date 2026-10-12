@@ -18,6 +18,7 @@ import 'utils/app_transitions.dart';
 import 'utils/anti_spam.dart';
 import 'core/navigation/shell_navigation.dart';
 import 'core/theme/app_colors.dart';
+import 'widgets/queue/ticket_deleted_dialog.dart';
 
 typedef _C = AppColors;
 
@@ -130,7 +131,9 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
   int? _subscribedTicketId;
   final Map<String, dynamic> _tvQueueDisplay = {};
   late final PageController _promoPageController;
+  static final Set<int> _notifiedCompletedTicketIds = <int>{};
   int _currentPromoPage = 0;
+  bool _isShowingDeletedModal = false;
 
   // ── Navigate to profile with ALL registration fields ──────────
   void _navigateToProfile() {
@@ -207,6 +210,18 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
               value: ticketId,
             ),
             callback: (payload) {
+              if (payload.eventType == PostgresChangeEvent.delete) {
+                if (!mounted) return;
+                _unsubscribeDashboardQueueRealtime();
+                _showDashboardTicketDeletedModal(
+                  serviceLabel: _queueDashboard.serviceLabel.isNotEmpty ? _queueDashboard.serviceLabel : 'Consultation',
+                  queueNumber: _queueDashboard.myQueueNumber ?? 0,
+                  ticketCode: _queueDashboard.ticketCode,
+                );
+                _loadAllData(isInitial: false);
+                return;
+              }
+
               final rec = payload.newRecord;
               if (rec.isEmpty || !mounted) return;
               final id = (rec['id'] as num?)?.toInt();
@@ -230,11 +245,24 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     payload: '{"action":"queue"}',
                   );
                 } else if (const {'completed', 'finished', 'done'}.contains(status)) {
-                  NotificationService.showImmediateNotification(
-                    id: 890,
-                    title: 'Consultation Completed!',
-                    body: 'Your consultation has been completed. Prescriptions and instructions are ready.',
-                    payload: '{"action":"consultation_done"}',
+                  _unsubscribeDashboardQueueRealtime();
+                  if (!_notifiedCompletedTicketIds.contains(ticketId)) {
+                    _notifiedCompletedTicketIds.add(ticketId);
+                    NotificationService.showImmediateNotification(
+                      id: 890,
+                      title: 'Consultation Completed!',
+                      body: 'Your consultation has been completed. Prescriptions and instructions are ready.',
+                      payload: '{"action":"consultation_done"}',
+                    );
+                  }
+                  // Check immediately for new e-prescription alert
+                  ShellNavigation.checkPrescriptions();
+                } else if (const {'cancelled', 'canceled'}.contains(status)) {
+                  _unsubscribeDashboardQueueRealtime();
+                  _showDashboardTicketDeletedModal(
+                    serviceLabel: rec['service_label']?.toString() ?? _queueDashboard.serviceLabel,
+                    queueNumber: (rec['queue_number'] as num?)?.toInt() ?? _queueDashboard.myQueueNumber ?? 0,
+                    ticketCode: rec['ticket_code']?.toString() ?? _queueDashboard.ticketCode,
                   );
                 }
                 _loadAllData(isInitial: false);
@@ -257,6 +285,46 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
       _dashboardQueueRealtimeChannel = null;
       _subscribedTicketId = null;
     }
+  }
+
+  void _showDashboardTicketDeletedModal({
+    required String serviceLabel,
+    required int queueNumber,
+    required String ticketCode,
+  }) {
+    if (_isShowingDeletedModal || !mounted) return;
+    _isShowingDeletedModal = true;
+
+    NotificationService.showImmediateNotification(
+      id: 891,
+      title: 'Queue Ticket Cancelled',
+      body: 'Your queue ticket for $serviceLabel has been cancelled or removed by clinic staff.',
+      payload: '{"action":"ticket_deleted"}',
+    );
+
+    TicketDeletedDialog.show(
+      context: context,
+      serviceLabel: serviceLabel,
+      queueNumber: queueNumber,
+      ticketCode: ticketCode,
+      onDismiss: () {
+        if (mounted) {
+          setState(() {
+            _isShowingDeletedModal = false;
+          });
+          _loadAllData(isInitial: false);
+        }
+      },
+      onRejoin: () {
+        if (mounted) {
+          setState(() {
+            _isShowingDeletedModal = false;
+          });
+          _loadAllData(isInitial: false);
+          ShellNavigation.switchTab(ShellNavigation.tabQueue);
+        }
+      },
+    );
   }
 
   void _subscribeDoctorAvailabilityRealtime() {
@@ -393,6 +461,13 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         if (newQueueSnapshot.hasActiveQueue && newQueueSnapshot.queueId != null) {
           _subscribeDashboardQueueRealtime(newQueueSnapshot.queueId);
         } else {
+          if (_subscribedTicketId != null && newQueueSnapshot.isCancelled) {
+            _showDashboardTicketDeletedModal(
+              serviceLabel: newQueueSnapshot.serviceLabel.isNotEmpty ? newQueueSnapshot.serviceLabel : 'Consultation',
+              queueNumber: newQueueSnapshot.myQueueNumber ?? 0,
+              ticketCode: newQueueSnapshot.ticketCode,
+            );
+          }
           _unsubscribeDashboardQueueRealtime();
         }
 
@@ -414,6 +489,9 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
     if (prescriptionItems.isEmpty) return;
     
     final firstItem = prescriptionItems.first;
+    // Mark as acknowledged immediately since the patient is actively viewing it
+    ApiService.acknowledgePrescription(firstItem.prescriptionId);
+
     final prescriptionCode = firstItem.prescriptionCode;
     final doctorName = firstItem.displayDoctorName;
     final issuedDate = DateFormat('MM/dd/yyyy').format(firstItem.issuedAt);

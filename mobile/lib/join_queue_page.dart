@@ -14,6 +14,7 @@ import 'core/navigation/shell_navigation.dart';
 
 import 'core/theme/app_colors.dart';
 import 'widgets/queue/consultation_completed_dialog.dart';
+import 'widgets/queue/ticket_deleted_dialog.dart';
 import 'widgets/queue/active_ticket_card.dart';
 import 'widgets/queue/queue_join_form.dart';
 
@@ -57,13 +58,45 @@ class _JoinQueuePageState extends State<JoinQueuePage>
   bool _isSubmitting = false;
 
   // Tracking & completion state
+  static final Set<int> _sessionAcknowledgedCompletedTicketIds = <int>{};
   int? _activeQueueId;
   String? _activeServiceLabel;
   int? _activeQueueNumber;
   String? _activeTicketCode;
   bool _isShowingDoneModal = false;
+  bool _isShowingDeletedModal = false;
   bool _userManuallyCancelled = false;
   RealtimeChannel? _queueRealtimeChannel;
+
+  String get _acknowledgedCompletedTicketKey =>
+      'last_acknowledged_completed_ticket_id_${widget.citizenId}';
+
+  Future<bool> _isTicketAlreadyAcknowledged(int ticketId) async {
+    if (_sessionAcknowledgedCompletedTicketIds.contains(ticketId)) {
+      return true;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userAck = prefs.getInt(_acknowledgedCompletedTicketKey);
+      if (userAck != null && userAck >= ticketId) return true;
+      final globalAck = prefs.getInt('last_acknowledged_completed_ticket_id');
+      if (globalAck != null && globalAck >= ticketId) return true;
+    } catch (e) {
+      debugPrint('Error reading acknowledged ticket status: $e');
+    }
+    return false;
+  }
+
+  Future<void> _markTicketAcknowledged(int ticketId) async {
+    _sessionAcknowledgedCompletedTicketIds.add(ticketId);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_acknowledgedCompletedTicketKey, ticketId);
+      await prefs.setInt('last_acknowledged_completed_ticket_id', ticketId);
+    } catch (e) {
+      debugPrint('Error saving acknowledged ticket status: $e');
+    }
+  }
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -107,12 +140,15 @@ class _JoinQueuePageState extends State<JoinQueuePage>
         _stopRefreshTimer();
         _unsubscribeQueueRealtime();
         if (snapshot.isCompleted && snapshot.queueId != null) {
-          _handleConsultationDone(
-            ticketId: snapshot.queueId!,
-            serviceLabel: snapshot.serviceLabel.isNotEmpty ? snapshot.serviceLabel : (_activeServiceLabel ?? 'Consultation'),
-            queueNumber: snapshot.myQueueNumber ?? _activeQueueNumber ?? 0,
-            ticketCode: snapshot.ticketCode.isNotEmpty ? snapshot.ticketCode : (_activeTicketCode ?? ''),
-          );
+          final ticketId = snapshot.queueId!;
+          if (!_sessionAcknowledgedCompletedTicketIds.contains(ticketId)) {
+            _handleConsultationDone(
+              ticketId: ticketId,
+              serviceLabel: snapshot.serviceLabel.isNotEmpty ? snapshot.serviceLabel : (_activeServiceLabel ?? 'Consultation'),
+              queueNumber: snapshot.myQueueNumber ?? _activeQueueNumber ?? 0,
+              ticketCode: snapshot.ticketCode.isNotEmpty ? snapshot.ticketCode : (_activeTicketCode ?? ''),
+            );
+          }
         } else {
           _checkRecentCompletedTicket();
         }
@@ -150,6 +186,20 @@ class _JoinQueuePageState extends State<JoinQueuePage>
               value: ticketId,
             ),
             callback: (payload) {
+              if (payload.eventType == PostgresChangeEvent.delete) {
+                if (!_userManuallyCancelled && !_isShowingDeletedModal && !_isShowingDoneModal) {
+                  _unsubscribeQueueRealtime();
+                  _stopRefreshTimer();
+                  _handleTicketDeleted(
+                    ticketId: ticketId,
+                    serviceLabel: _activeServiceLabel ?? 'Consultation',
+                    queueNumber: _activeQueueNumber ?? 0,
+                    ticketCode: _activeTicketCode ?? '',
+                  );
+                }
+                return;
+              }
+
               final rec = payload.newRecord;
               if (rec.isEmpty) return;
               final id = (rec['id'] as num?)?.toInt();
@@ -157,12 +207,25 @@ class _JoinQueuePageState extends State<JoinQueuePage>
 
               if (id == ticketId) {
                 if (const {'completed', 'finished', 'done'}.contains(status)) {
+                  _unsubscribeQueueRealtime();
+                  _stopRefreshTimer();
                   _handleConsultationDone(
                     ticketId: id!,
                     serviceLabel: rec['service_label']?.toString() ?? _activeServiceLabel ?? 'Consultation',
                     queueNumber: (rec['queue_number'] as num?)?.toInt() ?? _activeQueueNumber ?? 0,
                     ticketCode: rec['ticket_code']?.toString() ?? _activeTicketCode ?? '',
                   );
+                } else if (const {'cancelled', 'canceled'}.contains(status)) {
+                  if (!_userManuallyCancelled && !_isShowingDeletedModal && !_isShowingDoneModal) {
+                    _unsubscribeQueueRealtime();
+                    _stopRefreshTimer();
+                    _handleTicketDeleted(
+                      ticketId: ticketId,
+                      serviceLabel: rec['service_label']?.toString() ?? _activeServiceLabel ?? 'Consultation',
+                      queueNumber: (rec['queue_number'] as num?)?.toInt() ?? _activeQueueNumber ?? 0,
+                      ticketCode: rec['ticket_code']?.toString() ?? _activeTicketCode ?? '',
+                    );
+                  }
                 } else if (status == 'serving') {
                   HapticFeedback.heavyImpact();
                   NotificationService.showImmediateNotification(
@@ -243,13 +306,23 @@ class _JoinQueuePageState extends State<JoinQueuePage>
         _unsubscribeQueueRealtime();
 
         if (snapshot.isCompleted && snapshot.queueId != null) {
-          _handleConsultationDone(
+          final ticketId = snapshot.queueId!;
+          if (!_sessionAcknowledgedCompletedTicketIds.contains(ticketId)) {
+            _handleConsultationDone(
+              ticketId: ticketId,
+              serviceLabel: snapshot.serviceLabel.isNotEmpty ? snapshot.serviceLabel : (_activeServiceLabel ?? 'Consultation'),
+              queueNumber: snapshot.myQueueNumber ?? _activeQueueNumber ?? 0,
+              ticketCode: snapshot.ticketCode.isNotEmpty ? snapshot.ticketCode : (_activeTicketCode ?? ''),
+            );
+          }
+        } else if (snapshot.isCancelled && snapshot.queueId != null && !_userManuallyCancelled && !_isShowingDeletedModal) {
+          _handleTicketDeleted(
             ticketId: snapshot.queueId!,
             serviceLabel: snapshot.serviceLabel.isNotEmpty ? snapshot.serviceLabel : (_activeServiceLabel ?? 'Consultation'),
             queueNumber: snapshot.myQueueNumber ?? _activeQueueNumber ?? 0,
             ticketCode: snapshot.ticketCode.isNotEmpty ? snapshot.ticketCode : (_activeTicketCode ?? ''),
           );
-        } else if (_activeQueueId != null && !_userManuallyCancelled && !_isShowingDoneModal) {
+        } else if (_activeQueueId != null && !_userManuallyCancelled && !_isShowingDoneModal && !_isShowingDeletedModal) {
           final prevId = _activeQueueId!;
           final prevService = _activeServiceLabel ?? 'Consultation';
           final prevNum = _activeQueueNumber ?? 0;
@@ -258,7 +331,16 @@ class _JoinQueuePageState extends State<JoinQueuePage>
           final ticketInfo = await ApiService.getTicketStatus(prevId);
           final status = ticketInfo?['status']?.toString().toLowerCase().trim();
           if (const {'completed', 'finished', 'done'}.contains(status)) {
-            _handleConsultationDone(
+            if (!_sessionAcknowledgedCompletedTicketIds.contains(prevId)) {
+              _handleConsultationDone(
+                ticketId: prevId,
+                serviceLabel: ticketInfo?['service_label']?.toString() ?? prevService,
+                queueNumber: (ticketInfo?['queue_number'] as num?)?.toInt() ?? prevNum,
+                ticketCode: ticketInfo?['ticket_code']?.toString() ?? prevCode,
+              );
+            }
+          } else if (ticketInfo == null || const {'cancelled', 'canceled'}.contains(status)) {
+            _handleTicketDeleted(
               ticketId: prevId,
               serviceLabel: ticketInfo?['service_label']?.toString() ?? prevService,
               queueNumber: (ticketInfo?['queue_number'] as num?)?.toInt() ?? prevNum,
@@ -275,22 +357,23 @@ class _JoinQueuePageState extends State<JoinQueuePage>
   Future<void> _checkRecentCompletedTicket() async {
     if (_isShowingDoneModal || !mounted) return;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final lastAck = prefs.getInt('last_acknowledged_completed_ticket_id');
       final completedTicket = await ApiService.getCompletedQueueTicket();
       if (completedTicket != null && mounted) {
         final ticketId = (completedTicket['id'] as num?)?.toInt();
-        if (ticketId != null && ticketId != lastAck) {
-          final completedAtStr = completedTicket['completed_at']?.toString();
-          if (completedAtStr != null) {
-            final completedAt = DateTime.tryParse(completedAtStr);
-            if (completedAt != null && DateTime.now().difference(completedAt.toLocal()).inHours < 2) {
-              _handleConsultationDone(
-                ticketId: ticketId,
-                serviceLabel: completedTicket['service_label']?.toString() ?? 'Consultation',
-                queueNumber: (completedTicket['queue_number'] as num?)?.toInt() ?? 0,
-                ticketCode: completedTicket['ticket_code']?.toString() ?? '',
-              );
+        if (ticketId != null) {
+          final isAcked = await _isTicketAlreadyAcknowledged(ticketId);
+          if (!isAcked) {
+            final completedAtStr = completedTicket['completed_at']?.toString();
+            if (completedAtStr != null) {
+              final completedAt = DateTime.tryParse(completedAtStr);
+              if (completedAt != null && DateTime.now().difference(completedAt.toLocal()).inHours < 2) {
+                _handleConsultationDone(
+                  ticketId: ticketId,
+                  serviceLabel: completedTicket['service_label']?.toString() ?? 'Consultation',
+                  queueNumber: (completedTicket['queue_number'] as num?)?.toInt() ?? 0,
+                  ticketCode: completedTicket['ticket_code']?.toString() ?? '',
+                );
+              }
             }
           }
         }
@@ -307,19 +390,29 @@ class _JoinQueuePageState extends State<JoinQueuePage>
     required String ticketCode,
   }) async {
     if (_isShowingDoneModal || !mounted) return;
+
+    // Immediately stop realtime and refresh timer for this ticket
+    _unsubscribeQueueRealtime();
+    _stopRefreshTimer();
+
+    // Clean up local queue tracking state
+    _clearFormInputs();
+    _activeQueueId = null;
+    _activeServiceLabel = null;
+    _activeQueueNumber = null;
+    _activeTicketCode = null;
+
+    // Check if this ticket was already acknowledged / completed modal was shown
+    final alreadyAcked = await _isTicketAlreadyAcknowledged(ticketId);
+    if (alreadyAcked) {
+      debugPrint('[JoinQueuePage] Ticket $ticketId already acknowledged. Skipping completed modal.');
+      return;
+    }
+
     _isShowingDoneModal = true;
+    await _markTicketAcknowledged(ticketId);
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('last_acknowledged_completed_ticket_id', ticketId);
-
-      // Erase all inputs in the queue tracker
-      _clearFormInputs();
-      _activeQueueId = null;
-      _activeServiceLabel = null;
-      _activeQueueNumber = null;
-      _activeTicketCode = null;
-
       // Notify citizen immediately
       NotificationService.showImmediateNotification(
         id: 890,
@@ -371,6 +464,55 @@ class _JoinQueuePageState extends State<JoinQueuePage>
       ticketCode: ticketCode,
       onReturnToMainMenu: _navigateToMainMenu,
     );
+  }
+
+  Future<void> _handleTicketDeleted({
+    required int ticketId,
+    required String serviceLabel,
+    required int queueNumber,
+    required String ticketCode,
+  }) async {
+    if (_isShowingDeletedModal || _isShowingDoneModal || !mounted) return;
+
+    _unsubscribeQueueRealtime();
+    _stopRefreshTimer();
+
+    _clearFormInputs();
+    _activeQueueId = null;
+    _activeServiceLabel = null;
+    _activeQueueNumber = null;
+    _activeTicketCode = null;
+
+    _isShowingDeletedModal = true;
+    try {
+      NotificationService.showImmediateNotification(
+        id: 891,
+        title: 'Queue Ticket Cancelled',
+        body: 'Your queue ticket for $serviceLabel has been cancelled or removed by the clinic staff.',
+        payload: '{"action":"ticket_deleted"}',
+      );
+
+      await TicketDeletedDialog.show(
+        context: context,
+        serviceLabel: serviceLabel,
+        queueNumber: queueNumber,
+        ticketCode: ticketCode,
+        onDismiss: () {
+          if (mounted) {
+            _refreshDashboard();
+          }
+        },
+        onRejoin: () {
+          if (mounted) {
+            _refreshDashboard();
+          }
+        },
+      );
+    } finally {
+      if (mounted) {
+        _isShowingDeletedModal = false;
+      }
+    }
   }
 
   @override

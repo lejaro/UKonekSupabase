@@ -25,8 +25,6 @@ class ActiveTicketCard extends StatelessWidget {
     final isCancelled = queue.isCancelled;
     final isServing = queue.isCurrentlyBeingServed;
     final isOnCall = !isFinished && !isCancelled && queue.isOnCallStatus;
-    final isNext = !isFinished && !isCancelled && !isServing && !isOnCall && queue.isNextInLine;
-    final isTurn = isServing || isNext;
 
     final Color statusColor = isFinished
         ? _C.success
@@ -132,7 +130,7 @@ class ActiveTicketCard extends StatelessWidget {
           const SizedBox(height: 16),
 
           // ── Step Progress Tracker ────────────────────────────
-          QueueStepTracker(queue: queue, isOnCall: isOnCall, isTurn: isTurn),
+          QueueStepTracker(queue: queue, isOnCall: isOnCall, isTurn: isServing),
           const SizedBox(height: 16),
 
           // ── Ticket card ───────────────────────────────────────

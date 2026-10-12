@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'services/api_service.dart';
 import 'core/theme/app_colors.dart';
 
@@ -30,6 +32,8 @@ class _PrescriptionGroup {
   bool get isCancelled => dispensingStatus == 'cancelled';
   bool get isPending   => dispensingStatus == 'pending';
   bool get isPartial   => dispensingStatus == 'partial';
+
+  bool get needsDispensing => !isDispensed && !isCancelled;
 }
 
 class PrescriptionPage extends StatefulWidget {
@@ -112,6 +116,17 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
         _loading = false;
       });
 
+      // Acknowledge all loaded prescriptions so they don't trigger stale alert popups later
+      if (records.isNotEmpty) {
+        int highestId = 0;
+        for (final r in records) {
+          if (r.prescriptionId > highestId) highestId = r.prescriptionId;
+        }
+        if (highestId > 0) {
+          ApiService.acknowledgePrescription(highestId);
+        }
+      }
+
       // Auto-open target prescription detail if requested
       if (widget.initialPrescriptionId != null && !_hasAutoOpened && _groups.isNotEmpty) {
         _hasAutoOpened = true;
@@ -182,6 +197,16 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
         _groups = _buildGroups(records);
         _dispenseLogs = logs;
       });
+
+      if (records.isNotEmpty) {
+        int highestId = 0;
+        for (final r in records) {
+          if (r.prescriptionId > highestId) highestId = r.prescriptionId;
+        }
+        if (highestId > 0) {
+          ApiService.acknowledgePrescription(highestId);
+        }
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Prescriptions and purchase history updated.'),
@@ -817,6 +842,34 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                   Text(g.doctorName,
                       style: const TextStyle(fontSize: 12, color: _C.textMuted)),
                 ])),
+                if (g.needsDispensing)
+                  Tooltip(
+                    message: 'Show Pharmacy QR Code',
+                    child: InkWell(
+                      onTap: () => _showPrescriptionQrModal(context, g),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _C.primaryMid.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _C.primaryMid.withOpacity(0.2)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.qr_code_2_rounded, size: 15, color: _C.primaryMid),
+                            SizedBox(width: 4),
+                            Text(
+                              'QR',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: _C.primaryMid),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
@@ -849,19 +902,53 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                     style: const TextStyle(fontSize: 12, color: _C.textMuted)),
 
               const SizedBox(height: 10),
-              // Footer row
+              // Footer row (responsive & no spilling)
               Row(children: [
                 const Icon(Icons.calendar_today_rounded, size: 12, color: _C.textMuted),
                 const SizedBox(width: 4),
-                Text('Issued: ${DateFormat('MMM d, yyyy').format(g.issuedAt)}',
-                    style: const TextStyle(fontSize: 11, color: _C.textMuted)),
-                if (g.isDispensed && g.dispensedAt != null) ...[
-                  const SizedBox(width: 12),
-                  const Icon(Icons.check_circle_rounded, size: 12, color: _C.success),
-                  const SizedBox(width: 4),
-                  Text('Dispensed: ${DateFormat('MMM d, yyyy').format(g.dispensedAt!)}',
-                      style: const TextStyle(fontSize: 11, color: _C.success)),
-                ],
+                Expanded(
+                  child: Text(
+                    'Issued: ${DateFormat('MMM d, yyyy').format(g.issuedAt)}',
+                    style: const TextStyle(fontSize: 11, color: _C.textMuted),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (g.needsDispensing)
+                  InkWell(
+                    onTap: () => _showPrescriptionQrModal(context, g),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _C.primaryMid.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: _C.primaryMid.withOpacity(0.2)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.qr_code_rounded, size: 13, color: _C.primaryMid),
+                          SizedBox(width: 4),
+                          Text(
+                            'QR Code',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _C.primaryMid),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (g.isDispensed && g.dispensedAt != null)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle_rounded, size: 12, color: _C.success),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Dispensed: ${DateFormat('MMM d').format(g.dispensedAt!)}',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.success),
+                      ),
+                    ],
+                  ),
               ]),
             ]),
           ),
@@ -872,6 +959,9 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
 
   // ── Prescription group detail sheet ───────────────────────────
   void _showGroupDetail(_PrescriptionGroup g) {
+    if (g.prescriptionId > 0) {
+      ApiService.acknowledgePrescription(g.prescriptionId);
+    }
     final statusColor = g.isDispensed
         ? _C.success
         : g.isCancelled
@@ -893,7 +983,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
+        initialChildSize: 0.82,
         maxChildSize: 0.95,
         minChildSize: 0.45,
         builder: (_, sc) => Container(
@@ -964,6 +1054,12 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
                 controller: sc,
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
                 children: [
+                  // ── Pharmacy Verification QR Section (only for undispensed / partial) ──
+                  if (g.needsDispensing) ...[
+                    _buildPharmacyQrSection(g),
+                    const SizedBox(height: 18),
+                  ],
+
                   Text('${g.items.length} Prescribed Medicine${g.items.length != 1 ? 's' : ''}',
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _C.primaryMid)),
                   const SizedBox(height: 12),
@@ -977,6 +1073,380 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
           ]),
         ),
       ),
+    );
+  }
+
+  // ── Pharmacy Verification QR Section ──────────────────────────
+  Widget _buildPharmacyQrSection(_PrescriptionGroup g) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _C.bg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _C.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: _C.primaryMid.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.qr_code_scanner_rounded, color: _C.primaryMid, size: 18),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PHARMACY SCAN QR CODE',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        color: _C.primaryMid,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    Text(
+                      'Present to pharmacist for dispensing',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: _C.textMuted,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => _showPrescriptionQrModal(context, g),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _C.divider),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.fullscreen_rounded, size: 14, color: _C.primaryMid),
+                      SizedBox(width: 4),
+                      Text(
+                        'Enlarge',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _C.primaryMid,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Central QR Code container
+          GestureDetector(
+            onTap: () => _showPrescriptionQrModal(context, g),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _C.fieldBdr, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  QrImageView(
+                    data: g.prescriptionCode,
+                    version: QrVersions.auto,
+                    size: 160.0,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: Color(0xFF0F172A),
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: _C.bg,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: _C.divider),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.qr_code_rounded, size: 14, color: _C.primaryMid),
+                        const SizedBox(width: 6),
+                        Text(
+                          g.prescriptionCode,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                            color: _C.textDark,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.touch_app_outlined, size: 13, color: _C.textMuted),
+              SizedBox(width: 4),
+              Text(
+                'Tap QR code to expand fullscreen for easy camera scanning',
+                style: TextStyle(fontSize: 11, color: _C.textMuted),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── High-Clarity Fullscreen QR Modal ───────────────────────────
+  void _showPrescriptionQrModal(BuildContext context, _PrescriptionGroup g) {
+    if (!g.needsDispensing) return;
+    HapticFeedback.mediumImpact();
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+          child: Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.18),
+                  blurRadius: 32,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top Header Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: _C.primaryMid.withOpacity(0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.qr_code_2_rounded, color: _C.primaryMid, size: 24),
+                        ),
+                        const SizedBox(width: 10),
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'E-Prescription QR Code',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: _C.textDark,
+                              ),
+                            ),
+                            Text(
+                              'Present to Pharmacist to Dispense',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: _C.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: _C.textMuted, size: 22),
+                      onPressed: () => Navigator.pop(dialogCtx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Large QR code container (maximum clarity & brightness)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _C.fieldBdr, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      QrImageView(
+                        data: g.prescriptionCode,
+                        version: QrVersions.auto,
+                        size: 200.0,
+                        eyeStyle: const QrEyeStyle(
+                          eyeShape: QrEyeShape.square,
+                          color: Color(0xFF0F172A),
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.square,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _C.primaryMid.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              g.prescriptionCode,
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                                color: _C.primaryMid,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: g.prescriptionCode));
+                                HapticFeedback.selectionClick();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Prescription code ${g.prescriptionCode} copied!'),
+                                    duration: const Duration(seconds: 2),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              },
+                              child: const Icon(Icons.copy_rounded, size: 16, color: _C.primaryMid),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Prescribed Info summary
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _C.bg,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _C.divider),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Doctor:', style: TextStyle(fontSize: 12, color: _C.textMuted)),
+                          Text(g.doctorName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _C.textDark)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Issued Date:', style: TextStyle(fontSize: 12, color: _C.textMuted)),
+                          Text(DateFormat('MMM d, yyyy • h:mm a').format(g.issuedAt), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _C.textDark)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Medications:', style: TextStyle(fontSize: 12, color: _C.textMuted)),
+                          Text('${g.items.length} prescribed item(s)', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _C.primaryMid)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                const Text(
+                  'The clinic pharmacist will scan this QR code with their camera scanner for instant prescription retrieval.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: _C.textMuted, height: 1.35),
+                ),
+                const SizedBox(height: 16),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _C.primaryMid,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text(
+                      'CLOSE',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

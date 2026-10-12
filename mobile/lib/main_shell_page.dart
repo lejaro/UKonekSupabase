@@ -14,6 +14,7 @@ import 'core/navigation/shell_navigation.dart';
 import 'core/theme/app_colors.dart';
 import 'widgets/prescription_details_sheet.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Unified persistent App Shell for uKonek.
 /// Hosts Dashboard, Medicine Scheduler, Queue, and Profile tabs without route pushing.
@@ -61,6 +62,7 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
   bool _isShowingPrescriptionModal = false;
   bool _isCheckingPrescriptionAlert = false;
   int? _lastAlertedPrescriptionId;
+  RealtimeChannel? _prescriptionRealtimeChannel;
 
   @override
   void initState() {
@@ -105,6 +107,9 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
       ),
     ];
 
+    // Real-time subscription to newly created prescriptions
+    _subscribePrescriptionRealtime();
+
     // Check for newly issued prescriptions shortly after startup
     Future.delayed(const Duration(milliseconds: 1200), () {
       if (mounted) _checkNewPrescriptionAlert();
@@ -116,7 +121,63 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
     WidgetsBinding.instance.removeObserver(this);
     ShellNavigation.currentTab.removeListener(_onNavigationTabChanged);
     ShellNavigation.prescriptionAlertTrigger.removeListener(_onPrescriptionTrigger);
+    _unsubscribePrescriptionRealtime();
     super.dispose();
+  }
+
+  void _subscribePrescriptionRealtime() {
+    if (_prescriptionRealtimeChannel != null) return;
+    try {
+      final client = Supabase.instance.client;
+      final citizenIdNum = int.tryParse(widget.citizenId);
+
+      _prescriptionRealtimeChannel = client
+          .channel('patient_prescriptions_${widget.citizenId}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'prescription_headers',
+            callback: (payload) {
+              final rec = payload.newRecord;
+              if (rec.isEmpty || !mounted) return;
+
+              final recCitizenId = (rec['patient_citizen_id'] as num?)?.toInt();
+              final recPatientId = (rec['patient_identifier'] ?? '').toString().trim();
+
+              bool belongsToMe = false;
+              if (citizenIdNum != null && recCitizenId != null && recCitizenId == citizenIdNum) {
+                belongsToMe = true;
+              } else if (recPatientId.isNotEmpty) {
+                if (recPatientId == widget.citizenId ||
+                    recPatientId == 'CIT-${widget.citizenId}') {
+                  belongsToMe = true;
+                }
+              }
+
+              if (belongsToMe) {
+                debugPrint('[Shell Realtime] New prescription header detected for citizen ${widget.citizenId}. Triggering alert...');
+                // Allow 600ms for doctor to finish inserting accompanying prescription_items
+                Future.delayed(const Duration(milliseconds: 600), () {
+                  if (mounted) _checkNewPrescriptionAlert();
+                });
+              }
+            },
+          )
+          .subscribe();
+      debugPrint('[Shell Realtime] Subscribed to prescription_headers for citizen ${widget.citizenId}');
+    } catch (e) {
+      debugPrint('Error subscribing prescription realtime: $e');
+    }
+  }
+
+  void _unsubscribePrescriptionRealtime() {
+    if (_prescriptionRealtimeChannel != null) {
+      try {
+        Supabase.instance.client.removeChannel(_prescriptionRealtimeChannel!);
+        debugPrint('[Shell Realtime] Unsubscribed prescription channel.');
+      } catch (_) {}
+      _prescriptionRealtimeChannel = null;
+    }
   }
 
   @override

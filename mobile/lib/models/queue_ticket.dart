@@ -125,11 +125,13 @@ class QueueDashboardSnapshot {
   /// True if this patient is currently being served by the doctor.
   bool get isCurrentlyBeingServed {
     if (isCompleted || isCancelled) return false;
+    // An on-call ticket is at the nurse/vitals station, not being served by the doctor
+    if (isOnCallStatus) return false;
     if (isServing) return true;
     if (myQueueNumber != null &&
         currentlyServingQueueNumber != null &&
         currentlyServingQueueNumber! > 0) {
-      return myQueueNumber == currentlyServingQueueNumber;
+      return myQueueNumber == currentlyServingQueueNumber && status.toLowerCase().trim() == 'serving';
     }
     return false;
   }

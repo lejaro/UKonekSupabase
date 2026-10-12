@@ -1381,7 +1381,8 @@ export async function completeQueueTicket(ticketId) {
     await supabase
       .from('queue_tickets')
       .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', Number(ticketId));
+      .eq('id', Number(ticketId))
+      .neq('status', 'completed');
     if (typeof window !== 'undefined' && window.loadQueueTickets) {
       window.loadQueueTickets();
     }

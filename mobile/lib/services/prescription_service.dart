@@ -332,10 +332,23 @@ class PrescriptionService {
       // If already acknowledged, do not alert again
       if (latestId <= lastAckId) return null;
 
-      // Only alert if issued recently (within last 24 hours)
+      // If prescription is already fulfilled, dispensed, or cancelled, auto-acknowledge and do not alert
+      final isAlreadyDispensed = firstItem.isPrescriptionDispensed ||
+          firstItem.isDispensed ||
+          firstItem.dispensedQuantity > 0 ||
+          latestItems.every((it) => it.isDispensed || it.isPrescriptionDispensed);
+      final isCancelled = firstItem.isCancelled;
+      if (isAlreadyDispensed || isCancelled) {
+        await acknowledgePrescription(latestId);
+        return null;
+      }
+
+      // Only alert if issued very recently (within last 15 minutes)
+      // Prescriptions older than 15 minutes are considered already existing/historical
+      // and should NOT trigger a disruptive pop-up modal when opening or resuming the app.
       final age = DateTime.now().difference(firstItem.issuedAt);
-      if (age.inHours > 24) {
-        // Automatically mark stale prescription as acknowledged so it doesn't pop up later
+      if (age.inMinutes > 15 || age.inMinutes < -15) {
+        // Automatically mark older prescription as acknowledged so it doesn't pop up late
         await acknowledgePrescription(latestId);
         return null;
       }

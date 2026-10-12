@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'services/api_service.dart';
 import 'core/theme/app_colors.dart';
+import 'prescription_page.dart';
+import 'utils/app_transitions.dart';
 
 typedef _C = AppColors;
 
@@ -22,7 +24,6 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
   final List<Map<String, dynamic>> _allRecords = [];
   List<Map<String, dynamic>> _foundRecords = [];
   VitalSigns? _latestVitals;
-  Consultation? _latestConsultation;
   String _selectedFilter = 'all'; // 'all', 'consultation', 'vitals'
 
   int _currentVitalsOffset = 0;
@@ -55,12 +56,6 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
         _latestVitals = vitals.first;
       } else {
         _latestVitals = null;
-      }
-
-      if (consults.isNotEmpty) {
-        _latestConsultation = consults.first;
-      } else {
-        _latestConsultation = null;
       }
 
       final List<Map<String, dynamic>> vitalsMapped = vitals.map((v) => {
@@ -897,6 +892,27 @@ class _uKonekHealthRecordsPageState extends State<uKonekHealthRecordsPage> {
 
                     if (c.followupDate != null)
                       _detailSection('Scheduled Follow-up', DateFormat('MMMM dd, yyyy').format(c.followupDate!)),
+
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          AppPageRoute.slideRight(const PrescriptionPage()),
+                        );
+                      },
+                      icon: const Icon(Icons.qr_code_2_rounded, size: 18, color: _C.primaryMid),
+                      label: const Text(
+                        'View E-Prescriptions & Pharmacy QR',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: _C.primaryMid, fontSize: 13),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: _C.primaryMid, width: 1.2),
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
                   ],
 
                   const SizedBox(height: 20),
