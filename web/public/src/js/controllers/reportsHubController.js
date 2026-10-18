@@ -171,7 +171,8 @@ export async function loadFeedback() {
   if (tbody) renderTableSkeleton(tbody, 4, 3);
 
   try {
-    const { data, error } = await supabase
+    const badge = document.getElementById('hub-count-feedback');
+    const { data, count, error } = await supabase
       .from('feedbacks')
       .select(`
         id,
@@ -182,7 +183,7 @@ export async function loadFeedback() {
         rating,
         created_at,
         citizen:citizens(id, first_name, last_name, email)
-      `)
+      `, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(0, FEEDBACK_PAGE_SIZE - 1);
 
@@ -191,24 +192,24 @@ export async function loadFeedback() {
       console.warn('[Feedback] Detailed join error, falling back to flat select:', error.message);
       const flatRes = await supabase
         .from('feedbacks')
-        .select('id, citizen_id, from_email, subject, message, rating, created_at')
+        .select('id, citizen_id, from_email, subject, message, rating, created_at', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(0, FEEDBACK_PAGE_SIZE - 1);
 
       if (flatRes.error) throw flatRes.error;
       _feedbacks = flatRes.data || [];
+      if (badge) {
+        badge.textContent = String(flatRes.count != null ? flatRes.count : _feedbacks.length);
+      }
     } else {
       _feedbacks = data || [];
+      if (badge) {
+        badge.textContent = String(count != null ? count : _feedbacks.length);
+      }
     }
 
     _feedbackOffset = _feedbacks.length;
     _hasMoreFeedback = _feedbacks.length === FEEDBACK_PAGE_SIZE;
-
-    // Update hub count badge
-    const badge = document.getElementById('hub-count-feedback');
-    if (badge) {
-      badge.textContent = String(_feedbacks.length);
-    }
 
     renderFeedbackTable();
     updateFeedbackPaginationUI();
@@ -374,28 +375,139 @@ export function openFeedbackDetail(id) {
   if (bodyEl) bodyEl.textContent = item.message || '(No message content provided)';
 
   if (deleteBtn) {
-    deleteBtn.onclick = () => deleteFeedback(item.id);
+    deleteBtn.disabled = false;
+    deleteBtn.textContent = 'Delete Review';
+    deleteBtn.onclick = async (e) => {
+      e.preventDefault();
+      const origText = deleteBtn.textContent;
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Deleting...';
+      try {
+        await deleteFeedback(item.id);
+      } finally {
+        if (deleteBtn) {
+          deleteBtn.disabled = false;
+          deleteBtn.textContent = origText;
+        }
+      }
+    };
   }
 
   if (modal) modal.classList.remove('hidden');
 }
 
+let _isDeletingFeedback = false;
+
 /**
- * Delete feedback by ID.
+ * Delete feedback / review by ID.
+ * Supports secure RPC deletion with graceful fallback to direct deletion.
  */
 export async function deleteFeedback(id) {
-  if (!confirm('Are you sure you want to permanently delete this citizen feedback?')) return;
+  if (!id) return;
+  if (_isDeletingFeedback) return;
+
+  if (!confirm('Are you sure you want to permanently delete this citizen review/feedback?')) {
+    return;
+  }
+
+  _isDeletingFeedback = true;
+  const feedbackId = Number(id) || id;
 
   try {
-    const { error } = await supabase.from('feedbacks').delete().eq('id', id);
-    if (error) throw error;
+    let deletedSuccessfully = false;
 
-    showToast('Feedback deleted successfully.', 'success');
-    document.getElementById('feedback-detail-modal')?.classList.add('hidden');
+    // 1. Try secure RPC delete_feedback first
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('delete_feedback', {
+        p_feedback_id: feedbackId
+      });
+
+      if (!rpcError) {
+        if (rpcData === true || rpcData?.success === true) {
+          deletedSuccessfully = true;
+        } else if (rpcData && rpcData.success === false && rpcData.error) {
+          throw new Error(rpcData.error);
+        }
+      } else {
+        console.warn('[Feedback] RPC delete_feedback warning, trying direct delete:', rpcError.message);
+      }
+    } catch (rpcErr) {
+      if (rpcErr.message && !rpcErr.message.includes('not found') && !rpcErr.message.includes('function') && !rpcErr.message.includes('schema cache')) {
+        throw rpcErr;
+      }
+    }
+
+    // 2. Fallback to delete_feedback_admin RPC if delete_feedback was not available
+    if (!deletedSuccessfully) {
+      try {
+        const { data: rpcAdminData, error: rpcAdminError } = await supabase.rpc('delete_feedback_admin', {
+          p_id: feedbackId
+        });
+        if (!rpcAdminError && (rpcAdminData === true || rpcAdminData?.success === true)) {
+          deletedSuccessfully = true;
+        }
+      } catch (_) {}
+    }
+
+    // 3. Fallback to direct DELETE with representation select
+    if (!deletedSuccessfully) {
+      const { data, error } = await supabase
+        .from('feedbacks')
+        .delete()
+        .eq('id', feedbackId)
+        .select('id');
+
+      if (error) {
+        throw error;
+      }
+
+      // Check if row security silently blocked the delete
+      if (data && data.length === 0) {
+        const { data: existsCheck } = await supabase
+          .from('feedbacks')
+          .select('id')
+          .eq('id', feedbackId)
+          .maybeSingle();
+
+        if (existsCheck) {
+          throw new Error('Permission denied: Your account role does not have permission to delete this review.');
+        }
+      }
+      deletedSuccessfully = true;
+    }
+
+    // Immediately update in-memory list and UI for instant responsiveness
+    _feedbacks = _feedbacks.filter((f) => String(f.id) !== String(id));
+    renderFeedbackTable();
+    updateFeedbackPaginationUI();
+
+    // Close detail modal
+    const modal = document.getElementById('feedback-detail-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+
+    // Decrement count badge immediately
+    const badge = document.getElementById('hub-count-feedback');
+    if (badge) {
+      const current = parseInt(badge.textContent, 10);
+      if (!isNaN(current) && current > 0) {
+        badge.textContent = String(current - 1);
+      } else {
+        badge.textContent = String(_feedbacks.length);
+      }
+    }
+
+    showToast('Review deleted successfully.', 'success');
+
+    // Re-sync with Supabase in background
     await loadFeedback();
   } catch (err) {
     console.error('[Feedback] Delete error:', err);
-    showToast('Failed to delete feedback record: ' + (err.message || 'Unknown error'), 'error');
+    showToast('Failed to delete review: ' + (err.message || 'Unknown error'), 'error');
+  } finally {
+    _isDeletingFeedback = false;
   }
 }
 
@@ -680,7 +792,17 @@ export function initReportsHubController() {
       if (delBtn) {
         e.stopPropagation();
         const id = delBtn.getAttribute('data-id');
-        if (id) deleteFeedback(id);
+        if (id) {
+          const origText = delBtn.textContent;
+          delBtn.disabled = true;
+          delBtn.textContent = '...';
+          deleteFeedback(id).finally(() => {
+            if (delBtn) {
+              delBtn.disabled = false;
+              delBtn.textContent = origText;
+            }
+          });
+        }
         return;
       }
 

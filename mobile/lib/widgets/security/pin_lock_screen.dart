@@ -250,9 +250,9 @@ class _PinLockScreenState extends State<PinLockScreen> {
   @override
   Widget build(BuildContext context) {
     final session = PatientSessionState.session;
-    final patientName = session != null && session.fullname.isNotEmpty
-        ? session.fullname
-        : (session?.username ?? 'Patient');
+    final patientFirstName = session != null && session.firstName.isNotEmpty
+        ? session.firstName
+        : (session?.username.isNotEmpty == true ? session!.username.split(' ').first : 'Patient');
 
     return PopScope(
       canPop: false, // Prevent physical back button from bypassing lock
@@ -311,7 +311,7 @@ class _PinLockScreenState extends State<PinLockScreen> {
                           const SizedBox(height: 6),
 
                           Text(
-                            'Welcome back, $patientName',
+                            'Welcome back, $patientFirstName',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               fontSize: 14,

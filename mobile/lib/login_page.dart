@@ -9,6 +9,7 @@ import 'menu_page.dart';
 import 'forgot_password_page.dart';
 import 'utils/app_transitions.dart';
 import 'core/session/patient_session.dart';
+import 'core/security/login_security_service.dart';
 
 class uKonekLoginPage extends StatefulWidget {
   const uKonekLoginPage({super.key});
@@ -48,6 +49,29 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
     _slideAnim = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
         .animate(CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic));
     _animController.forward();
+
+    _initSecurityState();
+  }
+
+  Future<void> _initSecurityState() async {
+    final remaining = await LoginSecurityService.instance.getLockoutRemainingSeconds();
+    if (!mounted) return;
+    if (remaining > 0) {
+      setState(() {
+        _isLocked = true;
+        _attemptsLeft = 0;
+        _lockSecondsLeft = remaining;
+      });
+      _startLockTimer(remaining);
+    } else {
+      final attempts = await LoginSecurityService.instance.getAttemptsLeft();
+      if (!mounted) return;
+      setState(() {
+        _isLocked = false;
+        _attemptsLeft = attempts;
+        _lockSecondsLeft = 0;
+      });
+    }
   }
 
   @override
@@ -59,16 +83,28 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
     super.dispose();
   }
 
-  void _startLockout() {
-    setState(() { _isLocked = true; _lockSecondsLeft = 60; });
+  void _startLockTimer(int initialSeconds) {
     _lockTimer?.cancel();
-    _lockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_lockSecondsLeft <= 1) {
+    _lockSecondsLeft = initialSeconds;
+    _lockTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      final remaining = await LoginSecurityService.instance.getLockoutRemainingSeconds();
+      if (!mounted) {
         timer.cancel();
-        setState(() { _isLocked = false; _attemptsLeft = 3; _lockSecondsLeft = 60; });
-        passwordController.clear();
+        return;
+      }
+      if (remaining <= 0) {
+        timer.cancel();
+        await LoginSecurityService.instance.clearLockout();
+        if (mounted) {
+          setState(() {
+            _isLocked = false;
+            _attemptsLeft = LoginSecurityService.maxAttempts;
+            _lockSecondsLeft = 0;
+          });
+          passwordController.clear();
+        }
       } else {
-        setState(() => _lockSecondsLeft--);
+        setState(() => _lockSecondsLeft = remaining);
       }
     });
   }
@@ -167,11 +203,15 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
         id: (user['id'] ?? '').toString(),
         username: displayName,
         fullname: fullName,
+        firstName: firstName.isNotEmpty ? firstName : displayName,
         email: _str(user, 'email'),
         phone: _str(user, 'contact_number'),
         address: _str(user, 'complete_address'),
         rawProfile: user,
       ));
+
+      await LoginSecurityService.instance.resetOnSuccess();
+      if (!mounted) return;
 
       Navigator.pushAndRemoveUntil(
         context,
@@ -205,18 +245,33 @@ class _uKonekLoginPageState extends State<uKonekLoginPage>
         return;
       }
 
-      setState(() {
-        _isLoading = false;
-        if (countsAsAttempt) _attemptsLeft--;
-      });
+      if (countsAsAttempt) {
+        final remainingAttempts = await LoginSecurityService.instance.recordFailedAttempt();
+        final remainingSeconds = await LoginSecurityService.instance.getLockoutRemainingSeconds();
+        if (!mounted) return;
 
-      if (countsAsAttempt) passwordController.clear();
+        passwordController.clear();
 
-      if (countsAsAttempt && _attemptsLeft <= 0) {
-        _startLockout();
+        if (remainingSeconds > 0) {
+          setState(() {
+            _isLoading = false;
+            _isLocked = true;
+            _attemptsLeft = 0;
+            _lockSecondsLeft = remainingSeconds;
+          });
+          _startLockTimer(remainingSeconds);
+        } else {
+          setState(() {
+            _isLoading = false;
+            _attemptsLeft = remainingAttempts;
+          });
+          final suffix = ' ($_attemptsLeft left)';
+          _showSnack('$message$suffix', isError: true);
+        }
       } else {
-        final suffix = countsAsAttempt ? ' ($_attemptsLeft left)' : '';
-        _showSnack('$message$suffix', isError: true);
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        _showSnack(message, isError: true);
       }
     }
   }

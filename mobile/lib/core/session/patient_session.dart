@@ -6,6 +6,7 @@ class PatientSession {
   final String id;
   final String username;
   final String fullname;
+  final String firstName;
   final String email;
   final String phone;
   final String address;
@@ -15,6 +16,7 @@ class PatientSession {
     required this.id,
     required this.username,
     required this.fullname,
+    this.firstName = '',
     this.email = '',
     this.phone = '',
     this.address = '',
@@ -24,7 +26,7 @@ class PatientSession {
   factory PatientSession.fromProfile(Map<String, dynamic> profile) {
     final citizenId = (profile['id'] ?? '').toString();
     final username = (profile['username'] ?? '').toString();
-    final firstName = (profile['firstname'] ?? '').toString().trim();
+    final firstName = (profile['firstname'] ?? profile['first_name'] ?? '').toString().trim();
     final middleInitial = (profile['middle_initial'] ?? '').toString().trim();
     final surname = (profile['surname'] ?? '').toString().trim();
 
@@ -35,6 +37,7 @@ class PatientSession {
       id: citizenId,
       username: username,
       fullname: fullname,
+      firstName: firstName.isNotEmpty ? firstName : (fullname.isNotEmpty ? fullname.split(' ').first : username),
       email: (profile['email'] ?? '').toString().trim(),
       phone: (profile['contact_number'] ?? '').toString().trim(),
       address: (profile['complete_address'] ?? '').toString().trim(),
@@ -47,9 +50,9 @@ class PatientSession {
     final rawNick = (rawProfile['nickname'] as String?)?.trim();
     if (rawNick != null && rawNick.isNotEmpty) return rawNick;
 
-    final first = (rawProfile['firstname'] as String?)?.trim() ??
+    final first = firstName.isNotEmpty ? firstName : ((rawProfile['firstname'] as String?)?.trim() ??
         (rawProfile['first_name'] as String?)?.trim() ??
-        '';
+        '');
     if (first.isNotEmpty) return first.split(' ').first;
 
     final nameParts = fullname.trim().split(RegExp(r'\s+'));
@@ -65,6 +68,7 @@ class PatientSession {
     String? id,
     String? username,
     String? fullname,
+    String? firstName,
     String? email,
     String? phone,
     String? address,
@@ -74,6 +78,7 @@ class PatientSession {
       id: id ?? this.id,
       username: username ?? this.username,
       fullname: fullname ?? this.fullname,
+      firstName: firstName ?? this.firstName,
       email: email ?? this.email,
       phone: phone ?? this.phone,
       address: address ?? this.address,
@@ -93,6 +98,7 @@ class PatientSessionState {
   static String get username => session?.username ?? '';
   static String get citizenId => session?.id ?? '';
   static String get fullname => session?.fullname ?? '';
+  static String get firstName => session?.firstName ?? '';
   static String get nickname => session?.nickname ?? '';
   static String get email => session?.email ?? '';
   static String get phone => session?.phone ?? '';
