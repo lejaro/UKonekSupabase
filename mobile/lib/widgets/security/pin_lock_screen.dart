@@ -422,30 +422,51 @@ class _PinLockScreenState extends State<PinLockScreen> {
                   ),
                   const SizedBox(height: 22),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(
-                        onPressed: _isSigningOut ? null : _closeOverlay,
-                        child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
-                      ),
-                      const SizedBox(width: 10),
-                      ElevatedButton(
-                        onPressed: _isSigningOut ? null : _submitSignOut,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFDC2626),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _isSigningOut ? null : _closeOverlay,
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
-                        child: _isSigningOut
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Text(
-                                'Sign Out',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                              ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isSigningOut ? null : _submitSignOut,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: _isSigningOut
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text(
+                                  'Yes, Sign Out',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                        ),
                       ),
                     ],
                   ),
@@ -535,7 +556,7 @@ class _PinLockScreenState extends State<PinLockScreen> {
                                 ),
                               ),
 
-                              const SizedBox(height: 32),
+                              const SizedBox(height: 24),
 
                               // ── Pin Pad ──
                               PinPad(
@@ -569,12 +590,12 @@ class _PinLockScreenState extends State<PinLockScreen> {
                                   const SizedBox(width: 8),
                                   TextButton.icon(
                                     onPressed: _openSignOutDialog,
-                                    icon: const Icon(Icons.logout_rounded, size: 16, color: Color(0xFF64748B)),
+                                    icon: const Icon(Icons.logout_rounded, size: 16, color: Color(0xFFDC2626)),
                                     label: const Text(
                                       'Sign Out',
                                       style: TextStyle(
-                                        color: Color(0xFF64748B),
-                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFFDC2626),
+                                        fontWeight: FontWeight.w700,
                                         fontSize: 13,
                                       ),
                                     ),
