@@ -110,9 +110,7 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
     }
   }
 
-  bool _loading = false;
   Future<void> _refreshProfile() async {
-    setState(() => _loading = true);
     try {
       final p = await ApiService.fetchMyCitizenProfile();
       try {
@@ -131,10 +129,8 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         _emergencyName    = p['emergency_contact_complete_name'] ?? '';
         _emergencyContact = p['emergency_contact_contact_number'] ?? '';
         _relation         = p['relation'] ?? '';
-        _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
       debugPrint('Error fetching profile: $e');
     }
   }
@@ -159,15 +155,33 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
 
   String get _displayName {
     final parts = [_firstName, _middleName, _surname, _nameExtension]
+        .map((s) => s.trim())
         .where((s) => s.isNotEmpty).toList();
-    return parts.isNotEmpty ? parts.join(' ') : widget.fullName;
+    if (parts.isNotEmpty) return parts.join(' ');
+    if (widget.fullName.trim().isNotEmpty) return widget.fullName.trim();
+    if (widget.username.trim().isNotEmpty) return widget.username.trim();
+    return 'Citizen';
   }
 
   String get _initials {
-    if (_firstName.isNotEmpty && _surname.isNotEmpty) {
-      return '${_firstName[0]}${_surname[0]}'.toUpperCase();
+    final f = _firstName.trim();
+    final s = _surname.trim();
+    if (f.isNotEmpty && s.isNotEmpty) {
+      return '${f[0]}${s[0]}'.toUpperCase();
     }
-    return widget.fullName.isNotEmpty ? widget.fullName[0].toUpperCase() : 'U';
+    if (f.isNotEmpty) return f[0].toUpperCase();
+    if (s.isNotEmpty) return s[0].toUpperCase();
+    final full = widget.fullName.trim();
+    if (full.isNotEmpty) {
+      final p = full.split(RegExp(r'\s+'));
+      if (p.length > 1 && p.last.isNotEmpty) {
+        return '${p.first[0]}${p.last[0]}'.toUpperCase();
+      }
+      return full[0].toUpperCase();
+    }
+    final u = widget.username.trim();
+    if (u.isNotEmpty) return u[0].toUpperCase();
+    return 'U';
   }
 
   // Add this getter to _uKonekProfilePageState
@@ -391,7 +405,12 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
                 children: [
                   const Text('Citizen Profile', style: TextStyle(color: _C.textDark, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.4)),
                   const SizedBox(height: 3),
-                  Text(widget.username, style: const TextStyle(color: _C.textMuted, fontSize: 13)),
+                  Text(
+                    widget.username,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: _C.textMuted, fontSize: 13),
+                  ),
                 ],
               ),
             ),
@@ -420,7 +439,12 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
               Container(
                 width: 70, height: 70,
                 decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.4), width: 2)),
-                child: Center(child: Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold))),
+                child: Center(
+                  child: Text(
+                    _initials,
+                    style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
               Container(
                 width: 22, height: 22,
@@ -433,13 +457,25 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_displayName, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+                Text(
+                  _displayName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 4),
-                const Text('Tap to show your QR check-in code', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const Text(
+                  'Tap to show your QR check-in code',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 40),
         ]),
       ),
@@ -454,12 +490,12 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         title: 'Personal Information',
         icon: Icons.person_outline_rounded,
         fields: [
-          _EditField('First Name',     _firstName,     (v) => _firstName     = v),
-          _EditField('Middle Name',    _middleName,    (v) => _middleName    = v, required: false),
-          _EditField('Last Name',      _surname,       (v) => _surname       = v),
-          _EditField('Name Extension', _nameExtension, (v) => _nameExtension = v, required: false),
+          _EditField('First Name',     _firstName,     (v) => _firstName     = v, maxLength: 40, formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s\-'.]"))]),
+          _EditField('Middle Name',    _middleName,    (v) => _middleName    = v, required: false, maxLength: 40, formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s\-'.]"))]),
+          _EditField('Last Name',      _surname,       (v) => _surname       = v, maxLength: 40, formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s\-'.]"))]),
+          _EditField('Name Extension', _nameExtension, (v) => _nameExtension = v, required: false, maxLength: 10, formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z0-9\s.]"))]),
           _EditField('Date of Birth',  _dob,           (v) => _dob           = v, type: FieldType.date),
-          _EditField('Age',            _age,           (v) => _age           = v, type: FieldType.numeric),
+          _EditField('Age',            _age,           (v) => _age           = v, type: FieldType.numeric, maxLength: 3),
           _EditField('Sex',            _sex,           (v) => _sex           = v,
             type: FieldType.dropdown,
             options: ['Male', 'Female'],
@@ -485,9 +521,9 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         title: 'Contact & Address',
         icon: Icons.contact_mail_outlined,
         fields: [
-          _EditField('Email',   _email,   (v) => _email   = v, type: FieldType.email),
-          _EditField('Phone',   _phone,   (v) => _phone   = v, type: FieldType.phone),
-          _EditField('Address', _address, (v) => _address = v, type: FieldType.multiline),
+          _EditField('Email',   _email,   (v) => _email   = v, type: FieldType.email, maxLength: 80),
+          _EditField('Phone',   _phone,   (v) => _phone   = v, type: FieldType.phone, maxLength: 20),
+          _EditField('Address', _address, (v) => _address = v, type: FieldType.multiline, maxLength: 150),
         ],
       ),
       children: [
@@ -529,8 +565,8 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         title: 'Emergency Contact',
         icon: Icons.emergency_outlined,
         fields: [
-          _EditField('Contact Name',   _emergencyName,    (v) => _emergencyName    = v),
-          _EditField('Contact Number', _emergencyContact, (v) => _emergencyContact = v, type: FieldType.phone),
+          _EditField('Contact Name',   _emergencyName,    (v) => _emergencyName    = v, maxLength: 50, formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s\-'.]"))]),
+          _EditField('Contact Number', _emergencyContact, (v) => _emergencyContact = v, type: FieldType.phone, maxLength: 20),
           _EditField('Relationship',   _relation,         (v) => _relation         = v,
             type: FieldType.dropdown,
             options: ['Parent', 'Spouse', 'Sibling', 'Child', 'Relative', 'Friend', 'Guardian', 'Other'],
@@ -922,7 +958,6 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
     );
     final baseDecoration = InputDecoration(
       labelText: f.label,
-      hintText:  f.hint,
       labelStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
       filled: true,
       fillColor: _C.fieldBg,
@@ -1010,14 +1045,23 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         return TextFormField(
           controller: ctrl,
           keyboardType: TextInputType.phone,
-          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s]'))],
+          maxLength: f.maxLength,
+          maxLengthEnforcement: MaxLengthEnforcement.enforced,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s]')),
+            LengthLimitingTextInputFormatter(f.maxLength),
+          ],
           style: const TextStyle(fontSize: 14, color: _C.textDark),
           decoration: baseDecoration.copyWith(
+            counterText: "",
             prefixIcon: const Icon(Icons.phone_outlined, color: _C.primary, size: 18),
           ),
-          validator: f.required
-              ? (v) => (v == null || v.trim().isEmpty) ? '${f.label} is required' : null
-              : null,
+          validator: (v) {
+            final trimmed = v?.trim() ?? '';
+            if (f.required && trimmed.isEmpty) return '${f.label} is required';
+            if (trimmed.length > f.maxLength) return 'Max. ${f.maxLength} characters';
+            return null;
+          },
         );
 
     // ── Email ───────────────────────────────────
@@ -1025,17 +1069,23 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         return TextFormField(
           controller: ctrl,
           keyboardType: TextInputType.emailAddress,
+          maxLength: f.maxLength,
+          maxLengthEnforcement: MaxLengthEnforcement.enforced,
+          inputFormatters: [
+            LengthLimitingTextInputFormatter(f.maxLength),
+          ],
           style: const TextStyle(fontSize: 14, color: _C.textDark),
           decoration: baseDecoration.copyWith(
+            counterText: "",
             prefixIcon: const Icon(Icons.email_outlined, color: _C.primary, size: 18),
           ),
-          validator: f.required
-              ? (v) {
-            if (v == null || v.trim().isEmpty) return '${f.label} is required';
-            if (!v.contains('@')) return 'Enter a valid email';
+          validator: (v) {
+            final trimmed = v?.trim() ?? '';
+            if (f.required && trimmed.isEmpty) return '${f.label} is required';
+            if (trimmed.isNotEmpty && !trimmed.contains('@')) return 'Enter a valid email';
+            if (trimmed.length > f.maxLength) return 'Max. ${f.maxLength} characters';
             return null;
-          }
-              : null,
+          },
         );
 
     // ── Numeric ─────────────────────────────────
@@ -1043,12 +1093,22 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
         return TextFormField(
           controller: ctrl,
           keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          maxLength: f.maxLength,
+          maxLengthEnforcement: MaxLengthEnforcement.enforced,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(f.maxLength),
+          ],
           style: const TextStyle(fontSize: 14, color: _C.textDark),
-          decoration: baseDecoration,
-          validator: f.required
-              ? (v) => (v == null || v.trim().isEmpty) ? '${f.label} is required' : null
-              : null,
+          decoration: baseDecoration.copyWith(
+            counterText: "",
+          ),
+          validator: (v) {
+            final trimmed = v?.trim() ?? '';
+            if (f.required && trimmed.isEmpty) return '${f.label} is required';
+            if (trimmed.length > f.maxLength) return 'Max. ${f.maxLength} digits';
+            return null;
+          },
         );
 
     // ── Multiline ───────────────────────────────
@@ -1057,30 +1117,50 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
           controller: ctrl,
           keyboardType: TextInputType.multiline,
           maxLines: 3,
+          maxLength: f.maxLength,
+          maxLengthEnforcement: MaxLengthEnforcement.enforced,
+          inputFormatters: [
+            LengthLimitingTextInputFormatter(f.maxLength),
+          ],
           style: const TextStyle(fontSize: 14, color: _C.textDark),
           decoration: baseDecoration.copyWith(
+            counterText: "",
             alignLabelWithHint: true,
             prefixIcon: const Padding(
               padding: EdgeInsets.only(bottom: 40),
               child: Icon(Icons.location_on_outlined, color: _C.primary, size: 18),
             ),
           ),
-          validator: f.required
-              ? (v) => (v == null || v.trim().isEmpty) ? '${f.label} is required' : null
-              : null,
+          validator: (v) {
+            final trimmed = v?.trim() ?? '';
+            if (f.required && trimmed.isEmpty) return '${f.label} is required';
+            if (trimmed.length > f.maxLength) return 'Max. ${f.maxLength} characters';
+            return null;
+          },
         );
 
     // ── Plain text (default) ────────────────────
       case FieldType.text:
-      default:
         return TextFormField(
           controller: ctrl,
           keyboardType: TextInputType.text,
+          maxLength: f.maxLength,
+          maxLengthEnforcement: MaxLengthEnforcement.enforced,
+          inputFormatters: [
+            if (f.formatters != null) ...f.formatters!,
+            LengthLimitingTextInputFormatter(f.maxLength),
+          ],
           style: const TextStyle(fontSize: 14, color: _C.textDark),
-          decoration: baseDecoration,
-          validator: f.required
-              ? (v) => (v == null || v.trim().isEmpty) ? '${f.label} is required' : null
-              : null,
+          decoration: baseDecoration.copyWith(
+            counterText: "",
+          ),
+          validator: (v) {
+            final trimmed = v?.trim() ?? '';
+            if (f.required && trimmed.isEmpty) return '${f.label} is required';
+            if (f.required && trimmed.length < 2) return 'Min. 2 characters';
+            if (trimmed.length > f.maxLength) return 'Max. ${f.maxLength} characters';
+            return null;
+          },
         );
     }
   }
@@ -1221,12 +1301,13 @@ class _uKonekProfilePageState extends State<uKonekProfilePage> {
                 const SizedBox(height: 2),
                 Text(
                   value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: _C.textDark,
                     fontSize: 14,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -1321,17 +1402,19 @@ class _EditField {
   final String value;
   final void Function(String) setter;
   final bool required;
-  final String? hint;
   final FieldType type;
   final List<String>? options; // for dropdown
+  final int maxLength;
+  final List<TextInputFormatter>? formatters;
 
   const _EditField(
       this.label,
       this.value,
       this.setter, {
         this.required = true,
-        this.hint,
         this.type = FieldType.text,
         this.options,
+        this.maxLength = 50,
+        this.formatters,
       });
 }

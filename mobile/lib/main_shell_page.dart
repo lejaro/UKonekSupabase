@@ -529,6 +529,9 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
                   const SizedBox(height: 14),
                   Text(
                     widget.fullname.isNotEmpty ? widget.fullname : widget.username,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 15,

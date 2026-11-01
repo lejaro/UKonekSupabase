@@ -63,7 +63,7 @@ class MedicineCacheService {
   static Future<void> saveIntakeLogs(String citizenId, String dateKey, List<Map<String, dynamic>> logs) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('${_logsPrefix}${citizenId}_$dateKey', jsonEncode(logs));
+      await prefs.setString('$_logsPrefix${citizenId}_$dateKey', jsonEncode(logs));
     } catch (e) {
       debugPrint('Error saving intake logs to cache: $e');
     }
@@ -73,7 +73,7 @@ class MedicineCacheService {
   static Future<List<Map<String, dynamic>>?> loadCachedIntakeLogs(String citizenId, String dateKey) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString('${_logsPrefix}${citizenId}_$dateKey');
+      final raw = prefs.getString('$_logsPrefix${citizenId}_$dateKey');
       if (raw == null || raw.isEmpty) return null;
       final decoded = jsonDecode(raw) as List<dynamic>;
       return decoded.whereType<Map<String, dynamic>>().toList();
@@ -195,7 +195,7 @@ class MedicineCacheService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final allKeys = prefs.getKeys();
-      final prefix = '${_logsPrefix}${citizenId}_';
+      final prefix = '$_logsPrefix${citizenId}_';
       final cutoff = DateTime.now().subtract(maxAge);
 
       for (final key in allKeys) {

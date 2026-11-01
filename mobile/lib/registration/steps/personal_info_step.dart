@@ -168,7 +168,7 @@ class PersonalInfoStep extends StatelessWidget {
   Widget _field(String label, TextEditingController ctrl, IconData icon,
       {bool required = true, String? hint, List<TextInputFormatter>? formatters, int maxLength = 50}) {
     final effectiveFormatters = <TextInputFormatter>[
-      if (formatters != null) ...formatters,
+      ...?formatters,
       LengthLimitingTextInputFormatter(maxLength),
     ];
     return Padding(

@@ -27,7 +27,6 @@ class uKonekContactStep extends StatelessWidget {
 
   // ── Medical Green Design Tokens ──────────────────────────────
   static const Color _primary = Color(0xFF059669);     // Emerald 600
-  static const Color _primary2 = Color(0xFF064E3B);    // Forest Emerald 900
   static const Color _textDark = Color(0xFF0F172A);    // Slate 900
   static const Color _textMuted = Color(0xFF64748B);   // Slate 500
   static const Color _fieldBg = Color(0xFFF8FAFC);     // Slate Field
@@ -238,7 +237,7 @@ class uKonekContactStep extends StatelessWidget {
   Widget _inputField(TextEditingController ctrl, String label, IconData icon,
       {bool isEmail = false, bool enabled = true, bool isRequired = true, int maxLength = 100, List<TextInputFormatter>? formatters}) {
     final effectiveFormatters = <TextInputFormatter>[
-      if (formatters != null) ...formatters,
+      ...?formatters,
       if (isEmail) FilteringTextInputFormatter.deny(RegExp(r'\s')),
       LengthLimitingTextInputFormatter(maxLength),
     ];

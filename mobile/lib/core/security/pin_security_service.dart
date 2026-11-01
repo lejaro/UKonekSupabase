@@ -185,24 +185,51 @@ class PinSecurityService {
 
   /// Verifies account password with Supabase to allow bypassing or resetting forgotten PIN.
   Future<bool> verifyAccountPassword(String password) async {
-    final auth = Supabase.instance.client.auth;
-    final currentUser = auth.currentUser;
-    final email = currentUser?.email ?? PatientSessionState.session?.email;
+    final cleanPwd = password.trim();
+    if (cleanPwd.isEmpty) return false;
 
-    if (email == null || email.isEmpty) {
+    final auth = Supabase.instance.client.auth;
+    final sessionUser = auth.currentSession?.user ?? auth.currentUser;
+    String? email = sessionUser?.email;
+
+    if (email == null || email.trim().isEmpty) {
+      email = PatientSessionState.session?.email;
+    }
+    if (email == null || email.trim().isEmpty) {
+      email = PatientSessionState.session?.rawProfile['email']?.toString();
+    }
+    if (email == null || email.trim().isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        email = prefs.getString('saved_email') ?? prefs.getString('login_email');
+      } catch (_) {}
+    }
+
+    if (email == null || email.trim().isEmpty) {
+      debugPrint('[PinSecurity] verifyAccountPassword: No email found for current patient session.');
       return false;
     }
 
+    final cleanEmail = email.trim().toLowerCase();
+
     try {
-      final response = await Supabase.instance.client.auth.signInWithPassword(
-        email: email,
-        password: password,
+      final response = await auth.signInWithPassword(
+        email: cleanEmail,
+        password: cleanPwd,
       );
       if (response.user != null) {
+        if (response.session?.accessToken != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('session_token', response.session!.accessToken);
+        }
         unlock();
         return true;
       }
-    } catch (_) {}
+    } on AuthException catch (e) {
+      debugPrint('[PinSecurity] verifyAccountPassword AuthException: ${e.message}');
+    } catch (e) {
+      debugPrint('[PinSecurity] verifyAccountPassword unexpected error: $e');
+    }
     return false;
   }
 

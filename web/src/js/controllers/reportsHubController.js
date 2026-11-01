@@ -9,6 +9,7 @@
 
 import { supabase } from '../lib/supabaseClient.js';
 import { showToast, toggleChartSkeleton, renderTableSkeleton } from '../utils/uiHelpers.js';
+import { sessionStore } from '../services/sessionStore.js';
 import { loadPromoPosters } from './promoPosterController.js';
 import { loadSystemReportData, initSystemReportController } from './systemReportController.js';
 
@@ -18,6 +19,16 @@ let _feedbackRatingFilter = 'all';
 let _activePaneId = 'announcements-pane';
 let _diagnosesChart = null;
 let _consultsChart = null;
+
+/**
+ * Check if the current logged in user has permission to delete patient reviews.
+ * Authorized roles: Doctors and Administrators.
+ */
+export function canUserDeleteReviews() {
+  const user = sessionStore.getUser();
+  const role = String(user?.role || document.body.getAttribute('data-role') || '').trim().toLowerCase();
+  return role === 'doctor' || role === 'admin';
+}
 
 function escHtml(str) {
   if (str == null) return '';
@@ -271,10 +282,10 @@ export function renderFeedbackTable() {
       <tr class="empty-row">
         <td colspan="4" style="text-align:center; padding:40px; color:#64748b;">
           <div style="font-weight:700; font-size:14px; margin-bottom:4px; color:#334155;">
-            ${isFiltered ? 'No matching feedback found' : 'No citizen feedback received yet'}
+            ${isFiltered ? 'No matching patient reviews found' : 'No patient reviews or feedback received yet'}
           </div>
           <div style="font-size:12px; color:#94a3b8;">
-            ${isFiltered ? 'Try clearing your search query or rating filter.' : 'Citizen responses submitted through the mobile app will automatically appear here.'}
+            ${isFiltered ? 'Try clearing your search query or rating filter.' : 'Patient reviews and ratings submitted through the mobile app will automatically appear here.'}
           </div>
         </td>
       </tr>
@@ -282,8 +293,10 @@ export function renderFeedbackTable() {
     return;
   }
 
+  const canDelete = canUserDeleteReviews();
+
   tbody.innerHTML = filtered.map((item) => {
-    let citizenName = 'Anonymous Citizen';
+    let citizenName = 'Anonymous Patient';
     if (item.citizen && (item.citizen.first_name || item.citizen.last_name)) {
       citizenName = [item.citizen.first_name, item.citizen.last_name].filter(Boolean).join(' ');
     } else if (item.from_email) {
@@ -324,9 +337,11 @@ export function renderFeedbackTable() {
           <button type="button" class="chip-btn chip-btn-outline btn-view-feedback" data-id="${item.id}" style="padding:4px 10px; font-size:11px; margin-right:4px;">
             View
           </button>
-          <button type="button" class="chip-btn chip-btn-danger btn-delete-feedback" data-id="${item.id}" style="padding:4px 10px; font-size:11px;">
-            Delete
-          </button>
+          ${canDelete ? `
+            <button type="button" class="chip-btn chip-btn-danger btn-delete-feedback" data-id="${item.id}" style="padding:4px 10px; font-size:11px;" title="Delete this review">
+              Delete
+            </button>
+          ` : ''}
         </td>
       </tr>
     `;
@@ -348,7 +363,7 @@ export function openFeedbackDetail(id) {
   const bodyEl = document.getElementById('feedback-detail-body');
   const deleteBtn = document.getElementById('feedback-detail-delete-btn');
 
-  let citizenName = 'Anonymous Citizen';
+  let citizenName = 'Anonymous Patient';
   if (item.citizen && (item.citizen.first_name || item.citizen.last_name)) {
     citizenName = [item.citizen.first_name, item.citizen.last_name].filter(Boolean).join(' ');
   } else if (item.from_email) {
@@ -375,22 +390,27 @@ export function openFeedbackDetail(id) {
   if (bodyEl) bodyEl.textContent = item.message || '(No message content provided)';
 
   if (deleteBtn) {
-    deleteBtn.disabled = false;
-    deleteBtn.textContent = 'Delete Review';
-    deleteBtn.onclick = async (e) => {
-      e.preventDefault();
-      const origText = deleteBtn.textContent;
-      deleteBtn.disabled = true;
-      deleteBtn.textContent = 'Deleting...';
-      try {
-        await deleteFeedback(item.id);
-      } finally {
-        if (deleteBtn) {
-          deleteBtn.disabled = false;
-          deleteBtn.textContent = origText;
+    if (canUserDeleteReviews()) {
+      deleteBtn.style.display = '';
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = 'Delete Review';
+      deleteBtn.onclick = async (e) => {
+        e.preventDefault();
+        const origText = deleteBtn.textContent;
+        deleteBtn.disabled = true;
+        deleteBtn.textContent = 'Deleting...';
+        try {
+          await deleteFeedback(item.id);
+        } finally {
+          if (deleteBtn) {
+            deleteBtn.disabled = false;
+            deleteBtn.textContent = origText;
+          }
         }
-      }
-    };
+      };
+    } else {
+      deleteBtn.style.display = 'none';
+    }
   }
 
   if (modal) modal.classList.remove('hidden');
@@ -400,13 +420,14 @@ let _isDeletingFeedback = false;
 
 /**
  * Delete feedback / review by ID.
+ * Doctors and Administrators have full authorization to delete patient reviews.
  * Supports secure RPC deletion with graceful fallback to direct deletion.
  */
 export async function deleteFeedback(id) {
   if (!id) return;
   if (_isDeletingFeedback) return;
 
-  if (!confirm('Are you sure you want to permanently delete this citizen review/feedback?')) {
+  if (!confirm('Are you sure you want to permanently delete this patient review?')) {
     return;
   }
 
@@ -426,13 +447,27 @@ export async function deleteFeedback(id) {
         if (rpcData === true || rpcData?.success === true) {
           deletedSuccessfully = true;
         } else if (rpcData && rpcData.success === false && rpcData.error) {
-          throw new Error(rpcData.error);
+          if (
+            rpcData.error.toLowerCase().includes('not found') ||
+            rpcData.error.toLowerCase().includes('already deleted')
+          ) {
+            // Already deleted from remote, proceed with local state cleanup
+            deletedSuccessfully = true;
+          } else {
+            throw new Error(rpcData.error);
+          }
         }
       } else {
-        console.warn('[Feedback] RPC delete_feedback warning, trying direct delete:', rpcError.message);
+        console.warn('[Feedback] RPC delete_feedback notice, attempting direct delete:', rpcError.message);
       }
     } catch (rpcErr) {
-      if (rpcErr.message && !rpcErr.message.includes('not found') && !rpcErr.message.includes('function') && !rpcErr.message.includes('schema cache')) {
+      if (
+        rpcErr.message &&
+        !rpcErr.message.includes('not found') &&
+        !rpcErr.message.includes('function') &&
+        !rpcErr.message.includes('schema cache') &&
+        !rpcErr.message.includes('PGRST')
+      ) {
         throw rpcErr;
       }
     }
@@ -470,7 +505,7 @@ export async function deleteFeedback(id) {
           .maybeSingle();
 
         if (existsCheck) {
-          throw new Error('Permission denied: Your account role does not have permission to delete this review.');
+          throw new Error('Permission denied: Doctor or administrator privileges are required to delete reviews.');
         }
       }
       deletedSuccessfully = true;
@@ -499,7 +534,7 @@ export async function deleteFeedback(id) {
       }
     }
 
-    showToast('Review deleted successfully.', 'success');
+    showToast('Patient review deleted successfully.', 'success');
 
     // Re-sync with Supabase in background
     await loadFeedback();
@@ -836,4 +871,9 @@ export function initReportsHubController() {
 
   // 6. Initial background load of feedback count to populate badge
   loadFeedback().catch((e) => console.warn('[ReportsHub] Feedback count preload warning:', e));
+
+  // 7. Subscribe to session changes so review deletion permissions update reactively
+  sessionStore.onSessionChange(() => {
+    renderFeedbackTable();
+  });
 }

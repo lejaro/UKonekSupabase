@@ -4,7 +4,6 @@ import 'menu_page.dart';
 // ── Shared design tokens ───────────────────────────────────────
 class _C {
   static const primary    = Color(0xFF0A2E6E);
-  static const primaryMid = Color(0xFF1565C0);
   static const bg         = Color(0xFFF8FAFF);
   static const textDark   = Color(0xFF1A2740);
   static const textMuted  = Color(0xFF8A93A0);
@@ -99,7 +98,6 @@ class _OnboardingPageState extends State<OnboardingPage>
   Widget build(BuildContext context) {
     final data    = _onboardingData[_currentPage];
     final accent  = data['color'] as Color;
-    final bgColor = data['bgColor'] as Color;
     final isLast  = _currentPage == _onboardingData.length - 1;
 
     return Scaffold(

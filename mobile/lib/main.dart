@@ -114,20 +114,28 @@ class _UKonekAppState extends State<UKonekApp> {
     // PKCE flow: ukonekmobile://reset-password?code=...
     // Supabase uses a `code` query param for the PKCE exchange
     if (uri.queryParameters.containsKey('code') &&
-        uriStr.contains('reset-password')) return true;
+        uriStr.contains('reset-password')) {
+      return true;
+    }
 
     // Implicit flow fragment: ukonekmobile://reset-password#access_token=...&type=recovery
     if (uri.fragment.isNotEmpty) {
       // Parse fragment as query parameters (key=value&key2=value2)
       final fragParams = Uri.splitQueryString(uri.fragment);
-      if (fragParams['type'] == 'recovery') return true;
+      if (fragParams['type'] == 'recovery') {
+        return true;
+      }
     }
 
     // Query-encoded token: ?type=recovery
-    if (uri.queryParameters['type'] == 'recovery') return true;
+    if (uri.queryParameters['type'] == 'recovery') {
+      return true;
+    }
 
     // Host or path hint (covers both flows)
-    if (uriStr.contains('reset-password')) return true;
+    if (uriStr.contains('reset-password')) {
+      return true;
+    }
 
     return false;
   }

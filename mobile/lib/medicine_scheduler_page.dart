@@ -1262,19 +1262,25 @@ class _MedicineSchedulerPageState extends State<MedicineSchedulerPage> with Widg
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(isToday 
-                  ? "${_getGreeting()}, $_patientNickname 👋"
-                  : DateFormat('EEEE, MMM d, yyyy').format(_selectedDate),
-                  style: TextStyle(fontSize: isToday ? 24 : 20, fontWeight: FontWeight.w900, color: _textDark)),
-              const SizedBox(height: 4),
-              Text(isToday 
-                  ? "Let's stay on track with your health."
-                  : "Medication schedule for this date.",
-                  style: const TextStyle(fontSize: 14, color: _textMuted)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(isToday 
+                    ? "${_getGreeting()}, $_patientNickname 👋"
+                    : DateFormat('EEEE, MMM d, yyyy').format(_selectedDate),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: isToday ? 24 : 20, fontWeight: FontWeight.w900, color: _textDark)),
+                const SizedBox(height: 4),
+                Text(isToday 
+                    ? "Let's stay on track with your health."
+                    : "Medication schedule for this date.",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, color: _textMuted)),
+              ],
+            ),
           ),
         ],
       ),
