@@ -1381,9 +1381,13 @@ export function initConsultationSection() {
   initConsultationTabs();
   initPrescriptionDosagePresets();
   initConsultationPatientSelector();
-  loadConsultationData();
-  loadTriagedWaitingPatients();
-  initLabSection();
+  // Lazy-load: only query if consultation section is actively visible
+  const consultSec = document.getElementById('consultation-section');
+  if (consultSec && !consultSec.classList.contains('hidden')) {
+    loadConsultationData();
+    loadTriagedWaitingPatients();
+    initLabSection();
+  }
 
   if (typeof window !== 'undefined') {
     window.loadTriagedWaitingPatients = loadTriagedWaitingPatients;

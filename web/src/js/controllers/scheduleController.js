@@ -862,12 +862,13 @@ export function initSchedule() {
     });
   }
 
-  subscribeToStaffAvailability();
+  // Note: staff availability realtime subscription is now deferred to loadDoctorSchedules
 }
 
 export const initScheduleController = initSchedule;
 
 export async function loadDoctorSchedules(user = sessionStore.getUser()) {
+  subscribeToStaffAvailability();
   return loadSchedules(user);
 }
 

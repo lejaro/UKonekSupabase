@@ -381,6 +381,7 @@ export function stopQueueFallbackPolling() {
 }
 
 export async function setupRealtime() {
+  if (queueBoardChannel) return;
   try {
     teardownQueueRealtime();
 
@@ -440,6 +441,9 @@ if (typeof document !== 'undefined' && !document._queueVisibilityBound) {
 }
 
 export async function loadQueueTickets() {
+  if (!queueBoardChannel) {
+    setupRealtime().catch(e => console.warn('[Queue] Realtime auto-connect warning:', e));
+  }
   if (state.loading) return;
   if (document.querySelector('.queue-ticket-card.dragging')) return;
 
@@ -830,8 +834,11 @@ export function setupUI() {
 
 export async function initQueueController() {
   setupUI();
-  await setupRealtime();
-  await loadQueueTickets();
+  const queueSec = document.getElementById('queue-section');
+  if (queueSec && !queueSec.classList.contains('hidden')) {
+    await setupRealtime();
+    await loadQueueTickets();
+  }
 }
 
 // Preserve global helper endpoints

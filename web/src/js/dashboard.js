@@ -269,11 +269,7 @@ async function bootstrapDashboard() {
     // Non-blocking queue controller init so realtime setup does not delay navigation
     initQueueController().catch(e => console.warn('[Dashboard] Queue controller init warning:', e));
 
-    // Parallel background pre-load of directories so counters and metrics are immediately populated
-    Promise.all([
-      loadStaffDirectory().catch(e => console.warn('[Dashboard] Staff directory load warning:', e)),
-      loadCitizenDirectory().catch(e => console.warn('[Dashboard] Citizen directory load warning:', e))
-    ]);
+    // Note: Staff & citizen directories are now loaded on-demand when visiting users-section
 
     // 4. Resolve and display initial section based on URL hash or default
     const initialSection = getSectionFromHash() || DEFAULT_SECTION_ID;

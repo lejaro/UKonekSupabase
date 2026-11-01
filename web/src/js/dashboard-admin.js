@@ -209,11 +209,20 @@ async function loadAnalyticsData() {
     let vitalsQuery = supabase.from('vital_signs').select('id, created_at');
     if (startDate) vitalsQuery = vitalsQuery.gte('created_at', `${startDate}T00:00:00`);
 
-    let rxQuery = supabase.from('prescription_headers').select('id, issued_at');
+    // Optimize: query exact counts via head without downloading thousands of rows
+    let rxQuery = supabase.from('prescription_headers').select('*', { count: 'exact', head: true });
     if (startDate) rxQuery = rxQuery.gte('issued_at', `${startDate}T00:00:00`);
 
-    let labQuery = supabase.from('lab_orders').select('id, created_at');
+    let labQuery = supabase.from('lab_orders').select('*', { count: 'exact', head: true });
     if (startDate) labQuery = labQuery.gte('created_at', `${startDate}T00:00:00`);
+
+    // Trend chart only charts the last 7 days
+    const chartWindowStart = startDate || new Date(now.getTime() - 7 * 86400000).toISOString().split('T')[0];
+    if (!startDate) {
+      consultQuery = consultQuery.gte('consulted_at', `${chartWindowStart}T00:00:00`);
+      queueQuery = queueQuery.gte('queue_date', chartWindowStart);
+      vitalsQuery = vitalsQuery.gte('created_at', `${chartWindowStart}T00:00:00`);
+    }
 
     const [
       citizensCountRes,
@@ -225,11 +234,11 @@ async function loadAnalyticsData() {
       staffRes
     ] = await Promise.all([
       supabase.from('citizens').select('*', { count: 'exact', head: true }),
-      consultQuery.limit(2000),
-      queueQuery.limit(2000),
-      vitalsQuery.limit(2000),
-      rxQuery.limit(2000),
-      labQuery.limit(2000),
+      consultQuery.limit(300),
+      queueQuery.limit(300),
+      vitalsQuery.limit(300),
+      rxQuery,
+      labQuery,
       supabase.from('staff').select('id, role, status, is_online')
     ]);
 
@@ -237,8 +246,8 @@ async function loadAnalyticsData() {
     const consults = consultRes.data || [];
     const queueTickets = queueRes.data || [];
     const vitals = vitalsRes.data || [];
-    const prescriptions = rxRes.data || [];
-    const labOrders = labRes.data || [];
+    const prescriptionsCount = typeof rxRes.count === 'number' ? rxRes.count : (rxRes.data?.length || 0);
+    const labOrdersCount = typeof labRes.count === 'number' ? labRes.count : (labRes.data?.length || 0);
     const allStaff = staffRes.data || [];
 
     const activeStaffCount = allStaff.filter(s => (s.status || '').toLowerCase() === 'active').length;
@@ -250,8 +259,8 @@ async function loadAnalyticsData() {
       consultationsCount: consults.length,
       queueTicketsCount: queueTickets.length,
       vitalsCount: vitals.length,
-      prescriptionsCount: prescriptions.length,
-      labOrdersCount: labOrders.length,
+      prescriptionsCount,
+      labOrdersCount,
       consults,
       startDate: startDate || 'All Time',
       endDate: now.toISOString().split('T')[0],
@@ -273,7 +282,7 @@ async function loadAnalyticsData() {
 
     // Render Charts
     renderTrendsChart(consults, vitals, queueTickets);
-    renderDeptLoadChart(vitals.length, consults.length, prescriptions.length, labOrders.length);
+    renderDeptLoadChart(vitals.length, consults.length, prescriptionsCount, labOrdersCount);
   } catch (err) {
     console.error('[Admin] Error loading analytics data:', err);
     showToast('Failed to load operational analytics.', 'error');

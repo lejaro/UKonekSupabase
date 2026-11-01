@@ -59,65 +59,80 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
   static const Color _textDark     = Color(0xFF0F172A);
 
   late int _selectedTab;
-  late final List<Widget> _pages;
+  late final List<Widget?> _pageInstances;
   bool _isShowingPrescriptionModal = false;
   bool _isCheckingPrescriptionAlert = false;
   int? _lastAlertedPrescriptionId;
   RealtimeChannel? _prescriptionRealtimeChannel;
 
+  Widget _ensurePageLoaded(int index) {
+    if (_pageInstances[index] == null) {
+      switch (index) {
+        case 0:
+          _pageInstances[0] = uKonekDashboardPage(
+            username: widget.username,
+            citizenId: widget.citizenId,
+            fullname: widget.fullname,
+            email: widget.email,
+            phone: widget.phone,
+            address: widget.address,
+            isEmbeddedInShell: true,
+          );
+          break;
+        case 1:
+          _pageInstances[1] = uKonekMedicineSchedulerPage(
+            username: widget.username,
+            citizenId: widget.citizenId,
+            nickname: widget.fullname.trim().split(RegExp(r'\s+')).first.isNotEmpty
+                ? widget.fullname.trim().split(RegExp(r'\s+')).first
+                : null,
+            isEmbeddedInShell: true,
+          );
+          break;
+        case 2:
+          _pageInstances[2] = uKonekJoinQueuePage(
+            username: widget.username,
+            citizenId: widget.citizenId,
+            isEmbeddedInShell: true,
+          );
+          break;
+        case 3:
+          _pageInstances[3] = uKonekProfilePage(
+            username: widget.username,
+            citizenId: widget.citizenId,
+            fullName: widget.fullname.isNotEmpty ? widget.fullname : widget.username,
+            email: widget.email,
+            phone: widget.phone,
+            address: widget.address,
+            isEmbeddedInShell: true,
+          );
+          break;
+      }
+    }
+    return _pageInstances[index]!;
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _pageInstances = List<Widget?>.filled(4, null);
     _selectedTab = widget.initialTab;
+    _ensurePageLoaded(_selectedTab);
     ShellNavigation.currentTab.value = _selectedTab;
     ShellNavigation.currentTab.addListener(_onNavigationTabChanged);
     ShellNavigation.prescriptionAlertTrigger.addListener(_onPrescriptionTrigger);
 
-    _pages = [
-      uKonekDashboardPage(
-        username: widget.username,
-        citizenId: widget.citizenId,
-        fullname: widget.fullname,
-        email: widget.email,
-        phone: widget.phone,
-        address: widget.address,
-        isEmbeddedInShell: true,
-      ),
-      uKonekMedicineSchedulerPage(
-        username: widget.username,
-        citizenId: widget.citizenId,
-        nickname: widget.fullname.trim().split(RegExp(r'\s+')).first.isNotEmpty
-            ? widget.fullname.trim().split(RegExp(r'\s+')).first
-            : null,
-        isEmbeddedInShell: true,
-      ),
-      uKonekJoinQueuePage(
-        username: widget.username,
-        citizenId: widget.citizenId,
-        isEmbeddedInShell: true,
-      ),
-      uKonekProfilePage(
-        username: widget.username,
-        citizenId: widget.citizenId,
-        fullName: widget.fullname.isNotEmpty ? widget.fullname : widget.username,
-        email: widget.email,
-        phone: widget.phone,
-        address: widget.address,
-        isEmbeddedInShell: true,
-      ),
-    ];
-
     // Real-time subscription to newly created prescriptions
     _subscribePrescriptionRealtime();
 
-    // Check for newly issued prescriptions shortly after startup
-    Future.delayed(const Duration(milliseconds: 1200), () {
+    // Check for newly issued prescriptions shortly after startup (relaxed to avoid boot spikes)
+    Future.delayed(const Duration(milliseconds: 3000), () {
       if (mounted) _checkNewPrescriptionAlert();
     });
 
     // Synchronize upcoming clinical follow-up reminders
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    Future.delayed(const Duration(milliseconds: 4500), () {
       if (mounted) FollowupNotificationService.syncAndScheduleFollowupReminders();
     });
   }
@@ -272,6 +287,7 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     HapticFeedback.selectionClick();
     ShellNavigation.currentTab.value = index;
+    _ensurePageLoaded(index);
     setState(() {
       _selectedTab = index;
     });
@@ -309,7 +325,10 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
       child: Scaffold(
         body: IndexedStack(
           index: _selectedTab,
-          children: _pages,
+          children: List.generate(
+            4,
+            (i) => _pageInstances[i] ?? const SizedBox.shrink(),
+          ),
         ),
         bottomNavigationBar: _buildBottomNav(),
       ),
