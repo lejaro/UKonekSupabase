@@ -697,33 +697,7 @@ if (typeof window !== 'undefined') {
 }
 
 export function initPrescriptionDosagePresets() {
-  document.querySelectorAll('.rx-preset-chip').forEach(btn => {
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = 'true';
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const dosage = btn.getAttribute('data-dosage');
-      const sig = btn.getAttribute('data-sig');
-
-      const linesContainer = document.getElementById('prescription-lines');
-      let lastLine = linesContainer?.lastElementChild;
-      if (!lastLine) {
-        const addBtn = document.getElementById('add-prescription-line');
-        if (addBtn) {
-          addBtn.click();
-          lastLine = linesContainer?.lastElementChild;
-        }
-      }
-
-      if (lastLine) {
-        const dosageInput = lastLine.querySelector('.rx-dosage-input') || lastLine.querySelector('input[placeholder*="Dosage"]');
-        const sigInput = lastLine.querySelector('.rx-instructions-input') || lastLine.querySelector('input[placeholder*="Instructions"]');
-        if (dosageInput && dosage) dosageInput.value = dosage;
-        if (sigInput && sig) sigInput.value = sig;
-        showToast('Prescription dosage shortcut applied.', 'info');
-      }
-    });
-  });
+  // Dosage presets removed per clinical requirements
 }
 
 export async function loadVitalsForConsultation(queueTicketId) {

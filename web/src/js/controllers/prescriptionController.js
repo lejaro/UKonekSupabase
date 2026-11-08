@@ -471,31 +471,6 @@ export function initPrescriptionController() {
     });
   }
 
-  // Dosage shortcut preset chips
-  document.querySelectorAll('.rx-preset-chip').forEach((btn) => {
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = 'true';
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const dosage = btn.getAttribute('data-dosage') || '';
-      const sig = btn.getAttribute('data-sig') || '';
-
-      const lines = document.getElementById('prescription-lines');
-      let lastLine = lines?.lastElementChild;
-      if (!lastLine) {
-        addPrescriptionLine();
-        lastLine = lines?.lastElementChild;
-      }
-
-      if (lastLine) {
-        const dosageInput = lastLine.querySelector('.pres-dosage');
-        const instructionsInput = lastLine.querySelector('.pres-instructions');
-        if (dosageInput && dosage) dosageInput.value = dosage;
-        if (instructionsInput && sig) instructionsInput.value = sig;
-        showToast('Prescription shortcut applied.', 'info');
-      }
-    });
-  });
 
   // Prescription Form Submit Handler
   if (form && !form.dataset.bound) {
