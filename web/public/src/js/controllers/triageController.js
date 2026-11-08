@@ -277,12 +277,28 @@ function updateTriagePaginationUI() {
   }
 
   container.innerHTML = `
-    <span class="load-more-counter">Showing ${rawVitalsData.length} triage record(s)</span>
+    <div class="load-more-counter">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b; flex-shrink:0;">
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+      </svg>
+      <span>Showing <strong class="load-more-count">${rawVitalsData.length}</strong> triage record(s)</span>
+    </div>
     ${hasMoreTriage ? `
       <button type="button" class="btn-load-more" id="triage-load-more-btn">
-        <span>Load More (10)</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="7 13 12 18 17 13"></polyline>
+          <polyline points="7 6 12 11 17 6"></polyline>
+        </svg>
+        <span>Load More Records (10)</span>
       </button>
-    ` : `<span style="font-size:11px;color:#94a3b8;">All triage records loaded</span>`}
+    ` : `
+      <span class="load-more-all-loaded">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        All triage records loaded
+      </span>
+    `}
   `;
 
   const btn = document.getElementById('triage-load-more-btn');
@@ -290,7 +306,7 @@ function updateTriagePaginationUI() {
     if (isLoadingMoreTriage) return;
     isLoadingMoreTriage = true;
     btn.disabled = true;
-    btn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading...</span>';
+    btn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading Records...</span>';
 
     try {
       const { data: moreVitals, error } = await supabase

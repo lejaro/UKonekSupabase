@@ -112,12 +112,28 @@ function updateFeedbackPaginationUI() {
   }
 
   container.innerHTML = `
-    <span class="load-more-counter">Showing ${_feedbacks.length} feedback(s)</span>
+    <div class="load-more-counter">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b; flex-shrink:0;">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+      </svg>
+      <span>Showing <strong class="load-more-count">${_feedbacks.length}</strong> feedback(s)</span>
+    </div>
     ${_hasMoreFeedback ? `
       <button type="button" class="btn-load-more" id="feedback-load-more-btn">
-        <span>Load More (10)</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="7 13 12 18 17 13"></polyline>
+          <polyline points="7 6 12 11 17 6"></polyline>
+        </svg>
+        <span>Load More Feedbacks (10)</span>
       </button>
-    ` : `<span style="font-size:11px;color:#94a3b8;">All feedback records loaded</span>`}
+    ` : `
+      <span class="load-more-all-loaded">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        All feedback records loaded
+      </span>
+    `}
   `;
 
   const btn = document.getElementById('feedback-load-more-btn');
@@ -125,7 +141,7 @@ function updateFeedbackPaginationUI() {
     if (_isLoadingMoreFeedback) return;
     _isLoadingMoreFeedback = true;
     btn.disabled = true;
-    btn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading...</span>';
+    btn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading Feedbacks...</span>';
 
     try {
       const from = _feedbackOffset;

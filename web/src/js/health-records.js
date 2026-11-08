@@ -405,9 +405,13 @@ function renderConsultationsTab(rows, error, staffLookup) {
     <div id="chr-consults-pagination" class="load-more-container">
       <span class="load-more-counter" id="chr-consults-counter"></span>
       <button type="button" class="btn-load-more" id="chr-consults-load-more">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="7 13 12 18 17 13"></polyline>
+          <polyline points="7 6 12 11 17 6"></polyline>
+        </svg>
         <span>Load More (10)</span>
       </button>
-      <span id="chr-consults-end" style="font-size:11px;color:#94a3b8;display:none;">All records loaded</span>
+      <span id="chr-consults-end" class="load-more-all-loaded" style="display:none;">All records loaded</span>
     </div>`;
 
   const searchInput = document.getElementById('chr-consult-search');
@@ -610,9 +614,13 @@ function renderVitalsTab(rows, error, staffLookup) {
     <div id="chr-vitals-pagination" class="load-more-container">
       <span class="load-more-counter" id="chr-vitals-counter"></span>
       <button type="button" class="btn-load-more" id="chr-vitals-load-more">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="7 13 12 18 17 13"></polyline>
+          <polyline points="7 6 12 11 17 6"></polyline>
+        </svg>
         <span>Load More (10)</span>
       </button>
-      <span id="chr-vitals-end" style="font-size:11px;color:#94a3b8;display:none;">All records loaded</span>
+      <span id="chr-vitals-end" class="load-more-all-loaded" style="display:none;">All records loaded</span>
     </div>`;
 
   const searchInput = document.getElementById('chr-vitals-search');
@@ -795,9 +803,13 @@ function renderPrescriptionsTab(rows, error, staffLookup) {
     <div id="chr-rx-pagination" class="load-more-container">
       <span class="load-more-counter" id="chr-rx-counter"></span>
       <button type="button" class="btn-load-more" id="chr-rx-load-more">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="7 13 12 18 17 13"></polyline>
+          <polyline points="7 6 12 11 17 6"></polyline>
+        </svg>
         <span>Load More (10)</span>
       </button>
-      <span id="chr-rx-end" style="font-size:11px;color:#94a3b8;display:none;">All records loaded</span>
+      <span id="chr-rx-end" class="load-more-all-loaded" style="display:none;">All records loaded</span>
     </div>`;
 
   const searchInput = document.getElementById('chr-rx-search');
@@ -989,9 +1001,13 @@ function renderLabOrdersTab(rows, error, staffLookup) {
     <div id="chr-laborders-pagination" class="load-more-container">
       <span class="load-more-counter" id="chr-laborders-counter"></span>
       <button type="button" class="btn-load-more" id="chr-laborders-load-more">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="7 13 12 18 17 13"></polyline>
+          <polyline points="7 6 12 11 17 6"></polyline>
+        </svg>
         <span>Load More (10)</span>
       </button>
-      <span id="chr-laborders-end" style="font-size:11px;color:#94a3b8;display:none;">All records loaded</span>
+      <span id="chr-laborders-end" class="load-more-all-loaded" style="display:none;">All records loaded</span>
     </div>`;
 
   const tbody = document.getElementById('chr-laborders-list');

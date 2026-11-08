@@ -155,12 +155,31 @@ function updateCitizensLoadMoreUI() {
   }
 
   container.innerHTML = `
-    <span class="load-more-counter">Showing ${latestPatientsList.length} citizen(s)</span>
+    <div class="load-more-counter">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b; flex-shrink:0;">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+      </svg>
+      <span>Showing <strong class="load-more-count">${latestPatientsList.length}</strong> citizen(s)</span>
+    </div>
     ${hasMoreCitizens ? `
       <button type="button" class="btn-load-more" id="citizens-load-more-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="7 13 12 18 17 13"></polyline>
+          <polyline points="7 6 12 11 17 6"></polyline>
+        </svg>
         <span>Load More Citizens (15)</span>
       </button>
-    ` : `<span style="font-size:11px;color:#94a3b8;">All citizens loaded</span>`}
+    ` : `
+      <span class="load-more-all-loaded">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        All citizens loaded
+      </span>
+    `}
   `;
 
   const btn = document.getElementById('citizens-load-more-btn');
@@ -168,7 +187,7 @@ function updateCitizensLoadMoreUI() {
     if (isLoadingMoreCitizens) return;
     isLoadingMoreCitizens = true;
     btn.disabled = true;
-    btn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading...</span>';
+    btn.innerHTML = '<span class="btn-load-more-spinner"></span><span>Loading Citizens...</span>';
 
     try {
       const { data, error } = await supabase
