@@ -1218,18 +1218,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.touch_app_outlined, size: 13, color: _C.textMuted),
-              SizedBox(width: 4),
-              Text(
-                'Tap QR code to expand fullscreen for easy camera scanning',
-                style: TextStyle(fontSize: 11, color: _C.textMuted),
-              ),
-            ],
-          ),
+
         ],
       ),
     );
