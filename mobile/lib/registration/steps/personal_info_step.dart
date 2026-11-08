@@ -74,15 +74,16 @@ class PersonalInfoStep extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    flex: 2,
+                    flex: 3,
                     child: _field('Last Name', lastName,
                         Icons.family_restroom_outlined,
                         required: true,
                         formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s\-'.]"))]),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: _extensionDropdown(), // Integrated Dropdown[cite: 1]
+                    flex: 2,
+                    child: _extensionDropdown(),
                   ),
                 ],
               ),
@@ -229,17 +230,18 @@ class PersonalInfoStep extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
         initialValue: nameExtension.text.isEmpty ? null : nameExtension.text,
+        isExpanded: true,
         dropdownColor: Colors.white,
         style: const TextStyle(fontSize: 14, color: _textDark),
+        icon: const Icon(Icons.arrow_drop_down, color: _textMuted, size: 20),
         decoration: InputDecoration(
-          labelText: 'Ext.',
+          labelText: 'Extension',
+          hintText: 'None',
           labelStyle: const TextStyle(fontSize: 13, color: _textMuted),
-          prefixIcon: Icon(Icons.more_horiz,
-              color: _primary.withOpacity(0.6), size: 20),
           filled: true,
           fillColor: _fieldBg,
           contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(color: _fieldBdr)),
@@ -256,6 +258,7 @@ class PersonalInfoStep extends StatelessWidget {
             child: Text(
               val.isEmpty ? 'None' : val,
               style: TextStyle(color: val.isEmpty ? _textMuted : _textDark),
+              overflow: TextOverflow.ellipsis,
             ),
           );
         }).toList(),

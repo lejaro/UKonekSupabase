@@ -81,7 +81,10 @@ class uKonekContactStep extends StatelessWidget {
                     street, 'Street Name / Purok', Icons.signpost_outlined,
                     maxLength: 100,
                     formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z0-9\s\-#/.,']"))]),
-                _barangayDropdown(), // Integrated Valenzuela Barangay Dropdown[cite: 1]
+                _inputField(
+                    brgy, 'Barangay', Icons.location_city_outlined,
+                    maxLength: 80,
+                    formatters: [FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z0-9\s\-#/.,']"))]),
               ],
             ),
             const SizedBox(height: 16),
@@ -279,41 +282,7 @@ class uKonekContactStep extends StatelessWidget {
     );
   }
 
-  Widget _barangayDropdown() {
-    final List<String> valenzuelaBarangays = [
-      'Arkong Bato', 'Bisig', 'Coloong', 'Lawang Bato', 'Malanday',
-      'Pariancillo Villa', 'Pulo', 'Tagalag', 'Balangkas', 'Canumay East',
-      'Dalandanan', 'Lingunan', 'Malinta', 'Pasolo', 'Punturin',
-      'Veinte Reales', 'Bignay', 'Canumay West', 'Isla', 'Mabolo',
-      'Palasan', 'Poblacion', 'Rincon', 'Wawang Pulo', 'Bagbaguin',
-      'Mapulang Lupa', 'Parada', 'Gen. T. de Leon', 'Marulas',
-      'Paso de Blas', 'Karuhatan', 'Maysan', 'Ugong'
-    ]..sort(); // Alphabetical sorting[cite: 1]
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: DropdownButtonFormField<String>(
-        initialValue: brgy.text.isEmpty ? null : brgy.text, // Defaults to hint if empty[cite: 1]
-        isExpanded: true,
-        dropdownColor: Colors.white,
-        style: const TextStyle(fontSize: 14, color: _textDark),
-        decoration: _decoration('Barangay', Icons.location_city_outlined),
-        hint: Text('Choose a Barangay', // Default placeholder[cite: 1]
-            style: TextStyle(color: _textMuted.withOpacity(0.6))),
-        icon: Icon(Icons.keyboard_arrow_down_rounded, color: _textMuted.withOpacity(0.5)),
-        items: valenzuelaBarangays.map((String value) {
-          return DropdownMenuItem<String>(
-            value: value,
-            child: Text(value),
-          );
-        }).toList(),
-        onChanged: (String? newValue) {
-          brgy.text = newValue ?? '';
-        },
-        validator: (v) => (v == null || v.isEmpty) ? 'Please choose a barangay' : null,
-      ),
-    );
-  }
 
   Widget _relationshipDropdown() {
     final List<String> relationships = [

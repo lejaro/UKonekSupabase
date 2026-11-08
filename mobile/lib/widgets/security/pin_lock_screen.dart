@@ -215,143 +215,185 @@ class _PinLockScreenState extends State<PinLockScreen> {
   }
 
   Widget _buildForgotPinOverlay() {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _isSubmittingForgot ? null : _closeOverlay,
       child: Container(
         color: const Color(0x8C000000),
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: GestureDetector(
-          onTap: () {}, // Prevent taps inside card from closing
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(maxWidth: 400),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 24,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(22),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFECFDF5),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.lock_reset_rounded, color: Color(0xFF059669), size: 24),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset > 0 ? bottomInset + 16 : 20),
+            child: GestureDetector(
+              onTap: () {}, // Prevent taps inside card from closing
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 24,
+                        offset: Offset(0, 8),
                       ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'Forgot PIN?',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(22),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.lock_reset_rounded, color: Color(0xFF059669), size: 24),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Forgot PIN?',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: _isSubmittingForgot ? null : _closeOverlay,
+                            icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8)),
+                            splashRadius: 18,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Enter your account password to verify your identity and reset your 4-digit PIN.',
+                        style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
+                      ),
+                      const SizedBox(height: 18),
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        autofocus: true,
+                        textInputAction: TextInputAction.go,
+                        onSubmitted: (_) => _submitForgotPassword(),
+                        decoration: InputDecoration(
+                          labelText: 'Account Password',
+                          hintText: 'Enter password',
+                          prefixIcon: const Icon(Icons.password_rounded, color: Color(0xFF059669), size: 20),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                  color: const Color(0xFF94A3B8),
+                                  size: 20,
+                                ),
+                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: InkWell(
+                                  onTap: _isSubmittingForgot ? null : _submitForgotPassword,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF059669),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: _isSubmittingForgot
+                                        ? const SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                          )
+                                        : const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                'Enter',
+                                                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                              ),
+                                              SizedBox(width: 3),
+                                              Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 14),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          errorText: _forgotError,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: _isSubmittingForgot ? null : _closeOverlay,
+                            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton.icon(
+                            onPressed: _isSubmittingForgot ? null : _submitForgotPassword,
+                            icon: _isSubmittingForgot
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+                            label: const Text(
+                              'Enter',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF059669),
+                              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Divider(height: 24, color: Color(0xFFF1F5F9)),
+                      Center(
+                        child: TextButton(
+                          onPressed: _isSubmittingForgot ? null : _openSignOutDialog,
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text(
+                            'Forgot your password too? Sign out here',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF059669),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
-                      IconButton(
-                        onPressed: _isSubmittingForgot ? null : _closeOverlay,
-                        icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8)),
-                        splashRadius: 18,
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Enter your account password to verify your identity and reset your 4-digit PIN.',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
-                  ),
-                  const SizedBox(height: 18),
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    autofocus: true,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _submitForgotPassword(),
-                    decoration: InputDecoration(
-                      labelText: 'Account Password',
-                      hintText: 'Enter password',
-                      prefixIcon: const Icon(Icons.password_rounded, color: Color(0xFF059669), size: 20),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                          color: const Color(0xFF94A3B8),
-                          size: 20,
-                        ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                      ),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      errorText: _forgotError,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: _isSubmittingForgot ? null : _closeOverlay,
-                        child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
-                      ),
-                      const SizedBox(width: 10),
-                      ElevatedButton(
-                        onPressed: _isSubmittingForgot ? null : _submitForgotPassword,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF059669),
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: _isSubmittingForgot
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Text(
-                                'Verify & Reset',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                              ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Divider(height: 24, color: Color(0xFFF1F5F9)),
-                  Center(
-                    child: TextButton(
-                      onPressed: _isSubmittingForgot ? null : _openSignOutDialog,
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: const Text(
-                        'Forgot your password too? Sign out here',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF059669),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
