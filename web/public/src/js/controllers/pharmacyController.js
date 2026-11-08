@@ -200,7 +200,11 @@ export async function checkPatientDrugAllergies(patientId, medicineName) {
 export function initPharmacySection() {
   const rxCloseBtn = document.getElementById('prescription-modal-close');
 
-  refreshMedicineData();
+  // Lazy-load: only fetch medicine catalog if pharmacy section is visible
+  const medSec = document.getElementById('medicine-section');
+  if (medSec && !medSec.classList.contains('hidden')) {
+    refreshMedicineData();
+  }
 
   if (rxCloseBtn && !rxCloseBtn.dataset.bound) {
     rxCloseBtn.dataset.bound = 'true';

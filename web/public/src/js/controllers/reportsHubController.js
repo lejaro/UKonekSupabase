@@ -869,8 +869,7 @@ export function initReportsHubController() {
   // 5. Initialize System Report & Executive Intelligence
   initSystemReportController();
 
-  // 6. Initial background load of feedback count to populate badge
-  loadFeedback().catch((e) => console.warn('[ReportsHub] Feedback count preload warning:', e));
+  // 6. Feedback records are loaded on-demand when switching to feedback-pane
 
   // 7. Subscribe to session changes so review deletion permissions update reactively
   sessionStore.onSessionChange(() => {

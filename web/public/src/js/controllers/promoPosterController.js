@@ -33,7 +33,12 @@ export function initPromoPosterController() {
   setupActionButtons();
   setupModalEvents();
   setupFilterAndSearch();
-  loadPromoPosters();
+  // Lazy-load: only fetch promo posters if announcements section/pane is visible
+  const repSec = document.getElementById('reports-section');
+  const annPane = document.getElementById('announcements-pane');
+  if (repSec && !repSec.classList.contains('hidden') && annPane && !annPane.classList.contains('hidden')) {
+    loadPromoPosters();
+  }
 }
 
 /**

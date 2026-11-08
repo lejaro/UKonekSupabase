@@ -31,6 +31,33 @@ export let clinicalMetricsCache = {
 
 export async function loadClinicalOperationsMetrics() {
   try {
+    // 1. High-speed consolidated RPC (1 single roundtrip for metrics + charts, zero client table scans)
+    const { data: bootData, error: bootError } = await supabase.rpc('get_dashboard_bootstrap_data');
+    if (!bootError && bootData && bootData.metrics) {
+      clinicalMetricsCache = {
+        ...clinicalMetricsCache,
+        waiting: bootData.metrics.waiting || 0,
+        serving: bootData.metrics.serving || 0,
+        consultsToday: bootData.metrics.consults_today || 0,
+        vitalsToday: bootData.metrics.vitals_today || 0,
+        dispensesToday: bootData.metrics.dispenses_today || 0
+      };
+      if (typeof bootData.metrics.registered_citizens === 'number') {
+        updateRegisteredCitizensMetric(bootData.metrics.registered_citizens);
+      }
+      if (bootData.analytics) {
+        analyticsDataCache = {
+          lineTrend: bootData.analytics.lineTrend || analyticsDataCache.lineTrend,
+          topDiagnoses: bootData.analytics.topDiagnoses || analyticsDataCache.topDiagnoses,
+          priorityDist: bootData.analytics.priorityDist || analyticsDataCache.priorityDist
+        };
+      }
+      renderClinicalMetrics();
+      renderDashboardInsights();
+      return;
+    }
+
+    // 2. Fallback to get_clinical_operations_metrics if bootstrap RPC not yet migrated
     const { data, error } = await supabase.rpc('get_clinical_operations_metrics');
 
     if (error) {
@@ -144,7 +171,10 @@ export let analyticsDataCache = {
   priorityDist: { labels: [], counts: [] }
 };
 
-export async function loadDashboardAnalyticsData() {
+export async function loadDashboardAnalyticsData(force = false) {
+  if (!force && analyticsDataCache.lineTrend.labels && analyticsDataCache.lineTrend.labels.length > 0) {
+    return;
+  }
   try {
     const dates = [];
     const dayLabels = [];

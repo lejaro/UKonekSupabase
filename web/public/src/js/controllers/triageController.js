@@ -773,7 +773,11 @@ export function initTriageSection() {
   const cancelFormBtn = document.getElementById('vitals-cancel-form-btn');
   const closeModalXBtn = document.getElementById('vitals-close-modal');
 
-  loadRecentVitals();
+  // Lazy-load: only query recent vitals if vitals section is visible
+  const vitalsSec = document.getElementById('vitals-section');
+  if (vitalsSec && !vitalsSec.classList.contains('hidden')) {
+    loadRecentVitals();
+  }
 
   ['vitals-bp', 'vitals-hr', 'vitals-rr', 'vitals-temp', 'vitals-spo2'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', evaluateVitalsRisk);
