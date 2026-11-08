@@ -110,6 +110,8 @@ class NotificationService {
           ShellNavigation.switchTab(ShellNavigation.tabMedicineScheduler);
         } else if (data['action'] == 'followup' || data['action'] == 'queue') {
           ShellNavigation.switchTab(ShellNavigation.tabQueue);
+        } else if (data['action'] == 'prescription' || data['action'] == 'prescription_dispensed') {
+          ShellNavigation.switchTab(ShellNavigation.tabDashboard);
         }
       }
     } catch (e) {

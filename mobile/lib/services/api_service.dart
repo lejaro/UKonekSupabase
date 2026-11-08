@@ -225,6 +225,18 @@ class ApiService {
   static Future<void> acknowledgePrescription(int prescriptionId) =>
       PrescriptionService.acknowledgePrescription(prescriptionId);
 
+  static Future<MedicineDispensedAlert?> fetchLatestUnacknowledgedDispense({
+    int? targetPrescriptionId,
+    int? citizenId,
+  }) =>
+      PrescriptionService.fetchLatestUnacknowledgedDispense(
+        targetPrescriptionId: targetPrescriptionId,
+        citizenId: citizenId,
+      );
+
+  static Future<void> acknowledgeDispense(int prescriptionId, [String status = 'dispensed']) =>
+      PrescriptionService.acknowledgeDispense(prescriptionId, status);
+
   // ── Announcements ────────────────────────────────────────────────
   static Future<List<Announcement>> fetchAnnouncements() =>
       AnnouncementService.fetchAnnouncements();

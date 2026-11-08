@@ -385,4 +385,141 @@ class PrescriptionService {
       debugPrint('Error acknowledging prescription: $e');
     }
   }
+
+  static String _dispenseAckKeyForUser(int prescriptionId, String status) {
+    try {
+      final session = _client.auth.currentSession;
+      final userId = session?.user.id;
+      if (userId != null && userId.isNotEmpty) {
+        return 'ack_dispensed_${userId}_${prescriptionId}_${status.toLowerCase()}';
+      }
+    } catch (_) {}
+    return 'ack_dispensed_${prescriptionId}_${status.toLowerCase()}';
+  }
+
+  /// Retrieves the latest dispensed prescription if not yet acknowledged.
+  /// Used to trigger the Medicine Dispensed pop-up modal and local notification.
+  static Future<MedicineDispensedAlert?> fetchLatestUnacknowledgedDispense({
+    int? targetPrescriptionId,
+    int? citizenId,
+  }) async {
+    try {
+      final records = await fetchPrescriptions(limit: 20, citizenId: citizenId);
+      if (records.isEmpty) return null;
+
+      // Group by prescriptionId
+      final Map<int, List<PrescriptionRecord>> groups = {};
+      for (final r in records) {
+        if (r.prescriptionId <= 0) continue;
+        if (targetPrescriptionId != null && r.prescriptionId != targetPrescriptionId) continue;
+        groups.putIfAbsent(r.prescriptionId, () => []).add(r);
+      }
+      if (groups.isEmpty) return null;
+
+      // Filter groups that have been dispensed or partially dispensed
+      final dispensedGroups = groups.entries.where((entry) {
+        final items = entry.value;
+        return items.any((it) =>
+            it.isPrescriptionDispensed ||
+            it.isPartial ||
+            it.isDispensed ||
+            it.dispensedQuantity > 0);
+      }).toList();
+
+      if (dispensedGroups.isEmpty) return null;
+
+      // Sort by latest dispensedAt desc, then issuedAt desc, then prescriptionId desc
+      dispensedGroups.sort((a, b) {
+        DateTime? maxDate(List<PrescriptionRecord> list) {
+          DateTime? max;
+          for (final item in list) {
+            final d = item.dispensedAt ?? item.issuedAt;
+            if (max == null || d.isAfter(max)) max = d;
+          }
+          return max;
+        }
+
+        final dateA = maxDate(a.value) ?? a.value.first.issuedAt;
+        final dateB = maxDate(b.value) ?? b.value.first.issuedAt;
+        final dateComp = dateB.compareTo(dateA);
+        if (dateComp != 0) return dateComp;
+        return b.key.compareTo(a.key);
+      });
+
+      final latestGroup = dispensedGroups.first;
+      final latestId = latestGroup.key;
+      final latestItems = latestGroup.value;
+      final firstItem = latestItems.first;
+      final currentStatus = firstItem.dispensingStatus.toLowerCase();
+
+      final prefs = await SharedPreferences.getInstance();
+      final ackKey = _dispenseAckKeyForUser(latestId, currentStatus);
+      final isAck = prefs.getBool(ackKey) ?? false;
+      if (isAck) return null;
+
+      // If targetPrescriptionId is null (e.g. app startup/resume check rather than realtime push),
+      // only alert if dispensed recently (within last 30 minutes)
+      if (targetPrescriptionId == null) {
+        DateTime? latestDispensed;
+        for (final item in latestItems) {
+          final d = item.dispensedAt;
+          if (d != null && (latestDispensed == null || d.isAfter(latestDispensed))) {
+            latestDispensed = d;
+          }
+        }
+        final dispenseTime = latestDispensed ?? firstItem.issuedAt;
+        final age = DateTime.now().difference(dispenseTime);
+        if (age.inMinutes > 30 || age.inMinutes < -30) {
+          // Auto-mark historical dispenses so they don't pop up late
+          await acknowledgeDispense(latestId, currentStatus);
+          return null;
+        }
+      }
+
+      // Query dispense logs to find pharmacist name if available
+      String pharmacistName = 'Clinic Pharmacist';
+      try {
+        final logs = await fetchPrescriptionDispenseLogs(
+          prescriptionId: latestId,
+          limit: 5,
+          citizenId: citizenId,
+        );
+        for (final l in logs) {
+          final pName = l.pharmacistName.trim();
+          if (pName.isNotEmpty && pName.toLowerCase() != 'pharmacist') {
+            pharmacistName = pName;
+            break;
+          }
+        }
+      } catch (e) {
+        debugPrint('Could not fetch pharmacist name from logs: $e');
+      }
+
+      return MedicineDispensedAlert(
+        prescriptionId: latestId,
+        prescriptionCode: firstItem.prescriptionCode,
+        dispensingStatus: currentStatus,
+        doctorName: firstItem.displayDoctorName,
+        pharmacistName: pharmacistName,
+        dispensedAt: firstItem.dispensedAt ?? DateTime.now(),
+        items: latestItems,
+      );
+    } catch (e) {
+      debugPrint('Error checking unacknowledged dispense: $e');
+      return null;
+    }
+  }
+
+  /// Marks a prescription dispense event as acknowledged so its pop-up is not repeated.
+  static Future<void> acknowledgeDispense(int prescriptionId, [String status = 'dispensed']) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ackKey = _dispenseAckKeyForUser(prescriptionId, status);
+      await prefs.setBool(ackKey, true);
+      // Also set generic key without status for fallback
+      await prefs.setBool('ack_dispensed_$prescriptionId', true);
+    } catch (e) {
+      debugPrint('Error acknowledging dispense: $e');
+    }
+  }
 }

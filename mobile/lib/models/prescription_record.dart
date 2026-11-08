@@ -170,6 +170,30 @@ class NewPrescriptionAlert {
   String get displayDoctorName => formatDoctorName(doctorName);
 }
 
+/// Holds information about a fulfilled/dispensed prescription for alerting the patient.
+class MedicineDispensedAlert {
+  final int prescriptionId;
+  final String prescriptionCode;
+  final String dispensingStatus;
+  final String doctorName;
+  final String pharmacistName;
+  final DateTime dispensedAt;
+  final List<PrescriptionRecord> items;
+
+  const MedicineDispensedAlert({
+    required this.prescriptionId,
+    required this.prescriptionCode,
+    required this.dispensingStatus,
+    required this.doctorName,
+    required this.pharmacistName,
+    required this.dispensedAt,
+    required this.items,
+  });
+
+  String get displayDoctorName => formatDoctorName(doctorName);
+  bool get isPartial => dispensingStatus.toLowerCase() == 'partial';
+}
+
 class PrescribedMedicine {
   final String medicineName;
   final int quantity;

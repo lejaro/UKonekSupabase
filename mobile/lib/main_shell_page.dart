@@ -63,6 +63,9 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
   bool _isShowingPrescriptionModal = false;
   bool _isCheckingPrescriptionAlert = false;
   int? _lastAlertedPrescriptionId;
+  bool _isShowingDispenseModal = false;
+  bool _isCheckingDispenseAlert = false;
+  String? _lastAlertedDispenseKey;
   RealtimeChannel? _prescriptionRealtimeChannel;
 
   Widget _ensurePageLoaded(int index) {
@@ -123,12 +126,45 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
     ShellNavigation.currentTab.addListener(_onNavigationTabChanged);
     ShellNavigation.prescriptionAlertTrigger.addListener(_onPrescriptionTrigger);
 
-    // Real-time subscription to newly created prescriptions
+    // Route system notification taps directly to corresponding shell views
+    NotificationService.onNotificationAction = (data) {
+      if (!mounted) return;
+      final action = data['action']?.toString();
+      if (action == 'prescription_dispensed') {
+        final rxId = (data['id'] as num?)?.toInt();
+        Navigator.push(
+          context,
+          AppPageRoute.slideRight(PrescriptionPage(
+            initialTab: 1, // Purchase / Dispense Logs tab
+            initialPrescriptionId: rxId,
+          )),
+        );
+      } else if (action == 'prescription') {
+        final rxId = (data['id'] as num?)?.toInt();
+        Navigator.push(
+          context,
+          AppPageRoute.slideRight(PrescriptionPage(
+            initialPrescriptionId: rxId,
+          )),
+        );
+      } else if (action == 'medicine') {
+        selectTab(ShellNavigation.tabMedicineScheduler);
+      } else if (action == 'followup' || action == 'queue') {
+        selectTab(ShellNavigation.tabQueue);
+      }
+    };
+
+    // Real-time subscription to newly created and dispensed prescriptions
     _subscribePrescriptionRealtime();
 
     // Check for newly issued prescriptions shortly after startup (relaxed to avoid boot spikes)
     Future.delayed(const Duration(milliseconds: 3000), () {
       if (mounted) _checkNewPrescriptionAlert();
+    });
+
+    // Check for newly dispensed medicines shortly after startup
+    Future.delayed(const Duration(milliseconds: 3500), () {
+      if (mounted) _checkMedicineDispensedAlert();
     });
 
     // Synchronize upcoming clinical follow-up reminders
@@ -140,6 +176,7 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    NotificationService.onNotificationAction = null;
     ShellNavigation.currentTab.removeListener(_onNavigationTabChanged);
     ShellNavigation.prescriptionAlertTrigger.removeListener(_onPrescriptionTrigger);
     _unsubscribePrescriptionRealtime();
@@ -155,7 +192,7 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
       _prescriptionRealtimeChannel = client
           .channel('patient_prescriptions_${widget.citizenId}')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
+            event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'prescription_headers',
             filter: citizenIdNum != null
@@ -182,12 +219,24 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
                 }
               }
 
-              if (belongsToMe) {
+              if (!belongsToMe) return;
+
+              if (payload.eventType == PostgresChangeEvent.insert) {
                 debugPrint('[Shell Realtime] New prescription header detected for citizen ${widget.citizenId}. Triggering alert...');
                 // Allow 600ms for doctor to finish inserting accompanying prescription_items
                 Future.delayed(const Duration(milliseconds: 600), () {
                   if (mounted) _checkNewPrescriptionAlert();
                 });
+              } else if (payload.eventType == PostgresChangeEvent.update) {
+                final status = (rec['dispensing_status'] ?? '').toString().toLowerCase();
+                if (status == 'dispensed' || status == 'partial') {
+                  debugPrint('[Shell Realtime] Prescription dispense update detected for citizen ${widget.citizenId}. Triggering alert...');
+                  final rxId = (rec['id'] as num?)?.toInt();
+                  // Allow 500ms for pharmacy dispense logs to finish committing
+                  Future.delayed(const Duration(milliseconds: 500), () {
+                    if (mounted) _checkMedicineDispensedAlert(targetPrescriptionId: rxId);
+                  });
+                }
               }
             },
           )
@@ -212,6 +261,7 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkNewPrescriptionAlert();
+      _checkMedicineDispensedAlert();
       FollowupNotificationService.syncAndScheduleFollowupReminders();
     }
   }
@@ -275,6 +325,79 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
       },
     ).then((_) {
       _isShowingPrescriptionModal = false;
+    });
+  }
+
+  Future<void> _checkMedicineDispensedAlert({int? targetPrescriptionId}) async {
+    if (!mounted || _isShowingDispenseModal || _isCheckingDispenseAlert) return;
+    _isCheckingDispenseAlert = true;
+    try {
+      final citizenIdNum = int.tryParse(widget.citizenId);
+      final alert = await ApiService.fetchLatestUnacknowledgedDispense(
+        targetPrescriptionId: targetPrescriptionId,
+        citizenId: citizenIdNum,
+      );
+      if (alert != null && mounted && !_isShowingDispenseModal) {
+        final alertKey = '${alert.prescriptionId}_${alert.dispensingStatus}';
+        if (alertKey != _lastAlertedDispenseKey) {
+          _lastAlertedDispenseKey = alertKey;
+          _showMedicineDispensedModal(alert);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking medicine dispensed alert: $e');
+    } finally {
+      _isCheckingDispenseAlert = false;
+    }
+  }
+
+  void _showMedicineDispensedModal(MedicineDispensedAlert alert) {
+    if (!mounted || _isShowingDispenseModal) return;
+    _isShowingDispenseModal = true;
+    _lastAlertedDispenseKey = '${alert.prescriptionId}_${alert.dispensingStatus}';
+
+    // Invalidate local medicine schedule cache so scheduler reflects newly dispensed items
+    MedicineCacheService.invalidateScheduleCache(widget.citizenId);
+
+    // Immediately mark as acknowledged in prefs
+    ApiService.acknowledgeDispense(alert.prescriptionId, alert.dispensingStatus);
+
+    // Subtle vibration feedback
+    HapticFeedback.mediumImpact();
+
+    // Trigger immediate push notification in system bar
+    final statusText = alert.isPartial ? 'partially dispensed' : 'dispensed';
+    NotificationService.showImmediateNotification(
+      id: 888,
+      title: alert.isPartial ? 'Medication Partially Dispensed' : 'Medication Dispensed!',
+      body: 'Your prescription (${alert.prescriptionCode}) has been $statusText by the pharmacy.',
+      payload: '{"action":"prescription_dispensed","id":${alert.prescriptionId}}',
+    );
+
+    MedicineDispensedAlertDialog.show(
+      context,
+      alert: alert,
+      onViewDispenseLogs: () async {
+        await ApiService.acknowledgeDispense(alert.prescriptionId, alert.dispensingStatus);
+        if (mounted) Navigator.of(context).pop();
+        _isShowingDispenseModal = false;
+        if (mounted) {
+          Navigator.push(
+            context,
+            AppPageRoute.slideRight(PrescriptionPage(
+              initialTab: 1, // Open directly to Purchase / Dispense Logs tab
+              initialPrescriptionId: alert.prescriptionId,
+            )),
+          );
+        }
+      },
+      onDismiss: () async {
+        await ApiService.acknowledgeDispense(alert.prescriptionId, alert.dispensingStatus);
+        if (mounted) Navigator.of(context).pop();
+        _isShowingDispenseModal = false;
+      },
+    ).then((_) {
+      _isShowingDispenseModal = false;
     });
   }
 

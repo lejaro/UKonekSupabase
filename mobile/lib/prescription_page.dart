@@ -38,7 +38,12 @@ class _PrescriptionGroup {
 
 class PrescriptionPage extends StatefulWidget {
   final int? initialPrescriptionId;
-  const PrescriptionPage({super.key, this.initialPrescriptionId});
+  final int initialTab;
+  const PrescriptionPage({
+    super.key,
+    this.initialPrescriptionId,
+    this.initialTab = 0,
+  });
 
   @override
   State<PrescriptionPage> createState() => _PrescriptionPageState();
@@ -69,6 +74,7 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
   @override
   void initState() {
     super.initState();
+    _mainTab = widget.initialTab;
     _load();
   }
 
@@ -127,8 +133,8 @@ class _PrescriptionPageState extends State<PrescriptionPage> {
         }
       }
 
-      // Auto-open target prescription detail if requested
-      if (widget.initialPrescriptionId != null && !_hasAutoOpened && _groups.isNotEmpty) {
+      // Auto-open target prescription detail if requested (on Prescriptions tab)
+      if (widget.initialTab == 0 && widget.initialPrescriptionId != null && !_hasAutoOpened && _groups.isNotEmpty) {
         _hasAutoOpened = true;
         final match = _groups.firstWhere(
           (g) => g.prescriptionId == widget.initialPrescriptionId,
