@@ -339,8 +339,9 @@ async function handleSubmitPromoPoster() {
 
     let finalImageUrl = null;
 
-    // 1. If a local file was chosen, upload to Supabase Storage 'promo-banners'
+    // 1. If a local file was chosen, compress and upload to Supabase Storage 'promo-banners'
     if (_selectedImageFile) {
+      const fileToUpload = await compressImageFile(_selectedImageFile, 1200, 0.82);
       const ext = _selectedImageFile.name.split('.').pop() || 'jpg';
       const cleanName = _selectedImageFile.name.replace(/[^a-zA-Z0-9]/g, '_');
       const filePath = `promos/${Date.now()}_${cleanName}.${ext}`;
@@ -348,16 +349,15 @@ async function handleSubmitPromoPoster() {
       console.log('[PromoPosters] Uploading image to storage bucket promo-banners:', filePath);
       const { error: uploadErr } = await supabase.storage
         .from('promo-banners')
-        .upload(filePath, _selectedImageFile, {
+        .upload(filePath, fileToUpload, {
           cacheControl: '3600',
           upsert: true,
-          contentType: _selectedImageFile.type || 'image/jpeg'
+          contentType: fileToUpload.type || 'image/jpeg'
         });
 
       if (uploadErr) {
-        console.warn('[PromoPosters] Storage upload error, falling back to data URL:', uploadErr);
-        // Fallback: Read as data URL if storage upload failed
-        finalImageUrl = await readFileAsDataURL(_selectedImageFile);
+        console.error('[PromoPosters] Storage upload error:', uploadErr);
+        throw new Error(`Failed to upload image banner to Storage: ${uploadErr.message || 'Storage error'}. Please verify promo-banners bucket access.`);
       } else {
         const { data: publicUrlData } = supabase.storage
           .from('promo-banners')
@@ -420,13 +420,47 @@ async function handleSubmitPromoPoster() {
 }
 
 /**
- * Helper to convert file to data URL fallback if bucket upload fails.
+ * Compresses and downscales an image file client-side before uploading.
+ * Caps dimensions to maxWidth/maxHeight and outputs a compressed JPEG blob.
+ * Prevents uploading massive 10MB+ camera files to Storage or memory.
  */
-function readFileAsDataURL(file) {
-  return new Promise((resolve, reject) => {
+function compressImageFile(file, maxWidth = 1200, quality = 0.82) {
+  return new Promise((resolve) => {
+    if (!file || !file.type || !file.type.startsWith('image/') || file.type.includes('svg')) {
+      return resolve(file);
+    }
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob || blob.size >= file.size) {
+              return resolve(file);
+            }
+            const cleanName = (file.name || 'image.jpg').replace(/\.[^/.]+$/, '') + '.jpg';
+            const compressedFile = new File([blob], cleanName, { type: 'image/jpeg' });
+            resolve(compressedFile);
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(file);
     reader.readAsDataURL(file);
   });
 }

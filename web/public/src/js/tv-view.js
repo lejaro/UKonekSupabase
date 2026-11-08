@@ -127,9 +127,14 @@ const tvView = (() => {
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
-                table: 'queue_tickets',
-                filter: 'status=in.(serving,on_call,waiting)'
+                table: 'queue_tickets'
             }, (payload) => {
+                const newStatus = (payload?.new?.status || '').toLowerCase().trim();
+                const oldStatus = (payload?.old?.status || '').toLowerCase().trim();
+                const relevantStatuses = ['serving', 'on_call', 'waiting'];
+                const isRelevant = relevantStatuses.includes(newStatus) || relevantStatuses.includes(oldStatus);
+                if (!isRelevant && payload.eventType !== 'DELETE') return;
+
                 console.log('[TV View] Realtime change detected:', payload.eventType);
                 if (tvDebounceTimer) clearTimeout(tvDebounceTimer);
                 tvDebounceTimer = setTimeout(() => {

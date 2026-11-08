@@ -1835,6 +1835,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                     ? Image.network(
                         imageUrl,
                         fit: BoxFit.cover,
+                        cacheWidth: 800,
                         loadingBuilder: (ctx, child, progress) {
                           if (progress == null) return child;
                           return Container(
@@ -2008,6 +2009,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
                       customImageUrl,
                       width: double.infinity,
                       fit: BoxFit.cover,
+                      cacheWidth: 800,
                       errorBuilder: (c, e, s) => const SizedBox(),
                     ),
                   ),

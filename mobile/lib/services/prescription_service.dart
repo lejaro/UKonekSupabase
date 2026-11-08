@@ -277,7 +277,7 @@ class PrescriptionService {
 
     final response = await _client
         .from('medicine_intake_logs')
-        .select()
+        .select('prescription_item_id, dose_index, scheduled_time, actual_time, created_at, status, intake_date')
         .eq('citizen_id', citizenId)
         .eq('intake_date', dateStr);
 

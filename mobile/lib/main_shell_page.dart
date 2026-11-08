@@ -158,6 +158,13 @@ class _uKonekMainShellPageState extends State<uKonekMainShellPage> with WidgetsB
             event: PostgresChangeEvent.insert,
             schema: 'public',
             table: 'prescription_headers',
+            filter: citizenIdNum != null
+                ? PostgresChangeFilter(
+                    type: PostgresChangeFilterType.eq,
+                    column: 'patient_citizen_id',
+                    value: citizenIdNum,
+                  )
+                : null,
             callback: (payload) {
               final rec = payload.newRecord;
               if (rec.isEmpty || !mounted) return;

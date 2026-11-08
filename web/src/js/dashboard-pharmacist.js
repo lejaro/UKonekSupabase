@@ -393,7 +393,8 @@ async function loadMedicines() {
       .from('medicines')
       .select('id, name, description, qty, unit, expiry_date, drug_classification, created_at, updated_at')
       .is('archived_at', null)
-      .order('name', { ascending: true });
+      .order('name', { ascending: true })
+      .limit(500);
     if (error) throw new Error(error.message);
     medicines = (data || []).map(row => ({
       id:                  row.id,

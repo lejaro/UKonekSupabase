@@ -203,11 +203,13 @@ export async function loadDashboardAnalyticsData(force = false) {
       supabase
         .from('queue_tickets')
         .select('queue_date, created_at, citizen_type, service_label')
-        .gte('created_at', sevenDaysAgoStart),
+        .gte('created_at', sevenDaysAgoStart)
+        .limit(2000),
       supabase
         .from('consultations')
         .select('consulted_at, created_at, diagnosis')
         .gte('created_at', sevenDaysAgoStart)
+        .limit(1000)
     ]);
 
     const queueTickets = queueRes.data || [];

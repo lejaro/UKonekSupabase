@@ -367,7 +367,8 @@ export async function loadTriagedWaitingPatients() {
     const { data: completedConsults } = await supabase
       .from('consultations')
       .select('patient_citizen_id, patient_identifier, created_at')
-      .gte('created_at', twentyFourHoursAgo);
+      .gte('created_at', twentyFourHoursAgo)
+      .limit(100);
 
     const completedCitizenIds = new Set((completedConsults || []).map(c => c.patient_citizen_id).filter(Boolean));
 

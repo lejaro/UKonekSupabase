@@ -35,7 +35,7 @@ export async function listAvailableDoctorSchedules(dateFrom, dateTo) {
  * @param {number|string} [options.doctorStaffId]
  * @returns {Promise<Array>}
  */
-export async function listDoctorSchedules({ from, to, doctorStaffId } = {}) {
+export async function listDoctorSchedules({ from, to, doctorStaffId, limit = 200 } = {}) {
   let query = supabase
     .from('doctor_schedules')
     .select(`
@@ -53,8 +53,9 @@ export async function listDoctorSchedules({ from, to, doctorStaffId } = {}) {
         status
       )
     `)
-    .order('schedule_date', { ascending: true })
-    .order('start_time', { ascending: true });
+    .order('schedule_date', { ascending: false })
+    .order('start_time', { ascending: true })
+    .limit(limit);
 
   if (from) {
     query = query.gte('schedule_date', from);
@@ -73,7 +74,14 @@ export async function listDoctorSchedules({ from, to, doctorStaffId } = {}) {
     throw new Error(error.message || 'Failed to list doctor schedules.');
   }
 
-  return data || [];
+  const rows = data || [];
+  // Return in chronological order for display
+  return rows.sort((a, b) => {
+    const da = a.schedule_date || '';
+    const db = b.schedule_date || '';
+    if (da !== db) return da.localeCompare(db);
+    return (a.start_time || '').localeCompare(b.start_time || '');
+  });
 }
 
 /**

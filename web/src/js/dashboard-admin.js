@@ -1340,18 +1340,18 @@ function initBackupRestore() {
         };
 
         // Fetch datasets sequentially to prevent starving database connection pool under 50+ concurrent users
-        const citizens = await fetchTable('citizens', supabase.from('citizens').select('*').limit(5000));
+        const citizens = await fetchTable('citizens', supabase.from('citizens').select('*').order('created_at', { ascending: false }).limit(1000));
         const staff = await fetchTable('staff', supabase.from('staff').select('*').limit(1000));
-        const doctorSchedules = await fetchTable('doctor_schedules', supabase.from('doctor_schedules').select('*').limit(5000));
-        const announcements = await fetchTable('announcements', supabase.from('announcements').select('*').limit(2000));
-        const consultations = await fetchTable('consultations', supabase.from('consultations').select('*').limit(5000));
-        const vitalSigns = await fetchTable('vital_signs', supabase.from('vital_signs').select('*').limit(5000));
-        const prescriptionHeaders = await fetchTable('prescription_headers', supabase.from('prescription_headers').select('*').limit(5000));
-        const prescriptionItems = await fetchTable('prescription_items', supabase.from('prescription_items').select('*').limit(10000));
-        const labOrders = await fetchTable('lab_orders', supabase.from('lab_orders').select('*').limit(5000));
-        const medicines = await fetchTable('medicines', supabase.from('medicines').select('*').limit(5000));
-        const queueTickets = await fetchTable('queue_tickets', supabase.from('queue_tickets').select('*').limit(5000));
-        const feedbacks = await fetchTable('feedbacks', supabase.from('feedbacks').select('*').limit(2000));
+        const doctorSchedules = await fetchTable('doctor_schedules', supabase.from('doctor_schedules').select('*').order('schedule_date', { ascending: false }).limit(1000));
+        const announcements = await fetchTable('announcements', supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(500));
+        const consultations = await fetchTable('consultations', supabase.from('consultations').select('*').order('created_at', { ascending: false }).limit(1000));
+        const vitalSigns = await fetchTable('vital_signs', supabase.from('vital_signs').select('*').order('created_at', { ascending: false }).limit(1000));
+        const prescriptionHeaders = await fetchTable('prescription_headers', supabase.from('prescription_headers').select('*').order('issued_at', { ascending: false }).limit(1000));
+        const prescriptionItems = await fetchTable('prescription_items', supabase.from('prescription_items').select('*').order('created_at', { ascending: false }).limit(2000));
+        const labOrders = await fetchTable('lab_orders', supabase.from('lab_orders').select('*').order('created_at', { ascending: false }).limit(1000));
+        const medicines = await fetchTable('medicines', supabase.from('medicines').select('*').limit(1000));
+        const queueTickets = await fetchTable('queue_tickets', supabase.from('queue_tickets').select('*').order('created_at', { ascending: false }).limit(1000));
+        const feedbacks = await fetchTable('feedbacks', supabase.from('feedbacks').select('*').order('created_at', { ascending: false }).limit(500));
 
         const backupData = {
           metadata: {
