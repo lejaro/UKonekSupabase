@@ -10,7 +10,6 @@ import * as staffService from '../services/staffService.js';
 import { showToast, renderTableSkeleton, swapContainer } from '../utils/uiHelpers.js';
 import { attachDetailRow, openDataDetail, sanitizeText, formatDetailValue } from '../utils/dataDetailModal.js';
 import { openDialogModal, toTitleCase, navigateToSection, getDisplayFullName, getInitials } from './navigationController.js';
-import { updateRegisteredCitizensMetric } from './telemetryController.js';
 import { cleanNone, formatPhysicalExam } from '../utils/clinicalFormatters.js';
 import { sanitizeSearchTerm } from '../utils/querySanitizer.js';
 
@@ -446,18 +445,6 @@ export async function loadPatientData() {
     renderTableSkeleton(citizensTbody, 5, 5);
   }
 
-  // Exact head count for dashboard metric without loading entire dataset
-  try {
-    const { count: totalCount } = await supabase
-      .from('citizens')
-      .select('*', { count: 'exact', head: true });
-    if (typeof totalCount === 'number') {
-      updateRegisteredCitizensMetric(totalCount);
-    }
-  } catch (countErr) {
-    console.warn('Could not fetch exact citizen count:', countErr);
-  }
-
   let patients = [];
   try {
     const { data, error } = await supabase
@@ -503,14 +490,10 @@ export function updateUsersSectionTelemetry() {
   const staffEl = document.getElementById('users-stat-staff');
   const dutyEl = document.getElementById('users-stat-onduty');
   const citizenEl = document.getElementById('users-stat-citizens');
-  const tabStaffCount = document.getElementById('tab-count-staff');
-  const tabCitizenCount = document.getElementById('tab-count-citizens');
 
   if (staffEl) staffEl.textContent = String(staffCount);
   if (dutyEl) dutyEl.textContent = String(onDutyCount);
   if (citizenEl) citizenEl.textContent = String(citizenCount);
-  if (tabStaffCount) tabStaffCount.textContent = String(staffCount);
-  if (tabCitizenCount) tabCitizenCount.textContent = String(citizenCount);
 }
 
 let currentAccountData = null;
