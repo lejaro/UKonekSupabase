@@ -656,7 +656,7 @@ class MedicineDispensedAlertDialog extends StatelessWidget {
                     Icon(Icons.history_rounded, size: 18),
                     SizedBox(width: 8),
                     Text(
-                      'View Purchase / Dispense Logs',
+                      'View Purchase',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
