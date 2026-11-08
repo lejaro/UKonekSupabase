@@ -12,12 +12,20 @@ import { attachDetailRow, openDataDetail, sanitizeText, formatDetailValue } from
 import { openDialogModal, toTitleCase, navigateToSection, getDisplayFullName, getInitials } from './navigationController.js';
 import { updateRegisteredCitizensMetric } from './telemetryController.js';
 import { cleanNone, formatPhysicalExam } from '../utils/clinicalFormatters.js';
+import { sanitizeSearchTerm } from '../utils/querySanitizer.js';
 
 export const storedAccounts = new Map();
 export let latestStaffList = [];
 export let latestPatientsList = [];
 let citizenActiveFilter = 'all';
 const citizenDetailCache = new Map();
+
+// Remote Search State for Citizens
+let isSearchingCitizens = false;
+let citizenSearchResults = [];
+let citizenSearchQuery = '';
+let citizenSearchDebounceTimer = null;
+let isExecutingCitizenSearch = false;
 
 
 export function getStaffPresenceStatus(user) {
@@ -154,6 +162,44 @@ function updateCitizensLoadMoreUI() {
     tableWrap.parentNode.insertBefore(container, tableWrap.nextSibling);
   }
 
+  // Search Results Active Mode
+  if (isSearchingCitizens) {
+    if (isExecutingCitizenSearch) {
+      container.innerHTML = `
+        <div class="load-more-counter">
+          <span class="btn-load-more-spinner"></span>
+          <span>Searching database across all registered citizens for "<strong>${sanitizeText(citizenSearchQuery)}</strong>"...</span>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="load-more-counter">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b; flex-shrink:0;">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span>Database Search: Found <strong class="load-more-count">${citizenSearchResults.length}</strong> matching citizen(s) for "<strong>${sanitizeText(citizenSearchQuery)}</strong>"</span>
+      </div>
+      <button type="button" class="btn-load-more" id="citizens-clear-search-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+        <span>Clear Search</span>
+      </button>
+    `;
+
+    document.getElementById('citizens-clear-search-btn')?.addEventListener('click', () => {
+      const input = document.getElementById('citizens-finder-input');
+      if (input) input.value = '';
+      resetCitizenSearch();
+    });
+    return;
+  }
+
+  // Standard Browsing Mode (Lazy Loading)
   container.innerHTML = `
     <div class="load-more-counter">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b; flex-shrink:0;">
@@ -214,19 +260,24 @@ function updateCitizensLoadMoreUI() {
   });
 }
 
-function renderCitizensTableRows() {
+function renderCitizensTableRows(customList = null) {
   const citizensTbody = document.getElementById('citizens-tbody');
   if (!citizensTbody) return;
 
+  const listToRender = customList !== null ? customList : (isSearchingCitizens ? citizenSearchResults : latestPatientsList);
+
   swapContainer(citizensTbody, (fragment) => {
-    if (latestPatientsList.length === 0) {
+    if (listToRender.length === 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = '<td class="table-cell" colspan="5" style="text-align:center; padding:32px 16px; color:#94a3b8;">No registered citizens found.</td>';
+      const emptyMsg = isSearchingCitizens
+        ? `No citizens found matching "<strong>${sanitizeText(citizenSearchQuery)}</strong>" across the database.`
+        : 'No registered citizens found.';
+      tr.innerHTML = `<td class="table-cell" colspan="5" style="text-align:center; padding:32px 16px; color:#94a3b8;">${emptyMsg}</td>`;
       fragment.appendChild(tr);
       return;
     }
 
-    latestPatientsList.forEach((citizen) => {
+    listToRender.forEach((citizen) => {
       const fullName = `${citizen.firstname || ''} ${citizen.surname || ''}`.trim() || citizen.username || 'Citizen';
       const contact = citizen.contact_number || '—';
       const email = citizen.email || '—';
@@ -273,9 +324,120 @@ function renderCitizensTableRows() {
     });
   });
 
-  applyCitizensFinder();
+  if (!isSearchingCitizens) {
+    applyCitizenDateFilter();
+  }
   updateUsersSectionTelemetry();
   updateCitizensLoadMoreUI();
+}
+
+function applyCitizenDateFilter() {
+  if (citizenActiveFilter !== 'recent') return;
+  const rows = document.querySelectorAll('#citizens-tbody tr.citizen-row');
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  rows.forEach((row) => {
+    const createdRaw = row.dataset.createdAt;
+    if (createdRaw) {
+      const created = new Date(createdRaw);
+      row.style.display = created >= thirtyDaysAgo ? '' : 'none';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
+
+export function resetCitizenSearch() {
+  if (citizenSearchDebounceTimer) {
+    clearTimeout(citizenSearchDebounceTimer);
+    citizenSearchDebounceTimer = null;
+  }
+  isSearchingCitizens = false;
+  isExecutingCitizenSearch = false;
+  citizenSearchResults = [];
+  citizenSearchQuery = '';
+  renderCitizensTableRows();
+}
+
+export async function executeRemoteCitizenSearch(query) {
+  const cleanTerm = sanitizeSearchTerm(query);
+  if (!cleanTerm) {
+    resetCitizenSearch();
+    return;
+  }
+
+  isSearchingCitizens = true;
+  isExecutingCitizenSearch = true;
+  citizenSearchQuery = query;
+  updateCitizensLoadMoreUI();
+
+  try {
+    let req = supabase
+      .from('citizens')
+      .select('id, firstname, surname, username, email, contact_number, complete_address, age, date_of_birth, sex, emergency_contact_complete_name, emergency_contact_contact_number, relation, created_at')
+      .or(`firstname.ilike.%${cleanTerm}%,surname.ilike.%${cleanTerm}%,email.ilike.%${cleanTerm}%,contact_number.ilike.%${cleanTerm}%`)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (citizenActiveFilter === 'recent') {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      req = req.gte('created_at', thirtyDaysAgo.toISOString());
+    }
+
+    const { data, error } = await req;
+
+    // Discard result if user has already modified search query while request was in-flight
+    const currentInput = document.getElementById('citizens-finder-input');
+    if (currentInput && currentInput.value.trim() !== query.trim()) {
+      return;
+    }
+
+    if (error) {
+      console.warn('Error searching citizens:', error);
+      showToast('Search encountered a temporary error.', 'warning');
+      citizenSearchResults = [];
+    } else {
+      citizenSearchResults = Array.isArray(data) ? data : [];
+    }
+  } catch (err) {
+    console.error('Citizen search exception:', err);
+    citizenSearchResults = [];
+  } finally {
+    isExecutingCitizenSearch = false;
+    renderCitizensTableRows();
+  }
+}
+
+export function applyCitizensFinder() {
+  const citizensFinderInput = document.getElementById('citizens-finder-input');
+  const query = String(citizensFinderInput?.value || '').trim();
+
+  // If query was cleared, immediately restore browsing list
+  if (!query) {
+    resetCitizenSearch();
+    return;
+  }
+
+  // Instant local visual feedback on already loaded rows
+  const rows = document.querySelectorAll('#citizens-tbody tr.citizen-row');
+  const lowerQuery = query.toLowerCase();
+  rows.forEach((row) => {
+    const text = row.textContent ? row.textContent.toLowerCase() : '';
+    row.style.display = text.includes(lowerQuery) ? '' : 'none';
+  });
+
+  // Schedule remote database search across all records with 350ms debounce
+  if (citizenSearchDebounceTimer) {
+    clearTimeout(citizenSearchDebounceTimer);
+  }
+
+  if (query.length >= 2) {
+    citizenSearchDebounceTimer = setTimeout(() => {
+      executeRemoteCitizenSearch(query);
+    }, 350);
+  }
 }
 
 export async function loadPatientData() {
@@ -332,34 +494,6 @@ export function applyStaffFinder() {
     row.style.display = matchesQuery && matchesRole ? '' : 'none';
   });
 }
-
-export function applyCitizensFinder() {
-  const citizensFinderInput = document.getElementById('citizens-finder-input');
-  const query = String(citizensFinderInput?.value || '').trim().toLowerCase();
-  const rows = document.querySelectorAll('#citizens-tbody tr.citizen-row');
-
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  rows.forEach((row) => {
-    const text = row.textContent ? row.textContent.toLowerCase() : '';
-    const matchesQuery = !query || text.includes(query);
-
-    let matchesFilter = true;
-    if (citizenActiveFilter === 'recent') {
-      const createdRaw = row.dataset.createdAt;
-      if (createdRaw) {
-        const created = new Date(createdRaw);
-        matchesFilter = created >= thirtyDaysAgo;
-      } else {
-        matchesFilter = false;
-      }
-    }
-
-    row.style.display = matchesQuery && matchesFilter ? '' : 'none';
-  });
-}
-
 
 export function updateUsersSectionTelemetry() {
   const staffCount = latestStaffList.length;
@@ -725,7 +859,20 @@ export function initUsersSection() {
 
   if (staffFinderInput) staffFinderInput.addEventListener('input', applyStaffFinder);
   if (roleFilterInput) roleFilterInput.addEventListener('change', applyStaffFinder);
-  if (citizensFinderInput) citizensFinderInput.addEventListener('input', applyCitizensFinder);
+  if (citizensFinderInput) {
+    citizensFinderInput.addEventListener('input', applyCitizensFinder);
+    citizensFinderInput.addEventListener('search', applyCitizensFinder);
+    citizensFinderInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const q = citizensFinderInput.value.trim();
+        if (q.length >= 2) {
+          if (citizenSearchDebounceTimer) clearTimeout(citizenSearchDebounceTimer);
+          executeRemoteCitizenSearch(q);
+        }
+      }
+    });
+  }
 
   // Filter Chips for Citizens
   document.querySelectorAll('#citizen-filter-chips .ph-filter-chip').forEach((chip) => {
@@ -733,7 +880,11 @@ export function initUsersSection() {
       document.querySelectorAll('#citizen-filter-chips .ph-filter-chip').forEach(c => c.classList.remove('is-active'));
       chip.classList.add('is-active');
       citizenActiveFilter = chip.getAttribute('data-filter') || 'all';
-      applyCitizensFinder();
+      if (isSearchingCitizens && citizenSearchQuery) {
+        executeRemoteCitizenSearch(citizenSearchQuery);
+      } else {
+        renderCitizensTableRows();
+      }
     });
   });
 
