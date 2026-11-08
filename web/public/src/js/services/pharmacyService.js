@@ -5,14 +5,29 @@ import { supabase } from '../lib/supabaseClient.js';
  * Encapsulates medicines catalog, stock updates, prescriptions, and dispense logs.
  */
 
+let _medicinesCache = null;
+let _medicinesCacheTimestamp = 0;
+const MEDICINES_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+export function invalidateMedicinesCache() {
+  _medicinesCache = null;
+  _medicinesCacheTimestamp = 0;
+}
+
 /**
  * List medicines from the clinic inventory.
  * @param {Object} [options]
  * @param {boolean} [options.includeArchived=false]
- * @param {number} [options.limit=100]
+ * @param {boolean} [options.forceRefresh=false]
+ * @param {number} [options.limit=300]
  * @returns {Promise<Array>}
  */
-export async function listMedicines({ includeArchived = false, limit = 100 } = {}) {
+export async function listMedicines({ includeArchived = false, forceRefresh = false, limit = 300 } = {}) {
+  const now = Date.now();
+  if (!includeArchived && !forceRefresh && _medicinesCache && (now - _medicinesCacheTimestamp) < MEDICINES_CACHE_TTL_MS) {
+    return _medicinesCache;
+  }
+
   let query = supabase
     .from('medicines')
     .select('*')
@@ -28,7 +43,12 @@ export async function listMedicines({ includeArchived = false, limit = 100 } = {
     throw new Error(error.message || 'Failed to list medicines.');
   }
 
-  return data || [];
+  const result = data || [];
+  if (!includeArchived) {
+    _medicinesCache = result;
+    _medicinesCacheTimestamp = now;
+  }
+  return result;
 }
 
 /**
@@ -66,6 +86,7 @@ export async function createMedicine(payload) {
     throw new Error(error.message || 'Failed to create medicine.');
   }
 
+  invalidateMedicinesCache();
   return data;
 }
 
@@ -87,6 +108,7 @@ export async function updateMedicine(id, payload) {
     throw new Error(error.message || 'Failed to update medicine.');
   }
 
+  invalidateMedicinesCache();
   return data;
 }
 

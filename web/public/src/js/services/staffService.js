@@ -25,6 +25,46 @@ async function assertCanModifyAccounts(actionDescription = 'modify user accounts
   return { currentAuthUser, staffRecord };
 }
 
+// ── In-Memory Staff Cache (30-Minute TTL to eliminate redundant DB calls) ──────
+let _staffCache = null;
+let _staffCacheTimestamp = 0;
+const STAFF_CACHE_TTL_MS = 30 * 60 * 1000;
+
+export function invalidateStaffCache() {
+  _staffCache = null;
+  _staffCacheTimestamp = 0;
+  console.log('[StaffService] Staff cache invalidated.');
+}
+
+/**
+ * Retrieves staff accounts using in-memory cache when fresh.
+ * @param {Object} [options]
+ * @param {boolean} [options.forceRefresh=false]
+ * @returns {Promise<Array>}
+ */
+export async function getCachedStaffAccounts({ forceRefresh = false } = {}) {
+  const now = Date.now();
+  if (!forceRefresh && _staffCache && (now - _staffCacheTimestamp) < STAFF_CACHE_TTL_MS) {
+    return _staffCache;
+  }
+
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('list_staff_accounts');
+    if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0) {
+      _staffCache = rpcData;
+      _staffCacheTimestamp = now;
+      return _staffCache;
+    }
+  } catch (err) {
+    console.warn('[StaffService] list_staff_accounts RPC error:', err);
+  }
+
+  const fallback = await listStaff();
+  _staffCache = Array.isArray(fallback) ? fallback : [];
+  _staffCacheTimestamp = now;
+  return _staffCache;
+}
+
 export async function listStaff() {
   // 1. Attempt using administrative RPC to retrieve all staff records including disabled accounts
   try {
@@ -67,6 +107,7 @@ export async function updateStaffById(id, payload) {
     });
 
     if (!rpcError && rpcData?.success) {
+      invalidateStaffCache();
       return rpcData.staff;
     }
     if (rpcError && /forbidden.*admin role required/i.test(rpcError.message)) {
@@ -91,6 +132,7 @@ export async function updateStaffById(id, payload) {
     throw new Error(msg);
   }
 
+  invalidateStaffCache();
   return data;
 }
 
@@ -116,6 +158,8 @@ export async function deleteStaffById(id) {
   if (error) {
     throw new Error(error.message || 'Unable to delete account.');
   }
+
+  invalidateStaffCache();
 }
 
 export async function deleteStaffAccount(staffId) {
@@ -140,6 +184,8 @@ export async function deleteStaffAccount(staffId) {
     }
     throw new Error(msg);
   }
+
+  invalidateStaffCache();
 }
 
 export async function resetStaffPassword(staffId, newPassword) {
@@ -187,6 +233,7 @@ export async function toggleStaffStatus(staffId, newStatus) {
       if (rpcData && rpcData.success === false) {
         throw new Error(rpcData.error || 'Failed to update account status');
       }
+      invalidateStaffCache();
       return rpcData;
     }
 
@@ -214,6 +261,7 @@ export async function toggleStaffStatus(staffId, newStatus) {
     throw new Error(msg);
   }
 
+  invalidateStaffCache();
   return { success: true, status: normalizedStatus, staff: data?.[0] };
 }
 

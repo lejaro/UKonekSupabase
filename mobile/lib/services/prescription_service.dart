@@ -26,6 +26,14 @@ class PrescriptionService {
     if (user == null) return [];
 
     try {
+      // Offload from database: fetch indexed prescriptions and synthesize schedule directly on phone CPU
+      final prescriptions = await fetchPrescriptions(limit: 20, citizenId: citizenId);
+      final synthesized = synthesizeScheduledMedicinesFromPrescriptions(prescriptions);
+      if (synthesized.isNotEmpty) {
+        return synthesized;
+      }
+
+      // Fallback to legacy RPC only if prescription list yielded empty (e.g. historical OTC items)
       final params = <String, dynamic>{};
       if (citizenId != null && citizenId > 0) {
         params['p_citizen_id'] = citizenId;

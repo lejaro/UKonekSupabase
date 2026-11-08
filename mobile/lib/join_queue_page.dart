@@ -543,7 +543,8 @@ class _JoinQueuePageState extends State<JoinQueuePage>
       ));
       if (mounted) { 
         _refreshDashboard();
-        _startRefreshTimer(); // Start auto-refresh after joining queue
+        // Realtime handles live ticket advancement; polling timer only engaged as fallback
+        if (_queueRealtimeChannel == null) _startRefreshTimer();
         setState(() => _isSubmitting = false); 
       }
     } catch (e) {

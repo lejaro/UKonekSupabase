@@ -597,23 +597,8 @@ export async function loadSchedules(user) {
   let doctors = [];
 
   try {
-    const staffRpc = await supabase.rpc('list_staff_accounts');
-    let staff = !staffRpc.error
-      ? (Array.isArray(staffRpc.data) ? staffRpc.data : [])
-      : [];
-
-    if (!staff.length) {
-      try {
-        const fallback = await staffService.listStaff();
-        if (Array.isArray(fallback) && fallback.length) {
-          staff = fallback;
-        }
-      } catch (fallbackErr) {
-        console.warn('Fallback staff fetch failed:', fallbackErr);
-      }
-    }
-
-    staffRoster = staff;
+    const staff = await staffService.getCachedStaffAccounts();
+    staffRoster = Array.isArray(staff) ? staff : [];
     doctors = staffRoster.filter((item) => isDoctorRole(item?.role));
 
     const scheduleRpc = await supabase.rpc('list_doctor_schedules');

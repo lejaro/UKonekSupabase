@@ -315,7 +315,22 @@ async function openCitizenHealthModal(citizen) {
         .order('created_at', { ascending: false })
         .range(0, CHR_PAGE_SIZE - 1),
 
-      supabase.rpc('list_staff_accounts')
+      // In-memory cached staff lookup (30-min TTL to eliminate redundant RPCs on patient view)
+      (async () => {
+        if (window._cachedStaffList && (Date.now() - (window._cachedStaffTimestamp || 0)) < 30 * 60 * 1000) {
+          return { data: window._cachedStaffList };
+        }
+        try {
+          const res = await supabase.rpc('list_staff_accounts');
+          if (res && res.data) {
+            window._cachedStaffList = res.data;
+            window._cachedStaffTimestamp = Date.now();
+          }
+          return res;
+        } catch (_) {
+          return { data: [] };
+        }
+      })()
     ]);
 
     const staffLookup = buildStaffLookup(staffRes?.data || []);

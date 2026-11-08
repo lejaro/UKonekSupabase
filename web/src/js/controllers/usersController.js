@@ -37,12 +37,8 @@ export function isSelfUser(user) {
   return false;
 }
 
-export async function listStaffFromSupabase() {
-  const rpcResult = await supabase.rpc('list_staff_accounts');
-  if (!rpcResult.error) {
-    return Array.isArray(rpcResult.data) ? rpcResult.data : [];
-  }
-  const staff = await staffService.listStaff();
+export async function listStaffFromSupabase({ forceRefresh = false } = {}) {
+  const staff = await staffService.getCachedStaffAccounts({ forceRefresh });
   return Array.isArray(staff) ? staff : [];
 }
 
@@ -839,6 +835,7 @@ export function initUsersSection() {
 
         registerForm.reset();
         showToast('Staff account created successfully.', 'success');
+        staffService.invalidateStaffCache();
         await loadStaffData();
       } catch (err) {
         console.error('Account creation error:', err);

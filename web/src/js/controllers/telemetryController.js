@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabaseClient.js';
 import { navigateToSection } from './navigationController.js';
 import { toggleStatsSkeleton, toggleChartSkeleton } from '../utils/uiHelpers.js';
 
-export const ADMIN_DASHBOARD_REFRESH_MS = 180000; // Relaxed 3-minute heartbeat
+export const ADMIN_DASHBOARD_REFRESH_MS = 600000; // 10-minute safety heartbeat (Realtime handles live updates)
 let adminDashboardRefreshTimer = null;
 let adminDashboardRefreshInFlight = false;
 let lastDashboardRefreshTime = 0;
@@ -562,7 +562,7 @@ export function startAdminDashboardAutoRefresh() {
       if (document.visibilityState === 'visible') {
         const dashSection = document.getElementById('dashboard-section');
         if (dashSection && !dashSection.classList.contains('hidden')) {
-          if (Date.now() - lastDashboardRefreshTime > 60000) {
+          if (Date.now() - lastDashboardRefreshTime > 300000) {
             try {
               await loadClinicalOperationsMetrics();
               renderDashboardInsights();

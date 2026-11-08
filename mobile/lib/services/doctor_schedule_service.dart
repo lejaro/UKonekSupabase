@@ -27,7 +27,7 @@ class DoctorScheduleService {
         .where((row) => (row['role']?.toString().toLowerCase() ?? '') == 'doctor')
         .map(DoctorStatus.fromMap)
         .toList(growable: false);
-    ApiCache.set(cacheKey, result, const Duration(minutes: 5));
+    ApiCache.set(cacheKey, result, const Duration(minutes: 30));
     return result;
   }
 
@@ -56,7 +56,7 @@ class DoctorScheduleService {
 
     final rows = (response as List<dynamic>?) ?? const [];
     final result = rows.whereType<Map<String, dynamic>>().map(DoctorSchedule.fromMap).toList(growable: false);
-    ApiCache.set(cacheKey, result, const Duration(minutes: 5));
+    ApiCache.set(cacheKey, result, const Duration(minutes: 30));
     return result;
   }
 }
