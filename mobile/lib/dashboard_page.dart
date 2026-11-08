@@ -406,7 +406,7 @@ class _uKonekDashboardPageState extends State<uKonekDashboardPage>
         ApiService.listDoctorStatus(forceRefresh: forceRefresh),
         ApiService.getMyQueueDashboard(),
         ApiService.fetchPrescriptions(limit: 10),
-        ApiService.fetchAnnouncements(),
+        ApiService.fetchAnnouncements(forceRefresh: forceRefresh),
         SharedPreferences.getInstance(),
       ]);
       

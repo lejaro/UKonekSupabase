@@ -817,6 +817,10 @@ export async function exportQueueReport(startDate = null, endDate = null) {
   }
 }
 
+// ── System Reports In-Memory Cache (5-Minute TTL per date range) ─────────────
+const _systemReportsSummaryCache = new Map();
+const SYSTEM_REPORTS_CACHE_TTL_MS = 5 * 60 * 1000;
+
 /**
  * 5. SYSTEM USAGE REPORT
  * Exports clinic system usage statistics, operational volume, service utilization,
@@ -829,47 +833,91 @@ export async function exportSystemUsageReport(startDate = null, endDate = null) 
     
     console.log('[Reports] Generating System Usage Report...');
     
-    const startIso = startDate ? (startDate.includes('T') ? startDate : `${startDate}T00:00:00`) : null;
-    const endIso = endDate ? (endDate.includes('T') ? endDate : `${endDate}T23:59:59`) : null;
+    // Client-side precomputed UTC range to enable direct B-tree index scans in DB
+    let startIso = null;
+    let endIso = null;
+    if (startDate) {
+      startIso = startDate.includes('T') ? startDate : new Date(`${startDate}T00:00:00+08:00`).toISOString();
+    }
+    if (endDate) {
+      endIso = endDate.includes('T') ? endDate : new Date(`${endDate}T23:59:59.999+08:00`).toISOString();
+    }
+
+    const cacheKey = `${startIso || 'all'}_${endIso || 'all'}`;
+    const cachedEntry = _systemReportsSummaryCache.get(cacheKey);
 
     let consultations = 0, vitals = 0, queueTickets = 0, completedTickets = 0, cancelledTickets = 0;
     let prescriptions = 0, dispensedRx = 0, labOrders = 0, completedLabs = 0, totalCitizens = 0;
     let newCitizens = 0, activeMeds = 0, lowStockMeds = 0, staffLogins = 0, feedbacks = 0, announcements = 0;
     let staffList = [];
-
-    // Attempt high-performance consolidated RPC first (1 single round-trip instead of 17)
     let summaryResolved = false;
-    try {
-      const { data: summaryData, error: summaryError } = await supabase.rpc('get_system_reports_summary', {
-        p_start_date: startIso,
-        p_end_date: endIso
-      });
 
-      if (!summaryError && summaryData) {
-        const s = typeof summaryData === 'string' ? JSON.parse(summaryData) : summaryData;
-        consultations = s.consultations_count || 0;
-        vitals = s.vitals_count || 0;
-        queueTickets = s.queue_tickets_count || 0;
-        completedTickets = s.completed_tickets_count || 0;
-        cancelledTickets = s.cancelled_tickets_count || 0;
-        prescriptions = s.prescriptions_count || 0;
-        dispensedRx = s.dispensed_prescriptions_count || 0;
-        labOrders = s.lab_orders_count || 0;
-        completedLabs = s.completed_labs_count || 0;
-        totalCitizens = s.total_citizens_count || 0;
-        newCitizens = s.new_citizens_count || 0;
-        activeMeds = s.active_medicines_count || 0;
-        lowStockMeds = s.low_stock_medicines_count || 0;
-        staffLogins = s.staff_logins_count || 0;
-        feedbacks = s.feedbacks_count || 0;
-        announcements = s.announcements_count || 0;
+    if (cachedEntry && (Date.now() - cachedEntry.timestamp) < SYSTEM_REPORTS_CACHE_TTL_MS) {
+      console.log('[Reports] Reusing in-memory cached summary for', cacheKey);
+      const s = cachedEntry.data;
+      consultations = s.consultations;
+      vitals = s.vitals;
+      queueTickets = s.queueTickets;
+      completedTickets = s.completedTickets;
+      cancelledTickets = s.cancelledTickets;
+      prescriptions = s.prescriptions;
+      dispensedRx = s.dispensedRx;
+      labOrders = s.labOrders;
+      completedLabs = s.completedLabs;
+      totalCitizens = s.totalCitizens;
+      newCitizens = s.newCitizens;
+      activeMeds = s.activeMeds;
+      lowStockMeds = s.lowStockMeds;
+      staffLogins = s.staffLogins;
+      feedbacks = s.feedbacks;
+      announcements = s.announcements;
+      staffList = s.staffList || [];
+      summaryResolved = true;
+    }
 
-        const staffRes = await supabase.from('staff').select('id, role, status');
-        staffList = staffRes?.data || [];
-        summaryResolved = true;
+    // Attempt high-performance consolidated RPC if not cached
+    if (!summaryResolved) {
+      try {
+        const { data: summaryData, error: summaryError } = await supabase.rpc('get_system_reports_summary', {
+          p_start_date: startIso,
+          p_end_date: endIso
+        });
+
+        if (!summaryError && summaryData) {
+          const s = typeof summaryData === 'string' ? JSON.parse(summaryData) : summaryData;
+          consultations = s.consultations_count || 0;
+          vitals = s.vitals_count || 0;
+          queueTickets = s.queue_tickets_count || 0;
+          completedTickets = s.completed_tickets_count || 0;
+          cancelledTickets = s.cancelled_tickets_count || 0;
+          prescriptions = s.prescriptions_count || 0;
+          dispensedRx = s.dispensed_prescriptions_count || 0;
+          labOrders = s.lab_orders_count || 0;
+          completedLabs = s.completed_labs_count || 0;
+          totalCitizens = s.total_citizens_count || 0;
+          newCitizens = s.new_citizens_count || 0;
+          activeMeds = s.active_medicines_count || 0;
+          lowStockMeds = s.low_stock_medicines_count || 0;
+          staffLogins = s.staff_logins_count || 0;
+          feedbacks = s.feedbacks_count || 0;
+          announcements = s.announcements_count || 0;
+
+          const staffRes = await supabase.from('staff').select('id, role, status');
+          staffList = staffRes?.data || [];
+          summaryResolved = true;
+
+          _systemReportsSummaryCache.set(cacheKey, {
+            timestamp: Date.now(),
+            data: {
+              consultations, vitals, queueTickets, completedTickets, cancelledTickets,
+              prescriptions, dispensedRx, labOrders, completedLabs, totalCitizens,
+              newCitizens, activeMeds, lowStockMeds, staffLogins, feedbacks, announcements, staffList
+            }
+          });
+        }
+      } catch (rpcErr) {
+        console.warn('[Reports] Consolidated summary RPC notice, executing resilient fallback:', rpcErr);
       }
-    } catch (rpcErr) {
-      console.warn('[Reports] Consolidated summary RPC notice, executing resilient fallback:', rpcErr);
     }
 
     if (!summaryResolved) {

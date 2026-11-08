@@ -18,6 +18,10 @@ const state = {
   loading: false
 };
 
+export function getLiveQueueTickets() {
+  return Array.isArray(state.tickets) ? state.tickets : [];
+}
+
 export function canConsultPatients() {
   const role = String(sessionStore.getUser()?.role || '').trim().toLowerCase();
   return role === 'doctor';

@@ -238,8 +238,11 @@ class ApiService {
       PrescriptionService.acknowledgeDispense(prescriptionId, status);
 
   // ── Announcements ────────────────────────────────────────────────
-  static Future<List<Announcement>> fetchAnnouncements() =>
-      AnnouncementService.fetchAnnouncements();
+  static Future<List<Announcement>> fetchAnnouncements({bool forceRefresh = false}) =>
+      AnnouncementService.fetchAnnouncements(forceRefresh: forceRefresh);
+
+  static void invalidateAnnouncementCache() =>
+      AnnouncementService.invalidateCache();
 
   // ── Citizen Feedback ─────────────────────────────────────────────
   static Future<void> submitCitizenFeedback(FeedbackSubmission submission) =>

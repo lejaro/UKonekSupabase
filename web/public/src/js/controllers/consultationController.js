@@ -14,6 +14,7 @@ import { showSection } from './navigationController.js';
 import { openPrescriptionModalForPatient, resolveCitizenId } from './prescriptionController.js';
 import { evaluateBp, evaluateHr, evaluateTemp, evaluateSpo2 } from './triageController.js';
 import { sanitizeSearchTerm } from '../utils/querySanitizer.js';
+import { getLiveQueueTickets } from './queueController.js';
 
 export let consultations = [];
 export let consultationQueueTickets = [];
@@ -885,6 +886,49 @@ export async function loadLatestVitalsForCitizen(citizenId) {
   }
 }
 
+function renderCitizenSearchResults(citizens, dropdown, trimmed) {
+  dropdown.innerHTML = citizens.map(c => {
+    const fullName = `${c.firstname || ''} ${c.middle_initial ? c.middle_initial + '. ' : ''}${c.surname || ''}`.trim();
+    const initials = `${(c.firstname || 'P')[0]}${(c.surname || 'T')[0]}`.toUpperCase();
+    const isWalkin = c.email && String(c.email).includes('walkin_');
+    const metaParts = [];
+    if (c.age) metaParts.push(`${c.age} yo`);
+    if (c.sex) metaParts.push(c.sex);
+    if (c.contact_number) metaParts.push(`📞 ${c.contact_number}`);
+    const metaLine = metaParts.join(' • ');
+    const hasAllergy = c.allergies && c.allergies !== 'None' && c.allergies.trim().length > 0;
+    const badgeText = c._fromQueue
+      ? (c._ticketCode ? `Queue: ${c._ticketCode}` : 'In Queue Today')
+      : (isWalkin ? 'Walk-in' : 'CIT-' + c.id);
+    const badgeBg = c._fromQueue ? '#ecfdf5; color:#047857; border:1px solid #a7f3d0' : '';
+
+    return `
+      <div class="citizen-dropdown-item" data-citizen-id="${c.id}">
+        <div class="citizen-avatar">${sanitizeText(initials)}</div>
+        <div class="citizen-info">
+          <div class="citizen-name-line">
+            <span>${sanitizeText(fullName)}</span>
+            <span class="citizen-id-badge" style="${badgeBg}">${sanitizeText(badgeText)}</span>
+          </div>
+          <div class="citizen-sub-line">${sanitizeText(metaLine)}</div>
+          ${hasAllergy ? `<div style="font-size:11px; color:#dc2626; font-weight:600; margin-top:2px;">⚠️ Allergies: ${sanitizeText(c.allergies)}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  dropdown.querySelectorAll('.citizen-dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const rawId = item.dataset.citizenId;
+      const idNum = Number(rawId);
+      const citizen = citizens.find(c => String(c.id) === rawId || c.id === idNum);
+      if (citizen) {
+        bindCitizenToConsultation(citizen);
+      }
+    });
+  });
+}
+
 async function executeCitizenSearch(query) {
   const dropdown = document.getElementById('consult-citizen-dropdown');
   if (!dropdown) return;
@@ -893,6 +937,69 @@ async function executeCitizenSearch(query) {
   if (trimmed.length < 2) {
     dropdown.innerHTML = '';
     dropdown.classList.add('hidden');
+    return;
+  }
+
+  // 1. Tier 1: Instant in-memory check against active Queue patients (0ms latency, 0 DB queries)
+  try {
+    const liveTickets = getLiveQueueTickets();
+    const qLower = trimmed.toLowerCase();
+    const localMatches = [];
+    const seenCitizenIds = new Set();
+
+    for (const t of liveTickets) {
+      const c = t.citizen;
+      if (c && c.id) {
+        const fn = String(c.firstname || '').toLowerCase();
+        const sn = String(c.surname || '').toLowerCase();
+        const full = `${fn} ${sn}`.trim();
+        const phone = String(c.contact_number || '').replace(/\D/g, '');
+        const idStr = String(c.id);
+        const code = String(t.ticket_code || '').toLowerCase();
+
+        if (fn.includes(qLower) || sn.includes(qLower) || full.includes(qLower) ||
+            (qLower.length >= 3 && phone.includes(qLower)) || idStr === qLower || code === qLower) {
+          if (!seenCitizenIds.has(c.id)) {
+            seenCitizenIds.add(c.id);
+            localMatches.push({ ...c, _fromQueue: true, _ticketCode: t.ticket_code });
+          }
+        }
+      } else if (t.walkin_patient_name) {
+        const wn = String(t.walkin_patient_name).toLowerCase();
+        if (wn.includes(qLower)) {
+          const fakeId = `walkin_${t.id}`;
+          if (!seenCitizenIds.has(fakeId)) {
+            seenCitizenIds.add(fakeId);
+            localMatches.push({
+              id: fakeId,
+              firstname: t.walkin_patient_name,
+              surname: '',
+              age: t.walkin_age || 0,
+              sex: t.walkin_sex || '',
+              contact_number: t.walkin_contact || '',
+              allergies: '',
+              email: 'walkin_patient',
+              _fromQueue: true,
+              _ticketCode: t.ticket_code
+            });
+          }
+        }
+      }
+    }
+
+    if (localMatches.length > 0) {
+      dropdown.classList.remove('hidden');
+      renderCitizenSearchResults(localMatches, dropdown, trimmed);
+      return;
+    }
+  } catch (memErr) {
+    console.warn('[Consultation] In-memory queue patient search notice:', memErr);
+  }
+
+  // 2. Tier 2: If query is less than 3 chars and not in today's queue, prompt for more input
+  if (trimmed.length < 3) {
+    dropdown.innerHTML = '<div style="padding:12px; text-align:center; color:#94a3b8; font-size:12px;">Type at least 3 characters to search all citizen health records...</div>';
+    dropdown.classList.remove('hidden');
     return;
   }
 
@@ -936,41 +1043,7 @@ async function executeCitizenSearch(query) {
       return;
     }
 
-    dropdown.innerHTML = citizens.map(c => {
-      const fullName = `${c.firstname || ''} ${c.middle_initial ? c.middle_initial + '. ' : ''}${c.surname || ''}`.trim();
-      const initials = `${(c.firstname || 'P')[0]}${(c.surname || 'T')[0]}`.toUpperCase();
-      const isWalkin = c.email && c.email.includes('walkin_');
-      const metaParts = [];
-      if (c.age) metaParts.push(`${c.age} yo`);
-      if (c.sex) metaParts.push(c.sex);
-      if (c.contact_number) metaParts.push(`📞 ${c.contact_number}`);
-      const metaLine = metaParts.join(' • ');
-      const hasAllergy = c.allergies && c.allergies !== 'None' && c.allergies.trim().length > 0;
-
-      return `
-        <div class="citizen-dropdown-item" data-citizen-id="${c.id}">
-          <div class="citizen-avatar">${sanitizeText(initials)}</div>
-          <div class="citizen-info">
-            <div class="citizen-name-line">
-              <span>${sanitizeText(fullName)}</span>
-              <span class="citizen-id-badge">${isWalkin ? 'Walk-in' : 'CIT-' + c.id}</span>
-            </div>
-            <div class="citizen-sub-line">${sanitizeText(metaLine)}</div>
-            ${hasAllergy ? `<div style="font-size:11px; color:#dc2626; font-weight:600; margin-top:2px;">⚠️ Allergies: ${sanitizeText(c.allergies)}</div>` : ''}
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    dropdown.querySelectorAll('.citizen-dropdown-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const id = Number(item.dataset.citizenId);
-        const citizen = citizens.find(c => c.id === id);
-        if (citizen) {
-          bindCitizenToConsultation(citizen);
-        }
-      });
-    });
+    renderCitizenSearchResults(citizens, dropdown, trimmed);
   } catch (err) {
     console.error('Citizen search error:', err);
     dropdown.innerHTML = '<div style="padding:12px; text-align:center; color:#ef4444; font-size:12px;">Error searching patient records. Please try again.</div>';
@@ -1114,7 +1187,7 @@ export function initConsultationPatientSelector() {
       const val = e.target.value;
       citizenSearchDebounceTimer = setTimeout(() => {
         executeCitizenSearch(val);
-      }, 250);
+      }, 450);
     });
 
     searchInput.addEventListener('keydown', (e) => {

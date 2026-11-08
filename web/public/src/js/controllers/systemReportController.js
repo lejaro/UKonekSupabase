@@ -10,6 +10,8 @@ import { showToast, toggleChartSkeleton } from '../utils/uiHelpers.js';
 let _systemTrendChart = null;
 let _departmentLoadChart = null;
 let _currentMetricsCache = null;
+const _reportDataCache = new Map();
+const REPORT_CACHE_TTL_MS = 5 * 60 * 1000; // 5-minute client cache
 
 function escHtml(str) {
   if (str == null) return '';
@@ -27,37 +29,69 @@ function getDateRange() {
   return { startDate, endDate };
 }
 
+function applyMetricsToUi(metrics) {
+  updateKpiCard('sys-metric-consults', metrics.consultationsCount, `${metrics.consultationsCount} Clinical Encounters`);
+  updateKpiCard('sys-metric-queue', metrics.queueTicketsCount, `${metrics.queueCompletionRate}% Completion Rate`);
+  updateKpiCard('sys-metric-rx', metrics.prescriptionsCount, `${metrics.rxFulfillmentRate}% Dispensed`);
+  updateKpiCard('sys-metric-lab', metrics.labOrdersCount, `${metrics.completedLabs} Diagnostic Tests Done`);
+  updateKpiCard('sys-metric-citizens', metrics.totalCitizens, 'Total Registered Patients');
+  updateKpiCard('sys-metric-staff', metrics.onlineStaff, `${metrics.onlineStaff} of ${metrics.totalStaff} Staff Online`);
+
+  renderSystemTrendChart(metrics.consults || [], metrics.vitals || [], metrics.tickets || []);
+  renderDepartmentLoadChart((metrics.vitals || []).length, metrics.consultationsCount, metrics.prescriptionsCount, metrics.labOrdersCount);
+}
+
 /**
  * Load system report telemetry, update executive KPI cards, and render charts.
  */
-export async function loadSystemReportData() {
+export async function loadSystemReportData(forceRefresh = false) {
   const { startDate, endDate } = getDateRange();
   console.log(`[SystemReport] Loading metrics for range: ${startDate || 'All Time'} to ${endDate || 'Present'}`);
+
+  // Client-precomputed UTC bounds to enable direct B-tree index scans in DB
+  let startUtc = null;
+  let endUtc = null;
+  if (startDate) {
+    startUtc = startDate.includes('T') ? startDate : new Date(`${startDate}T00:00:00+08:00`).toISOString();
+  }
+  if (endDate) {
+    endUtc = endDate.includes('T') ? endDate : new Date(`${endDate}T23:59:59.999+08:00`).toISOString();
+  }
+
+  const cacheKey = `${startDate || 'all'}_${endDate || 'all'}`;
+  const cached = _reportDataCache.get(cacheKey);
+
+  if (!forceRefresh && cached && (Date.now() - cached.timestamp) < REPORT_CACHE_TTL_MS) {
+    console.log('[SystemReport] Reusing cached metrics for', cacheKey);
+    _currentMetricsCache = cached.data;
+    applyMetricsToUi(_currentMetricsCache);
+    return;
+  }
 
   toggleChartSkeleton('system-trend-chart', true);
   toggleChartSkeleton('department-load-chart', true);
 
   try {
-    // 1. Build queries with date filtering (using safe column selections)
+    // 1. Build queries with date filtering (using direct UTC ISO index bounds)
     let consultQuery = supabase.from('consultations').select('id, consulted_at, diagnosis, created_at');
-    if (startDate) consultQuery = consultQuery.gte('consulted_at', `${startDate}T00:00:00`);
-    if (endDate) consultQuery = consultQuery.lte('consulted_at', `${endDate}T23:59:59`);
+    if (startUtc) consultQuery = consultQuery.gte('consulted_at', startUtc);
+    if (endUtc) consultQuery = consultQuery.lte('consulted_at', endUtc);
 
     let queueQuery = supabase.from('queue_tickets').select('id, queue_date, status, created_at');
     if (startDate) queueQuery = queueQuery.gte('queue_date', startDate);
     if (endDate) queueQuery = queueQuery.lte('queue_date', endDate);
 
     let vitalsQuery = supabase.from('vital_signs').select('id, created_at, temperature, blood_pressure');
-    if (startDate) vitalsQuery = vitalsQuery.gte('created_at', `${startDate}T00:00:00`);
-    if (endDate) vitalsQuery = vitalsQuery.lte('created_at', `${endDate}T23:59:59`);
+    if (startUtc) vitalsQuery = vitalsQuery.gte('created_at', startUtc);
+    if (endUtc) vitalsQuery = vitalsQuery.lte('created_at', endUtc);
 
     let rxQuery = supabase.from('prescription_headers').select('id, dispensing_status, issued_at');
-    if (startDate) rxQuery = rxQuery.gte('issued_at', `${startDate}T00:00:00`);
-    if (endDate) rxQuery = rxQuery.lte('issued_at', `${endDate}T23:59:59`);
+    if (startUtc) rxQuery = rxQuery.gte('issued_at', startUtc);
+    if (endUtc) rxQuery = rxQuery.lte('issued_at', endUtc);
 
     let labQuery = supabase.from('lab_orders').select('id, status, created_at');
-    if (startDate) labQuery = labQuery.gte('created_at', `${startDate}T00:00:00`);
-    if (endDate) labQuery = labQuery.lte('created_at', `${endDate}T23:59:59`);
+    if (startUtc) labQuery = labQuery.gte('created_at', startUtc);
+    if (endUtc) labQuery = labQuery.lte('created_at', endUtc);
 
     // Parallel fetch with RPC operational metrics fallback
     const [
@@ -142,19 +176,13 @@ export async function loadSystemReportData() {
       prescriptions
     };
 
-    // 2. Update KPI Card DOM elements using matching HTML element IDs
-    updateKpiCard('sys-metric-consults', displayConsultsCount, `${displayConsultsCount} Clinical Encounters`);
-    updateKpiCard('sys-metric-queue', tickets.length, `${queueCompletionRate}% Completion Rate`);
-    updateKpiCard('sys-metric-rx', prescriptions.length || (opMetrics?.dispenses_today || 0), `${rxFulfillmentRate}% Dispensed`);
-    updateKpiCard('sys-metric-lab', labOrders.length, `${completedLabs} Diagnostic Tests Done`);
-    updateKpiCard('sys-metric-citizens', totalCitizens, 'Total Registered Patients');
-    updateKpiCard('sys-metric-staff', onlineStaff, `${onlineStaff} of ${staffList.length} Staff Online`);
+    _reportDataCache.set(cacheKey, {
+      timestamp: Date.now(),
+      data: _currentMetricsCache
+    });
 
-    // 3. Render Trend Chart (Last 7 days daily aggregate)
-    renderSystemTrendChart(consults, vitals, tickets);
-
-    // 4. Render Departmental Load Chart
-    renderDepartmentLoadChart(vitals.length, displayConsultsCount, prescriptions.length, labOrders.length);
+    // 2. Update KPI Card DOM elements and charts
+    applyMetricsToUi(_currentMetricsCache);
 
   } catch (err) {
     console.error('[SystemReport] Error compiling report metrics:', err);
