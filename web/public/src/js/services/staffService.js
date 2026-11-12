@@ -37,6 +37,25 @@ export function invalidateStaffCache() {
 }
 
 /**
+ * Updates a single staff member's availability status inside the in-memory cache
+ * so local toggles and Realtime events stay consistent across navigation.
+ * @param {number|string} staffId
+ * @param {string} availabilityStatus
+ * @param {Object|null} [patch=null]
+ */
+export function updateCachedStaffAvailability(staffId, availabilityStatus, patch = null) {
+  if (!Array.isArray(_staffCache) || _staffCache.length === 0) return;
+  const idx = _staffCache.findIndex((item) => String(item?.id || '') === String(staffId));
+  if (idx < 0) return;
+  if (patch && typeof patch === 'object') {
+    Object.assign(_staffCache[idx], patch);
+  }
+  if (availabilityStatus) {
+    _staffCache[idx].availability_status = availabilityStatus;
+  }
+}
+
+/**
  * Retrieves staff accounts using in-memory cache when fresh.
  * @param {Object} [options]
  * @param {boolean} [options.forceRefresh=false]

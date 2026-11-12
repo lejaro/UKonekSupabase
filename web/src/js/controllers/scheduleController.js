@@ -22,6 +22,8 @@ export let cachedScheduleStaff = [];
 export let cachedScheduleDoctors = [];
 export let cachedScheduleEntries = [];
 let staffAvailabilityChannel = null;
+let scheduleFallbackPollTimer = null;
+let scheduleVisibilityBound = false;
 
 export function normalizeAvailabilityStatus(value) {
   const raw = String(value || '').trim().toLowerCase();
@@ -187,13 +189,16 @@ export async function updateStaffAvailabilityById(staffId, status) {
   if (!staffId) throw new Error('Missing staff id.');
   const normalized = normalizeAvailabilityStatus(status);
 
-  const { error } = await supabase.rpc('set_staff_availability', {
+  const { data, error } = await supabase.rpc('set_staff_availability', {
     p_target_staff_id: Number(staffId),
     p_status: normalized
   });
 
   if (error) {
     throw new Error(error.message || 'Unable to update availability status.');
+  }
+  if (data && (data.error || data.success === false)) {
+    throw new Error(data.error || 'Unable to update availability status.');
   }
 
   updateAvailabilityInCaches(staffId, normalized);
@@ -239,12 +244,15 @@ export function updateAvailabilityInCaches(staffId, status, newRow = null) {
     const idx = list.findIndex((item) => String(item?.id || '') === String(staffId));
     if (idx < 0) return;
     const record = list[idx];
-    record.availability_status = normalized;
     if (newRow) Object.assign(record, newRow);
+    record.availability_status = normalized;
   };
 
   updateList(cachedScheduleStaff);
   updateList(cachedScheduleDoctors);
+  if (typeof staffService.updateCachedStaffAvailability === 'function') {
+    staffService.updateCachedStaffAvailability(staffId, normalized, newRow);
+  }
 
   const user = sessionStore.getUser();
   if (user && String(user.id) === String(staffId)) {
@@ -585,8 +593,10 @@ export function populateScheduleDoctorSelect(selectedDoctorId = null) {
 export async function loadSchedules(user) {
   const doctorGrid = document.getElementById('schedule-doctors-grid') || document.getElementById('schedule-doctors-tbody');
   const nurseGrid = document.getElementById('schedule-nurses-grid') || document.getElementById('schedule-nurses-tbody');
-  if (doctorGrid) renderCardsSkeleton(doctorGrid, 2);
-  if (nurseGrid) renderCardsSkeleton(nurseGrid, 2);
+  if (!cachedScheduleStaff.length) {
+    if (doctorGrid) renderCardsSkeleton(doctorGrid, 2);
+    if (nurseGrid) renderCardsSkeleton(nurseGrid, 2);
+  }
 
   if (cachedScheduleStaff && cachedScheduleStaff.length > 0) {
     updateScheduleSummaryCounts(cachedScheduleStaff);
@@ -597,7 +607,9 @@ export async function loadSchedules(user) {
   let doctors = [];
 
   try {
-    const staff = await staffService.getCachedStaffAccounts();
+    // Always fetch fresh staff availability so changes toggled by other staff (e.g., nurses)
+    // are visible immediately rather than serving a stale 30-minute directory cache.
+    const staff = await staffService.getCachedStaffAccounts({ forceRefresh: true });
     staffRoster = Array.isArray(staff) ? staff : [];
     doctors = staffRoster.filter((item) => isDoctorRole(item?.role));
 
@@ -717,7 +729,38 @@ export function closeScheduleModal() {
   if (modal) modal.classList.add('hidden');
 }
 
+function isScheduleSectionVisible() {
+  const sec = document.getElementById('schedule-section');
+  return Boolean(sec && !sec.classList.contains('hidden'));
+}
+
+function startScheduleFallbackPolling() {
+  if (scheduleFallbackPollTimer) return;
+  scheduleFallbackPollTimer = setInterval(() => {
+    if (document.visibilityState === 'visible' && isScheduleSectionVisible()) {
+      loadSchedules(sessionStore.getUser());
+    }
+  }, 30000);
+}
+
+function stopScheduleFallbackPolling() {
+  if (!scheduleFallbackPollTimer) return;
+  clearInterval(scheduleFallbackPollTimer);
+  scheduleFallbackPollTimer = null;
+}
+
+function handleScheduleVisibilityChange() {
+  if (document.visibilityState === 'visible' && isScheduleSectionVisible()) {
+    loadSchedules(sessionStore.getUser());
+  }
+}
+
 export function teardownStaffAvailability() {
+  stopScheduleFallbackPolling();
+  if (scheduleVisibilityBound) {
+    document.removeEventListener('visibilitychange', handleScheduleVisibilityChange);
+    scheduleVisibilityBound = false;
+  }
   if (staffAvailabilityChannel) {
     try {
       supabase.removeChannel(staffAvailabilityChannel);
@@ -728,6 +771,10 @@ export function teardownStaffAvailability() {
 }
 
 export function subscribeToStaffAvailability() {
+  if (!scheduleVisibilityBound && typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', handleScheduleVisibilityChange);
+    scheduleVisibilityBound = true;
+  }
   if (staffAvailabilityChannel) return;
 
   try {
@@ -740,15 +787,23 @@ export function subscribeToStaffAvailability() {
       }, (payload) => {
         const updated = payload?.new;
         if (!updated || !updated.id) return;
-        if (!isScheduleRole(updated.role)) return;
+        const isKnownScheduleStaff = cachedScheduleStaff.some((s) => String(s?.id || '') === String(updated.id));
+        if (!isScheduleRole(updated.role) && !isKnownScheduleStaff) return;
         updateAvailabilityInCaches(updated.id, updated.availability_status, updated);
-        if (!document.getElementById('schedule-section')?.classList.contains('hidden')) {
+        if (isScheduleSectionVisible()) {
           renderScheduleDoctors(cachedScheduleStaff, sessionStore.getUser());
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          stopScheduleFallbackPolling();
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          startScheduleFallbackPolling();
+        }
+      });
   } catch (error) {
     console.warn('Realtime availability subscription failed:', error);
+    startScheduleFallbackPolling();
   }
 }
 
