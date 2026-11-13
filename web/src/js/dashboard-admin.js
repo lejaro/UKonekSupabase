@@ -181,6 +181,21 @@ function initNavigation() {
       }
     });
   }
+
+  const btnRefresh = document.getElementById('btn-refresh-analytics');
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', async () => {
+      btnRefresh.disabled = true;
+      try {
+        await loadAnalyticsData();
+        showToast('Analytics refreshed successfully.', 'success');
+      } catch (err) {
+        showToast('Failed to refresh analytics.', 'error');
+      } finally {
+        btnRefresh.disabled = false;
+      }
+    });
+  }
 }
 
 // ── Section 1: Dashboard & Analytics ─────────────────────────────────────────
